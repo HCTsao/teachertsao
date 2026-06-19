@@ -273,7 +273,8 @@ function renderTools() {
 
     // 建立並插入教具卡片
     filteredTools.forEach(tool => {
-        const card = document.createElement('div');
+        const card = document.createElement('a');
+        card.href = tool.path;
         card.className = 'tool-card';
         card.innerHTML = `
             <div class="card-top">
@@ -284,12 +285,10 @@ function renderTools() {
                 <p class="card-desc">${tool.desc}</p>
             </div>
             <div class="card-bottom">
-                <button class="btn-open"><i class="fa-solid fa-play"></i> 開始學習</button>
+                <span class="btn-open"><i class="fa-solid fa-play"></i> 開始學習</span>
             </div>
         `;
         
-        // 點擊卡片開啟教具
-        card.addEventListener('click', () => openTool(tool));
         toolsGrid.appendChild(card);
     });
 }
