@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>正方體展開圖 3D 實驗室</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #f0f9ff; font-family: "Microsoft JhengHei", sans-serif; }
+        #canvas-container { width: 100%; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; }
+        
+        /* 左側控制面板 */
+        .panel {
+            pointer-events: auto;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-width: 350px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        /* 網格樣式 */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(6, 40px);
+            grid-template-rows: repeat(6, 40px);
+            gap: 4px;
+            margin: 0 auto;
+            background-color: #e5e7eb;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        .grid-cell {
+            width: 40px;
+            height: 40px;
+            background-color: white;
+            border: 1px solid #d1d5db;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 4px;
+        }
+        .grid-cell:hover { background-color: #bfdbfe; }
+        .grid-cell.active { background-color: #3b82f6; border-color: #2563eb; }
+        
+        /* 滑桿樣式 */
+        input[type=range] { width: 100%; cursor: pointer; }
+
+        .instruction { font-size: 0.9rem; color: #4b5563; line-height: 1.5; }
+        
+        /* 顏色說明標籤 */
+        .color-legend { display: flex; gap: 8px; margin-top: 5px; font-size: 0.8rem; }
+        .color-box { width: 12px; height: 12px; display: inline-block; border-radius: 2px; margin-right: 4px; border: 1px solid rgba(0,0,0,0.1); }
+
+        /* 彈出視窗樣式 */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 100;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .modal-overlay.show { opacity: 1; pointer-events: auto; }
+        .modal-content {
+            background: white; padding: 24px; border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            max-width: 320px; width: 90%;
+            transform: translateY(20px); transition: transform 0.3s;
+            text-align: center;
+        }
+        .modal-overlay.show .modal-content { transform: translateY(0); }
+    </style>
+</head>
+<body>
+
+    <!-- 3D 場景容器 -->
+    <div id="canvas-container"></div>
+
+    <!-- UI 操作介面 -->
+    <div id="ui-layer">
+        <div class="panel">
+            <h1 class="text-xl font-bold text-blue-800">📦 正方體展開圖實驗室</h1>
+            
+            <div class="instruction">
+                <p>1. 在下方網格點擊，畫出你的展開圖。</p>
+                <p>2. 點擊「生成 3D 模型」。</p>
+                <p>3. 拉動滑桿或自動組合，觀察效果！</p>
+            </div>
+
+            <!-- 繪圖網格 -->
+            <div class="flex justify-center">
+                <div id="grid" class="grid-container">
+                    <!-- JS 會自動生成格子 -->
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                <button id="btn-generate" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition text-sm">
+                    生成 3D 模型
+                </button>
+                <button id="btn-clear" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded transition text-sm">
+                    清除
+                </button>
+            </div>
+
+            <hr class="border-gray-200">
+
+            <div>
+                <label class="block text-sm font-bold mb-2 text-gray-700">折疊進度控制 (0% - 100%)</label>
+                <input type="range" id="fold-slider" min="0" max="100" value="0" disabled>
+                
+                <button id="btn-auto-fold" class="mt-3 w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    ▶ 自動組合
+                </button>
+            </div>
+
+            <div id="status-box" class="flex flex-col gap-2">
+                <div id="status-msg" class="text-center text-sm text-gray-500 font-bold min-h-[1.5em]">
+                    請先繪製圖形...
+                </div>
+            </div>
+            
+            <div class="mt-auto pt-2 border-t">
+                <div class="color-legend flex-wrap justify-center">
+                    <span class="flex items-center"><span class="color-box" style="background:#4ade80;"></span>對應面A</span>
+                    <span class="flex items-center"><span class="color-box" style="background:#60a5fa;"></span>對應面B</span>
+                    <span class="flex items-center"><span class="color-box" style="background:#facc15;"></span>對應面C</span>
+                    <span class="flex items-center"><span class="color-box" style="background:#ef4444;"></span>錯誤</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 自訂彈出視窗 -->
+    <div id="custom-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="modal-title" class="text-lg font-bold mb-2 text-gray-800">提示</h3>
+            <p id="modal-message" class="text-gray-600 mb-6 text-sm">訊息內容</p>
+            <div id="modal-actions" class="flex justify-center gap-2">
+                <!-- 按鈕會動態生成 -->
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- 全域變數設定 ---
+        const GRID_SIZE = 6;
+        let gridState = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(false));
+        let scene, camera, renderer, controls;
+        let rootGroup; 
+        let pivotGroups = []; 
+        let overlappingIds = new Set();
+        let tianCellIds = new Set(); 
+        let lockedEdges = new Set(); 
+        let faceColorMap = new Map();
+        
+        let confirmGenerationMode = false;
+
+        const COLORS = {
+            green: 0x4ade80,  
+            blue: 0x60a5fa,   
+            yellow: 0xfacc15, 
+            error: 0xef4444,  
+            edge: 0x000000    
+        };
+        
+        // --- 初始化 UI ---
+        function initUI() {
+            renderGrid();
+            document.getElementById('btn-generate').onclick = tryGenerateModel;
+            document.getElementById('btn-clear').onclick = clearGrid;
+            document.getElementById('btn-auto-fold').onclick = startAutoFold;
+            
+            const slider = document.getElementById('fold-slider');
+            slider.oninput = (e) => updateFolding(e.target.value);
+            // 監聽滑桿放開事件
+            slider.onchange = (e) => checkFoldCompletion(e.target.value); 
+        }
+
+        function renderGrid() {
+            const gridEl = document.getElementById('grid');
+            gridEl.innerHTML = '';
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'grid-cell' + (gridState[y][x] ? ' active' : '');
+                    cell.onclick = () => toggleCell(x, y);
+                    gridEl.appendChild(cell);
+                }
+            }
+        }
+
+        function toggleCell(x, y) {
+            gridState[y][x] = !gridState[y][x];
+            renderGrid();
+            resetGenerateButton();
+        }
+
+        function resetGenerateButton() {
+            confirmGenerationMode = false;
+            const btn = document.getElementById('btn-generate');
+            btn.innerText = "生成 3D 模型";
+            btn.classList.remove('bg-orange-500', 'hover:bg-orange-600');
+            btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            updateStatus("...", "normal");
+        }
+
+        function clearGrid() {
+            gridState = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(false));
+            renderGrid();
+            if (rootGroup) scene.remove(rootGroup);
+            pivotGroups = [];
+            
+            const slider = document.getElementById('fold-slider');
+            slider.value = 0;
+            slider.disabled = true;
+            document.getElementById('btn-auto-fold').disabled = true;
+            
+            resetGenerateButton();
+            updateStatus("已清除", "normal");
+        }
+
+        function updateStatus(text, type) {
+            const el = document.getElementById('status-msg');
+            el.innerText = text;
+            if (type === 'error') el.className = 'text-center text-sm font-bold text-red-600';
+            else if (type === 'warn') el.className = 'text-center text-sm font-bold text-orange-600';
+            else if (type === 'success') el.className = 'text-center text-sm font-bold text-green-600';
+            else el.className = 'text-center text-sm text-gray-500';
+        }
+
+        // --- 彈出視窗控制 ---
+        function showModal(title, message, buttons = []) {
+            const modal = document.getElementById('custom-modal');
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-message').innerHTML = message;
+            
+            const actionsDiv = document.getElementById('modal-actions');
+            actionsDiv.innerHTML = '';
+
+            if (buttons.length === 0) {
+                buttons = [{ text: '確定', onClick: closeModal, class: 'bg-blue-600 text-white' }];
+            }
+
+            buttons.forEach(btn => {
+                const button = document.createElement('button');
+                button.innerText = btn.text;
+                button.className = `px-4 py-2 rounded font-bold text-sm transition ${btn.class || 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`;
+                button.onclick = btn.onClick;
+                actionsDiv.appendChild(button);
+            });
+
+            modal.classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('custom-modal').classList.remove('show');
+        }
+
+        // --- 自動組合動畫 ---
+        function startAutoFold() {
+            const slider = document.getElementById('fold-slider');
+            if (slider.disabled) return;
+
+            let currentVal = parseInt(slider.value);
+            if (currentVal >= 100) currentVal = 0;
+
+            function step() {
+                if (currentVal < 100) {
+                    currentVal += 1; 
+                    slider.value = currentVal;
+                    updateFolding(currentVal);
+                    requestAnimationFrame(step);
+                } else {
+                    checkFoldCompletion(100);
+                }
+            }
+            step();
+        }
+
+        function checkFoldCompletion(value) {
+            // 只有在完全折疊 (100) 時才檢查錯誤提示
+            if (parseInt(value) >= 100) {
+                // 優先檢查：田字型
+                if (tianCellIds.size > 0) {
+                    showModal("摺不起來了！", "遇到田字型結構，無法繼續折疊。", 
+                        [{ text: '知道了', onClick: closeModal, class: 'bg-red-500 hover:bg-red-600 text-white' }]
+                    );
+                    return;
+                }
+
+                // [新增] 檢查：是否有面重疊
+                if (overlappingIds.size > 0) {
+                    showModal("無法變成正方體", `有 ${overlappingIds.size} 個面重疊了！`, 
+                        [{ text: '知道了', onClick: closeModal, class: 'bg-red-500 hover:bg-red-600 text-white' }]
+                    );
+                    return;
+                }
+
+                // 最後檢查：面數是否正確
+                const cells = getCells();
+                if (cells.length !== 6) {
+                    const diff = cells.length - 6;
+                    let msg = "";
+                    let title = "無法變成正方體";
+                    
+                    if (diff < 0) {
+                        msg = `缺少了 ${Math.abs(diff)} 個面！`;
+                    } else {
+                        msg = `多了 ${diff} 個面！`;
+                    }
+                    
+                    showModal(title, msg, 
+                        [{ text: '知道了', onClick: closeModal, class: 'bg-red-500 hover:bg-red-600 text-white' }]
+                    );
+                }
+            }
+        }
+
+        // --- 初始化 3D 場景 ---
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf0f9ff);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 15, 15);
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(10, 20, 10);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            const gridHelper = new THREE.GridHelper(20, 20, 0xcccccc, 0xe5e7eb);
+            scene.add(gridHelper);
+
+            animate();
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // --- 核心邏輯 ---
+        function getCells() {
+            let cells = [];
+            for(let y=0; y<GRID_SIZE; y++) {
+                for(let x=0; x<GRID_SIZE; x++) {
+                    if(gridState[y][x]) cells.push({x, y, id: `${x},${y}`});
+                }
+            }
+            return cells;
+        }
+
+        function analyzeTianBlocks() {
+            tianCellIds.clear();
+            lockedEdges.clear();
+            let hasTian = false;
+            for (let y = 0; y < GRID_SIZE - 1; y++) {
+                for (let x = 0; x < GRID_SIZE - 1; x++) {
+                    if (gridState[y][x] && gridState[y][x+1] && 
+                        gridState[y+1][x] && gridState[y+1][x+1]) {
+                        hasTian = true;
+                        tianCellIds.add(`${x},${y}`);
+                        tianCellIds.add(`${x+1},${y}`);
+                        tianCellIds.add(`${x},${y+1}`);
+                        tianCellIds.add(`${x+1},${y+1}`);
+                        lockedEdges.add(getEdgeKey(x, y, x+1, y));     
+                        lockedEdges.add(getEdgeKey(x, y+1, x+1, y+1)); 
+                        lockedEdges.add(getEdgeKey(x, y, x, y+1));     
+                        lockedEdges.add(getEdgeKey(x+1, y, x+1, y+1)); 
+                    }
+                }
+            }
+            return hasTian;
+        }
+
+        function getEdgeKey(x1, y1, x2, y2) {
+            if (x1 < x2 || (x1 === x2 && y1 < y2)) {
+                return `${x1},${y1}-${x2},${y2}`;
+            } else {
+                return `${x2},${y2}-${x1},${y1}`;
+            }
+        }
+
+        function tryGenerateModel() {
+            let cells = getCells();
+
+            if (cells.length === 0) {
+                showModal("提示", "請先在網格上畫出圖形！");
+                return;
+            }
+
+            // 檢查連通性
+            if (!checkConnectivity(cells)) {
+                showModal("錯誤", "圖形未連接！所有的面必須連在一起，不能斷開。", 
+                    [{ text: '好，我檢查一下', onClick: closeModal, class: 'bg-blue-600 text-white' }]
+                );
+                return;
+            }
+
+            // [修改重點] 生成前的面數檢查，改回中性提示
+            if (cells.length !== 6 && !confirmGenerationMode) {
+                const msg = `目前選了 ${cells.length} 個面<br><span class="text-xs text-gray-400">(正方體展開圖要有6個面)</span>`;
+
+                showModal("面數確認", msg, [
+                    { 
+                        text: '回去修改', 
+                        onClick: closeModal, 
+                        class: 'bg-gray-200 text-gray-800 hover:bg-gray-300' 
+                    },
+                    { 
+                        text: '仍要生成', 
+                        onClick: () => {
+                            closeModal();
+                            confirmGenerationMode = true;
+                            generateModel(cells);
+                        }, 
+                        class: 'bg-red-500 text-white hover:bg-red-600' 
+                    }
+                ]);
+                return;
+            }
+
+            generateModel(cells);
+            resetGenerateButton();
+        }
+
+        function checkConnectivity(cells) {
+            const startCell = cells[0];
+            const visited = new Set();
+            const queue = [startCell];
+            visited.add(startCell.id);
+            
+            let idx = 0;
+            while(idx < queue.length) {
+                const current = queue[idx++];
+                const neighbors = [
+                    {x: current.x+1, y: current.y}, {x: current.x-1, y: current.y},
+                    {x: current.x, y: current.y+1}, {x: current.x, y: current.y-1}
+                ];
+                neighbors.forEach(n => {
+                    const neighbor = cells.find(c => c.x === n.x && c.y === n.y);
+                    if (neighbor && !visited.has(neighbor.id)) {
+                        visited.add(neighbor.id);
+                        queue.push(neighbor);
+                    }
+                });
+            }
+            return visited.size === cells.length;
+        }
+
+        function generateModel(cells) {
+            if (rootGroup) scene.remove(rootGroup);
+            pivotGroups = [];
+            
+            const hasTian = analyzeTianBlocks();
+            const treeVisited = new Set();
+            const tree = buildTree(cells[0], treeVisited, cells);
+            overlappingIds = simulateFoldAndAnalyze(tree);
+            
+            if (hasTian) {
+                updateStatus("發現「田」字型！(無法折疊)", "error");
+            } else if (overlappingIds.size > 0) {
+                updateStatus("偵測到面重疊！", "error");
+            } else if (cells.length !== 6) {
+                updateStatus(`面數：${cells.length} (需6面)`, "normal");
+            } else {
+                updateStatus("完美的正方體展開圖！", "success");
+            }
+
+            rootGroup = new THREE.Group();
+            scene.add(rootGroup);
+            createFace3D(tree, rootGroup);
+
+            const slider = document.getElementById('fold-slider');
+            slider.disabled = false;
+            slider.value = 0;
+            document.getElementById('btn-auto-fold').disabled = false;
+            
+            controls.target.set(0, 0, 0);
+        }
+
+        function buildTree(currentCell, visited, allCells) {
+            visited.add(currentCell.id);
+            const node = { x: currentCell.x, y: currentCell.y, id: currentCell.id, children: [] };
+            const directions = [
+                { dx: 0, dy: -1, name: 'top' }, { dx: 0, dy: 1, name: 'bottom' },
+                { dx: -1, dy: 0, name: 'left' }, { dx: 1, dy: 0, name: 'right' }
+            ];
+            directions.forEach(dir => {
+                const nx = currentCell.x + dir.dx;
+                const ny = currentCell.y + dir.dy;
+                const neighbor = allCells.find(c => c.x === nx && c.y === ny);
+                if (neighbor && !visited.has(neighbor.id)) {
+                    node.children.push({ direction: dir.name, node: buildTree(neighbor, visited, allCells) });
+                }
+            });
+            return node;
+        }
+
+        function simulateFoldAndAnalyze(rootNode) {
+            const occupiedPositions = new Map(); 
+            const badIds = new Set();
+            faceColorMap.clear();
+
+            function traverse(node, parentMatrix) {
+                const currentPos = new THREE.Vector3(0, 0, 0).applyMatrix4(parentMatrix);
+                const x = Math.round(currentPos.x);
+                const y = Math.round(currentPos.y);
+                const z = Math.round(currentPos.z);
+                const posKey = `${x},${y},${z}`;
+
+                if (!occupiedPositions.has(posKey)) occupiedPositions.set(posKey, []);
+                occupiedPositions.get(posKey).push(node.id);
+
+                const normal = new THREE.Vector3(0, 1, 0).transformDirection(parentMatrix);
+                let color = COLORS.green; 
+                if (Math.abs(normal.x) > 0.5) color = COLORS.blue; 
+                else if (Math.abs(normal.z) > 0.5) color = COLORS.yellow; 
+                faceColorMap.set(node.id, color);
+
+                node.children.forEach(child => {
+                    const edgeKey = getEdgeKey(node.x, node.y, child.node.x, child.node.y);
+                    const isLocked = lockedEdges.has(edgeKey);
+                    const childMatrix = parentMatrix.clone();
+                    const tempMatrix = new THREE.Matrix4();
+                    const rotMatrix = new THREE.Matrix4();
+                    
+                    if (!isLocked) {
+                        if (child.direction === 'right') { 
+                            tempMatrix.makeTranslation(1, 0, 0); childMatrix.multiply(tempMatrix);
+                            rotMatrix.makeRotationZ(Math.PI / 2); childMatrix.multiply(rotMatrix);
+                            tempMatrix.makeTranslation(1, 0, 0); childMatrix.multiply(tempMatrix);
+                        } else if (child.direction === 'left') { 
+                            tempMatrix.makeTranslation(-1, 0, 0); childMatrix.multiply(tempMatrix);
+                            rotMatrix.makeRotationZ(-Math.PI / 2); childMatrix.multiply(rotMatrix);
+                            tempMatrix.makeTranslation(-1, 0, 0); childMatrix.multiply(tempMatrix);
+                        } else if (child.direction === 'top') { 
+                            tempMatrix.makeTranslation(0, 0, -1); childMatrix.multiply(tempMatrix);
+                            rotMatrix.makeRotationX(Math.PI / 2); childMatrix.multiply(rotMatrix);
+                            tempMatrix.makeTranslation(0, 0, -1); childMatrix.multiply(tempMatrix);
+                        } else if (child.direction === 'bottom') { 
+                            tempMatrix.makeTranslation(0, 0, 1); childMatrix.multiply(tempMatrix);
+                            rotMatrix.makeRotationX(-Math.PI / 2); childMatrix.multiply(rotMatrix);
+                            tempMatrix.makeTranslation(0, 0, 1); childMatrix.multiply(tempMatrix);
+                        }
+                    } else {
+                        if (child.direction === 'right') { tempMatrix.makeTranslation(2, 0, 0); childMatrix.multiply(tempMatrix); }
+                        else if (child.direction === 'left') { tempMatrix.makeTranslation(-2, 0, 0); childMatrix.multiply(tempMatrix); }
+                        else if (child.direction === 'top') { tempMatrix.makeTranslation(0, 0, -2); childMatrix.multiply(tempMatrix); }
+                        else if (child.direction === 'bottom') { tempMatrix.makeTranslation(0, 0, 2); childMatrix.multiply(tempMatrix); }
+                    }
+                    traverse(child.node, childMatrix);
+                });
+            }
+            traverse(rootNode, new THREE.Matrix4());
+            occupiedPositions.forEach((ids) => { if (ids.length > 1) ids.forEach(id => badIds.add(id)); });
+            return badIds;
+        }
+
+        function createFace3D(treeNode, parentGroup) {
+            const geometry = new THREE.BoxGeometry(1.98, 0.1, 1.98);
+            const isError = tianCellIds.has(treeNode.id) || overlappingIds.has(treeNode.id);
+            const baseColor = isError ? COLORS.error : (faceColorMap.get(treeNode.id) || COLORS.green);
+            const material = new THREE.MeshLambertMaterial({ color: baseColor });
+            const materials = Array(6).fill(material);
+
+            const mesh = new THREE.Mesh(geometry, materials);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            parentGroup.add(mesh);
+
+            const edgesGeo = new THREE.EdgesGeometry(geometry);
+            const edgesMat = new THREE.LineBasicMaterial({ color: COLORS.edge, linewidth: 2 });
+            mesh.add(new THREE.LineSegments(edgesGeo, edgesMat));
+
+            treeNode.children.forEach(child => {
+                const edgeKey = getEdgeKey(treeNode.x, treeNode.y, child.node.x, child.node.y);
+                const isLocked = lockedEdges.has(edgeKey);
+                const pivotGroup = new THREE.Group();
+                const offset = 1; 
+
+                switch(child.direction) {
+                    case 'right': pivotGroup.position.set(offset, 0, 0); break;
+                    case 'left':  pivotGroup.position.set(-offset, 0, 0); break;
+                    case 'bottom':pivotGroup.position.set(0, 0, offset); break;
+                    case 'top':   pivotGroup.position.set(0, 0, -offset); break;
+                }
+                mesh.add(pivotGroup);
+
+                let axis, targetRotation;
+                if (isLocked) {
+                    axis = 'x'; targetRotation = 0;
+                } else {
+                    switch(child.direction) {
+                        case 'right': axis = 'z'; targetRotation = Math.PI / 2; break;
+                        case 'left':  axis = 'z'; targetRotation = -Math.PI / 2; break;
+                        case 'bottom':axis = 'x'; targetRotation = -Math.PI / 2; break;
+                        case 'top':   axis = 'x'; targetRotation = Math.PI / 2; break;
+                    }
+                }
+
+                pivotGroups.push({ group: pivotGroup, axis: axis, maxRotation: targetRotation });
+                const childContainer = new THREE.Group();
+                switch(child.direction) {
+                    case 'right': childContainer.position.set(offset, 0, 0); break;
+                    case 'left':  childContainer.position.set(-offset, 0, 0); break;
+                    case 'bottom':childContainer.position.set(0, 0, offset); break;
+                    case 'top':   childContainer.position.set(0, 0, -offset); break;
+                }
+                pivotGroup.add(childContainer);
+                createFace3D(child.node, childContainer);
+            });
+        }
+
+        function updateFolding(value) {
+            const percent = value / 100;
+            pivotGroups.forEach(item => {
+                item.group.rotation[item.axis] = item.maxRotation * percent;
+            });
+        }
+
+        initUI();
+        init3D();
+
+    </script>
+</body>
+</html>

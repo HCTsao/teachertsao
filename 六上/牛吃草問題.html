@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>羊吃草面積互動教學</title>
+    <style>
+        body {
+            font-family: 'Comic Sans MS', '微軟正黑體', sans-serif;
+            background-color: #f0f8ff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+            margin-bottom: 10px;
+        }
+
+        /* 控制區塊 */
+        .controls {
+            background: white;
+            padding: 15px 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+            border: 3px solid #795548;
+            max-width: 900px;
+            width: 95%;
+            box-sizing: border-box;
+        }
+
+        .scenario-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 8px 16px;
+            font-size: 16px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background-color: #f1f1f1;
+            color: #555;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        button.scenario-btn.active {
+            background-color: #FF9800;
+            color: white;
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        button#animBtn {
+            background-color: #2196F3;
+            color: white;
+            min-width: 120px;
+            margin-top: 5px;
+        }
+        
+        button:disabled {
+            background-color: #BDBDBD !important;
+            color: #fff;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .sliders-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+            align-items: center;
+            background-color: #fff3e0;
+            padding: 10px;
+            border-radius: 15px;
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+            justify-content: center;
+            font-size: 1.1em;
+            flex-wrap: wrap;
+        }
+        
+        .slider-row label {
+            min-width: 180px;
+            text-align: right;
+        }
+        
+        input[type="range"] {
+            accent-color: #FF9800;
+            width: 200px;
+            cursor: pointer;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* 畫布容器 */
+        .canvas-container {
+            position: relative;
+            overflow: hidden;
+            border-radius: 4px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            width: 900px;
+            height: 600px;
+            max-width: 100%;
+            margin-bottom: 10px;
+        }
+
+        canvas {
+            background-color: #8BC34A;
+            display: block;
+            background-image: 
+                radial-gradient(#a5d6a7 15%, transparent 16%),
+                radial-gradient(#a5d6a7 15%, transparent 16%);
+            background-size: 40px 40px;
+            background-position: 0 0, 20px 20px;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 資訊面板 */
+        .info-panel {
+            background: white;
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 95%;
+            max-width: 900px;
+            box-sizing: border-box;
+            min-height: 100px;
+        }
+
+        /* 算式區塊 */
+        .formula-container {
+            background-color: #fff8e1;
+            padding: 10px;
+            border-radius: 10px;
+            border: 2px dashed #FFB74D;
+            text-align: left;
+            margin-top: 5px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* 雙欄佈局 */
+        .split-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: space-between;
+        }
+        
+        .split-col {
+            flex: 1;
+            min-width: 300px;
+            background: rgba(255, 255, 255, 0.5);
+            padding: 10px;
+            border-radius: 8px;
+        }
+        
+        .total-row {
+            width: 100%;
+            text-align: center;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 2px dashed #ccc;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #E65100;
+        }
+
+        .math-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 1.2em;
+        }
+
+        .math-table td {
+            padding: 4px 2px;
+            vertical-align: middle;
+        }
+
+        .col-label {
+            text-align: right;
+            white-space: nowrap;
+            width: 1%;
+            padding-right: 5px;
+            color: #555;
+            font-weight: bold;
+        }
+
+        .col-eq {
+            text-align: center;
+            width: 1em;
+            color: #d35400;
+            font-weight: bold;
+        }
+
+        .col-value {
+            text-align: left;
+            color: #333;
+            word-break: break-word;
+        }
+
+        tbody.step-group {
+            display: none;
+            border-bottom: 1px solid #eee;
+        }
+        .split-col tbody.step-group {
+            border-bottom: none;
+        }
+        
+        tbody.step-group:last-child {
+            border-bottom: none;
+        }
+        tbody.step-group:last-child .col-value {
+            color: #d35400;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .step-btn {
+            background-color: #9C27B0;
+            color: white;
+            font-size: 1.1em;
+            padding: 8px 30px;
+            margin-top: 5px;
+            border-radius: 25px;
+            animation: pulse 2s infinite;
+            display: inline-block;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .highlight {
+            color: #e91e63;
+            font-weight: bold;
+        }
+
+        .fraction {
+            display: inline-block;
+            vertical-align: middle;
+            text-align: center;
+            font-size: 0.85em; 
+            margin: 0 2px;
+        }
+        .fraction > span {
+            display: block;
+            padding: 0 2px;
+            line-height: 1;
+        }
+        .fraction span.numerator {
+            border-bottom: 2px solid #333;
+            margin-bottom: 2px;
+            padding-bottom: 1px;
+        }
+
+        .hint-text {
+            color: #999;
+            font-size: 0.8em;
+            margin-left: 5px;
+            font-weight: normal;
+            display: inline-block;
+        }
+
+        .sim-group {
+            position: relative;
+            display: inline-block;
+            margin: 0 2px;
+        }
+        .cancelled {
+            position: relative;
+            color: #999;
+            font-size: 0.8em;
+        }
+        .cancelled::after {
+            content: '';
+            position: absolute;
+            top: 45%;
+            left: -10%;
+            width: 120%;
+            height: 2px;
+            background-color: #F44336;
+            transform: rotate(-25deg);
+        }
+        .new-val {
+            color: #D32F2F;
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-left: 2px;
+            vertical-align: super; 
+            font-size: 1em;
+        }
+        .fraction .cancelled::after {
+            height: 2px; 
+        }
+        .fraction .new-val {
+            vertical-align: baseline; 
+            font-size: 1em;
+        }
+
+        #animStatus {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 16px;
+            display: none;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1 id="titleText">🐑 羊吃草模擬器</h1>
+
+    <div class="controls">
+        <div class="scenario-buttons">
+            <button onclick="setScenario('A')" id="btnA" class="scenario-btn active">情境 A (草地中央)</button>
+            <button onclick="setScenario('B')" id="btnB" class="scenario-btn">情境 B (圍牆邊)</button>
+            <button onclick="setScenario('C')" id="btnC" class="scenario-btn">情境 C (牆角)</button>
+            <button onclick="setScenario('D')" id="btnD" class="scenario-btn">情境 D (牛舍)</button>
+        </div>
+        
+        <div class="sliders-group">
+            <div class="slider-row">
+                <label for="ropeLength">繩子長度 (半徑): <span id="ropeVal" class="highlight">2</span> m</label>
+                <input type="range" id="ropeLength" min="1" max="18" step="1" value="2" oninput="updateSimulation()">
+            </div>
+            
+            <div id="shedControls" class="hidden" style="width: 100%; display: flex; flex-direction: column; gap: 8px;">
+                <div class="slider-row">
+                    <label for="shedLength">牛舍長度: <span id="shedLenVal" class="highlight">10</span> m</label>
+                    <input type="range" id="shedLength" min="2" max="14" step="2" value="10" oninput="updateSimulation()">
+                </div>
+                <div class="slider-row">
+                    <label for="shedWidth">牛舍寬度: <span id="shedWidVal" class="highlight">8</span> m</label>
+                    <input type="range" id="shedWidth" min="6" max="12" step="2" value="8" oninput="updateSimulation()">
+                </div>
+            </div>
+        </div>
+
+        <button id="animBtn" onclick="toggleAnimation()">▶ 開始走</button>
+    </div>
+
+    <!-- 畫布區 -->
+    <div class="canvas-container">
+        <canvas id="gameCanvas" width="900" height="600"></canvas>
+        <div id="animStatus">動畫狀態</div>
+    </div>
+
+    <!-- 計算步驟區 -->
+    <div class="info-panel">
+        <button id="stepBtn" class="step-btn" onclick="nextStep()" style="display:none;">💡 顯示計算步驟</button>
+
+        <div id="formulaArea" class="formula-container" style="display:none;">
+            <!-- 一般情境 A, B, C 用 -->
+            <table id="normalTable" class="math-table">
+                <tbody id="step1" class="step-group"></tbody>
+                <tbody id="step2" class="step-group"></tbody>
+                <tbody id="step3" class="step-group"></tbody>
+            </table>
+
+            <!-- 情境 D 用 -->
+            <div id="splitLayout" class="split-layout hidden">
+                <!-- 左欄：3/4圓 -->
+                <div class="split-col">
+                    <table class="math-table">
+                        <tbody id="d_step1" class="step-group"></tbody>
+                        <tbody id="d_step2" class="step-group"></tbody>
+                        <tbody id="d_step3" class="step-group"></tbody>
+                    </table>
+                </div>
+                
+                <!-- 右欄：1/4圓 (如有) -->
+                <div class="split-col">
+                    <table class="math-table">
+                        <tbody id="d_step4" class="step-group"></tbody>
+                        <tbody id="d_step5" class="step-group"></tbody>
+                        <tbody id="d_step6" class="step-group"></tbody>
+                    </table>
+                </div>
+                
+                <!-- 底部：總面積 (注意ID改成 d_step7) -->
+                <div id="d_step7" class="total-row step-group" style="display:none;">
+                    總面積 = ...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const titleText = document.getElementById('titleText');
+        const ropeSlider = document.getElementById('ropeLength');
+        const shedLengthSlider = document.getElementById('shedLength');
+        const shedWidthSlider = document.getElementById('shedWidth');
+        const animStatus = document.getElementById('animStatus');
+        const normalTable = document.getElementById('normalTable');
+        const splitLayout = document.getElementById('splitLayout');
+        
+        // 狀態變數
+        let scenario = 'A'; 
+        let radiusMeters = 2; 
+        let scale = 32; 
+        const wallThickness = 8; 
+
+        // 牛舍設定
+        let shedL_m = 10; 
+        let shedW_m = 8;  
+
+        // 動畫變數
+        let isAnimating = false;
+        let animationId = null;
+        let goatAngle = 0; 
+        let startAngle = 0; 
+        let endAngleLimit = 0; 
+        let walkSpeed = 0.03; 
+
+        // 情境 D 複雜動畫狀態
+        let dAnimPhase = 0; 
+        let dSmallAngle = 0;
+        let dZoomScale = 1;
+        let dPauseCounter = 0;
+        
+        let currentFocusX = 0;
+        let currentFocusY = 0;
+
+        let centerX = canvas.width / 2;
+        let centerY = canvas.height / 2;
+        
+        let currentStep = 0;
+        let totalSteps = 3; 
+
+        function setScenario(type) {
+            scenario = type;
+            
+            // 1. 將所有情境的速度統一設定為 0.01 (原本是 0.02)
+            walkSpeed = 0.01;
+            
+            document.querySelectorAll('.scenario-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('btn' + type).classList.add('active');
+            
+            const shedControls = document.getElementById('shedControls');
+            
+            if (type === 'B' || type === 'C') {
+                ropeSlider.min = 2;
+                ropeSlider.max = 6;
+                ropeSlider.step = 2; 
+                ropeSlider.value = 2;
+            } else if (type === 'D') {
+                // 情境 D 設定
+                titleText.innerText = "🐄 牛吃草模擬器 (牛舍問題)";
+                shedControls.classList.remove('hidden');
+                scale = 15; 
+                
+                // 1. 設定牛舍預設值 (修正：先設定牛舍長寬)
+                shedLengthSlider.value = 10;
+                shedWidthSlider.value = 8;
+                
+                // 2. 設定繩子最大值 (最大值 = 牛舍長度)
+                ropeSlider.min = 2;
+                ropeSlider.step = 2; 
+                ropeSlider.max = shedLengthSlider.value;
+                
+                // 3. 修正：繩子預設值改為 8m
+                ropeSlider.value = 8;
+                
+            } else {
+                // 情境 A
+                ropeSlider.min = 1;
+                ropeSlider.max = 5;
+                ropeSlider.step = 0.5;
+                ropeSlider.value = 2;
+            }
+
+            if (type !== 'D') {
+                titleText.innerText = "🐑 羊吃草模擬器";
+                shedControls.classList.add('hidden');
+                scale = 45; 
+            }
+            
+            updateSimulation();
+        }
+
+        function resetAnimationState() {
+            stopAnimation();
+            isAnimating = false;
+            goatAngle = startAngle;
+            dAnimPhase = 0;
+            dSmallAngle = 0;
+            dZoomScale = 1;
+            dPauseCounter = 0;
+            animStatus.style.display = 'none';
+            currentFocusX = centerX;
+            currentFocusY = centerY;
+        }
+
+        function updateSimulation() {
+            if (scenario === 'D') {
+                shedL_m = parseFloat(shedLengthSlider.value);
+                shedW_m = parseFloat(shedWidthSlider.value);
+                ropeSlider.max = shedL_m; 
+                
+                document.getElementById('shedLenVal').innerText = shedL_m;
+                document.getElementById('shedWidVal').innerText = shedW_m;
+            }
+
+            radiusMeters = parseFloat(ropeSlider.value);
+            document.getElementById('ropeVal').innerText = radiusMeters;
+
+            if (scenario === 'D') {
+                centerX = canvas.width / 2;
+                centerY = canvas.height / 2;
+                startAngle = Math.PI * 2;
+                endAngleLimit = Math.PI * 0.5; 
+            } else {
+                if (scenario === 'A') {
+                    centerX = canvas.width / 2;
+                    centerY = canvas.height / 2;
+                    startAngle = 0;
+                    endAngleLimit = Math.PI * 2;
+                } else if (scenario === 'B') {
+                    centerX = canvas.width / 2;
+                    centerY = wallThickness; 
+                    startAngle = 0;
+                    endAngleLimit = Math.PI;
+                } else if (scenario === 'C') {
+                    centerX = canvas.width - wallThickness;
+                    centerY = canvas.height - wallThickness;
+                    startAngle = Math.PI;
+                    endAngleLimit = Math.PI * 1.5;
+                }
+            }
+            
+            resetAnimationState();
+            
+            const animBtn = document.getElementById('animBtn');
+            animBtn.innerText = "▶ 開始走";
+            animBtn.style.backgroundColor = "#2196F3";
+            animBtn.disabled = false;
+            
+            draw();
+            hideMathPanel(); 
+            document.getElementById('stepBtn').style.display = 'inline-block'; 
+            resetStepButton();
+        }
+
+        function toggleAnimation() {
+            if (isAnimating) return;
+            isAnimating = true;
+            goatAngle = startAngle; 
+            dAnimPhase = 0;
+            dZoomScale = 1;
+            dPauseCounter = 0;
+            currentFocusX = centerX;
+            currentFocusY = centerY;
+
+            const btn = document.getElementById('animBtn');
+            const animalName = scenario === 'D' ? "🐄" : "🐐";
+            btn.innerText = `${animalName} 走動中...`;
+            btn.disabled = true; 
+            
+            if (scenario === 'D') {
+                if (radiusMeters > shedW_m) {
+                    dSmallAngle = Math.PI * 0.5; 
+                }
+            }
+            
+            animateLoop();
+        }
+
+        function stopAnimation() {
+            isAnimating = false;
+            if (animationId) cancelAnimationFrame(animationId);
+            const btn = document.getElementById('animBtn');
+            btn.disabled = false;
+            btn.innerText = "▶ 再走一次"; 
+            btn.style.backgroundColor = "#2196F3";
+            animStatus.style.display = 'none';
+        }
+
+        function animateLoop() {
+            if (!isAnimating) return;
+            
+            if (scenario === 'D') {
+                const needTurn = radiusMeters > shedW_m;
+                const targetCornerX = centerX;
+                const targetCornerY = centerY + (shedW_m * scale);
+
+                if (dAnimPhase === 0) {
+                    goatAngle -= walkSpeed;
+                    if (goatAngle <= endAngleLimit) {
+                        goatAngle = endAngleLimit;
+                        if (needTurn) {
+                            dAnimPhase = 1; 
+                            dPauseCounter = 0;
+                            showStatus("遇到牆角，準備轉彎...");
+                        } else {
+                            stopAnimation();
+                            return;
+                        }
+                    }
+                } else if (dAnimPhase === 1) {
+                    dPauseCounter++;
+                    if (dPauseCounter > 40) {
+                        dAnimPhase = 2; 
+                        showStatus("🔍 鏡頭拉近：看清楚轉彎處");
+                    }
+                } else if (dAnimPhase === 2) {
+                    // 2. 調整縮放速度 (Zoom In)
+                    // 縮放步距由 0.05 改為 0.02 (變慢)
+                    // 移動比例由 0.033 改為 0.0133 (配合縮放時間)
+                    if (dZoomScale < 2.5) { 
+                        dZoomScale += 0.02;
+                        currentFocusX += (targetCornerX - centerX) * 0.0133; 
+                        currentFocusY += (targetCornerY - centerY) * 0.0133;
+                    } else {
+                        dZoomScale = 2.5;
+                        currentFocusX = targetCornerX;
+                        currentFocusY = targetCornerY;
+                        dAnimPhase = 3; 
+                        showStatus("繼續走完剩下的 1/4 圓");
+                    }
+                } else if (dAnimPhase === 3) {
+                    dSmallAngle -= walkSpeed;
+                    if (dSmallAngle <= 0) {
+                        dSmallAngle = 0;
+                        dAnimPhase = 4; 
+                        showStatus("走完了！鏡頭復原");
+                    }
+                } else if (dAnimPhase === 4) {
+                    // 2. 調整縮放速度 (Zoom Out)
+                    // 縮放步距由 0.05 改為 0.02 (變慢)
+                    // 移動比例由 0.033 改為 0.0133 (配合縮放時間)
+                    if (dZoomScale > 1.0) {
+                        dZoomScale -= 0.02;
+                        currentFocusX -= (targetCornerX - centerX) * 0.0133;
+                        currentFocusY -= (targetCornerY - centerY) * 0.0133;
+                    } else {
+                        dZoomScale = 1.0;
+                        currentFocusX = centerX;
+                        currentFocusY = centerY;
+                        stopAnimation();
+                        return;
+                    }
+                }
+                
+            } else {
+                goatAngle += walkSpeed;
+                if (goatAngle >= endAngleLimit) {
+                    goatAngle = endAngleLimit; 
+                    draw(); 
+                    stopAnimation();
+                    return;
+                }
+            }
+            draw();
+            animationId = requestAnimationFrame(animateLoop);
+        }
+
+        function showStatus(text) {
+            animStatus.innerText = text;
+            animStatus.style.display = 'block';
+        }
+
+        function resetStepButton() {
+            currentStep = 0;
+            const btn = document.getElementById('stepBtn');
+            btn.innerText = "💡 顯示計算步驟";
+            btn.style.display = 'inline-block';
+            document.getElementById('formulaArea').style.display = 'none';
+            
+            const allSteps = document.querySelectorAll('.step-group');
+            allSteps.forEach(el => el.style.display = 'none');
+        }
+
+        function hideMathPanel() {
+            resetStepButton();
+        }
+        
+        function nextStep() {
+            const formulaArea = document.getElementById('formulaArea');
+            const btn = document.getElementById('stepBtn');
+            
+            if (currentStep === 0) {
+                formulaArea.style.display = 'block';
+                if (scenario === 'D') {
+                    normalTable.style.display = 'none';
+                    splitLayout.classList.remove('hidden');
+                    splitLayout.style.display = 'flex';
+                } else {
+                    normalTable.style.display = 'table';
+                    splitLayout.classList.add('hidden');
+                    splitLayout.style.display = 'none';
+                }
+                prepareMathText(); 
+            }
+
+            currentStep++;
+            
+            if (currentStep <= totalSteps) {
+                let prefix = (scenario === 'D') ? 'd_step' : 'step';
+                let stepId = (scenario === 'D' && currentStep === totalSteps && currentStep > 3) ? 'd_step7' : `${prefix}${currentStep}`;
+                
+                // 容錯處理
+                let stepGroup = document.getElementById(stepId);
+                if (!stepGroup && scenario === 'D') {
+                     stepId = `d_step${currentStep}`;
+                     stepGroup = document.getElementById(stepId);
+                }
+
+                if(stepGroup) {
+                    if (stepGroup.tagName === 'TBODY') {
+                        stepGroup.style.display = 'table-row-group';
+                    } else {
+                        stepGroup.style.display = 'block';
+                    }
+                }
+                
+                if (currentStep < totalSteps) {
+                    btn.innerText = `👇 下一步`;
+                } else {
+                    btn.style.display = 'none'; 
+                }
+            }
+        }
+
+        function getFractionHtml(numerator, denominator, strikeNum=false, strikeDenom=false, newNumVal='', newDenomVal='') {
+            let numHtml = `${numerator}`;
+            if (strikeNum) {
+                numHtml = `<span class="sim-group"><span class="cancelled">${numerator}</span><span class="new-val">${newNumVal}</span></span>`;
+            }
+            
+            let denomHtml = `${denominator}`;
+            if (strikeDenom) {
+                denomHtml = `<span class="sim-group"><span class="cancelled">${denominator}</span><span class="new-val">${newDenomVal}</span></span>`;
+            }
+
+            return `<span class="fraction"><span class="numerator">${numHtml}</span><span>${denomHtml}</span></span>`;
+        }
+        
+        function createRow(label, eq, value) {
+            return `
+                <tr>
+                    <td class="col-label">${label}</td>
+                    <td class="col-eq">${eq}</td>
+                    <td class="col-value">${value}</td>
+                </tr>
+            `;
+        }
+        
+        function getSimNumber(oldVal, newVal) {
+             return `<span class="sim-group"><span class="cancelled">${oldVal}</span><span class="new-val">${newVal}</span></span>`;
+        }
+
+        function prepareMathText() {
+            const r = radiusMeters;
+            const unitHtml = `<span style="font-size: 0.8em; color: #555;">(m<sup>2</sup>)</span>`;
+            const fmt = (num) => parseFloat(num.toFixed(2));
+
+            if (scenario === 'D') {
+                const frac34 = getFractionHtml(3, 4);
+                const isLeftTurn = r > shedW_m;
+                const bigArea = fmt(r * r * 3.14 * 0.75);
+                
+                // --- 3/4 圓 ---
+                // Step 1
+                const label34 = `${getFractionHtml(3, 4)}圓`;
+                document.getElementById('d_step1').innerHTML = 
+                    createRow(label34, `=`, `${r} × ${r} × 3.14 × ${frac34}`);
+                
+                // Step 2: 約分
+                let step2Content = "";
+                if (r % 4 === 0) { 
+                    const rDiv4 = r / 4;
+                    const fracSim = getFractionHtml(3, 4, false, true, '', '1'); 
+                    const rSim = getSimNumber(r, rDiv4);
+                    step2Content = `${rSim} × ${r} × 3.14 × ${fracSim}`;
+                } else if (r % 2 === 0) { 
+                    const rDiv2 = r / 2;
+                    const fracSim = getFractionHtml(3, 4, false, true, '', '1');
+                    const rSim1 = getSimNumber(r, rDiv2);
+                    const rSim2 = getSimNumber(r, rDiv2);
+                    step2Content = `${rSim1} × ${rSim2} × 3.14 × ${fracSim}`;
+                } else {
+                     step2Content = `${(r*r)} × 3.14 × ${frac34} = ${fmt(r*r*0.75)} × 3.14`;
+                }
+                document.getElementById('d_step2').innerHTML = createRow(``, `=`, step2Content);
+                
+                // Step 3: 結果
+                let step3Result = `${bigArea}`;
+                
+                // 修正：如果沒有轉彎，這裡就是終點，直接加單位，並設定步驟數為 3
+                if (!isLeftTurn) {
+                    step3Result += ` ${unitHtml}`;
+                    totalSteps = 3;
+                    // 確保 "總面積" 那一行隱藏
+                    const step7 = document.getElementById('d_step7');
+                    if(step7) step7.style.display = 'none';
+                    
+                    // 清空後面的步驟避免殘留
+                    document.getElementById(`d_step4`).innerHTML = "";
+                    document.getElementById(`d_step5`).innerHTML = "";
+                    document.getElementById(`d_step6`).innerHTML = "";
+                }
+                
+                document.getElementById('d_step3').innerHTML = createRow(``, `=`, step3Result);
+                
+                // --- 1/4 圓 (如果需要轉彎) ---
+                if (isLeftTurn) {
+                    // 如果有轉彎，初始步驟為 3，後面會累加
+                    let stepSeq = 3;
+                    let totalArea = bigArea;
+
+                    const rSmall = fmt(r - shedW_m);
+                    const smallArea = fmt(rSmall * rSmall * 3.14 * 0.25);
+                    totalArea += smallArea;
+                    const frac14 = getFractionHtml(1, 4);
+                    
+                    // Step 4
+                    stepSeq++; 
+                    const label14 = `${getFractionHtml(1, 4)}圓`;
+                    document.getElementById(`d_step4`).innerHTML = 
+                        createRow(label14, `=`, `${rSmall} × ${rSmall} × 3.14 × ${frac14}`);
+                    
+                    // Step 5
+                    stepSeq++;
+                    let smallStep2 = "";
+                    if (rSmall % 4 === 0) {
+                        const rDiv = rSmall / 4;
+                        const fracSim = getFractionHtml(1, 4, false, true, '', '1');
+                        const rSim = getSimNumber(rSmall, rDiv);
+                        smallStep2 = `${rSim} × ${rSmall} × 3.14 × ${fracSim}`;
+                    } else if (rSmall % 2 === 0) {
+                        const rDiv2 = rSmall / 2;
+                        const rSim1 = getSimNumber(rSmall, rDiv2);
+                        const rSim2 = getSimNumber(rSmall, rDiv2);
+                        const fracSim = getFractionHtml(1, 4, false, true, '', '1');
+                        smallStep2 = `${rSim1} × ${rSim2} × 3.14 × ${fracSim}`;
+                    } else {
+                         smallStep2 = `${(rSmall*rSmall)} × 3.14 × ${frac14}`;
+                    }
+                    document.getElementById(`d_step5`).innerHTML = createRow(``, `=`, smallStep2);
+
+                    // Step 6
+                    stepSeq++;
+                    document.getElementById(`d_step6`).innerHTML = createRow(``, `=`, `${smallArea}`);
+                    
+                    // Step 7: 總面積
+                    stepSeq++; 
+                    let sumText = `${bigArea} + ${fmt(Math.pow(r-shedW_m,2)*3.14*0.25)}`;
+                    document.getElementById(`d_step7`).innerHTML = 
+                        `總面積 = ${sumText} = ${fmt(totalArea)} ${unitHtml}`;
+                    document.getElementById(`d_step7`).style.display = 'none'; // 預設隱藏，按按鈕才會出來
+                    
+                    totalSteps = stepSeq;
+                } 
+
+            } else {
+                // A, B, C 情境 (單欄)
+                totalSteps = 3;
+                const r2 = r * r;
+                const fullArea = fmt(r2 * 3.14);
+                
+                if (scenario === 'A') {
+                    document.getElementById('step1').innerHTML = createRow(`圓面積`, `=`, `${r} × ${r} × 3.14`);
+                    document.getElementById('step2').innerHTML = createRow(``, `=`, `${r2} × 3.14`);
+                    document.getElementById('step3').innerHTML = createRow(``, `=`, `${fullArea} ${unitHtml}`);
+                } else if (scenario === 'B') {
+                    const frac = getFractionHtml(1, 2);
+                    const area = fmt(fullArea / 2);
+                    const label12 = `${getFractionHtml(1, 2)}圓`;
+                    
+                    document.getElementById('step1').innerHTML = createRow(label12, `=`, `${r} × ${r} × 3.14 × ${frac}`);
+                    
+                    const rDiv2 = r / 2;
+                    const rSim = getSimNumber(r, rDiv2);
+                    const fracSim = getFractionHtml(1, 2, false, true, '', '1');
+                    const simText = `${rSim} × ${r} × 3.14 × ${fracSim}`;
+                    
+                    document.getElementById('step2').innerHTML = createRow(``, `=`, simText);
+                    document.getElementById('step3').innerHTML = createRow(``, `=`, `${area} ${unitHtml}`);
+
+                } else if (scenario === 'C') {
+                    const frac = getFractionHtml(1, 4);
+                    const area = fmt(fullArea / 4);
+                    const label14 = `${getFractionHtml(1, 4)}圓`;
+                    
+                    document.getElementById('step1').innerHTML = createRow(label14, `=`, `${r} × ${r} × 3.14 × ${frac}`);
+                    
+                    let simText = "";
+                    if (r % 4 === 0) {
+                        const rDiv4 = r / 4;
+                        const rSim = getSimNumber(r, rDiv4);
+                        const fracSim = getFractionHtml(1, 4, false, true, '', '1');
+                        simText = `${rSim} × ${r} × 3.14 × ${fracSim}`;
+                    } else {
+                        const rDiv2 = r / 2;
+                        const rSim1 = getSimNumber(r, rDiv2);
+                        const rSim2 = getSimNumber(r, rDiv2);
+                        const fracSim = getFractionHtml(1, 4, false, true, '', '1');
+                        simText = `${rSim1} × ${rSim2} × 3.14 × ${fracSim}`;
+                    }
+                    
+                    document.getElementById('step2').innerHTML = createRow(``, `=`, simText);
+                    document.getElementById('step3').innerHTML = createRow(``, `=`, `${area} ${unitHtml}`);
+                }
+            }
+        }
+
+        function draw() {
+            ctx.save();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (scenario === 'D') {
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.scale(dZoomScale, dZoomScale);
+                ctx.translate(-currentFocusX, -currentFocusY);
+            }
+
+            const rPx = radiusMeters * scale;
+
+            ctx.fillStyle = "#5D4037"; 
+            
+            if (scenario === 'D') {
+                const sW = shedL_m * scale; 
+                const sH = shedW_m * scale; 
+                
+                ctx.fillRect(centerX, centerY, sW, sH);
+                ctx.fillStyle = "#8D6E63";
+                ctx.fillRect(centerX + 5, centerY + 5, sW - 10, sH - 10);
+                
+                ctx.fillStyle = "#3E2723";
+                const fontSize = Math.max(10, 20 / dZoomScale); 
+                ctx.font = `bold ${fontSize}px 微軟正黑體`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText("牛舍", centerX + sW/2, centerY + sH/2);
+                
+            } else {
+                ctx.fillRect(0, 0, canvas.width, wallThickness);
+                ctx.fillRect(0, canvas.height - wallThickness, canvas.width, wallThickness);
+                ctx.fillRect(0, 0, wallThickness, canvas.height);
+                ctx.fillRect(canvas.width - wallThickness, 0, wallThickness, canvas.height);
+            }
+
+            if (scenario === 'D') {
+                if (isAnimating || goatAngle < startAngle) {
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, centerY);
+                    let drawEnd = goatAngle;
+                    if (dAnimPhase >= 1) drawEnd = Math.PI * 0.5;
+                    ctx.arc(centerX, centerY, rPx, startAngle, drawEnd, true); 
+                    ctx.lineTo(centerX, centerY);
+                    ctx.fill();
+
+                    if (radiusMeters > shedW_m && dAnimPhase >= 3) {
+                         const rSmall = (radiusMeters - shedW_m) * scale;
+                         const cornerX = centerX;
+                         const cornerY = centerY + (shedW_m * scale);
+                         
+                         ctx.fillStyle = "rgba(255, 241, 118, 0.8)";
+                         ctx.beginPath();
+                         ctx.moveTo(cornerX, cornerY);
+                         ctx.arc(cornerX, cornerY, rSmall, Math.PI * 0.5, dSmallAngle, true); 
+                         ctx.lineTo(cornerX, cornerY);
+                         ctx.fill();
+                    } 
+                    else if (!isAnimating && radiusMeters > shedW_m && goatAngle <= Math.PI * 0.5) {
+                         const rSmall = (radiusMeters - shedW_m) * scale;
+                         const cornerX = centerX;
+                         const cornerY = centerY + (shedW_m * scale);
+                         
+                         ctx.fillStyle = "rgba(255, 241, 118, 0.8)";
+                         ctx.beginPath();
+                         ctx.moveTo(cornerX, cornerY);
+                         ctx.arc(cornerX, cornerY, rSmall, Math.PI * 0.5, 0, true);
+                         ctx.lineTo(cornerX, cornerY);
+                         ctx.fill();
+                    }
+                }
+            } else {
+                ctx.fillStyle = "rgba(255, 255, 255, 0.7)"; 
+                if (goatAngle > startAngle) {
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, centerY);
+                    ctx.arc(centerX, centerY, rPx, startAngle, goatAngle);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = "#fff";
+                    ctx.stroke();
+                }
+            }
+
+            let animalX, animalY;
+            
+            if (scenario === 'D' && dAnimPhase >= 3) {
+                const rSmall = (radiusMeters - shedW_m) * scale;
+                const cornerX = centerX;
+                const cornerY = centerY + (shedW_m * scale);
+                animalX = cornerX + Math.cos(dSmallAngle) * rSmall;
+                animalY = cornerY + Math.sin(dSmallAngle) * rSmall;
+                
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(cornerX, cornerY);
+                ctx.strokeStyle = "#8d6e63";
+                ctx.lineWidth = 3 / dZoomScale; 
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(cornerX, cornerY);
+                ctx.lineTo(animalX, animalY);
+                ctx.stroke();
+                
+            } else {
+                let angle = goatAngle;
+                if (scenario === 'D' && dAnimPhase >= 1 && dAnimPhase < 3) angle = Math.PI * 0.5;
+                
+                animalX = centerX + Math.cos(angle) * rPx;
+                animalY = centerY + Math.sin(angle) * rPx;
+
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(animalX, animalY);
+                ctx.strokeStyle = "#8d6e63";
+                ctx.lineWidth = 3 / dZoomScale;
+                ctx.stroke();
+            }
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 6 / dZoomScale, 0, Math.PI * 2);
+            ctx.fillStyle = "#3E2723";
+            ctx.fill();
+
+            ctx.save();
+            ctx.translate(animalX, animalY);
+            ctx.scale(1/dZoomScale, 1/dZoomScale); 
+            if (isAnimating) ctx.rotate(Math.sin(Date.now() / 80) * 0.1);
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, 18, 0, Math.PI * 2);
+            ctx.fillStyle = "white";
+            ctx.fill();
+            ctx.strokeStyle = "#333";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.font = "24px Arial";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            const emoji = scenario === 'D' ? "🐄" : "🐐";
+            ctx.fillText(emoji, 0, 2); 
+            ctx.restore();
+            
+            ctx.restore(); 
+        }
+
+        setScenario('A');
+
+    </script>
+</body>
+</html>

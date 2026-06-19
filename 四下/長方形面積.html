@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>面積公式推導教學</title>
+    <style>
+        body {
+            font-family: "Microsoft JhengHei", "Heiti TC", sans-serif;
+            margin: 0; padding: 0; background-color: #f0f8ff;
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        /* 給標題一個 ID 以便程式控制，並稍微加大邊距 */
+        h2 { color: #333; margin: 25px 0 15px 0; min-height: 1.2em;}
+
+        /* 控制區 */
+        .controls {
+            background: white; padding: 15px 30px; border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px;
+            display: flex; gap: 40px; align-items: center;
+            flex-wrap: wrap; justify-content: center;
+        }
+        .control-group { display: flex; flex-direction: column; align-items: center; }
+        label { font-weight: bold; margin-bottom: 5px; color: #555; }
+        input[type=range] { width: 150px; cursor: pointer; }
+        
+        .btn-group { display: flex; gap: 10px; }
+        
+        button.action-btn {
+            padding: 10px 24px; font-size: 18px; cursor: pointer; border: none; border-radius: 50px;
+            font-weight: bold; color: white; background-color: #00a651; min-width: 180px;
+            transition: transform 0.1s, background-color 0.2s;
+        }
+        button.action-btn:hover { transform: scale(1.05); background-color: #008c44; }
+        
+        button.reset-btn {
+            padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 50px;
+            background-color: #e0e0e0; color: #555; transition: background-color 0.2s;
+        }
+        button.reset-btn:hover { background-color: #d0d0d0; }
+
+        /* 畫布：加大寬度以容納左側水平文字 */
+        canvas {
+            background-color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-radius: 8px;
+        }
+
+        /* 訊息區 */
+        .info-panel {
+            margin-top: 15px; width: 90%; max-width: 700px;
+            background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd;
+            text-align: center; min-height: 80px; display: flex; flex-direction: column; justify-content: center;
+            margin-bottom: 30px; /* 底部留白 */
+        }
+        .main-msg { font-size: 24px; font-weight: bold; color: #333; margin-bottom: 5px; }
+        .sub-msg { font-size: 18px; color: #666; }
+        .highlight { color: #d32f2f; font-weight: bold; font-size: 28px; }
+        .formula-box { 
+            display: inline-block; background-color: #fff3e0; padding: 5px 15px; 
+            border-radius: 5px; color: #d32f2f; font-weight: bold; margin-top: 5px;
+        }
+        /* 移除原先的 .unit-hint 樣式，因為已經移到 canvas 內繪製 */
+    </style>
+</head>
+<body>
+
+    <!-- 標題 ID 改為 mainTitle 供 JS 控制 -->
+    <h2 id="mainTitle">長方形面積公式推導</h2>
+
+    <div class="controls">
+        <div class="control-group">
+            <label>橫向格數: <span id="valW">5</span></label>
+            <input type="range" id="widthRange" min="1" max="10" value="5" oninput="resetToStart()">
+        </div>
+        <div class="control-group">
+            <label>縱向格數: <span id="valH">3</span></label>
+            <input type="range" id="heightRange" min="1" max="8" value="3" oninput="resetToStart()">
+        </div>
+        
+        <div class="btn-group">
+            <button id="mainBtn" class="action-btn" onclick="handleMainBtn()">下一步：數格子</button>
+            <button class="reset-btn" onclick="resetToStart()">重置題目</button>
+        </div>
+    </div>
+
+    <!-- 加大 Canvas 寬度到 700，讓左邊有空間放橫向文字 -->
+    <canvas id="gridCanvas" width="700" height="540"></canvas>
+
+    <div class="info-panel">
+        <div id="mainMsg" class="main-msg">準備：這是一個圖形</div>
+        <div id="subMsg" class="sub-msg">請想一想，它的面積是多少？</div>
+        <!-- 單位提示已移除，改由 Canvas 繪製 -->
+    </div>
+
+<script>
+    const canvas = document.getElementById('gridCanvas');
+    const ctx = canvas.getContext('2d');
+    const titleElem = document.getElementById('mainTitle'); // 取得標題元素
+    const widthInput = document.getElementById('widthRange');
+    const heightInput = document.getElementById('heightRange');
+    const valW = document.getElementById('valW');
+    const valH = document.getElementById('valH');
+    const mainBtn = document.getElementById('mainBtn');
+    const mainMsg = document.getElementById('mainMsg');
+    const subMsg = document.getElementById('subMsg');
+
+    // 修改處：將格子大小改為 38 (約等於螢幕上的 1cm)
+    const cellSize = 38; 
+    
+    // 這裡我們不再設定固定的 offsetX/Y，改為在 updateGrid 中動態計算
+    let offsetX = 50;  
+    let offsetY = 50;  
+
+    // 狀態: 0=初始, 1=數格子, 2=標示長寬, 3=公式
+    let step = 0;
+
+    // 按鈕的統一控制邏輯
+    function handleMainBtn() {
+        if (step < 3) {
+            step++; // 進入下一步
+        } else {
+            step = 0; // 如果已經是最後一步，則重置回第一步
+        }
+        updateGrid();
+    }
+
+    function resetToStart() {
+        step = 0;
+        updateGrid();
+    }
+
+    function updateGrid() {
+        const w = parseInt(widthInput.value);
+        const h = parseInt(heightInput.value);
+        
+        // 更新滑桿數字顯示
+        valW.textContent = w;
+        valH.textContent = h;
+
+        // --- 1. 動態更新標題 ---
+        if (w === h) {
+            titleElem.innerText = "正方形面積公式推導";
+        } else {
+            titleElem.innerText = "長方形面積公式推導";
+        }
+
+        // --- 2. 計算置中位置 ---
+        // 計算圖形總寬高
+        const totalGridW = w * cellSize;
+        const totalGridH = h * cellSize;
+        
+        // 將圖形置中於畫布
+        // 公式：(畫布寬度 - 圖形寬度) / 2
+        offsetX = (canvas.width - totalGridW) / 2;
+        offsetY = (canvas.height - totalGridH) / 2;
+
+        // 清空畫布
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 3. 基礎繪圖
+        drawBasicGrid(w, h);
+        
+        // 在所有步驟都繪製角落的單位提示
+        drawUnitHint();
+
+        // 4. 根據步驟顯示內容與按鈕文字
+        if (step === 0) {
+            // 初始狀態
+            mainMsg.innerText = "準備：請觀察這個圖形";
+            subMsg.innerText = "不用數，你能猜出它的面積是多少？";
+            mainBtn.innerText = "下一步：數格子";
+            mainBtn.style.backgroundColor = "#00a651"; // 綠色
+        } else if (step === 1) {
+            // 步驟1：數格子
+            drawCellNumbers(w, h);
+            mainMsg.innerHTML = `數一數：總共有 <span class="highlight">${w*h}</span> 個格子`;
+            // 修改處：更新引導語句
+            subMsg.innerText = "你能不能用一個乘法算式來算出總共有幾格？";
+            mainBtn.innerText = "下一步：觀察邊長";
+            mainBtn.style.backgroundColor = "#00a651";
+        } else if (step === 2) {
+            // 步驟2：標示長寬
+            drawCellNumbers(w, h);
+            drawDimensions(w, h);
+            
+            if(w === h) {
+                mainMsg.innerText = "觀察：每邊的格子數都一樣";
+                subMsg.innerHTML = `橫的有 <b>${w}</b> 格，直的也有 <b>${h}</b> 格`;
+            } else {
+                mainMsg.innerText = "觀察：橫的和直的各有幾格？";
+                subMsg.innerHTML = `橫的有 <b>${w}</b> 格，直的有 <b>${h}</b> 格`;
+            }
+            mainBtn.innerText = "下一步：導出公式";
+            mainBtn.style.backgroundColor = "#00a651";
+        } else if (step === 3) {
+            // 步驟3：公式
+            drawBasicGrid(w, h); // 重畫乾淨的
+            drawDimensions(w, h);
+            
+            let area = w * h;
+            // 修改處：公式結果加上單位
+            if (w === h) {
+                mainMsg.innerHTML = `正方形面積 = 邊長 × 邊長`;
+                subMsg.innerHTML = `<span class="formula-box">${w} × ${h} = ${area} (平方公分)</span>`;
+            } else {
+                mainMsg.innerHTML = `長方形面積 = 長 × 寬`;
+                subMsg.innerHTML = `<span class="formula-box">${w} × ${h} = ${area} (平方公分)</span>`;
+            }
+            // 按鈕變成重置功能
+            mainBtn.innerText = "完成 (再玩一次)";
+            mainBtn.style.backgroundColor = "#e65100"; // 換個顏色提示結束
+        }
+    }
+
+    // 畫基礎網格 (無數字)
+    function drawBasicGrid(w, h) {
+        for (let row = 0; row < h; row++) {
+            for (let col = 0; col < w; col++) {
+                const x = offsetX + col * cellSize;
+                const y = offsetY + row * cellSize;
+                
+                ctx.fillStyle = (w === h) ? "#e3f2fd" : "#e8f5e9"; 
+                ctx.fillRect(x, y, cellSize, cellSize);
+                ctx.strokeStyle = "#999";
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x, y, cellSize, cellSize);
+            }
+        }
+    }
+
+    // 畫格子內的數字
+    function drawCellNumbers(w, h) {
+        ctx.fillStyle = "#555";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        // 隨格子大小稍微調整字體
+        ctx.font = "16px Arial";
+        
+        let count = 1;
+        for (let row = 0; row < h; row++) {
+            for (let col = 0; col < w; col++) {
+                const x = offsetX + col * cellSize + cellSize/2;
+                const y = offsetY + row * cellSize + cellSize/2;
+                ctx.fillText(count, x, y);
+                count++;
+            }
+        }
+    }
+
+    // 畫外部標示
+    function drawDimensions(w, h) {
+        const totalW = w * cellSize;
+        const totalH = h * cellSize;
+
+        // 上方標示 (長 / 邊長)
+        ctx.beginPath(); ctx.strokeStyle = "#d32f2f"; ctx.lineWidth = 4;
+        ctx.moveTo(offsetX, offsetY - 10); ctx.lineTo(offsetX + totalW, offsetY - 10); ctx.stroke();
+        
+        ctx.fillStyle = "#d32f2f"; ctx.font = "bold 20px Arial"; ctx.textAlign = "center";
+        // 修改處：加上單位「公分」
+        let wLabel = (w === h) ? `${w}公分 (邊長)` : `${w}公分 (長)`;
+        ctx.fillText(wLabel, offsetX + totalW / 2, offsetY - 30);
+
+        // 左側標示 (寬 / 邊長)
+        ctx.beginPath(); ctx.strokeStyle = "#0056b3"; ctx.lineWidth = 4;
+        ctx.moveTo(offsetX - 10, offsetY); ctx.lineTo(offsetX - 10, offsetY + totalH); ctx.stroke();
+
+        ctx.fillStyle = "#0056b3";
+        ctx.save();
+        
+        // 定位到線條左側垂直中心
+        ctx.translate(offsetX - 20, offsetY + totalH / 2);
+        
+        // 修改處：加上單位「公分」
+        let hLabel = (w === h) ? `${h}公分 (邊長)` : `${h}公分 (寬)`;
+        ctx.textAlign = "right";  // 改為靠右對齊 (往左長)
+        ctx.textBaseline = "middle"; // 垂直置中
+        ctx.fillText(hLabel, 0, 0);
+        
+        ctx.restore();
+    }
+    
+    // 新增：繪製角落單位提示
+    function drawUnitHint() {
+        ctx.save();
+        ctx.fillStyle = "#888"; // 淺灰色
+        ctx.font = "14px Arial";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "bottom";
+        // 座標設定在左下角，留一點邊距 (20px, 高度-15px)
+        ctx.fillText("(註：圖中每一格代表 1 平方公分)", 20, canvas.height - 15);
+        ctx.restore();
+    }
+
+    // 初始化
+    updateGrid();
+
+</script>
+
+</body>
+</html><!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>面積公式推導教學</title>
+    <style>
+        body {
+            font-family: "Microsoft JhengHei", "Heiti TC", sans-serif;
+            margin: 0; padding: 0; background-color: #f0f8ff;
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        /* 給標題一個 ID 以便程式控制，並稍微加大邊距 */
+        h2 { color: #333; margin: 25px 0 15px 0; min-height: 1.2em;}
+
+        /* 控制區 */
+        .controls {
+            background: white; padding: 15px 30px; border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px;
+            display: flex; gap: 40px; align-items: center;
+            flex-wrap: wrap; justify-content: center;
+        }
+        .control-group { display: flex; flex-direction: column; align-items: center; }
+        label { font-weight: bold; margin-bottom: 5px; color: #555; }
+        input[type=range] { width: 150px; cursor: pointer; }
+        
+        .btn-group { display: flex; gap: 10px; }
+        
+        button.action-btn {
+            padding: 10px 24px; font-size: 18px; cursor: pointer; border: none; border-radius: 50px;
+            font-weight: bold; color: white; background-color: #00a651; min-width: 180px;
+            transition: transform 0.1s, background-color 0.2s;
+        }
+        button.action-btn:hover { transform: scale(1.05); background-color: #008c44; }
+        
+        button.reset-btn {
+            padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 50px;
+            background-color: #e0e0e0; color: #555; transition: background-color 0.2s;
+        }
+        button.reset-btn:hover { background-color: #d0d0d0; }
+
+        /* 畫布：加大寬度以容納左側水平文字 */
+        canvas {
+            background-color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-radius: 8px;
+        }
+
+        /* 訊息區 */
+        .info-panel {
+            margin-top: 15px; width: 90%; max-width: 700px;
+            background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd;
+            text-align: center; min-height: 80px; display: flex; flex-direction: column; justify-content: center;
+            margin-bottom: 30px; /* 底部留白 */
+        }
+        .main-msg { font-size: 24px; font-weight: bold; color: #333; margin-bottom: 5px; }
+        .sub-msg { font-size: 18px; color: #666; }
+        .highlight { color: #d32f2f; font-weight: bold; font-size: 28px; }
+        .formula-box { 
+            display: inline-block; background-color: #fff3e0; padding: 5px 15px; 
+            border-radius: 5px; color: #d32f2f; font-weight: bold; margin-top: 5px;
+        }
+        /* 移除原先的 .unit-hint 樣式，因為已經移到 canvas 內繪製 */
+    </style>
+</head>
+<body>
+
+    <!-- 標題 ID 改為 mainTitle 供 JS 控制 -->
+    <h2 id="mainTitle">長方形面積公式推導</h2>
+
+    <div class="controls">
+        <div class="control-group">
+            <label>橫向格數: <span id="valW">5</span></label>
+            <input type="range" id="widthRange" min="1" max="10" value="5" oninput="resetToStart()">
+        </div>
+        <div class="control-group">
+            <label>縱向格數: <span id="valH">3</span></label>
+            <input type="range" id="heightRange" min="1" max="8" value="3" oninput="resetToStart()">
+        </div>
+        
+        <div class="btn-group">
+            <button id="mainBtn" class="action-btn" onclick="handleMainBtn()">下一步：數格子</button>
+            <button class="reset-btn" onclick="resetToStart()">重置題目</button>
+        </div>
+    </div>
+
+    <!-- 加大 Canvas 寬度到 700，讓左邊有空間放橫向文字 -->
+    <canvas id="gridCanvas" width="700" height="540"></canvas>
+
+    <div class="info-panel">
+        <div id="mainMsg" class="main-msg">準備：這是一個圖形</div>
+        <div id="subMsg" class="sub-msg">請想一想，它的面積是多少？</div>
+        <!-- 單位提示已移除，改由 Canvas 繪製 -->
+    </div>
+
+<script>
+    const canvas = document.getElementById('gridCanvas');
+    const ctx = canvas.getContext('2d');
+    const titleElem = document.getElementById('mainTitle'); // 取得標題元素
+    const widthInput = document.getElementById('widthRange');
+    const heightInput = document.getElementById('heightRange');
+    const valW = document.getElementById('valW');
+    const valH = document.getElementById('valH');
+    const mainBtn = document.getElementById('mainBtn');
+    const mainMsg = document.getElementById('mainMsg');
+    const subMsg = document.getElementById('subMsg');
+
+    // 修改處：將格子大小改為 38 (約等於螢幕上的 1cm)
+    const cellSize = 38; 
+    
+    // 這裡我們不再設定固定的 offsetX/Y，改為在 updateGrid 中動態計算
+    let offsetX = 50;  
+    let offsetY = 50;  
+
+    // 狀態: 0=初始, 1=數格子, 2=標示長寬, 3=公式
+    let step = 0;
+
+    // 按鈕的統一控制邏輯
+    function handleMainBtn() {
+        if (step < 3) {
+            step++; // 進入下一步
+        } else {
+            step = 0; // 如果已經是最後一步，則重置回第一步
+        }
+        updateGrid();
+    }
+
+    function resetToStart() {
+        step = 0;
+        updateGrid();
+    }
+
+    function updateGrid() {
+        const w = parseInt(widthInput.value);
+        const h = parseInt(heightInput.value);
+        
+        // 更新滑桿數字顯示
+        valW.textContent = w;
+        valH.textContent = h;
+
+        // --- 1. 動態更新標題 ---
+        if (w === h) {
+            titleElem.innerText = "正方形面積公式推導";
+        } else {
+            titleElem.innerText = "長方形面積公式推導";
+        }
+
+        // --- 2. 計算置中位置 ---
+        // 計算圖形總寬高
+        const totalGridW = w * cellSize;
+        const totalGridH = h * cellSize;
+        
+        // 將圖形置中於畫布
+        // 公式：(畫布寬度 - 圖形寬度) / 2
+        offsetX = (canvas.width - totalGridW) / 2;
+        offsetY = (canvas.height - totalGridH) / 2;
+
+        // 清空畫布
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 3. 基礎繪圖
+        drawBasicGrid(w, h);
+        
+        // 在所有步驟都繪製角落的單位提示
+        drawUnitHint();
+
+        // 4. 根據步驟顯示內容與按鈕文字
+        if (step === 0) {
+            // 初始狀態
+            mainMsg.innerText = "準備：請觀察這個圖形";
+            subMsg.innerText = "不用數，你能猜出它的面積是多少？";
+            mainBtn.innerText = "下一步：數格子";
+            mainBtn.style.backgroundColor = "#00a651"; // 綠色
+        } else if (step === 1) {
+            // 步驟1：數格子
+            drawCellNumbers(w, h);
+            mainMsg.innerHTML = `數一數：總共有 <span class="highlight">${w*h}</span> 個格子`;
+            // 修改處：更新引導語句
+            subMsg.innerText = "你能不能用一個乘法算式來算出總共有幾格？";
+            mainBtn.innerText = "下一步：觀察邊長";
+            mainBtn.style.backgroundColor = "#00a651";
+        } else if (step === 2) {
+            // 步驟2：標示長寬
+            drawCellNumbers(w, h);
+            drawDimensions(w, h);
+            
+            if(w === h) {
+                mainMsg.innerText = "觀察：每邊的格子數都一樣";
+                subMsg.innerHTML = `橫的有 <b>${w}</b> 格，直的也有 <b>${h}</b> 格`;
+            } else {
+                mainMsg.innerText = "觀察：橫的和直的各有幾格？";
+                subMsg.innerHTML = `橫的有 <b>${w}</b> 格，直的有 <b>${h}</b> 格`;
+            }
+            mainBtn.innerText = "下一步：導出公式";
+            mainBtn.style.backgroundColor = "#00a651";
+        } else if (step === 3) {
+            // 步驟3：公式
+            drawBasicGrid(w, h); // 重畫乾淨的
+            drawDimensions(w, h);
+            
+            let area = w * h;
+            // 修改處：公式結果加上單位
+            if (w === h) {
+                mainMsg.innerHTML = `正方形面積 = 邊長 × 邊長`;
+                subMsg.innerHTML = `<span class="formula-box">${w} × ${h} = ${area} (平方公分)</span>`;
+            } else {
+                mainMsg.innerHTML = `長方形面積 = 長 × 寬`;
+                subMsg.innerHTML = `<span class="formula-box">${w} × ${h} = ${area} (平方公分)</span>`;
+            }
+            // 按鈕變成重置功能
+            mainBtn.innerText = "完成 (再玩一次)";
+            mainBtn.style.backgroundColor = "#e65100"; // 換個顏色提示結束
+        }
+    }
+
+    // 畫基礎網格 (無數字)
+    function drawBasicGrid(w, h) {
+        for (let row = 0; row < h; row++) {
+            for (let col = 0; col < w; col++) {
+                const x = offsetX + col * cellSize;
+                const y = offsetY + row * cellSize;
+                
+                ctx.fillStyle = (w === h) ? "#e3f2fd" : "#e8f5e9"; 
+                ctx.fillRect(x, y, cellSize, cellSize);
+                ctx.strokeStyle = "#999";
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x, y, cellSize, cellSize);
+            }
+        }
+    }
+
+    // 畫格子內的數字
+    function drawCellNumbers(w, h) {
+        ctx.fillStyle = "#555";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        // 隨格子大小稍微調整字體
+        ctx.font = "16px Arial";
+        
+        let count = 1;
+        for (let row = 0; row < h; row++) {
+            for (let col = 0; col < w; col++) {
+                const x = offsetX + col * cellSize + cellSize/2;
+                const y = offsetY + row * cellSize + cellSize/2;
+                ctx.fillText(count, x, y);
+                count++;
+            }
+        }
+    }
+
+    // 畫外部標示
+    function drawDimensions(w, h) {
+        const totalW = w * cellSize;
+        const totalH = h * cellSize;
+
+        // 上方標示 (長 / 邊長)
+        ctx.beginPath(); ctx.strokeStyle = "#d32f2f"; ctx.lineWidth = 4;
+        ctx.moveTo(offsetX, offsetY - 10); ctx.lineTo(offsetX + totalW, offsetY - 10); ctx.stroke();
+        
+        ctx.fillStyle = "#d32f2f"; ctx.font = "bold 20px Arial"; ctx.textAlign = "center";
+        // 修改處：加上單位「公分」
+        let wLabel = (w === h) ? `${w}公分 (邊長)` : `${w}公分 (長)`;
+        ctx.fillText(wLabel, offsetX + totalW / 2, offsetY - 30);
+
+        // 左側標示 (寬 / 邊長)
+        ctx.beginPath(); ctx.strokeStyle = "#0056b3"; ctx.lineWidth = 4;
+        ctx.moveTo(offsetX - 10, offsetY); ctx.lineTo(offsetX - 10, offsetY + totalH); ctx.stroke();
+
+        ctx.fillStyle = "#0056b3";
+        ctx.save();
+        
+        // 定位到線條左側垂直中心
+        ctx.translate(offsetX - 20, offsetY + totalH / 2);
+        
+        // 修改處：加上單位「公分」
+        let hLabel = (w === h) ? `${h}公分 (邊長)` : `${h}公分 (寬)`;
+        ctx.textAlign = "right";  // 改為靠右對齊 (往左長)
+        ctx.textBaseline = "middle"; // 垂直置中
+        ctx.fillText(hLabel, 0, 0);
+        
+        ctx.restore();
+    }
+    
+    // 新增：繪製角落單位提示
+    function drawUnitHint() {
+        ctx.save();
+        ctx.fillStyle = "#888"; // 淺灰色
+        ctx.font = "14px Arial";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "bottom";
+        // 座標設定在左下角，留一點邊距 (20px, 高度-15px)
+        ctx.fillText("(註：圖中每一格代表 1 平方公分)", 20, canvas.height - 15);
+        ctx.restore();
+    }
+
+    // 初始化
+    updateGrid();
+
+</script>
+
+</body>
+</html>

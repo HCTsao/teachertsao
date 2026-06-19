@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>圖形面積公式逐步推導 (全速優化版)</title>
+    <style>
+        body {
+            font-family: "Microsoft JhengHei", "Heiti TC", sans-serif;
+            margin: 0; padding: 0; background-color: #f5f5f5;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        /* 導覽列 */
+        .nav-bar {
+            background-color: #333; width: 100%; display: flex; justify-content: center;
+            padding: 10px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .nav-btn {
+            background-color: transparent; color: #ccc; border: 2px solid transparent;
+            padding: 10px 20px; font-size: 18px; cursor: pointer; margin: 0 10px;
+            border-radius: 5px; font-weight: bold; transition: all 0.3s;
+        }
+        .nav-btn:hover { color: white; background-color: #555; }
+        .nav-btn.active { color: white; border-color: #00a651; background-color: #444; }
+
+        /* 內容區 */
+        .page-section {
+            display: none; flex-direction: column; align-items: center; width: 100%; max-width: 800px;
+            padding: 20px; animation: fadeIn 0.5s;
+        }
+        .page-section.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        h2 { color: #333; margin-bottom: 10px; }
+        canvas { background-color: white; margin: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-radius: 4px; }
+
+        .controls { display: flex; gap: 15px; margin: 10px 0; }
+        
+        button.action-btn {
+            padding: 10px 30px; font-size: 18px; cursor: pointer; border: none; border-radius: 50px;
+            font-weight: bold; color: white; background-color: #00a651; min-width: 200px;
+            transition: transform 0.1s, background-color 0.2s;
+        }
+        button.action-btn:hover { transform: scale(1.02); background-color: #008c44; }
+        button.action-btn:disabled { background-color: #ccc; cursor: not-allowed; transform: none; }
+        
+        button.reset-btn {
+            padding: 10px 20px; font-size: 18px; cursor: pointer; border: none; border-radius: 50px;
+            background-color: #e0e0e0; color: #555;
+        }
+        button.reset-btn:hover { background-color: #d0d0d0; }
+
+        /* 訊息與公式區 */
+        .message-box {
+            font-size: 20px; font-weight: bold; color: #444; min-height: 1.5em; text-align: center; margin-bottom: 10px;
+        }
+        .conclusion-box {
+            width: 90%;
+            margin-top: 5px; padding: 15px 30px; background: #e8f5e9; border-radius: 10px;
+            border: 2px solid #00a651; font-size: 22px; color: #333; text-align: left; 
+            line-height: 1.8; display: none; /* 一開始隱藏 */
+        }
+        /* 每一行算式預設隱藏，透過 JS 顯示 */
+        .math-line { display: none; border-bottom: 1px dashed #ccc; padding: 5px 0; }
+        .math-line.visible { display: block; animation: slideIn 0.3s ease-out; }
+        .math-line:last-child { border-bottom: none; }
+        
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+
+        .highlight-red { color: #d32f2f; font-weight: bold; }
+        .highlight-blue { color: #0056b3; font-weight: bold; }
+        .final-answer { font-size: 26px; color: #d32f2f; font-weight: bold; background-color: #fff3e0; padding: 5px 10px; border-radius: 5px; display: inline-block; margin-top: 5px;}
+    </style>
+</head>
+<body>
+
+    <div class="nav-bar">
+        <button class="nav-btn active" onclick="switchPage('page1')">1. 平行四邊形</button>
+        <button class="nav-btn" onclick="switchPage('page2')">2. 三角形</button>
+        <button class="nav-btn" onclick="switchPage('page3')">3. 梯形</button>
+    </div>
+
+    <!-- ================= 頁面 1: 平行四邊形 ================= -->
+    <div id="page1" class="page-section active">
+        <h2>平行四邊形面積公式</h2>
+        <div class="controls">
+            <button id="btn1" class="action-btn" onclick="p1_next()">下一步：剪下並平移</button>
+            <button class="reset-btn" onclick="p1_reset()">重置</button>
+        </div>
+        <canvas id="canvas1" width="600" height="400"></canvas>
+        <div id="msg1" class="message-box">準備：請觀察這個平行四邊形</div>
+        
+        <div id="concl1" class="conclusion-box">
+            <div id="p1_line1" class="math-line">1. 形狀改變：平行四邊形 ➝ <b>長方形</b></div>
+            <div id="p1_line2" class="math-line">2. 長方形面積 = 長 × 寬</div>
+            <div id="p1_line3" class="math-line">3. 對應原本圖形：長 = <b>底</b>，寬 = <b>高</b></div>
+            <div id="p1_line4" class="math-line">4. 所以：平行四邊形面積 = <span class="final-answer">底 × 高</span></div>
+        </div>
+    </div>
+
+    <!-- ================= 頁面 2: 三角形 ================= -->
+    <div id="page2" class="page-section">
+        <h2>三角形面積公式</h2>
+        <div class="controls">
+            <button id="btn2" class="action-btn" onclick="p2_next()">下一步：複製並旋轉</button>
+            <button class="reset-btn" onclick="p2_reset()">重置</button>
+        </div>
+        <canvas id="canvas2" width="600" height="420"></canvas>
+        <div id="msg2" class="message-box">準備：這是一個三角形</div>
+
+        <div id="concl2" class="conclusion-box">
+            <div id="p2_line1" class="math-line">1. 拼合結果：兩個三角形拼成一個 <b>平行四邊形</b></div>
+            <div id="p2_line2" class="math-line">2. 平行四邊形面積 = 底 × 高</div>
+            <div id="p2_line3" class="math-line">3. 我們只需要算其中一個三角形 (一半)</div>
+            <div id="p2_line4" class="math-line">4. 所以：三角形面積 = <span class="final-answer">底 × 高 ÷ 2</span></div>
+        </div>
+    </div>
+
+    <!-- ================= 頁面 3: 梯形 ================= -->
+    <div id="page3" class="page-section">
+        <h2>梯形面積公式</h2>
+        <div class="controls">
+            <button id="btn3" class="action-btn" onclick="p3_next()">下一步：複製並旋轉</button>
+            <button class="reset-btn" onclick="p3_reset()">重置</button>
+        </div>
+        <canvas id="canvas3" width="600" height="420"></canvas>
+        <div id="msg3" class="message-box">準備：這是一個梯形，有上底與下底</div>
+
+        <div id="concl3" class="conclusion-box">
+            <div id="p3_line1" class="math-line">1. 拼合結果：兩個梯形拼成一個大 <b>平行四邊形</b></div>
+            <div id="p3_line2" class="math-line">2. 大平行四邊形的底 = <span class="highlight-blue">上底</span> + <span class="highlight-blue">下底</span></div>
+            <div id="p3_line3" class="math-line">3. 大平行四邊形面積 = (上底 + 下底) × 高</div>
+            <div id="p3_line4" class="math-line">4. 梯形是它的一半，所以面積 = <span class="final-answer">(上底 + 下底) × 高 ÷ 2</span></div>
+        </div>
+    </div>
+
+<script>
+    // === 通用設定 ===
+    const COLORS = {
+        fill: "#d1ece5", fillCopy: "#ffe082", stroke: "#333",
+        red: "#ff3333", green: "#00a651", blue: "#0056b3"
+    };
+
+    function switchPage(pageId) {
+        document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+        document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+        if(pageId === 'page1') document.querySelectorAll('.nav-btn')[0].classList.add('active');
+        if(pageId === 'page2') document.querySelectorAll('.nav-btn')[1].classList.add('active');
+        if(pageId === 'page3') document.querySelectorAll('.nav-btn')[2].classList.add('active');
+    }
+
+    // ==========================================
+    //  頁面 1 邏輯 (平行四邊形)
+    // ==========================================
+    const ctx1 = document.getElementById('canvas1').getContext('2d');
+    const msg1 = document.getElementById('msg1');
+    const concl1 = document.getElementById('concl1');
+    const btn1 = document.getElementById('btn1');
+    
+    const p1_baseY=300, p1_h=160, p1_topY=p1_baseY-p1_h, p1_b=280, p1_shift=100, p1_startX=100;
+    
+    let p1_state = 0; 
+    let p1_progress = 0;
+    let p1_animating = false;
+
+    function p1_draw() {
+        ctx1.clearRect(0,0,600,400); ctx1.lineWidth=2; ctx1.lineJoin="round";
+        
+        // 根據動畫進度繪圖
+        let isSplit = (p1_state >= 1) || (p1_animating); // 是否切開
+
+        if (!isSplit) {
+            // 完整平行四邊形
+            ctx1.fillStyle=COLORS.fill; ctx1.strokeStyle=COLORS.stroke; ctx1.beginPath();
+            ctx1.moveTo(p1_startX,p1_baseY); ctx1.lineTo(p1_startX+p1_b,p1_baseY); ctx1.lineTo(p1_startX+p1_b+p1_shift,p1_topY); ctx1.lineTo(p1_startX+p1_shift,p1_topY); ctx1.closePath(); ctx1.fill(); ctx1.stroke();
+            // 內部紅線
+            ctx1.beginPath(); ctx1.strokeStyle=COLORS.red; ctx1.lineWidth=3; ctx1.moveTo(p1_startX+p1_shift,p1_topY); ctx1.lineTo(p1_startX+p1_shift,p1_baseY); ctx1.stroke();
+        } else {
+            // 切開並移動
+            // 右邊梯形
+            ctx1.fillStyle=COLORS.fill; ctx1.strokeStyle=COLORS.stroke; ctx1.beginPath();
+            ctx1.moveTo(p1_startX+p1_shift,p1_baseY); ctx1.lineTo(p1_startX+p1_b,p1_baseY); ctx1.lineTo(p1_startX+p1_b+p1_shift,p1_topY); ctx1.lineTo(p1_startX+p1_shift,p1_topY); ctx1.closePath(); ctx1.fill(); ctx1.stroke();
+            
+            // 左邊三角形 (移動)
+            let currX = p1_startX + (p1_progress * p1_b);
+            ctx1.beginPath(); ctx1.moveTo(currX,p1_baseY); ctx1.lineTo(currX+p1_shift,p1_baseY); ctx1.lineTo(currX+p1_shift,p1_topY); ctx1.closePath(); ctx1.fill(); ctx1.stroke();
+            
+            // 紅線 (高)
+            ctx1.strokeStyle=COLORS.red; ctx1.lineWidth=3; ctx1.beginPath(); ctx1.moveTo(currX+p1_shift,p1_topY); ctx1.lineTo(currX+p1_shift,p1_baseY); ctx1.stroke();
+        }
+
+        // --- 標記與文字邏輯優化 ---
+        
+        // 直角記號 (永遠跟隨三角形右下角的紅線位置)
+        let triCornerX = (isSplit) ? (p1_startX + (p1_progress * p1_b) + p1_shift) : (p1_startX + p1_shift);
+        ctx1.strokeStyle="#333"; ctx1.lineWidth=1; 
+        ctx1.beginPath(); ctx1.moveTo(triCornerX-15,p1_baseY); ctx1.lineTo(triCornerX-15,p1_baseY-15); ctx1.lineTo(triCornerX,p1_baseY-15); ctx1.stroke();
+
+        // 綠線 (底)
+        ctx1.strokeStyle=COLORS.green; ctx1.lineWidth=4; ctx1.beginPath();
+        // 底線的視覺位置：如果合成了長方形，底線就畫在長方形下面
+        if (p1_progress >= 1) { 
+            ctx1.moveTo(p1_startX+p1_shift,p1_baseY); ctx1.lineTo(p1_startX+p1_shift+p1_b,p1_baseY); 
+        } else {
+            ctx1.moveTo(p1_startX,p1_baseY); ctx1.lineTo(p1_startX+p1_b,p1_baseY); 
+        }
+        ctx1.stroke();
+
+        // 文字標示：永遠顯示「底」與「高」，並且跟著圖形跑
+        ctx1.fillStyle="#000"; ctx1.font="bold 24px Arial"; ctx1.textAlign="center";
+
+        // 1. 高的文字：跟著紅線跑
+        // 紅線 X 座標 = triCornerX
+        ctx1.fillText("高", triCornerX-30, (p1_topY+p1_baseY)/2+10);
+
+        // 2. 底的文字：
+        // 為了視覺連貫，文字位置從「原本的中心」平滑移動到「新長方形的中心」
+        // 原本中心 X: p1_startX + p1_b/2
+        // 新中心 X: p1_startX + p1_shift + p1_b/2
+        // 移動量: p1_shift * p1_progress
+        let baseTextX = p1_startX + p1_b/2 + (p1_progress * p1_shift);
+        ctx1.fillText("底", baseTextX, p1_baseY+40); 
+    }
+
+    function p1_next() {
+        if (p1_animating) return;
+
+        if (p1_state === 0) {
+            // 開始動畫
+            p1_animating = true;
+            btn1.disabled = true;
+            msg1.innerHTML = "步驟 1: 剪下並移補成一個長方形...";
+            p1_animate_loop();
+        } else if (p1_state === 1) {
+            document.getElementById('p1_line1').classList.add('visible');
+            btn1.innerText = "下一步：公式";
+            p1_state++;
+        } else if (p1_state === 2) {
+            document.getElementById('p1_line2').classList.add('visible');
+            btn1.innerText = "下一步：對應";
+            p1_state++;
+        } else if (p1_state === 3) {
+            document.getElementById('p1_line3').classList.add('visible');
+            btn1.innerText = "下一步：結論";
+            p1_state++;
+        } else if (p1_state === 4) {
+            document.getElementById('p1_line4').classList.add('visible');
+            btn1.innerText = "推導完成";
+            btn1.disabled = true;
+        }
+    }
+
+    function p1_animate_loop() {
+        if (p1_progress < 1) {
+            p1_progress += 0.01; // [優化] 速度變慢
+            if (p1_progress > 1) p1_progress = 1;
+            p1_draw();
+            requestAnimationFrame(p1_animate_loop);
+        } else {
+            p1_animating = false;
+            p1_state = 1;
+            msg1.innerHTML = "變形完成！現在是長方形";
+            concl1.style.display = "block"; // 顯示框框
+            btn1.innerText = "下一步：推導公式";
+            btn1.disabled = false;
+            p1_draw();
+        }
+    }
+
+    function p1_reset() {
+        p1_animating = false; p1_state = 0; p1_progress = 0;
+        msg1.innerHTML = "準備：請觀察這個平行四邊形";
+        btn1.innerText = "下一步：剪下並平移"; btn1.disabled = false;
+        concl1.style.display = "none";
+        // 隱藏所有公式行
+        document.querySelectorAll('#concl1 .math-line').forEach(el => el.classList.remove('visible'));
+        p1_draw();
+    }
+
+
+    // ==========================================
+    //  頁面 2 邏輯 (三角形)
+    // ==========================================
+    const ctx2 = document.getElementById('canvas2').getContext('2d');
+    const msg2 = document.getElementById('msg2');
+    const concl2 = document.getElementById('concl2');
+    const btn2 = document.getElementById('btn2');
+
+    const p2_startX=150, p2_startY=320, p2_b=240, p2_h=160, p2_topOffset=100;
+    const p2_pA={x:p2_startX,y:p2_startY}, p2_pB={x:p2_startX+p2_b,y:p2_startY}, p2_pC={x:p2_startX+p2_topOffset,y:p2_startY-p2_h};
+    
+    let p2_state = 0; 
+    let p2_progress = 0;
+    let p2_animating = false;
+
+    function drawTriangle(ctx,p1,p2,p3,color){ ctx.fillStyle=color; ctx.strokeStyle=COLORS.stroke; ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y); ctx.lineTo(p3.x,p3.y); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    
+    function p2_draw() {
+        ctx2.clearRect(0,0,600,420); ctx2.lineWidth=2; ctx2.lineJoin="round";
+        
+        // 原始
+        drawTriangle(ctx2,p2_pA,p2_pB,p2_pC,COLORS.fill);
+        // 高與直角
+        ctx2.beginPath(); ctx2.strokeStyle=COLORS.red; ctx2.lineWidth=3; ctx2.moveTo(p2_pC.x,p2_pC.y); ctx2.lineTo(p2_pC.x,p2_startY); ctx2.stroke();
+        ctx2.strokeStyle="#333"; ctx2.lineWidth=1; ctx2.beginPath(); ctx2.moveTo(p2_pC.x-15,p2_startY); ctx2.lineTo(p2_pC.x-15,p2_startY-15); ctx2.lineTo(p2_pC.x,p2_startY-15); ctx2.stroke();
+
+        // 複製
+        if (p2_progress > 0) {
+            const midX=(p2_pB.x+p2_pC.x)/2; const midY=(p2_pB.y+p2_pC.y)/2;
+            ctx2.save(); ctx2.translate(midX,midY);
+            ctx2.rotate(p2_progress * Math.PI);
+            ctx2.translate(-midX,-midY);
+            drawTriangle(ctx2,p2_pA,p2_pB,p2_pC,COLORS.fillCopy);
+            ctx2.restore();
+        }
+
+        // 標示
+        ctx2.strokeStyle=COLORS.green; ctx2.lineWidth=4; ctx2.beginPath(); ctx2.moveTo(p2_startX,p2_startY); ctx2.lineTo(p2_startX+p2_b,p2_startY); ctx2.stroke();
+        ctx2.fillStyle="#000"; ctx2.font="bold 24px Arial"; ctx2.textAlign="center"; 
+        ctx2.fillText("底",p2_startX+p2_b/2,p2_startY+40); 
+        // [修改] 將高往右邊寫一點 (p2_pC.x - 15)
+        ctx2.fillText("高",p2_pC.x-15,(p2_pC.y+p2_startY)/2+10);
+        
+        if(p2_progress >= 1){ 
+            ctx2.fillStyle="#666"; ctx2.font="bold 20px Arial"; 
+            ctx2.fillText("1",p2_startX+p2_b/2,p2_startY-p2_h/3); 
+            ctx2.fillText("2",p2_startX+p2_b+(p2_topOffset-p2_b/2),p2_startY-p2_h*0.66); 
+        }
+    }
+
+    function p2_next() {
+        if (p2_animating) return;
+        if (p2_state === 0) {
+            p2_animating = true; btn2.disabled = true;
+            msg2.innerHTML = "動畫：複製並旋轉拼合...";
+            p2_animate_loop();
+        } else if (p2_state === 1) {
+            document.getElementById('p2_line1').classList.add('visible');
+            btn2.innerText = "下一步：大圖形面積";
+            p2_state++;
+        } else if (p2_state === 2) {
+            document.getElementById('p2_line2').classList.add('visible');
+            btn2.innerText = "下一步：一半";
+            p2_state++;
+        } else if (p2_state === 3) {
+            document.getElementById('p2_line3').classList.add('visible');
+            btn2.innerText = "下一步：結論";
+            p2_state++;
+        } else if (p2_state === 4) {
+            document.getElementById('p2_line4').classList.add('visible');
+            btn2.innerText = "推導完成";
+            btn2.disabled = true;
+        }
+    }
+
+    function p2_animate_loop() {
+        if (p2_progress < 1) {
+            p2_progress += 0.01; // [優化] 速度變慢
+            if (p2_progress > 1) p2_progress = 1;
+            p2_draw(); requestAnimationFrame(p2_animate_loop);
+        } else {
+            p2_animating = false; p2_state = 1;
+            msg2.innerHTML = "拼圖完成！請看下方";
+            concl2.style.display = "block";
+            btn2.innerText = "下一步：推導公式"; btn2.disabled = false;
+            p2_draw();
+        }
+    }
+
+    function p2_reset() {
+        p2_animating = false; p2_state = 0; p2_progress = 0;
+        msg2.innerHTML = "準備：這是一個三角形";
+        btn2.innerText = "下一步：複製並旋轉"; btn2.disabled = false;
+        concl2.style.display = "none";
+        document.querySelectorAll('#concl2 .math-line').forEach(el => el.classList.remove('visible'));
+        p2_draw();
+    }
+
+
+    // ==========================================
+    //  頁面 3 邏輯 (梯形)
+    // ==========================================
+    const ctx3 = document.getElementById('canvas3').getContext('2d');
+    const msg3 = document.getElementById('msg3');
+    const concl3 = document.getElementById('concl3');
+    const btn3 = document.getElementById('btn3');
+
+    const p3_startX=150, p3_startY=300, p3_b=180, p3_a=120, p3_h=130, p3_shift=40;
+    const p3_p1={x:p3_startX,y:p3_startY}, p3_p2={x:p3_startX+p3_b,y:p3_startY}, p3_p3={x:p3_startX+p3_shift+p3_a,y:p3_startY-p3_h}, p3_p4={x:p3_startX+p3_shift,y:p3_startY-p3_h};
+    
+    let p3_state = 0; 
+    let p3_progress = 0;
+    let p3_animating = false;
+
+    function drawTrapezoid(ctx,p1,p2,p3,p4,color,isBase){
+        ctx.fillStyle=color; ctx.strokeStyle=COLORS.stroke; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y); ctx.lineTo(p3.x,p3.y); ctx.lineTo(p4.x,p4.y); ctx.closePath(); ctx.fill(); ctx.stroke();
+        if(isBase){
+            ctx.beginPath(); ctx.strokeStyle=COLORS.red; ctx.lineWidth=3; ctx.moveTo(p4.x,p4.y); ctx.lineTo(p4.x,p1.y); ctx.stroke();
+            ctx.strokeStyle="#333"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(p4.x-15,p1.y); ctx.lineTo(p4.x-15,p1.y-15); ctx.lineTo(p4.x,p1.y-15); ctx.stroke();
+        }
+    }
+
+    function p3_draw() {
+        ctx3.clearRect(0,0,600,420); ctx3.lineJoin="round";
+        
+        // 1. 原始梯形
+        drawTrapezoid(ctx3,p3_p1,p3_p2,p3_p3,p3_p4,COLORS.fill,true);
+        
+        const midX=(p3_p2.x+p3_p3.x)/2; const midY=(p3_p2.y+p3_p3.y)/2;
+
+        if (p3_progress > 0) {
+            // 2. 複製梯形
+            ctx3.save(); ctx3.translate(midX,midY);
+            ctx3.rotate(p3_progress * Math.PI);
+            ctx3.translate(-midX,-midY);
+            drawTrapezoid(ctx3,p3_p1,p3_p2,p3_p3,p3_p4,COLORS.fillCopy,false);
+
+            if(p3_progress >= 1) {
+                // 畫藍線
+                ctx3.lineWidth=4; ctx3.strokeStyle=COLORS.blue;
+                ctx3.beginPath(); ctx3.moveTo(p3_p1.x, p3_p1.y); ctx3.lineTo(p3_p2.x, p3_p2.y); ctx3.stroke();
+                ctx3.beginPath(); ctx3.moveTo(p3_p4.x, p3_p4.y); ctx3.lineTo(p3_p3.x, p3_p3.y); ctx3.stroke();
+            }
+            ctx3.restore();
+        }
+
+        // 標示 (原始)
+        ctx3.lineWidth=4; ctx3.strokeStyle=COLORS.green;
+        ctx3.beginPath(); ctx3.moveTo(p3_p1.x,p3_p1.y); ctx3.lineTo(p3_p2.x,p3_p2.y); ctx3.stroke(); 
+        ctx3.beginPath(); ctx3.moveTo(p3_p4.x,p3_p4.y); ctx3.lineTo(p3_p3.x,p3_p3.y); ctx3.stroke(); 
+
+        ctx3.fillStyle="#000"; ctx3.font="bold 24px Arial"; ctx3.textAlign="center";
+        ctx3.fillText("下底",(p3_p1.x+p3_p2.x)/2,p3_p1.y+35); 
+        ctx3.fillText("上底",(p3_p4.x+p3_p3.x)/2,p3_p4.y-15); 
+        // [修改] 將高寫到右邊 (p3_p4.x + 15)
+        ctx3.fillText("高",p3_p4.x+15,(p3_p1.y+p3_p4.y)/2+10);
+
+        if(p3_progress >= 1){
+            ctx3.fillStyle="#666"; ctx3.font="bold 20px Arial";
+            ctx3.fillText("1",(p3_p1.x+p3_p2.x)/2,p3_p1.y-p3_h/2); ctx3.fillText("2",p3_p2.x+p3_a/2,p3_p1.y-p3_h/2);
+            
+            const origBottomCenterX=(p3_p1.x+p3_p2.x)/2; const newTopCenterX=2*midX-origBottomCenterX; const newTopCenterY=2*midY-p3_p1.y;
+            const origTopCenterX=(p3_p4.x+p3_p3.x)/2; const newBottomCenterX=2*midX-origTopCenterX; const newBottomCenterY=2*midY-p3_p4.y;
+            
+            ctx3.fillStyle=COLORS.blue; ctx3.font="bold 24px Arial";
+            ctx3.fillText("下底",newTopCenterX,newTopCenterY-15); ctx3.fillText("上底",newBottomCenterX,newBottomCenterY+35);
+        }
+    }
+
+    function p3_next() {
+        if (p3_animating) return;
+        if (p3_state === 0) {
+            p3_animating = true; btn3.disabled = true;
+            msg3.innerHTML = "動畫：複製並旋轉拼合...";
+            p3_animate_loop();
+        } else if (p3_state === 1) {
+            document.getElementById('p3_line1').classList.add('visible');
+            btn3.innerText = "下一步：計算底長";
+            p3_state++;
+        } else if (p3_state === 2) {
+            document.getElementById('p3_line2').classList.add('visible');
+            btn3.innerText = "下一步：大面積";
+            p3_state++;
+        } else if (p3_state === 3) {
+            document.getElementById('p3_line3').classList.add('visible');
+            btn3.innerText = "下一步：結論";
+            p3_state++;
+        } else if (p3_state === 4) {
+            document.getElementById('p3_line4').classList.add('visible');
+            btn3.innerText = "推導完成";
+            btn3.disabled = true;
+        }
+    }
+
+    function p3_animate_loop() {
+        if (p3_progress < 1) {
+            p3_progress += 0.01; // [優化] 速度變慢
+            if (p3_progress > 1) p3_progress = 1;
+            p3_draw(); requestAnimationFrame(p3_animate_loop);
+        } else {
+            p3_animating = false; p3_state = 1;
+            msg3.innerHTML = "拼圖完成！請看下方推導";
+            concl3.style.display = "block";
+            btn3.innerText = "下一步：推導公式"; btn3.disabled = false;
+            p3_draw();
+        }
+    }
+
+    function p3_reset() {
+        p3_animating = false; p3_state = 0; p3_progress = 0;
+        msg3.innerHTML = "準備：這是一個梯形，有上底與下底";
+        btn3.innerText = "下一步：複製並旋轉"; btn3.disabled = false;
+        concl3.style.display = "none";
+        document.querySelectorAll('#concl3 .math-line').forEach(el => el.classList.remove('visible'));
+        p3_draw();
+    }
+
+    // 初始化
+    p1_draw(); p2_draw(); p3_draw();
+</script>
+</body>
+</html>

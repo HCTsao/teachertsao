@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>速率小達人 - 六年級數學練習</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f0f9ff;
+        }
+        .math-box {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .unit-btn {
+            transition: all 0.2s;
+        }
+        .unit-btn.selected {
+            background-color: #3b82f6;
+            color: white;
+            border-color: #2563eb;
+            transform: scale(1.05);
+        }
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes shake {
+            10 { transform: translate3d(-1px, 0, 0); }
+            20% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+            80% { transform: translate3d(2px, 0, 0); }
+            90% { transform: translate3d(-1px, 0, 0); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div id="app" class="w-full max-w-md math-box p-8">
+        <!-- 主畫面 -->
+        <div id="menu-screen" class="text-center">
+            <h1 class="text-3xl font-bold text-blue-600 mb-6">🏃 速率小達人</h1>
+            <p class="text-gray-600 mb-8">答對才能過關！挑戰看看你的準確度吧！</p>
+            
+            <div class="space-y-4">
+                <button onclick="startQuiz('basic')" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg transition duration-200">
+                    基礎練習 (整數整除)
+                </button>
+                <button onclick="startQuiz('advanced')" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg transition duration-200">
+                    進階挑戰 (可能含小數)
+                </button>
+            </div>
+            <p class="mt-6 text-sm text-gray-500 italic">每關共有 5 題，加油！</p>
+        </div>
+
+        <!-- 練習畫面 -->
+        <div id="quiz-screen" class="hidden">
+            <div class="flex justify-between items-center mb-6">
+                <span id="question-progress" class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded">第 1 / 5 題</span>
+                <span id="score-display" class="text-gray-600 font-medium">得分: 0</span>
+            </div>
+
+            <div class="mb-6">
+                <div id="question-text" class="text-xl font-bold text-gray-800 leading-relaxed mb-4 min-h-[100px]">
+                    <!-- 題目內容 -->
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-500 mb-1">請輸入數值：</label>
+                    <input type="number" id="user-answer" step="any" placeholder="請輸入答案數字" 
+                        class="w-full border-2 border-gray-300 rounded-lg p-3 text-lg focus:outline-none focus:border-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-500 mb-2">請選擇正確單位：</label>
+                    <div id="unit-options" class="grid grid-cols-3 gap-2">
+                        <!-- 單位按鈕 -->
+                    </div>
+                </div>
+            </div>
+
+            <button id="submit-btn" onclick="checkAnswer()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200 mb-4">
+                確認答案
+            </button>
+            
+            <div id="feedback" class="text-center font-bold h-6"></div>
+        </div>
+
+        <!-- 結果畫面 -->
+        <div id="result-screen" class="hidden text-center">
+            <h2 class="text-3xl font-bold text-gray-800 mb-4">完成練習！</h2>
+            <div class="text-6xl font-bold text-blue-600 mb-6" id="final-score">0</div>
+            <p id="result-comment" class="text-lg text-gray-600 mb-8"></p>
+            <button onclick="resetGame()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200">
+                再練習一次
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentLevel = 'basic';
+        let questions = [];
+        let currentIndex = 0;
+        let score = 0;
+        let currentQuestion = {};
+        let selectedUnit = "";
+        let firstTry = true; // 追蹤是否為第一次嘗試，用來計分
+
+        const TYPES = { SPEED: '求速率', TIME: '求時間', DISTANCE: '求距離' };
+
+        const SCENARIOS = [
+            { subject: "小明走路", speedRange: [60, 90], sUnit: "公尺/分", tFull: "分鐘", dUnit: "公尺" },
+            { subject: "運動員跑步", speedRange: [5, 9], sUnit: "公尺/秒", tFull: "秒", dUnit: "公尺" },
+            { subject: "小華騎腳踏車", speedRange: [12, 20], sUnit: "公里/時", tFull: "小時", dUnit: "公里" },
+            { subject: "爸爸開車", speedRange: [50, 90], sUnit: "公里/時", tFull: "小時", dUnit: "公里" },
+            { subject: "高鐵", speedRange: [250, 300], sUnit: "公里/時", tFull: "小時", dUnit: "公里" },
+            { subject: "捷運", speedRange: [30, 60], sUnit: "公里/時", tFull: "小時", dUnit: "公里" },
+            { subject: "獵豹奔跑", speedRange: [20, 30], sUnit: "公尺/秒", tFull: "秒", dUnit: "公尺" }
+        ];
+
+        const ALL_UNITS = ["公里/時", "公尺/時", "公尺/分", "公尺/秒", "小時", "分鐘", "秒", "公里", "公尺", "公分"];
+
+        function startQuiz(level) {
+            currentLevel = level;
+            questions = generateQuestions();
+            currentIndex = 0;
+            score = 0;
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('quiz-screen').classList.remove('hidden');
+            showQuestion();
+        }
+
+        function generateQuestions() {
+            let qs = [];
+            let types = [TYPES.SPEED, TYPES.TIME, TYPES.DISTANCE, TYPES.SPEED, TYPES.TIME];
+            types.sort(() => Math.random() - 0.5);
+            for (let i = 0; i < 5; i++) {
+                qs.push(createSingleQuestion(types[i]));
+            }
+            return qs;
+        }
+
+        function createSingleQuestion(type) {
+            const sce = SCENARIOS[Math.floor(Math.random() * SCENARIOS.length)];
+            let d, v, t, ans, unit;
+
+            if (currentLevel === 'basic') {
+                v = Math.floor(Math.random() * (sce.speedRange[1] - sce.speedRange[0])) + sce.speedRange[0];
+                t = Math.floor(Math.random() * 5) + 2;
+                d = v * t;
+                if (type === TYPES.SPEED) { ans = v; unit = sce.sUnit; }
+                else if (type === TYPES.TIME) { ans = t; unit = sce.tFull; }
+                else { ans = d; unit = sce.dUnit; }
+            } else {
+                v = Math.floor(Math.random() * (sce.speedRange[1] - sce.speedRange[0])) + sce.speedRange[0];
+                t = (Math.floor(Math.random() * 20) + 11) / 10;
+                d = v * t;
+                if (type === TYPES.SPEED) { ans = Math.round((d / t) * 100) / 100; unit = sce.sUnit; }
+                else if (type === TYPES.TIME) { ans = Math.round((d / v) * 100) / 100; unit = sce.tFull; }
+                else { ans = Math.round(d * 100) / 100; unit = sce.dUnit; }
+            }
+
+            let options = [unit];
+            while (options.length < 3) {
+                let rU = ALL_UNITS[Math.floor(Math.random() * ALL_UNITS.length)];
+                if (!options.includes(rU)) options.push(rU);
+            }
+            options.sort(() => Math.random() - 0.5);
+
+            return { ...sce, type, d, v, t, ans, unit, options };
+        }
+
+        function showQuestion() {
+            currentQuestion = questions[currentIndex];
+            firstTry = true; // 重設為第一次嘗試
+            
+            const qText = document.getElementById('question-text');
+            const unitContainer = document.getElementById('unit-options');
+            
+            document.getElementById('question-progress').innerText = `第 ${currentIndex + 1} / 5 題`;
+            document.getElementById('score-display').innerText = `得分: ${score}`;
+            document.getElementById('feedback').innerText = '';
+            document.getElementById('user-answer').value = '';
+            selectedUnit = "";
+
+            let text = "";
+            const highlight = (val) => `<span class="text-blue-600">${val}</span>`;
+
+            switch (currentQuestion.type) {
+                case TYPES.SPEED:
+                    text = `${currentQuestion.subject}在 ${highlight(currentQuestion.t)} ${currentQuestion.tFull}內行駛了 ${highlight(currentQuestion.d)} ${currentQuestion.dUnit}，請問${currentQuestion.subject}的速率是多少？`;
+                    break;
+                case TYPES.TIME:
+                    text = `${currentQuestion.subject}以速率 ${highlight(currentQuestion.v)} ${currentQuestion.sUnit} 行駛了 ${highlight(currentQuestion.d)} ${currentQuestion.dUnit}，請問需要花多少${currentQuestion.tFull}？`;
+                    break;
+                case TYPES.DISTANCE:
+                    text = `${currentQuestion.subject}以速率 ${highlight(currentQuestion.v)} ${currentQuestion.sUnit} 行駛了 ${highlight(currentQuestion.t)} ${currentQuestion.tFull}，請問總共行駛了${highlight('多遠')}？`;
+                    break;
+            }
+
+            if (currentLevel === 'advanced') {
+                text += `<br><span class="text-sm text-red-500 font-normal">(若有小數，請四捨五入至小數點後兩位)</span>`;
+            }
+            qText.innerHTML = text;
+
+            unitContainer.innerHTML = '';
+            currentQuestion.options.forEach(u => {
+                const btn = document.createElement('button');
+                btn.className = "unit-btn border-2 border-gray-200 rounded-lg py-2 text-sm font-medium bg-gray-50";
+                btn.innerText = u;
+                btn.onclick = () => {
+                    selectedUnit = u;
+                    document.querySelectorAll('.unit-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                };
+                unitContainer.appendChild(btn);
+            });
+        }
+
+        function checkAnswer() {
+            const userValInput = document.getElementById('user-answer');
+            const userVal = parseFloat(userValInput.value);
+            const feedback = document.getElementById('feedback');
+            const quizBox = document.getElementById('quiz-screen');
+            
+            if (isNaN(userVal) || !selectedUnit) {
+                feedback.innerText = "⚠️ 請填寫數字並選擇單位！";
+                feedback.className = "text-center font-bold text-yellow-500";
+                return;
+            }
+
+            const numCorrect = Math.abs(userVal - currentQuestion.ans) < 0.01;
+            const unitCorrect = selectedUnit === currentQuestion.unit;
+
+            if (numCorrect && unitCorrect) {
+                // 答對了
+                if (firstTry) {
+                    score += 20; // 只有第一次嘗試對才給分
+                    feedback.innerText = "太棒了！完全正確！ ✨";
+                    feedback.className = "text-center font-bold text-green-500";
+                } else {
+                    feedback.innerText = "終於答對了！下次要更細心喔！ 👍";
+                    feedback.className = "text-center font-bold text-blue-500";
+                }
+                
+                document.getElementById('score-display').innerText = `得分: ${score}`;
+                document.getElementById('submit-btn').disabled = true;
+                
+                setTimeout(() => {
+                    document.getElementById('submit-btn').disabled = false;
+                    currentIndex++;
+                    if (currentIndex < 5) showQuestion();
+                    else showResult();
+                }, 2000);
+
+            } else {
+                // 答錯了
+                firstTry = false; // 標記為已經錯過
+                feedback.innerText = "算錯了或單位不對喔，再試試看！ ❌";
+                feedback.className = "text-center font-bold text-red-500";
+                
+                // 增加震動效果提示
+                userValInput.classList.add('shake', 'border-red-500');
+                setTimeout(() => {
+                    userValInput.classList.remove('shake', 'border-red-500');
+                }, 500);
+            }
+        }
+
+        function showResult() {
+            document.getElementById('quiz-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.remove('hidden');
+            document.getElementById('final-score').innerText = score;
+            const comment = document.getElementById('result-comment');
+            if (score === 100) comment.innerText = "完美！你簡直是速率專家！";
+            else if (score >= 60) comment.innerText = "不錯喔！觀念正確，但要注意計算的準確度。";
+            else comment.innerText = "加油！多練習幾次，你一定能掌握技巧的！";
+        }
+
+        function resetGame() {
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('menu-screen').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>

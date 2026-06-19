@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>數學 9-1 & 9-2：分數教學工具</title>
+    <style>
+        /* --- 整體版面設定 --- */
+        body {
+            font-family: 'Microsoft JhengHei', 'PingFang TC', sans-serif;
+            background-color: #fdf6e3;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #d35400;
+            margin-bottom: 5px;
+        }
+        
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 20px;
+            font-size: 1rem;
+        }
+
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        /* --- 頁籤 (Tabs) --- */
+        .tabs {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ecf0f1;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            color: #95a5a6;
+            font-weight: bold;
+            position: relative;
+            outline: none;
+        }
+
+        .tab-btn.active {
+            color: #2c3e50;
+        }
+
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background-color: #e67e22;
+        }
+
+        .tab-content {
+            display: none; /* 預設隱藏 */
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-content.active {
+            display: block; /* 啟用時顯示 */
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* --- 控制區塊 --- */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            background-color: #fcfcfc;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #eee;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        label {
+            font-size: 1.1rem;
+            color: #555;
+            margin-bottom: 5px;
+        }
+
+        input {
+            width: 80px;
+            padding: 8px;
+            font-size: 1.2rem;
+            text-align: center;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+
+        button.action-btn {
+            border: none;
+            padding: 10px 25px;
+            font-size: 1.2rem;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: transform 0.1s;
+            margin-top: 10px; /* 稍微調整位置 */
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        button.action-btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn-green { background-color: #27ae60; }
+        .btn-orange { background-color: #e67e22; }
+
+        .pulse {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(230, 126, 34, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(230, 126, 34, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(230, 126, 34, 0); }
+        }
+
+        /* --- 畫布區塊 --- */
+        .canvas-area {
+            margin: 10px auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 320px; /* 預留高度避免跳動 */
+        }
+
+        /* --- 分數說明文字區塊 --- */
+        .explanation {
+            background-color: #e8f6f3;
+            border: 2px dashed #1abc9c;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 10px;
+            font-size: 1.3rem;
+            line-height: 1.6;
+            color: #2c3e50;
+            min-height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column; 
+        }
+
+        .text-line {
+            margin: 5px 0;
+            white-space: nowrap; /* 避免文字斷在奇怪的地方 */
+        }
+
+        .highlight {
+            color: #e67e22;
+            font-weight: bold;
+            font-size: 1.5rem;
+            margin: 0 5px;
+        }
+
+        .fraction {
+            display: inline-block;
+            vertical-align: middle;
+            text-align: center;
+            font-size: 1.2rem;
+            margin: 0 5px;
+        }
+        .fraction span {
+            display: block;
+            padding: 0 5px;
+        }
+        .fraction .numerator {
+            border-bottom: 2px solid #000;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>國小數學：分數教學</h1>
+    <div class="subtitle">配合課本 9-1 & 9-2</div>
+
+    <div class="container">
+        <!-- 頁籤導覽 -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('pancake')">9-1 切蔥油餅</button>
+            <button class="tab-btn" onclick="switchTab('box')">9-2 分一盒東西</button>
+        </div>
+
+        <!-- === 9-1 蔥油餅內容 === -->
+        <div id="tab-pancake" class="tab-content active">
+            <div class="controls">
+                <div class="input-group">
+                    <label>一張平分幾片？</label>
+                    <input type="number" id="pan_den" value="4" min="1" max="20">
+                </div>
+                <div class="input-group">
+                    <label>拿走幾片？</label>
+                    <input type="number" id="pan_num" value="1" min="0" max="20">
+                </div>
+                <div style="width: 100%; text-align: center; margin-top: 10px;">
+                    <button id="pan_cutBtn" class="action-btn btn-green" onclick="pancakeSim.init()">切切看！</button>
+                    <button id="pan_stepBtn" class="action-btn btn-orange pulse" onclick="pancakeSim.nextStep()" style="display:none;">數數看 (下一步)</button>
+                </div>
+            </div>
+            
+            <div class="canvas-area">
+                <svg id="pancakeSvg" width="300" height="300" viewBox="-110 -110 220 220"></svg>
+            </div>
+
+            <div class="explanation" id="pan_textOutput">
+                請輸入數字並按下按鈕...
+            </div>
+        </div>
+
+        <!-- === 9-2 離散量內容 === -->
+        <div id="tab-box" class="tab-content">
+            <div class="controls">
+                <div class="input-group">
+                    <label>一盒有幾個？</label>
+                    <input type="number" id="box_den" value="6" min="1" max="20">
+                </div>
+                <div class="input-group">
+                    <label>拿走幾個？</label>
+                    <input type="number" id="box_num" value="1" min="0" max="20">
+                </div>
+                <div style="width: 100%; text-align: center; margin-top: 10px;">
+                    <button id="box_initBtn" class="action-btn btn-green" onclick="boxSim.init()">分分看！</button>
+                    <button id="box_stepBtn" class="action-btn btn-orange pulse" onclick="boxSim.nextStep()" style="display:none;">數數看 (下一步)</button>
+                </div>
+            </div>
+
+            <div class="canvas-area">
+                <!-- 這裡使用新的 SVG 區域 -->
+                <svg id="boxSvg" width="320" height="250" viewBox="0 0 320 250"></svg>
+            </div>
+
+            <div class="explanation" id="box_textOutput">
+                請輸入數字並按下按鈕...
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // === 通用工具函式 ===
+        function createFractionHTML(num, den) {
+            return `<div class="fraction"><span class="numerator">${num}</span><span>${den}</span></div>`;
+        }
+
+        // 頁籤切換邏輯
+        function switchTab(tabName) {
+            // 隱藏所有內容
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+            // 顯示選定內容
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            
+            // 更新按鈕狀態
+            const btnIndex = tabName === 'pancake' ? 0 : 1;
+            document.querySelectorAll('.tab-btn')[btnIndex].classList.add('active');
+        }
+
+        // 輸入限制邏輯 (通用)
+        function setupConstraint(denId, numId) {
+            const denInput = document.getElementById(denId);
+            const numInput = document.getElementById(numId);
+
+            // 初始限制
+            numInput.max = denInput.value;
+
+            // 分母改變時
+            denInput.addEventListener('input', function() {
+                let val = parseInt(this.value);
+                if (isNaN(val) || val < 1) val = 1;
+                
+                numInput.max = val;
+                if (parseInt(numInput.value) > val) {
+                    numInput.value = val;
+                }
+            });
+
+            // 分子改變時
+            numInput.addEventListener('input', function() {
+                const max = parseInt(denInput.value);
+                if (parseInt(this.value) > max) {
+                    this.value = max;
+                }
+            });
+        }
+
+        // === 9-1 蔥油餅邏輯 (封裝在 pancakeSim 物件中) ===
+        const pancakeSim = {
+            target: 0,
+            step: 0,
+            total: 4,
+
+            init: function() {
+                const denInput = document.getElementById('pan_den');
+                const numInput = document.getElementById('pan_num');
+                
+                this.total = parseInt(denInput.value);
+                this.target = parseInt(numInput.value);
+
+                if (this.total < 1) { alert("分母至少要是 1 喔！"); return; }
+                if (this.target < 0) { alert("不能拿負數片喔！"); return; }
+
+                const stepBtn = document.getElementById('pan_stepBtn');
+                const cutBtn = document.getElementById('pan_cutBtn');
+
+                if (this.target === 1) {
+                    this.step = 1;
+                    stepBtn.style.display = 'none';
+                    cutBtn.style.display = 'inline-block';
+                    this.updateView(true);
+                } else if (this.target > 1) {
+                    this.step = 0;
+                    stepBtn.style.display = 'inline-block';
+                    stepBtn.innerText = "數數看 (1)";
+                    cutBtn.style.display = 'none';
+                    this.updateView(false);
+                } else {
+                    this.step = 0;
+                    stepBtn.style.display = 'none';
+                    this.updateView(true);
+                }
+            },
+
+            nextStep: function() {
+                this.step++;
+                const stepBtn = document.getElementById('pan_stepBtn');
+                const cutBtn = document.getElementById('pan_cutBtn');
+
+                if (this.step >= this.target) {
+                    this.updateView(true);
+                    stepBtn.style.display = 'none';
+                    cutBtn.style.display = 'inline-block';
+                } else {
+                    stepBtn.innerText = `數數看 (${this.step + 1})`;
+                    this.updateView(false);
+                }
+            },
+
+            updateView: function(isFinal) {
+                const svg = document.getElementById('pancakeSvg');
+                svg.innerHTML = '';
+                const radius = 100;
+
+                // 畫蔥油餅
+                if (this.total === 1) {
+                    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    circle.setAttribute("r", radius);
+                    circle.setAttribute("fill", this.step >= 1 ? "#f39c12" : "#ecf0f1");
+                    circle.setAttribute("stroke", "#8e44ad");
+                    circle.setAttribute("stroke-width", "3");
+                    svg.appendChild(circle);
+                } else {
+                    const anglePerSlice = 360 / this.total;
+                    for (let i = 0; i < this.total; i++) {
+                        const startAngle = (i * anglePerSlice) - 90;
+                        const endAngle = ((i + 1) * anglePerSlice) - 90;
+                        const startRad = (startAngle * Math.PI) / 180;
+                        const endRad = (endAngle * Math.PI) / 180;
+                        const x1 = radius * Math.cos(startRad);
+                        const y1 = radius * Math.sin(startRad);
+                        const x2 = radius * Math.cos(endRad);
+                        const y2 = radius * Math.sin(endRad);
+                        const largeArcFlag = anglePerSlice > 180 ? 1 : 0;
+                        
+                        const pathData = `M 0 0 L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
+                        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                        path.setAttribute("d", pathData);
+                        
+                        if (i < this.step) {
+                            path.setAttribute("fill", "#f39c12");
+                            path.setAttribute("stroke", "#d35400");
+                        } else {
+                            path.setAttribute("fill", "#ecf0f1");
+                            path.setAttribute("stroke", "#bdc3c7");
+                        }
+                        path.setAttribute("stroke-width", "2");
+                        svg.appendChild(path);
+                    }
+                }
+
+                // 更新文字
+                const output = document.getElementById('pan_textOutput');
+                const unitFraction = createFractionHTML(1, this.total);
+                
+                if (this.step === 0) {
+                    output.innerHTML = `<div>一張蔥油餅平分成 ${this.total} 片。</div><div>準備好了嗎？</div>`;
+                    return;
+                }
+
+                if (this.target === 1) {
+                    const fraction = createFractionHTML(1, this.total);
+                    output.innerHTML = `
+                        <div class="text-line">一張蔥油餅平分成 ${this.total} 片。</div>
+                        <div class="text-line">其中的 <span class="highlight">1</span> 片，</div>
+                        <div class="text-line">是 ${fraction} 張蔥油餅。</div>
+                    `;
+                    return;
+                }
+
+                if (!isFinal) {
+                    output.innerHTML = `
+                        <div class="text-line">現在有 <span class="highlight">${this.step}</span> 片，</div>
+                        <div class="text-line">是 <span class="highlight">${this.step}</span> 個 ${unitFraction} 張蔥油餅。</div>
+                    `;
+                } else {
+                    const finalFraction = createFractionHTML(this.step, this.total);
+                    output.innerHTML = `
+                        <div class="text-line">現在有 <span class="highlight">${this.step}</span> 片，</div>
+                        <div class="text-line">是 <span class="highlight">${this.step}</span> 個 ${unitFraction} 張蔥油餅，</div>
+                        <div class="text-line">也就是 ${finalFraction} 張蔥油餅。</div>
+                    `;
+                }
+            }
+        };
+
+        // === 9-2 離散量邏輯 (一盒東西) ===
+        const boxSim = {
+            target: 0,
+            step: 0,
+            total: 6,
+
+            init: function() {
+                const denInput = document.getElementById('box_den');
+                const numInput = document.getElementById('box_num');
+                
+                this.total = parseInt(denInput.value);
+                this.target = parseInt(numInput.value);
+
+                if (this.total < 1) { alert("一盒至少要有一個喔！"); return; }
+                if (this.target < 0) { alert("不能拿負數個喔！"); return; }
+
+                const stepBtn = document.getElementById('box_stepBtn');
+                const initBtn = document.getElementById('box_initBtn');
+
+                if (this.target === 1) {
+                    this.step = 1;
+                    stepBtn.style.display = 'none';
+                    initBtn.style.display = 'inline-block';
+                    this.updateView(true);
+                } else if (this.target > 1) {
+                    this.step = 0;
+                    stepBtn.style.display = 'inline-block';
+                    stepBtn.innerText = "數數看 (1)";
+                    initBtn.style.display = 'none';
+                    this.updateView(false);
+                } else {
+                    this.step = 0;
+                    stepBtn.style.display = 'none';
+                    this.updateView(true);
+                }
+            },
+
+            nextStep: function() {
+                this.step++;
+                const stepBtn = document.getElementById('box_stepBtn');
+                const initBtn = document.getElementById('box_initBtn');
+
+                if (this.step >= this.target) {
+                    this.updateView(true);
+                    stepBtn.style.display = 'none';
+                    initBtn.style.display = 'inline-block';
+                } else {
+                    stepBtn.innerText = `數數看 (${this.step + 1})`;
+                    this.updateView(false);
+                }
+            },
+
+            updateView: function(isFinal) {
+                const svg = document.getElementById('boxSvg');
+                svg.innerHTML = ''; 
+
+                // 1. 畫盒子 (邊框)
+                const boxRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                boxRect.setAttribute("x", "10");
+                boxRect.setAttribute("y", "10");
+                boxRect.setAttribute("width", "300");
+                boxRect.setAttribute("height", "230");
+                boxRect.setAttribute("fill", "none");
+                boxRect.setAttribute("stroke", "#34495e");
+                boxRect.setAttribute("stroke-width", "4");
+                boxRect.setAttribute("rx", "15"); // 圓角
+                svg.appendChild(boxRect);
+
+                // 2. 計算排列 (Grid Layout)
+                // 優先使用原始計算 (接近正方形)
+                let cols = Math.ceil(Math.sqrt(this.total));
+                let rows = Math.ceil(this.total / cols);
+
+                // 如果可以整除 (例如 8, 10, 12)，則強制使用矩形排列
+                // 尋找接近平方根的因數
+                for (let r = Math.floor(Math.sqrt(this.total)); r >= 1; r--) {
+                    if (this.total % r === 0) {
+                        const c = this.total / r;
+                        // 確保不是長條狀 (1xN)，除非數字真的很小
+                        // 例如 7 (1x7) 會太長，所以 7 還是用預設的方陣(有缺口)
+                        // 8 (2x4) 可以，10 (2x5) 可以
+                        if (r > 1 || this.total <= 5) {
+                            rows = r;
+                            cols = c;
+                            // 習慣上寬度 > 高度
+                            if (rows > cols) {
+                                let temp = rows; rows = cols; cols = temp;
+                            }
+                            break;
+                        }
+                    }
+                }
+                
+                const itemRadius = Math.min(260 / cols, 200 / rows) / 2 - 5; 
+                const startX = 20 + (280 - (cols * itemRadius * 2 + (cols-1)*10)) / 2;
+                const startY = 20 + (210 - (rows * itemRadius * 2 + (rows-1)*10)) / 2;
+
+                for (let i = 0; i < this.total; i++) {
+                    const col = i % cols;
+                    const row = Math.floor(i / cols);
+                    
+                    const cx = startX + itemRadius + col * (itemRadius * 2 + 10);
+                    const cy = startY + itemRadius + row * (itemRadius * 2 + 10);
+
+                    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    circle.setAttribute("cx", cx);
+                    circle.setAttribute("cy", cy);
+                    circle.setAttribute("r", itemRadius);
+                    
+                    if (i < this.step) {
+                        circle.setAttribute("fill", "#e74c3c"); // 紅色果凍
+                        circle.setAttribute("stroke", "#c0392b");
+                    } else {
+                        circle.setAttribute("fill", "#ecf0f1");
+                        circle.setAttribute("stroke", "#bdc3c7");
+                    }
+                    circle.setAttribute("stroke-width", "2");
+                    svg.appendChild(circle);
+                    
+                    // 已移除數字標籤
+                }
+
+                // 3. 更新文字
+                const output = document.getElementById('box_textOutput');
+                const unitFraction = createFractionHTML(1, this.total);
+
+                if (this.step === 0) {
+                    output.innerHTML = `<div>一盒果凍有 ${this.total} 個。</div><div>準備好了嗎？</div>`;
+                    return;
+                }
+
+                if (this.target === 1) {
+                    const fraction = createFractionHTML(1, this.total);
+                    output.innerHTML = `
+                        <div class="text-line">一盒有 ${this.total} 個。</div>
+                        <div class="text-line">拿走 <span class="highlight">1</span> 個，</div>
+                        <div class="text-line">是 ${fraction} 盒果凍。</div>
+                    `;
+                    return;
+                }
+
+                if (!isFinal) {
+                    output.innerHTML = `
+                        <div class="text-line">現在拿了 <span class="highlight">${this.step}</span> 個，</div>
+                        <div class="text-line">是 <span class="highlight">${this.step}</span> 個 ${unitFraction} 盒。</div>
+                    `;
+                } else {
+                    const finalFraction = createFractionHTML(this.step, this.total);
+                    output.innerHTML = `
+                        <div class="text-line">拿了 <span class="highlight">${this.step}</span> 個，</div>
+                        <div class="text-line">是 <span class="highlight">${this.step}</span> 個 ${unitFraction} 盒，</div>
+                        <div class="text-line">也就是 ${finalFraction} 盒果凍。</div>
+                    `;
+                }
+            }
+        };
+
+        // === 程式進入點 ===
+        window.onload = function() {
+            setupConstraint('pan_den', 'pan_num');
+            setupConstraint('box_den', 'box_num');
+            pancakeSim.init();
+            boxSim.init();
+        };
+
+    </script>
+</body>
+</html>

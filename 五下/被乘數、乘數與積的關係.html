@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>對對碰數學金頭腦</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #064e3b;
+            background-image: radial-gradient(circle, #065f46 0%, #064e3b 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        .table-surface {
+            background: rgba(0, 0, 0, 0.15);
+            border: 6px solid #047857;
+            border-radius: 2rem;
+            flex-grow: 1;
+        }
+
+        .card {
+            perspective: 1000px;
+            cursor: pointer;
+            height: 100px; 
+            transition: all 0.2s;
+        }
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s; 
+            transform-style: preserve-3d;
+        }
+        .flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 0.6rem;
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+            border: 2px solid rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .green-stack .card-front {
+            background: #10b981;
+            color: rgba(255,255,255,0.3);
+            font-size: 1.8rem;
+        }
+
+        .yellow-stack .card-front {
+            background: #f59e0b;
+            color: rgba(255,255,255,0.3);
+            font-size: 1.8rem;
+        }
+
+        /* 選取時的黃色外框 */
+        .selected-card {
+            outline: 5px solid #fbbf24;
+            outline-offset: 2px;
+            box-shadow: 0 0 20px #fbbf24;
+            z-index: 10;
+        }
+
+        .card-back {
+            transform: rotateY(180deg);
+            background: #ffffff;
+            color: #1f2937;
+            padding: 4px;
+        }
+
+        .green-stack .card-back {
+            font-size: 0.85rem;
+        }
+
+        .yellow-stack .card-back {
+            font-size: 4.5rem; 
+            color: #d97706;
+        }
+
+        /* 填空方框樣式 */
+        .formula-box {
+            display: inline-flex;
+            width: 1.1rem; 
+            height: 1.1rem; 
+            border: 2px solid #94a3b8;
+            border-radius: 0.15rem;
+            background-color: #f8fafc;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+            margin: 0 0.15rem; 
+            flex-shrink: 0;
+        }
+
+        .matched {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease-out;
+        }
+
+        .active-player {
+            ring: 4px solid #fbbf24;
+            background-color: rgba(255, 255, 255, 0.2);
+            transform: scale(1.03);
+        }
+
+        .fraction-box {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            vertical-align: middle;
+            margin: 0 1px;
+            min-width: 0.8rem;
+        }
+        .fraction-line {
+            width: 100%;
+            border-top: 1.5px solid #1f2937;
+            margin: 1px 0;
+        }
+
+        .ai-thinking::after {
+            content: '';
+            animation: dotty 1.5s infinite;
+        }
+        @keyframes dotty {
+            0% { content: ''; }
+            33% { content: '.'; }
+            66% { content: '..'; }
+            100% { content: '...'; }
+        }
+
+        .start-screen {
+            background: rgba(6, 78, 59, 0.95);
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body class="p-4 font-sans text-white relative">
+
+    <!-- 遊戲開始畫面 -->
+    <div id="start-screen" class="fixed inset-0 z-[100] flex items-center justify-center start-screen p-6">
+        <div class="max-w-md w-full text-center space-y-8">
+            <div>
+                <h1 class="text-5xl font-black text-yellow-400 mb-4 drop-shadow-lg">對對碰<br>數學金頭腦</h1>
+                <p class="text-xl text-green-100 font-bold">請選擇挑戰模式</p>
+            </div>
+            <div class="grid grid-cols-1 gap-4">
+                <button onclick="startGame('decimals')" class="bg-yellow-500 hover:bg-yellow-400 text-slate-900 py-6 rounded-3xl font-black text-2xl shadow-xl transition-all hover:scale-105 active:scale-95">
+                    小數挑戰模式
+                </button>
+                <button onclick="startGame('fractions')" class="bg-blue-500 hover:bg-blue-400 text-white py-6 rounded-3xl font-black text-2xl shadow-xl transition-all hover:scale-105 active:scale-95">
+                    分數挑戰模式
+                </button>
+            </div>
+            <div class="text-green-300 text-sm italic">
+                遊戲出處：康軒五下課本數學好好玩
+            </div>
+        </div>
+    </div>
+
+    <div id="game-container" class="max-w-7xl mx-auto w-full flex flex-col flex-grow hidden">
+        <div class="flex justify-between items-end mb-4">
+            <div>
+                <h1 id="game-title-display" class="text-2xl font-black text-yellow-400 text-shadow">對對碰數學金頭腦</h1>
+                <p id="game-subtitle-display" class="text-green-200 font-semibold text-sm">判斷「被乘數」、「乘數」與「積」的關係</p>
+            </div>
+            <div id="status-display" class="bg-black bg-opacity-40 px-6 py-2 rounded-full border border-green-500 font-bold text-sm min-w-[200px] text-center">
+                等待開始...
+            </div>
+        </div>
+
+        <div id="scoreboard" class="grid grid-cols-4 gap-4 mb-4"></div>
+
+        <div class="table-surface p-6 shadow-2xl">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                <div class="flex flex-col">
+                    <h3 class="text-center font-bold text-green-300 mb-4 tracking-widest text-sm uppercase">綠色牌堆 (算式)</h3>
+                    <div id="green-grid" class="grid grid-cols-4 gap-3 green-stack"></div>
+                </div>
+                <div class="flex flex-col">
+                    <h3 class="text-center font-bold text-yellow-300 mb-4 tracking-widest text-sm uppercase">黃色牌堆 (符號)</h3>
+                    <div id="yellow-grid" class="grid grid-cols-4 gap-3 yellow-stack"></div>
+                </div>
+            </div>
+        </div>
+
+        <button onclick="resetToMain()" class="fixed bottom-6 right-6 bg-white bg-opacity-20 hover:bg-opacity-30 border border-white border-opacity-30 text-white px-6 py-3 rounded-full font-bold shadow-lg backdrop-blur-sm transition-all hover:scale-105 z-40">
+            回到主畫面
+        </button>
+
+        <div id="game-over" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center hidden z-50 p-4">
+            <div class="bg-white p-10 rounded-3xl text-center text-slate-800 max-w-md w-full shadow-2xl">
+                <h2 class="text-3xl font-black mb-6 text-green-600">挑戰結束！</h2>
+                <div id="winner-list" class="space-y-3 mb-8 text-left"></div>
+                <button onclick="resetToMain()" class="w-full bg-green-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-green-700 transition">返回主選單</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const PAIRS_COUNT = 12;
+        let players = [
+            { id: 0, name: "你", score: 0, type: 'human' },
+            { id: 1, name: "AI 小算", score: 0, type: 'ai' },
+            { id: 2, name: "AI 阿數", score: 0, type: 'ai' },
+            { id: 3, name: "AI 豆豆", score: 0, type: 'ai' }
+        ];
+
+        let currentPlayerIdx = 0;
+        let selectedCards = { green: null, yellow: null };
+        let isProcessing = false;
+        let isAnimationLock = false; 
+        let matchedCount = 0;
+        let gameMode = 'decimals'; 
+        let isGameActive = false; 
+
+        function formatMathNum(n) {
+            const num = parseFloat(n);
+            return Number.isInteger(num) ? num.toString() : num.toFixed(1);
+        }
+
+        function createFractionHTML(numerator, denominator) {
+            return `<div class="fraction-box">
+                <div class="text-[0.65rem]">${numerator}</div>
+                <div class="fraction-line"></div>
+                <div class="text-[0.65rem]">${denominator}</div>
+            </div>`;
+        }
+
+        function startGame(mode) {
+            gameMode = mode;
+            isGameActive = true;
+            players.forEach(p => p.score = 0);
+            matchedCount = 0;
+            currentPlayerIdx = 0;
+            selectedCards = { green: null, yellow: null };
+            isProcessing = false;
+            isAnimationLock = false;
+
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-container').classList.remove('hidden');
+            document.getElementById('game-over').classList.add('hidden');
+            document.getElementById('game-title-display').innerText = `對對碰：${mode === 'decimals' ? '小數挑戰' : '分數挑戰'}`;
+            init();
+        }
+
+        function resetToMain() {
+            isGameActive = false;
+            isProcessing = false;
+            isAnimationLock = false;
+            selectedCards = { green: null, yellow: null };
+            document.getElementById('start-screen').classList.remove('hidden');
+            document.getElementById('game-container').classList.add('hidden');
+            document.getElementById('game-over').classList.add('hidden');
+        }
+
+        function init() {
+            const symbols = ['>', '<', '='];
+            const greenItems = [];
+            const yellowItems = [];
+
+            for (let i = 0; i < PAIRS_COUNT; i++) {
+                const symbol = symbols[i % 3];
+                let contentHTML = "";
+
+                if (gameMode === 'decimals') {
+                    const baseNum = (Math.random() * 8 + 1).toFixed(1);
+                    let multiplier;
+                    if (symbol === '>') multiplier = (Math.random() * 0.9 + 1.1).toFixed(1);
+                    else if (symbol === '<') multiplier = (Math.random() * 0.8 + 0.1).toFixed(1);
+                    else multiplier = "1.0";
+
+                    const b = formatMathNum(baseNum);
+                    const m = formatMathNum(multiplier);
+                    contentHTML = `<div class="flex items-center justify-center w-full px-1 pointer-events-none">
+                        <span class="whitespace-nowrap">${b} × ${m}</span>
+                        <div class="formula-box"></div>
+                        <span class="whitespace-nowrap">${b}</span>
+                    </div>`;
+                } else {
+                    const base_n = Math.floor(Math.random() * 8) + 1;
+                    const base_d = Math.floor(Math.random() * 8) + 2;
+                    
+                    let mul_n, mul_d;
+                    if (symbol === '>') {
+                        mul_d = Math.floor(Math.random() * 4) + 2;
+                        mul_n = mul_d + Math.floor(Math.random() * 2) + 1; 
+                    } else if (symbol === '<') {
+                        mul_d = Math.floor(Math.random() * 4) + 3;
+                        mul_n = Math.floor(Math.random() * (mul_d - 1)) + 1; 
+                    } else {
+                        mul_d = Math.floor(Math.random() * 7) + 2;
+                        mul_n = mul_d; 
+                    }
+
+                    const baseHTML = createFractionHTML(base_n, base_d);
+                    const mulHTML = createFractionHTML(mul_n, mul_d);
+                    contentHTML = `<div class="flex items-center justify-center w-full px-1 pointer-events-none">
+                        ${baseHTML} <span class="mx-0.5">×</span> ${mulHTML}
+                        <div class="formula-box"></div>
+                        ${baseHTML}
+                    </div>`;
+                }
+
+                greenItems.push({ id: i, content: contentHTML, val: symbol });
+                yellowItems.push({ id: i, content: symbol, val: symbol });
+            }
+
+            renderGrid('green-grid', shuffle(greenItems), 'green');
+            renderGrid('yellow-grid', shuffle(yellowItems), 'yellow');
+            updateUI();
+        }
+
+        function shuffle(arr) {
+            return [...arr].sort(() => Math.random() - 0.5);
+        }
+
+        function renderGrid(gridId, data, type) {
+            const grid = document.getElementById(gridId);
+            grid.innerHTML = "";
+            data.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.dataset.type = type;
+                card.dataset.val = item.val;
+                card.id = `${type}-${index}`;
+                
+                card.innerHTML = `
+                    <div class="card-inner">
+                        <div class="card-front">?</div>
+                        <div class="card-back">${item.content}</div>
+                    </div>
+                `;
+                card.onclick = () => handleFlip(card);
+                grid.appendChild(card);
+            });
+        }
+
+        function updateStatusMsg(msg, isError = false) {
+            if (!isGameActive) return;
+            const status = document.getElementById('status-display');
+            status.innerText = msg;
+            if (isError) {
+                status.classList.replace('border-green-500', 'border-red-500');
+                status.classList.add('text-red-400');
+            } else {
+                status.classList.replace('border-red-500', 'border-green-500');
+                status.classList.remove('text-red-400');
+            }
+        }
+
+        function handleFlip(card) {
+            if (!isGameActive || isProcessing || isAnimationLock) return;
+            
+            const p = players[currentPlayerIdx];
+            if (p.type === 'ai' && window.event && window.event.isTrusted) {
+                updateStatusMsg("現在是 AI 的回合，請稍等喔！", true);
+                return;
+            }
+
+            const type = card.dataset.type;
+
+            if (card.classList.contains('matched')) {
+                updateStatusMsg("這張牌已經配對成功囉！", true);
+                return;
+            }
+
+            if (!selectedCards.green && !selectedCards.yellow) {
+                const unflipCount = document.querySelectorAll(`#${type}-grid .card:not(.flipped)`).length;
+                if (p.type === 'human' && card.classList.contains('flipped') && unflipCount > 0) {
+                    updateStatusMsg("請先翻開一張蓋住的牌來開始回合！", true);
+                    return; 
+                }
+            } 
+            else if (selectedCards[type] === card) {
+                card.classList.remove('selected-card');
+                selectedCards[type] = null;
+                updateStatusMsg("已取消選取。");
+                return;
+            }
+            else {
+                const firstCard = selectedCards.green || selectedCards.yellow;
+                if (p.type === 'human' && card.classList.contains('flipped') && card.dataset.val !== firstCard.dataset.val) {
+                    updateStatusMsg("這張牌不符合配對，請選擇另一張！", true);
+                    return; 
+                }
+
+                if (selectedCards[type] && selectedCards[type] !== card) {
+                    selectedCards[type].classList.remove('selected-card');
+                }
+            }
+
+            const wasFlipped = card.classList.contains('flipped');
+            if (!wasFlipped) {
+                card.classList.add('flipped');
+                isAnimationLock = true;
+                setTimeout(() => {
+                    isAnimationLock = false;
+                }, 600);
+            }
+
+            card.classList.add('selected-card');
+            selectedCards[type] = card;
+            
+            updateStatusMsg("已選取。請點選另一堆牌來進行配對。");
+
+            if (selectedCards.green && selectedCards.yellow) {
+                checkMatch();
+            }
+        }
+
+        async function checkMatch() {
+            const g = selectedCards.green;
+            const y = selectedCards.yellow;
+
+            if (!g || !y) {
+                isProcessing = false;
+                selectedCards = { green: null, yellow: null };
+                return;
+            }
+
+            isProcessing = true;
+            updateStatusMsg("判定中...");
+            await new Promise(r => setTimeout(r, 1000));
+
+            if (!isGameActive) return;
+
+            if (g.dataset.val === y.dataset.val) {
+                g.classList.add('matched');
+                y.classList.add('matched');
+                players[currentPlayerIdx].score += 1;
+                matchedCount++;
+                updateStatusMsg("答對了！恭喜得分！");
+            } else {
+                updateStatusMsg("不匹配，換下一位玩家！");
+            }
+
+            g.classList.remove('selected-card');
+            y.classList.remove('selected-card');
+
+            currentPlayerIdx = (currentPlayerIdx + 1) % 4;
+            selectedCards = { green: null, yellow: null };
+            
+            updateUI();
+            
+            if (matchedCount === PAIRS_COUNT) {
+                showGameOver();
+                return;
+            }
+
+            isProcessing = false;
+            if (isGameActive && players[currentPlayerIdx].type === 'ai') {
+                setTimeout(runAiTurn, 1000);
+            } else {
+                setTimeout(() => updateStatusMsg("換你了，請選兩張牌！"), 500);
+            }
+        }
+
+        async function runAiTurn() {
+            if (!isGameActive || matchedCount === PAIRS_COUNT) return;
+            const p = players[currentPlayerIdx];
+            updateStatusMsg(`${p.name} 思考中...`);
+
+            const unflipGreens = Array.from(document.querySelectorAll('#green-grid .card:not(.flipped):not(.matched)'));
+            const unflipYellows = Array.from(document.querySelectorAll('#yellow-grid .card:not(.flipped):not(.matched)'));
+            const openedGreens = Array.from(document.querySelectorAll('#green-grid .card.flipped:not(.matched)'));
+            const openedYellows = Array.from(document.querySelectorAll('#yellow-grid .card.flipped:not(.matched)'));
+            
+            let gToFlip, yToFlip;
+
+            let foundMatchOnTable = false;
+            for (let og of openedGreens) {
+                for (let oy of openedYellows) {
+                    if (og.dataset.val === oy.dataset.val) {
+                        gToFlip = og;
+                        yToFlip = oy;
+                        foundMatchOnTable = true;
+                        break;
+                    }
+                }
+                if(foundMatchOnTable) break;
+            }
+
+            if (!foundMatchOnTable) {
+                const allGreens = [...unflipGreens, ...openedGreens];
+                gToFlip = allGreens[Math.floor(Math.random() * allGreens.length)];
+
+                const targetVal = gToFlip.dataset.val;
+                const matchInOpenedYellow = openedYellows.find(y => y.dataset.val === targetVal);
+
+                if (matchInOpenedYellow) {
+                    yToFlip = matchInOpenedYellow;
+                } else {
+                    if (unflipYellows.length > 0) {
+                        yToFlip = unflipYellows[Math.floor(Math.random() * unflipYellows.length)];
+                    } else {
+                        yToFlip = openedYellows[Math.floor(Math.random() * openedYellows.length)];
+                    }
+                }
+            }
+
+            if (!isGameActive) return;
+            await new Promise(r => setTimeout(r, 800)); 
+            if (!isGameActive) return;
+            handleFlip(gToFlip);
+            await new Promise(r => setTimeout(r, 1200)); 
+            if (!isGameActive) return;
+            handleFlip(yToFlip);
+        }
+
+        function updateUI() {
+            if (!isGameActive) return;
+            const scoreboard = document.getElementById('scoreboard');
+            scoreboard.innerHTML = '';
+            players.forEach((p, i) => {
+                const isActive = i === currentPlayerIdx;
+                const cardStyle = isActive ? 'active-player border-yellow-400' : 'bg-white bg-opacity-10 border-transparent';
+                scoreboard.innerHTML += `
+                    <div class="p-3 rounded-2xl border-2 transition-all ${cardStyle}">
+                        <div class="text-[9px] font-bold ${isActive ? 'text-yellow-400' : 'text-green-400'} mb-1">
+                            ${p.type === 'ai' ? '🤖 AI BOT' : '👤 HUMAN'}
+                        </div>
+                        <div class="text-base font-bold truncate">${p.name}</div>
+                        <div class="text-xl font-black text-yellow-300">${p.score} <span class="text-[10px]">分</span></div>
+                    </div>
+                `;
+            });
+        }
+
+        function showGameOver() {
+            const modal = document.getElementById('game-over');
+            const list = document.getElementById('winner-list');
+            const sorted = [...players].sort((a,b) => b.score - a.score);
+            
+            list.innerHTML = sorted.map((p, i) => `
+                <div class="flex justify-between items-center p-4 ${i===0 ? 'bg-yellow-50 border-2 border-yellow-400' : 'bg-slate-50'} rounded-2xl">
+                    <span class="font-bold text-lg">${i+1}. ${p.name}</span>
+                    <span class="font-black text-xl text-green-600">${p.score} 分</span>
+                </div>
+            `).join('');
+            
+            modal.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>扇形數學教學 (周長/面積整合版)</title>
+    <style>
+        :root {
+            /* 預設變數 (周長模式) */
+            --bg-color: #f0f4f8;
+            --container-bg: #e3f2fd; /* 題目區背景 */
+            --border-color: #bbdefb;
+            --primary-btn: #4CAF50;
+            --primary-btn-hover: #43a047;
+            --active-step: #2196F3;
+            --explanation-bg: #fff8e1;
+            --explanation-border: #ffc107;
+            --title-color: #333;
+            --highlight-main: #E91E63; /* 重點色 (粉紅) */
+        }
+
+        /* 面積模式的主題變數 */
+        body.theme-area {
+            --bg-color: #e0f7fa;
+            --container-bg: #b2ebf2;
+            --border-color: #80deea;
+            --primary-btn: #00bcd4;
+            --primary-btn-hover: #00acc1;
+            --active-step: #0097A7;
+            --explanation-bg: #e1f5fe;
+            --explanation-border: #039be5;
+            --title-color: #01579b;
+            --highlight-main: #0277BD; /* 重點色 (深藍) */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            transition: background-color 0.3s;
+        }
+        
+        /* 頁籤樣式 */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: rgba(255, 255, 255, 0.5);
+            padding: 5px;
+            border-radius: 30px;
+        }
+
+        .tab-btn {
+            padding: 10px 30px;
+            font-size: 20px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #666;
+            background: transparent;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background: white;
+            color: var(--primary-btn);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transform: scale(1.05);
+        }
+
+        /* 內容容器 */
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 1100px;
+            width: 100%;
+        }
+
+        .canvas-area {
+            flex: 1.5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0;
+        }
+
+        canvas {
+            background: #fff;
+            border-radius: 50%;
+        }
+
+        .controls-area {
+            flex: 1;
+            min-width: 350px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        /* 題目設定區 */
+        .setup-box {
+            background: var(--container-bg);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            font-size: 18px;
+            transition: background 0.3s;
+        }
+        
+        input {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 70px;
+            text-align: center;
+            font-size: 18px;
+        }
+
+        label { font-weight: bold; color: var(--title-color); }
+
+        .btn-set {
+            background-color: var(--primary-btn);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: auto;
+            font-size: 18px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        .btn-set:hover { background-color: var(--primary-btn-hover); }
+
+        /* 步驟按鈕區 */
+        .step-buttons {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .step-btn {
+            flex: 1;
+            padding: 10px 0;
+            background-color: #eee;
+            border: none;
+            cursor: pointer;
+            font-size: 24px;
+            color: #555;
+            border-radius: 8px;
+            transition: all 0.2s;
+            font-weight: bold;
+            font-family: 'Arial Black', sans-serif;
+        }
+
+        .step-btn:hover { background-color: #ddd; }
+        
+        .step-btn.active {
+            background-color: var(--active-step);
+            color: white;
+            transform: scale(1.05);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        /* 說明與算式區 */
+        .explanation {
+            background: var(--explanation-bg);
+            border-left: 6px solid var(--explanation-border);
+            padding: 25px;
+            border-radius: 8px;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+            transition: background 0.3s, border 0.3s;
+        }
+
+        h2 { 
+            margin-top: 0; 
+            color: var(--title-color); 
+            font-size: 1.5em; 
+            margin-bottom: 20px; 
+            border-bottom: 2px solid rgba(0,0,0,0.1); 
+            padding-bottom: 10px;
+        }
+        
+        .math-line {
+            font-size: 1.4em;
+            line-height: 1.8;
+            margin-bottom: 15px;
+            opacity: 0;
+            animation: slideIn 0.4s forwards;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* 通用按鈕樣式 */
+        .action-btn {
+            margin-top: auto;
+            width: 100%;
+            padding: 15px;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.1s;
+            display: block;
+        }
+        
+        .btn-orange {
+            background-color: #ff9800;
+            box-shadow: 0 4px 0 #e65100;
+        }
+        .btn-orange:hover { background-color: #fb8c00; }
+        .btn-orange:active { transform: translateY(4px); box-shadow: 0 0 0 #e65100; }
+        .btn-orange:disabled { background-color: #ccc; box-shadow: none; cursor: default; transform: none; }
+
+        /* 顯示弧長/面積 專用按鈕 */
+        .btn-green {
+            background-color: #009688;
+            box-shadow: 0 4px 0 #00796B;
+            display: none;
+        }
+        .btn-green:hover { background-color: #26A69A; }
+        .btn-green:active { transform: translateY(4px); box-shadow: 0 0 0 #00796B; }
+
+        .highlight-main { color: var(--highlight-main); font-weight: bold; } 
+        .highlight-red { color: #D32F2F; font-weight: bold; } 
+        .note { color: #666; font-size: 0.8em; margin-left: 10px; font-weight: normal; }
+        
+        .frac {
+            display: inline-flex;
+            flex-direction: column;
+            text-align: center;
+            vertical-align: middle;
+            margin: 0 5px;
+            font-size: 0.9em;
+        }
+        .frac .num { border-bottom: 2px solid #333; padding: 0 2px; }
+        .frac .den { padding: 0 2px; }
+        
+        sup { font-size: 0.6em; vertical-align: super; }
+    </style>
+</head>
+<body>
+
+    <!-- 頁籤切換區 -->
+    <div class="tabs">
+        <button class="tab-btn active" id="tabPerimeter" onclick="switchMode('perimeter')">📏 扇形周長</button>
+        <button class="tab-btn" id="tabArea" onclick="switchMode('area')">🎨 扇形面積</button>
+    </div>
+
+    <div class="container">
+        <div class="canvas-area">
+            <canvas id="myCanvas" width="550" height="550"></canvas>
+        </div>
+
+        <div class="controls-area">
+            <div class="setup-box">
+                <label>半徑:</label>
+                <input type="number" id="radiusInput" value="10">
+                <span>公分</span>
+                <label style="margin-left: 10px;">角度:</label>
+                <input type="number" id="angleInput" value="135">
+                <span style="font-size: 1.2em;">°</span>
+                <button class="btn-set" onclick="setStep(1)">確認出題</button>
+            </div>
+
+            <div class="step-buttons">
+                <button class="step-btn active" id="btn1" onclick="setStep(1)">1</button>
+                <button class="step-btn" id="btn2" onclick="setStep(2)">2</button>
+                <button class="step-btn" id="btn3" onclick="setStep(3)">3</button>
+                <button class="step-btn" id="btn4" onclick="setStep(4)">4</button>
+            </div>
+
+            <div class="explanation">
+                <h2 id="stepTitle">步驟 1：先算出是幾分之幾圓</h2>
+                
+                <div id="mathLinesArea"></div>
+
+                <button id="nextSubStepBtn" class="action-btn btn-orange" onclick="nextMathLine()">👆 顯示算式步驟</button>
+                
+                <!-- 周長 Step 3 專用 -->
+                <button id="showArcBtn" class="action-btn btn-green" onclick="showArcLabelAction()">📏 顯示弧長</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('myCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // 核心變數
+    let radius = 10;
+    let angle = 135;
+    let step = 1; 
+    let num = 3; 
+    let den = 8; 
+    let currentMode = 'perimeter'; // 'perimeter' 或 'area'
+    
+    // 狀態控制
+    let currentMathLines = []; 
+    let currentLineIndex = -1; 
+    let isArcLabelVisible = false; // 控制 Step 3 弧長標籤是否顯示 (周長模式)
+
+    // 初始化
+    initProblem(); 
+    draw();
+    prepareMathLines(); 
+    updateMathDisplay(); 
+
+    // --- 工具函式 ---
+    function fmt(num) {
+        return parseFloat(parseFloat(num).toFixed(2));
+    }
+    
+    function gcd(a, b) { return !b ? a : gcd(b, a % b); }
+
+    function simplifyFraction(n, d) {
+        const common = gcd(n, d);
+        return [n / common, d / common];
+    }
+
+    // --- 核心邏輯 ---
+
+    function switchMode(mode) {
+        currentMode = mode;
+        
+        // 更新頁籤 UI
+        document.getElementById('tabPerimeter').classList.toggle('active', mode === 'perimeter');
+        document.getElementById('tabArea').classList.toggle('active', mode === 'area');
+        
+        // 更新主題顏色
+        if (mode === 'area') {
+            document.body.classList.add('theme-area');
+            // 隱藏步驟 4 按鈕
+            document.getElementById('btn4').style.visibility = 'hidden';
+        } else {
+            document.body.classList.remove('theme-area');
+            // 顯示步驟 4 按鈕
+            document.getElementById('btn4').style.visibility = 'visible';
+        }
+
+        // 重置為步驟 1
+        setStep(1);
+    }
+
+    function initProblem() {
+        radius = parseFloat(document.getElementById('radiusInput').value);
+        angle = parseFloat(document.getElementById('angleInput').value);
+        
+        const common = gcd(angle, 360);
+        num = angle / common; 
+        den = 360 / common;
+    }
+
+    function setStep(n) {
+        initProblem(); 
+        step = n;
+        currentLineIndex = -1; 
+        isArcLabelVisible = false; 
+        
+        document.querySelectorAll('.step-btn').forEach((btn, index) => {
+            const btnId = 'btn' + (index + 1);
+            if ((index + 1) === step) document.getElementById(btnId).classList.add('active');
+            else document.getElementById(btnId).classList.remove('active');
+        });
+
+        prepareMathLines();
+        updateMathDisplay();
+        draw(); 
+    }
+
+    function nextMathLine() {
+        currentLineIndex++;
+        updateMathDisplay();
+    }
+
+    function showArcLabelAction() {
+        isArcLabelVisible = true;
+        updateMathDisplay(); 
+        draw(); 
+    }
+
+    function updateMathDisplay() {
+        const container = document.getElementById('mathLinesArea');
+        const nextBtn = document.getElementById('nextSubStepBtn');
+        const arcBtn = document.getElementById('showArcBtn');
+        
+        let html = '';
+        for (let i = 0; i <= currentLineIndex && i < currentMathLines.length; i++) {
+            html += `<div class="math-line">${currentMathLines[i]}</div>`;
+        }
+        container.innerHTML = html;
+
+        const mathFinished = currentLineIndex >= currentMathLines.length - 1;
+        
+        // 重置按鈕
+        nextBtn.style.display = 'none';
+        arcBtn.style.display = 'none';
+        nextBtn.disabled = false;
+
+        if (currentLineIndex === -1) {
+             nextBtn.style.display = 'block';
+             nextBtn.innerText = "💡 開始計算";
+        } else if (mathFinished) {
+            // 特殊邏輯：周長模式 Step 3 顯示按鈕
+            if (currentMode === 'perimeter' && step === 3 && !isArcLabelVisible) {
+                arcBtn.style.display = 'block';
+            } else {
+                nextBtn.style.display = 'block';
+                nextBtn.innerText = "✅ 本步驟完成";
+                nextBtn.disabled = true;
+            }
+        } else {
+            nextBtn.style.display = 'block';
+            nextBtn.innerText = "👆 下一步驟";
+        }
+    }
+
+    function getFracHtml(n, d) {
+        return `<div class="frac"><span class="num">${n}</span><span class="den">${d}</span></div>`;
+    }
+
+    // --- 繪圖邏輯 ---
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        if (currentMode === 'perimeter') {
+            drawPerimeter();
+        } else {
+            drawArea();
+        }
+    }
+
+    // 1. 周長繪圖邏輯
+    function drawPerimeter() {
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const scale = 220 / Math.max(radius, 5);
+        const rVisual = radius * scale;
+
+        const startRad = -Math.PI / 2;
+        const angleRad = angle * Math.PI / 180;
+        const onePieceAngleRad = (2 * Math.PI) / den; 
+
+        // Step 1: 基礎圓
+        if (step >= 1) {
+            ctx.beginPath();
+            ctx.arc(cx, cy, rVisual, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#ddd';
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.arc(cx, cy, rVisual, startRad, startRad + angleRad);
+            ctx.fillStyle = 'rgba(233, 30, 99, 0.1)';
+            ctx.fill();
+            ctx.setLineDash([]); 
+        }
+
+        // Step 2: 圓周長強調
+        if (step === 2) {
+            ctx.beginPath();
+            ctx.arc(cx, cy, rVisual, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#E91E63';
+            ctx.lineWidth = 5;
+            ctx.stroke();
+        }
+
+        // Step 3 & 4: 畫弧長
+        if (step === 3 || step === 4) {
+            ctx.beginPath();
+            ctx.arc(cx, cy, rVisual, startRad, startRad + angleRad);
+            ctx.strokeStyle = '#E91E63';
+            ctx.lineWidth = 5;
+            ctx.stroke();
+
+            // 畫刻度
+            const markerLen = 15;
+            for (let i = 0; i < den; i++) {
+                const currentAngle = startRad + i * onePieceAngleRad;
+                const isInSector = i < num;
+                
+                const x1 = cx + (rVisual - markerLen/2) * Math.cos(currentAngle);
+                const y1 = cy + (rVisual - markerLen/2) * Math.sin(currentAngle);
+                const x2 = cx + (rVisual + markerLen/2) * Math.cos(currentAngle);
+                const y2 = cy + (rVisual + markerLen/2) * Math.sin(currentAngle);
+
+                ctx.beginPath();
+                ctx.strokeStyle = isInSector ? '#000' : '#ccc'; 
+                ctx.lineWidth = isInSector ? 3 : 1;
+                ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+             const endAngle = startRad + angleRad;
+             const x1e = cx + (rVisual - markerLen/2) * Math.cos(endAngle);
+             const y1e = cy + (rVisual - markerLen/2) * Math.sin(endAngle);
+             const x2e = cx + (rVisual + markerLen/2) * Math.cos(endAngle);
+             const y2e = cy + (rVisual + markerLen/2) * Math.sin(endAngle);
+             ctx.beginPath();
+             ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+             ctx.moveTo(x1e, y1e); ctx.lineTo(x2e, y2e);
+             ctx.stroke();
+
+            // 標籤顯示邏輯
+            const arcLenFinal = fmt(2 * radius * 3.14 * (angle/360));
+            const midAngle = startRad + angleRad / 2;
+            const labelR = rVisual + 35;
+            ctx.fillStyle = '#000'; 
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            if (step === 4 || (step === 3 && isArcLabelVisible)) {
+                 ctx.fillText(arcLenFinal, cx + labelR * Math.cos(midAngle), cy + labelR * Math.sin(midAngle));
+            }
+        }
+
+        // Step 4: 完成圖
+        if (step === 4) {
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + rVisual * Math.cos(startRad), cy + rVisual * Math.sin(startRad));
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + rVisual * Math.cos(startRad + angleRad), cy + rVisual * Math.sin(startRad + angleRad));
+            ctx.strokeStyle = '#D32F2F'; ctx.lineWidth = 5; ctx.stroke();
+            
+            ctx.fillStyle = '#D32F2F';
+            ctx.font = 'bold 18px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            const r1MidX = cx + (rVisual/2) * Math.cos(startRad);
+            const r1MidY = cy + (rVisual/2) * Math.sin(startRad);
+            ctx.fillText(radius, r1MidX + 15, r1MidY);
+
+            const r2MidX = cx + (rVisual/2) * Math.cos(startRad + angleRad);
+            const r2MidY = cy + (rVisual/2) * Math.sin(startRad + angleRad);
+            const textOffsetX = Math.cos(startRad + angleRad + Math.PI/2) * 20;
+            const textOffsetY = Math.sin(startRad + angleRad + Math.PI/2) * 20;
+            ctx.fillText(radius, r2MidX + textOffsetX, r2MidY + textOffsetY);
+        }
+    }
+
+    // 2. 面積繪圖邏輯
+    function drawArea() {
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const scale = 220 / Math.max(radius, 5);
+        const rVisual = radius * scale;
+
+        const startRad = -Math.PI / 2;
+        const angleRad = angle * Math.PI / 180;
+        const onePieceAngleRad = (2 * Math.PI) / den; 
+
+        // Step 1: 基礎圓 (虛線) + 扇形範圍
+        if (step === 1) {
+            ctx.beginPath();
+            ctx.arc(cx, cy, rVisual, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#ddd';
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.arc(cx, cy, rVisual, startRad, startRad + angleRad);
+            ctx.fillStyle = 'rgba(3, 169, 244, 0.2)'; 
+            ctx.fill();
+            ctx.setLineDash([]); 
+
+            // 移除原本加粗的半徑線條，只保留填色和圓周虛線
+        }
+
+        // Step 2: 圓面積強調 (顯示全圓)
+        if (step === 2) {
+            ctx.beginPath();
+            ctx.arc(cx, cy, rVisual, 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(3, 169, 244, 0.3)'; 
+            ctx.fill();
+            // 移除邊框 (stroke)
+            ctx.setLineDash([]);
+        }
+
+        // Step 3: 扇形面積填充 + 全圓黑色虛線切割
+        if (step === 3) {
+            // 扇形填充
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.arc(cx, cy, rVisual, startRad, startRad + angleRad);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(3, 169, 244, 0.6)'; 
+            ctx.fill();
+
+            // 全圓輪廓
+            ctx.beginPath();
+            ctx.arc(cx, cy, rVisual, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+
+            // 扇形邊框 (不加粗，改為一般粗細 1)
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.arc(cx, cy, rVisual, startRad, startRad + angleRad);
+            ctx.closePath();
+            ctx.strokeStyle = '#0277BD';
+            ctx.lineWidth = 1; // 修正：不要加粗
+            ctx.setLineDash([]);
+            ctx.stroke();
+
+            // 切割線 (黑色虛線)
+            for (let i = 0; i < den; i++) {
+                const currentAngle = startRad + i * onePieceAngleRad;
+                const x1 = cx;
+                const y1 = cy;
+                const x2 = cx + rVisual * Math.cos(currentAngle);
+                const y2 = cy + rVisual * Math.sin(currentAngle);
+                
+                ctx.beginPath();
+                ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+                ctx.strokeStyle = '#000'; 
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4, 4]); 
+                ctx.stroke();
+            }
+            ctx.setLineDash([]); 
+        }
+    }
+
+    // --- 算式文字邏輯 ---
+    function prepareMathLines() {
+        const title = document.getElementById('stepTitle');
+        currentMathLines = [];
+        
+        const fracStr = getFracHtml(num, den);
+
+        if (currentMode === 'perimeter') {
+            preparePerimeterMath(title, fracStr);
+        } else {
+            prepareAreaMath(title, fracStr);
+        }
+    }
+
+    function preparePerimeterMath(title, fracStr) {
+        const dia = radius * 2;
+        let rawNum = dia * num;
+        let rawDen = den;
+        let [sNum, sDen] = simplifyFraction(rawNum, rawDen);
+        
+        let middleTerm = '';
+        if (sDen === 1) middleTerm = sNum;
+        else middleTerm = getFracHtml(sNum, sDen);
+
+        const arcLen = fmt((sNum / sDen) * 3.14); 
+        const perimeter = fmt(arcLen + dia);
+
+        switch(step) {
+            case 1:
+                title.innerText = "步驟 1：先算出是幾分之幾圓？";
+                // 移除 sup，改為直接顯示符號
+                currentMathLines.push(`圓心角是 ${angle}°，一個圓是 360°。`);
+                currentMathLines.push(`${getFracHtml(angle, 360)}`);
+                currentMathLines.push(`= <strong>${fracStr} 圓</strong>`);
+                break;
+            case 2:
+                title.innerText = "步驟 2：列出圓周長算式";
+                currentMathLines.push(`先列出圓周長公式，<span class="highlight-red">不要急著算出答案</span>。`);
+                currentMathLines.push(`圓周長 = 直徑 × 3.14`);
+                currentMathLines.push(`= (半徑 × 2) × 3.14`);
+                currentMathLines.push(`= <strong>${dia} × 3.14</strong> <span class="note">(先保留)</span>`);
+                break;
+            case 3:
+                title.innerText = `步驟 3：乘以分數 (約分)`;
+                currentMathLines.push(`弧長 = 圓周長 × 分數`);
+                currentMathLines.push(`= ${dia} × 3.14 × ${fracStr}`);
+                currentMathLines.push(`= ${middleTerm} × 3.14 <span class="note">(先將 ${dia} 和 ${fracStr} 約分)</span>`);
+                currentMathLines.push(`= <strong>${arcLen}</strong>`);
+                break;
+            case 4:
+                title.innerText = `步驟 4：加上兩條半徑 (完成)`;
+                currentMathLines.push(`扇形周長 = 弧長 + 半徑 × 2`);
+                currentMathLines.push(`= <span class="highlight-main">${arcLen}</span> + <span class="highlight-red">${radius}</span> × 2`);
+                currentMathLines.push(`= ${arcLen} + ${dia}`);
+                currentMathLines.push(`= <strong>${perimeter} cm</strong>`);
+                break;
+        }
+    }
+
+    function prepareAreaMath(title, fracStr) {
+        const rSq = radius * radius;
+        let rawNum = rSq * num;
+        let rawDen = den;
+        let [sNum, sDen] = simplifyFraction(rawNum, rawDen);
+        
+        let middleTerm = '';
+        if (sDen === 1) middleTerm = sNum;
+        else middleTerm = getFracHtml(sNum, sDen);
+
+        const simplifiedBase = sNum / sDen;
+        const areaFinal = fmt(simplifiedBase * 3.14);
+
+        switch(step) {
+            case 1:
+                title.innerText = "步驟 1：先算出是幾分之幾圓？";
+                // 移除 sup，改為直接顯示符號
+                currentMathLines.push(`圓心角是 ${angle}°，一個圓是 360°。`);
+                currentMathLines.push(`${getFracHtml(angle, 360)}`);
+                currentMathLines.push(`= <strong>${fracStr} 圓</strong>`);
+                break;
+            case 2:
+                title.innerText = "步驟 2：列出圓面積算式";
+                // 新增引導文字，並修改算式顯示
+                currentMathLines.push(`先列出圓面積公式，<span class="highlight-red">不要急著算出答案</span>。`);
+                currentMathLines.push(`圓面積 = 半徑 × 半徑 × 3.14`);
+                // 修正：移除重複的算式，只保留最後一行，且不要先算出乘積
+                currentMathLines.push(`= <strong>${radius} × ${radius} × 3.14</strong> <span class="note">(先保留)</span>`);
+                break;
+            case 3:
+                title.innerText = `步驟 3：乘以分數 (約分) 並計算`;
+                currentMathLines.push(`扇形面積 = 圓面積 × 分數`);
+                // 修正：保留 半徑x半徑 的形式，不顯示 rSq (100)
+                currentMathLines.push(`= ${radius} × ${radius} × 3.14 × ${fracStr}`);
+                currentMathLines.push(`= (${radius} × ${radius} × ${fracStr}) × 3.14 <span class="note">(先約分)</span>`);
+                currentMathLines.push(`= ${middleTerm} × 3.14`);
+                currentMathLines.push(`= <strong>${areaFinal} cm<sup>2</sup></strong>`);
+                break;
+        }
+    }
+</script>
+
+</body>
+</html>

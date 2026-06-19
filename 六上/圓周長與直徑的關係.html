@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>圓周率視覺化教學</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 React 和 ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- 引入 Babel 用於解析 JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        /* 自定義動畫類別 */
+        .fade-in {
+            animation: fadeIn 1s ease-in forwards;
+            opacity: 0;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-sky-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- Icon 元件 (將 Lucide Icons 轉為 SVG 元件) ---
+        const PlayIcon = ({ size = 24 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+        );
+        const RotateCcwIcon = ({ size = 24 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"></path><path d="M3 3v9h9"></path></svg>
+        );
+        const RulerIcon = ({ size = 24 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"></path><path d="m14.5 12.5 2-2"></path><path d="m11.5 9.5 2-2"></path><path d="m8.5 6.5 2-2"></path><path d="m17.5 15.5 2-2"></path></svg>
+        );
+        const InfoIcon = ({ size = 24 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+        );
+
+        // --- 主程式元件 ---
+        const PiVisualizer = () => {
+            // 參數設定
+            const SCALE = 40; // 比例尺：1公分 = 40px (1格)
+            
+            // 狀態管理
+            const [diameterCm, setDiameterCm] = useState(4); // 直徑 (單位: cm)
+            const [progress, setProgress] = useState(0);     // 滾動動畫進度 (0 到 1)
+            const [isAnimating, setIsAnimating] = useState(false);
+            
+            // 比較動畫狀態 (0:未開始, 1~3:移動直徑, 4:顯示結果)
+            const [comparisonStep, setComparisonStep] = useState(0); 
+
+            const animationRef = useRef(null);
+
+            // 計算數值
+            const diameterPx = diameterCm * SCALE;
+            const circumferenceCm = diameterCm * Math.PI;
+            const circumferencePx = circumferenceCm * SCALE;
+            
+            // 版面設定
+            const startX = 30; 
+            const groundY = 250; 
+            
+            // 1. 滾動動畫邏輯 (放慢速度)
+            useEffect(() => {
+                if (isAnimating) {
+                let startTime;
+                const duration = 4000; // 動畫速度 4 秒
+
+                const animate = (time) => {
+                    if (!startTime) startTime = time;
+                    const timeElapsed = time - startTime;
+                    const newProgress = Math.min(timeElapsed / duration, 1);
+
+                    setProgress(newProgress);
+
+                    if (newProgress < 1) {
+                    animationRef.current = requestAnimationFrame(animate);
+                    } else {
+                    setIsAnimating(false);
+                    }
+                };
+
+                animationRef.current = requestAnimationFrame(animate);
+                } else {
+                cancelAnimationFrame(animationRef.current);
+                }
+
+                return () => cancelAnimationFrame(animationRef.current);
+            }, [isAnimating]);
+
+            // 2. 比較步驟自動播放
+            useEffect(() => {
+                if (comparisonStep > 0 && comparisonStep < 4) {
+                const timer = setTimeout(() => {
+                    setComparisonStep(prev => prev + 1);
+                }, 1500); 
+                return () => clearTimeout(timer);
+                }
+            }, [comparisonStep]);
+
+            // 重置
+            const handleReset = () => {
+                setIsAnimating(false);
+                setProgress(0);
+                setComparisonStep(0);
+            };
+
+            // 處理數值變更
+            const handleDiameterChange = (e) => {
+                setDiameterCm(Number(e.target.value));
+                handleReset();
+            };
+
+            // 開始滾動
+            const handleStartRolling = () => {
+                if (progress === 1) {
+                handleReset();
+                setTimeout(() => setIsAnimating(true), 100);
+                } else {
+                setIsAnimating(true);
+                }
+            };
+
+            // 開始比較
+            const handleStartComparison = () => {
+                if (comparisonStep === 0) {
+                setComparisonStep(1);
+                } else {
+                setComparisonStep(0);
+                }
+            };
+
+            // 繪圖座標計算
+            // 圓心目前的 X 座標 = 起點 + 半徑 + 已滾動距離
+            const currentCenterX = startX + (diameterPx / 2) + (progress * circumferencePx);
+            // 旋轉角度 = 進度 * 360度
+            const currentRotation = progress * 360;
+            // 比較區塊 Y 座標
+            const compareY = groundY + 50;
+
+            // 產生尺規刻度 (每 1cm 一格)
+            const renderRuler = () => {
+                const ticks = [];
+                const maxCm = 16; 
+                
+                // 從圓的起始接觸點開始畫刻度 (startX + 半徑)
+                const zeroPoint = startX + diameterPx/2;
+                
+                // 往右畫 0 ~ 16 cm
+                for (let cm = 0; cm <= maxCm; cm++) {
+                    const x = zeroPoint + (cm * SCALE);
+                    // 確保不超出 SVG 邊界 (800px)
+                    if (x < 800) {
+                        ticks.push(
+                            <g key={`tick-${cm}`}>
+                            <line x1={x} y1={groundY} x2={x} y2={groundY + 10} stroke="#94a3b8" strokeWidth="2" />
+                            {/* 每 1 公分標數字 */}
+                            <text x={x} y={groundY + 25} textAnchor="middle" className="text-xs fill-slate-400 font-mono">
+                                {cm}
+                            </text>
+                            </g>
+                        );
+                    }
+                }
+                
+                // 標註單位
+                ticks.push(
+                <text key="unit" x={zeroPoint - 20} y={groundY + 25} textAnchor="end" className="text-xs fill-slate-500 font-bold">
+                    (cm)
+                </text>
+                );
+
+                return ticks;
+            };
+
+            return (
+                <div className="min-h-screen p-4 flex flex-col items-center select-none">
+                
+                <header className="mb-6 text-center">
+                    <h1 className="text-3xl font-bold text-blue-800 mb-2">圓周長與直徑的關係</h1>
+                    <p className="text-gray-600">觀察圓滾動一圈的距離（圓周長）是直徑的幾倍？</p>
+                </header>
+
+                <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-4xl mb-6 relative overflow-hidden">
+                    
+                    {/* 控制面板 */}
+                    <div className="flex flex-col md:flex-row gap-8 items-center justify-between mb-6">
+                    <div className="flex-1 w-full">
+                        <label className="block text-lg font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                        <div className="w-4 h-4 rounded-full bg-blue-500"></div>
+                        步驟 1：調整直徑 (公分)
+                        </label>
+                        <div className="flex items-center gap-4">
+                        <input
+                            type="range"
+                            min="1"
+                            max="5"
+                            step="0.5"
+                            value={diameterCm}
+                            onChange={handleDiameterChange}
+                            disabled={isAnimating || progress > 0}
+                            className="flex-1 h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                        />
+                        <span className="text-xl font-mono font-bold text-blue-600 min-w-[3ch] text-center">
+                            {diameterCm}
+                        </span>
+                        <span className="text-gray-500">cm</span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">*一格代表 1 公分</p>
+                    </div>
+
+                    <div className="flex gap-4">
+                        <button
+                        onClick={handleStartRolling}
+                        disabled={isAnimating || progress === 1}
+                        className={`flex items-center gap-2 px-6 py-3 rounded-full text-white font-bold text-lg shadow-lg transition-transform hover:scale-105 active:scale-95
+                            ${isAnimating || progress === 1 
+                            ? 'bg-gray-400 cursor-not-allowed' 
+                            : 'bg-green-500 hover:bg-green-600'}`}
+                        >
+                        <PlayIcon size={24} />
+                        {progress === 0 ? '步驟 2：開始滾動' : '滾動中...'}
+                        </button>
+
+                        <button
+                        onClick={handleReset}
+                        className="flex items-center gap-2 px-6 py-3 rounded-full bg-gray-200 text-gray-700 font-bold text-lg hover:bg-gray-300 transition-colors"
+                        >
+                        <RotateCcwIcon size={24} />
+                        重置
+                        </button>
+                    </div>
+                    </div>
+
+                    {/* 畫布 */}
+                    <div 
+                    className="relative w-full overflow-hidden border-2 border-gray-200 rounded-xl bg-white" 
+                    style={{ height: '480px' }}
+                    >
+                    <svg width="100%" height="100%" viewBox={`0 0 800 480`} preserveAspectRatio="xMidYMid meet">
+                        
+                        {/* 地面與刻度 */}
+                        <line x1="0" y1={groundY} x2="800" y2={groundY} stroke="#cbd5e1" strokeWidth="2" />
+                        {renderRuler()}
+
+                        {/* 圓周長軌跡 (藍線) */}
+                        <line 
+                        x1={startX + diameterPx/2} 
+                        y1={groundY} 
+                        x2={startX + diameterPx/2 + (progress * circumferencePx)} 
+                        y2={groundY} 
+                        stroke="#3b82f6" 
+                        strokeWidth="4" 
+                        strokeLinecap="round"
+                        />
+                        
+                        {/* 圓周長文字標籤 */}
+                        {progress === 1 && (
+                        <text 
+                            x={startX + diameterPx/2 + circumferencePx / 2} 
+                            y={groundY - 20} 
+                            textAnchor="middle" 
+                            className="text-sm fill-blue-600 font-bold fade-in"
+                        >
+                            圓滾了一圈 (圓周長)
+                        </text>
+                        )}
+
+                        {/* 滾動的圓 */}
+                        <g transform={`translate(${currentCenterX}, ${groundY - diameterPx / 2}) rotate(${currentRotation})`}>
+                        <circle 
+                            cx="0" cy="0" 
+                            r={diameterPx / 2} 
+                            fill="rgba(59, 130, 246, 0.1)" 
+                            stroke="#2563eb" 
+                            strokeWidth="2" 
+                        />
+                        <line 
+                            x1={-diameterPx/2} y1="0" 
+                            x2={diameterPx/2} y2="0" 
+                            stroke="#2563eb" 
+                            strokeWidth="2" 
+                            opacity="0.5" 
+                        />
+                        <circle 
+                            cx="0" 
+                            cy={diameterPx / 2} 
+                            r="5" 
+                            fill="#ef4444" 
+                            stroke="white" 
+                            strokeWidth="2"
+                        />
+                        </g>
+
+                        {/* 比較動畫區 - 黃色直徑 (底層) */}
+                        
+                        {/* 已放置的直徑 1 (固定) */}
+                        {comparisonStep >= 2 && (
+                        <g>
+                            <line x1={startX + diameterPx/2} y1={compareY} x2={startX + diameterPx/2 + diameterPx} y2={compareY} stroke="#f59e0b" strokeWidth="4" strokeLinecap="round"/>
+                            <text x={startX + diameterPx/2 + diameterPx/2} y={compareY + 25} textAnchor="middle" className="text-sm font-bold fill-amber-700">1倍</text>
+                        </g>
+                        )}
+                        
+                        {/* 已放置的直徑 2 (固定) */}
+                        {comparisonStep >= 3 && (
+                        <g>
+                            <line x1={startX + diameterPx/2 + diameterPx} y1={compareY} x2={startX + diameterPx/2 + diameterPx*2} y2={compareY} stroke="#f59e0b" strokeWidth="4" strokeLinecap="round"/>
+                            <text x={startX + diameterPx/2 + diameterPx*1.5} y={compareY + 25} textAnchor="middle" className="text-sm font-bold fill-amber-700">2倍</text>
+                        </g>
+                        )}
+
+                        {/* 已放置的直徑 3 (固定) */}
+                        {comparisonStep >= 4 && (
+                        <g>
+                            <line x1={startX + diameterPx/2 + diameterPx*2} y1={compareY} x2={startX + diameterPx/2 + diameterPx*3} y2={compareY} stroke="#f59e0b" strokeWidth="4" strokeLinecap="round"/>
+                            <text x={startX + diameterPx/2 + diameterPx*2.5} y={compareY + 25} textAnchor="middle" className="text-sm font-bold fill-amber-700">3倍</text>
+                        </g>
+                        )}
+
+                        {/* 飛行的直徑 (動畫) - 中層 */}
+                        {[1, 2, 3].map((step) => (
+                        <g 
+                            key={step}
+                            style={{ 
+                            transform: comparisonStep === step 
+                                ? `translate(${startX + diameterPx/2 + diameterPx * (step-1)}px, ${compareY}px)` 
+                                : `translate(${currentCenterX - diameterPx/2}px, ${groundY - diameterPx/2}px)`,
+                            transition: 'transform 1.5s ease-in-out',
+                            opacity: comparisonStep === step ? 1 : 0
+                            }}
+                        >
+                            <line x1="0" y1="0" x2={diameterPx} y2="0" stroke="#f59e0b" strokeWidth="4" strokeLinecap="round" />
+                            <text x={diameterPx/2} y="-15" textAnchor="middle" className="text-sm font-bold fill-amber-600">直徑</text>
+                        </g>
+                        ))}
+
+                        {/* 黑色垂直分隔線 - 移至此處 (上層) */}
+                        {comparisonStep >= 2 && (
+                            <line x1={startX + diameterPx/2 + diameterPx} y1={compareY-8} x2={startX + diameterPx/2 + diameterPx} y2={compareY+8} stroke="#000" strokeWidth="2" />
+                        )}
+                        {comparisonStep >= 3 && (
+                            <line x1={startX + diameterPx/2 + diameterPx*2} y1={compareY-8} x2={startX + diameterPx/2 + diameterPx*2} y2={compareY+8} stroke="#000" strokeWidth="2" />
+                        )}
+                        {comparisonStep >= 4 && (
+                            <line x1={startX + diameterPx/2 + diameterPx*3} y1={compareY-8} x2={startX + diameterPx/2 + diameterPx*3} y2={compareY+8} stroke="#000" strokeWidth="2" />
+                        )}
+
+                        {/* 餘數與公式 */}
+                        {comparisonStep >= 4 && (
+                        <g className="fade-in">
+                            <line
+                            x1={startX + diameterPx/2 + diameterPx * 3} 
+                            y1={compareY} 
+                            x2={startX + diameterPx/2 + circumferencePx} 
+                            y2={compareY} 
+                            stroke="#ef4444" 
+                            strokeWidth="4" 
+                            strokeLinecap="round" 
+                            />
+                            
+                            <g transform={`translate(${startX + diameterPx/2 + diameterPx * 3 + (circumferencePx - diameterPx*3)/2}, ${compareY + 45})`}>
+                            <text x="0" y="10" textAnchor="middle" className="text-xs font-bold fill-red-600">≈ 0.14 倍</text>
+                            <line x1="0" y1="0" x2="0" y2="-15" stroke="#ef4444" strokeWidth="1" />
+                            </g>
+
+                            {/* 顯示結果看板 */}
+                            <g transform={`translate(400, 400)`}>
+                                <rect x="-200" y="-30" width="400" height="70" rx="10" fill="#eff6ff" stroke="#3b82f6" strokeWidth="2" />
+                                <text x="0" y="5" textAnchor="middle" className="text-2xl font-bold fill-blue-800" style={{ fontWeight: '800' }}>
+                                圓周長 = 直徑 × 圓周率
+                                </text>
+                                <text x="0" y="30" textAnchor="middle" className="text-base fill-gray-500">
+                                ( 圓周率 ≈ 3.14 )
+                                </text>
+                            </g>
+                        </g>
+                        )}
+
+                    </svg>
+                    </div>
+
+                    <div className="flex justify-center mt-4">
+                    <button
+                        onClick={handleStartComparison}
+                        disabled={progress < 1 || (comparisonStep > 0 && comparisonStep < 4)}
+                        className={`flex items-center gap-3 px-8 py-4 rounded-xl text-lg font-bold shadow-md transition-all
+                        ${progress < 1 
+                            ? 'bg-gray-100 text-gray-400 opacity-50 cursor-not-allowed' 
+                            : comparisonStep > 0
+                            ? 'bg-amber-100 text-amber-700 ring-2 ring-amber-500' 
+                            : 'bg-amber-500 text-white hover:bg-amber-600 hover:shadow-lg hover:-translate-y-1'
+                        }`}
+                    >
+                        {comparisonStep > 0 ? <RotateCcwIcon size={28}/> : <RulerIcon size={28} />}
+                        {comparisonStep === 0 ? '步驟 3：把直徑取下來量量看！' : comparisonStep < 4 ? '比較中...' : '重新比較'}
+                    </button>
+                    </div>
+
+                    {progress < 1 && (
+                    <div className="text-center mt-4 text-gray-400 flex items-center justify-center gap-2">
+                        <InfoIcon size={16} />
+                        請先按「開始滾動」把圓周長拉直，才能進行比較喔！
+                    </div>
+                    )}
+                </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<PiVisualizer />);
+    </script>
+</body>
+</html>

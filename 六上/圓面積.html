@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>圓面積公式推導 (最終完美版)</title>
+    <style>
+        body {
+            font-family: "Microsoft JhengHei", "Heiti TC", sans-serif;
+            text-align: center;
+            background-color: #f5f7fa;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: inline-block;
+            padding: 20px;
+            max-width: 950px;
+            width: 100%;
+        }
+        
+        .canvas-wrapper {
+            position: relative;
+            width: 900px;
+            height: 400px;
+            margin: 10px auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background-color: #fff;
+        }
+        
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .controls {
+            margin: 20px 0;
+            text-align: left;
+            padding: 15px 40px;
+            background-color: #fafafa;
+            border-radius: 10px;
+        }
+        .control-group {
+            margin-top: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        label {
+            font-weight: bold;
+            width: 130px;
+            color: #333;
+            text-align: right;
+            margin-right: 15px;
+        }
+        input[type=range] {
+            flex-grow: 1;
+            max-width: 400px;
+            cursor: pointer;
+        }
+        .value-display {
+            width: 100px;
+            color: #2980b9;
+            font-family: monospace;
+            font-size: 1.1em;
+            font-weight: bold;
+            text-align: left;
+            margin-left: 15px;
+        }
+        
+        /* 按鈕樣式 */
+        #btnNext {
+            position: absolute;
+            right: 50px;
+            bottom: 80px;
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(46, 204, 113, 0.4);
+            transition: all 0.2s;
+            font-family: "Microsoft JhengHei", sans-serif;
+            display: none;
+            z-index: 10;
+        }
+        #btnNext:hover {
+            background-color: #27ae60;
+            transform: scale(1.05);
+        }
+        #btnNext:active {
+            transform: scale(0.95);
+        }
+
+        /* 公式區 */
+        #formulaArea {
+            margin-top: 20px;
+            text-align: left;
+            padding: 20px 40px;
+            background-color: #fdfefe;
+            border: 2px dashed #bdc3c7;
+            border-radius: 10px;
+            min-height: 200px;
+            display: none;
+            font-size: 1.2em;
+            color: #2c3e50;
+            line-height: 2.2em;
+        }
+        .formula-line {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.5s ease-out;
+            font-weight: bold;
+        }
+        .formula-line.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .fraction {
+            display: inline-block;
+            vertical-align: middle;
+            text-align: center;
+            font-size: 0.9em;
+            margin: 0 2px;
+        }
+        .fraction > span {
+            display: block;
+            padding: 0 2px;
+        }
+        .fraction span.num {
+            border-bottom: 2px solid #2c3e50;
+        }
+        .fraction span.den {
+            padding-top: 1px;
+        }
+
+        h2 { color: #2c3e50; margin-bottom: 5px;}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>圓面積公式推導</h2>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label>1. 切割份數 (n)</label>
+            <input type="range" id="sliderN" min="0" max="5" step="1" value="0">
+            <span id="valN" class="value-display">16</span>
+        </div>
+        <div style="text-align: center; font-size: 0.8em; color: #999; margin-bottom: 10px;">
+            (可選份數: 16, 32, 64, 128, 256, 360)
+        </div>
+
+        <div class="control-group">
+            <label>2. 變形過程</label>
+            <input type="range" id="sliderProgress" min="0" max="2" step="0.005" value="0">
+            <span id="valProgress" class="value-display">0%</span>
+        </div>
+    </div>
+
+    <div class="canvas-wrapper">
+        <canvas id="myCanvas" width="900" height="400"></canvas>
+        <button id="btnNext">下一步 ➜</button>
+    </div>
+    
+    <!-- 修正後的公式文字 -->
+    <div id="formulaArea">
+        <div id="line1" class="formula-line">圓形面積 ＝ <span style="color:#d35400">圓周長的一半</span> × <span style="color:#e74c3c">半徑</span></div>
+        <div id="line2" class="formula-line">　　　　 ＝ (圓周長 ÷ 2) × 半徑</div>
+        <div id="line3" class="formula-line">　　　　 ＝ (直徑 × 圓周率 ÷ 2) × 半徑</div>
+        <div id="line4" class="formula-line">　　　　 ＝ 半徑 × 圓周率 × 半徑</div>
+        <div id="line5" class="formula-line">　　　　 ＝ 半徑 × 半徑 × 圓周率 <span style="font-size:0.8em; color:#7f8c8d">(圓周率=3.14)</span></div>
+    </div>
+</div>
+
+<script>
+    window.onload = function() {
+        const canvas = document.getElementById('myCanvas');
+        const ctx = canvas.getContext('2d');
+        const sliderN = document.getElementById('sliderN');
+        const sliderProgress = document.getElementById('sliderProgress');
+        const valN = document.getElementById('valN');
+        const valProgress = document.getElementById('valProgress');
+        const btnNext = document.getElementById('btnNext');
+        const formulaArea = document.getElementById('formulaArea');
+        const lines = [
+            document.getElementById('line1'),
+            document.getElementById('line2'),
+            document.getElementById('line3'),
+            document.getElementById('line4'),
+            document.getElementById('line5')
+        ];
+
+        let currentStep = 0;
+
+        if(parseInt(sliderN.value) > 5) sliderN.value = 0;
+        if(parseFloat(sliderProgress.value) > 2) sliderProgress.value = 0;
+
+        const nValues = [16, 32, 64, 128, 256, 360];
+        const r = 100; 
+        const cx = 180; 
+        const cy = canvas.height / 2 + 20;
+
+        function lerp(start, end, t) {
+            return start + (end - start) * t;
+        }
+
+        // 重置教學狀態函式
+        function resetTeaching() {
+            currentStep = 0;
+            // 恢復按鈕外觀
+            btnNext.style.display = 'none';
+            btnNext.textContent = "下一步 ➜";
+            btnNext.style.backgroundColor = "#2ecc71";
+            btnNext.style.cursor = "pointer";
+            
+            // 隱藏公式區
+            formulaArea.style.display = 'none';
+            lines.forEach(line => line.classList.remove('visible'));
+            
+            draw();
+        }
+
+        function draw() {
+            let nIndex = parseInt(sliderN.value);
+            if (isNaN(nIndex) || nIndex < 0 || nIndex >= nValues.length) nIndex = 0;
+            const n = nValues[nIndex]; 
+            
+            let progress = parseFloat(sliderProgress.value);
+            if (isNaN(progress)) progress = 0;
+            if (progress > 2) progress = 2;
+
+            valN.textContent = n;
+            let percentText = "";
+            if(progress < 1) percentText = Math.round(progress * 100) + "%";
+            else percentText = Math.round((progress - 1) * 100) + "%";
+            valProgress.textContent = percentText;
+
+            // 邏輯判斷：按鈕顯示控制
+            if (!(n === 360 && progress >= 1.99)) {
+                // 如果條件不滿足且曾經開始過教學，則重置
+                if(currentStep > 0) resetTeaching(); 
+            } else if (currentStep === 0) {
+                // 條件滿足，尚未開始，顯示第一顆按鈕
+                btnNext.style.display = 'block'; 
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const anglePerSector = (2 * Math.PI) / n;
+            const chordLength = 2 * r * Math.sin(Math.PI / n);
+            const stepWidth = chordLength; 
+            const paraWidth = (stepWidth * n) / 2; 
+
+            let sectors = [];
+
+            for (let i = 0; i < n; i++) {
+                const circleState = { x: cx, y: cy - 50, rotation: -Math.PI / 2 + i * anglePerSector };
+                const lineState = { x: cx + i * stepWidth, y: cy + 40, rotation: 0 };
+                const halfN = n / 2;
+                let paraState = {};
+                if (i < halfN) {
+                    paraState = { x: cx + i * stepWidth, y: cy + 40, rotation: 0 };
+                } else {
+                    paraState = { 
+                        x: cx + (i - halfN) * stepWidth + stepWidth / 2, 
+                        y: cy + 40 - r * Math.cos(anglePerSector/2), 
+                        rotation: Math.PI 
+                    };
+                }
+
+                let currentX, currentY, currentRot;
+                if (progress <= 1) {
+                    const t = progress; 
+                    const smoothT = t * t * (3 - 2 * t);
+                    currentX = lerp(circleState.x, lineState.x, smoothT);
+                    currentY = lerp(circleState.y, lineState.y, smoothT);
+                    currentRot = lerp(circleState.rotation, lineState.rotation, smoothT);
+                } else {
+                    const t = progress - 1;
+                    const smoothT = t * t * (3 - 2 * t);
+                    currentX = lerp(lineState.x, paraState.x, smoothT);
+                    currentY = lerp(lineState.y, paraState.y, smoothT);
+                    currentRot = lerp(lineState.rotation, paraState.rotation, smoothT);
+                }
+                
+                sectors.push({x: currentX, y: currentY, rot: currentRot});
+            }
+
+            const halfAng = anglePerSector / 2;
+
+            // 1. Fill
+            ctx.fillStyle = "rgba(200, 160, 255, 1)"; 
+            sectors.forEach(s => {
+                ctx.save();
+                ctx.translate(s.x, s.y);
+                ctx.rotate(s.rot);
+                ctx.beginPath();
+                ctx.moveTo(0, 0); 
+                ctx.arc(0, 0, r, -Math.PI/2 - halfAng, -Math.PI/2 + halfAng);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // 2. Lines (Radius)
+            sectors.forEach((s, i) => {
+                ctx.save();
+                ctx.translate(s.x, s.y);
+                ctx.rotate(s.rot);
+                
+                ctx.strokeStyle = "rgba(100, 0, 150, 0.4)"; 
+                if (n >= 128) ctx.lineWidth = 0.1;
+                else if (n >= 32) ctx.lineWidth = 0.3;
+                else ctx.lineWidth = 0.5;
+
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(r * Math.cos(-Math.PI/2 - halfAng), r * Math.sin(-Math.PI/2 - halfAng));
+                ctx.moveTo(0, 0);
+                ctx.lineTo(r * Math.cos(-Math.PI/2 + halfAng), r * Math.sin(-Math.PI/2 + halfAng));
+                ctx.stroke();
+
+                // 紅色半徑線 (僅在 n=360 時顯示)
+                if (i === 0 && n === 360) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    let radiusAngle = -Math.PI/2 - halfAng; 
+                    ctx.lineTo(r * Math.cos(radiusAngle), r * Math.sin(radiusAngle));
+                    ctx.strokeStyle = "#e74c3c"; // 紅色
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            });
+
+            // 3. Arc
+            ctx.strokeStyle = "blue";
+            ctx.lineWidth = 2.5; 
+            ctx.lineCap = "round"; 
+
+            sectors.forEach(s => {
+                ctx.save();
+                ctx.translate(s.x, s.y);
+                ctx.rotate(s.rot);
+                ctx.beginPath();
+                ctx.arc(0, 0, r, -Math.PI/2 - halfAng, -Math.PI/2 + halfAng);
+                ctx.stroke();
+                ctx.restore();
+            });
+
+            // === 標示文字 ===
+            if (progress >= 1.99 && n === 360) {
+                ctx.save();
+                ctx.fillStyle = "#333";
+                ctx.strokeStyle = "#666";
+                ctx.font = "bold 16px Microsoft JhengHei";
+                ctx.lineWidth = 1;
+
+                let textH = (currentStep < 1) ? "寬" : "半徑";
+                let textW = (currentStep < 1) ? "長" : "圓周長的一半";
+                
+                let colorH = (currentStep < 1) ? "#333" : "#e74c3c";
+                let colorW = (currentStep < 1) ? "#333" : "#d35400";
+
+                const labelX_Radius = cx - 25; 
+                const bottomY = cy + 40;
+                const topY = cy + 40 - r;
+                
+                ctx.beginPath();
+                ctx.moveTo(labelX_Radius + 5, bottomY);
+                ctx.lineTo(labelX_Radius + 5, topY);
+                ctx.moveTo(labelX_Radius, bottomY); ctx.lineTo(labelX_Radius + 10, bottomY);
+                ctx.moveTo(labelX_Radius, topY); ctx.lineTo(labelX_Radius + 10, topY);
+                ctx.stroke();
+                
+                ctx.textAlign = "right";
+                ctx.textBaseline = "middle";
+                ctx.fillStyle = colorH;
+                ctx.fillText(textH, labelX_Radius - 5, bottomY - r/2);
+
+                const labelY_Width = cy + 40 + 25; 
+                const lineStart = cx; 
+                const lineEnd = cx + paraWidth;
+
+                ctx.beginPath();
+                ctx.moveTo(lineStart, labelY_Width);
+                ctx.lineTo(lineEnd, labelY_Width);
+                ctx.moveTo(lineStart, labelY_Width - 5); ctx.lineTo(lineStart, labelY_Width + 5);
+                ctx.moveTo(lineEnd, labelY_Width - 5); ctx.lineTo(lineEnd, labelY_Width + 5);
+                ctx.strokeStyle = "#666";
+                ctx.stroke();
+
+                ctx.textAlign = "center";
+                ctx.textBaseline = "top"; 
+                ctx.fillStyle = colorW;
+                ctx.fillText(textW, lineStart + paraWidth/2, labelY_Width + 5);
+                ctx.restore();
+            }
+        }
+
+        // 修改後的按鈕點擊邏輯
+        btnNext.onclick = function() {
+            // 如果已經是完成狀態 (Step 6)，點擊則是重置
+            if (currentStep === 6) {
+                resetTeaching();
+                return;
+            }
+
+            currentStep++;
+            if (currentStep === 1) {
+                draw(); // 重繪更新畫布文字
+            }
+            if (currentStep === 2) {
+                formulaArea.style.display = 'block'; 
+                setTimeout(() => lines[0].classList.add('visible'), 50);
+            }
+            if (currentStep === 3) lines[1].classList.add('visible');
+            if (currentStep === 4) lines[2].classList.add('visible');
+            if (currentStep === 5) lines[3].classList.add('visible');
+            if (currentStep === 6) {
+                lines[4].classList.add('visible');
+                this.textContent = "完成 (重置)";
+                this.style.backgroundColor = "#95a5a6"; 
+                // 這裡不用再覆寫 onclick，因為開頭已經判斷 currentStep === 6 了
+            }
+        };
+
+        sliderN.addEventListener('input', () => { resetTeaching(); draw(); });
+        sliderProgress.addEventListener('input', () => { if(currentStep > 0) resetTeaching(); draw(); });
+
+        draw();
+    };
+</script>
+
+</body>
+</html>

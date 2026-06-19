@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>國小四年級數學：互動式四邊形繪製教學</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #f0f9ff; font-family: 'Microsoft JhengHei', sans-serif; }
+        canvas { cursor: none; touch-action: none; }
+        .btn-active { background-color: #3b82f6 !important; color: white; }
+        .guide-animation { animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+        .home-screen { background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%); }
+        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        #gameCanvas { user-select: none; }
+    </style>
+</head>
+<body class="flex flex-col items-center min-h-screen p-4">
+
+    <!-- 首頁選單 -->
+    <div id="homeScreen" class="fixed inset-0 z-50 flex flex-col items-center justify-center p-6 home-screen">
+        <div class="max-w-2xl w-full glass-card rounded-3xl shadow-2xl p-10 text-center">
+            <h1 class="text-5xl font-black text-blue-600 mb-4">📐 互動式四邊形繪製</h1>
+            <p class="text-xl text-slate-600 mb-8 font-bold">準備好成為幾何小大師了嗎？選擇一個關卡開始吧！</p>
+            
+            <div class="grid grid-cols-2 gap-4 mb-8">
+                <button onclick="startGame('square')" class="p-6 rounded-2xl bg-blue-100 hover:bg-blue-200 transition-all border-b-8 border-blue-300 active:border-b-0 active:translate-y-2 text-2xl font-black text-blue-700">正方形</button>
+                <button onclick="startGame('rectangle')" class="p-6 rounded-2xl bg-blue-100 hover:bg-blue-200 transition-all border-b-8 border-blue-300 active:border-b-0 active:translate-y-2 text-2xl font-black text-blue-700">長方形</button>
+                <button onclick="startGame('parallelogram')" class="p-6 rounded-2xl bg-blue-100 hover:bg-blue-200 transition-all border-b-8 border-blue-300 active:border-b-0 active:translate-y-2 text-2xl font-black text-blue-700">平行四邊形</button>
+                <button onclick="startGame('trapezoid')" class="p-6 rounded-2xl bg-blue-100 hover:bg-blue-200 transition-all border-b-8 border-blue-300 active:border-b-0 active:translate-y-2 text-2xl font-black text-blue-700">梯形</button>
+            </div>
+            
+            <button onclick="startGame('free')" class="w-full p-4 rounded-2xl bg-purple-500 hover:bg-purple-600 text-white transition-all border-b-8 border-purple-700 active:border-b-0 active:translate-y-2 text-2xl font-black mb-4">✨ 自由繪製練習模式</button>
+            
+            <p class="text-slate-400 font-bold italic">挑戰模式下，剩餘時間越多分數越高喔！</p>
+        </div>
+    </div>
+
+    <!-- 遊戲主畫面 -->
+    <div id="gameScreen" class="max-w-4xl w-full bg-white rounded-3xl shadow-2xl p-6 border-4 border-blue-100 hidden">
+        <header class="flex justify-between items-center mb-6">
+            <button onclick="goHome()" class="px-4 py-2 rounded-xl bg-slate-100 font-bold text-slate-600 hover:bg-slate-200">🏠 返回首頁</button>
+            <div class="flex gap-4">
+                <div class="bg-amber-100 px-4 py-2 rounded-xl border-2 border-amber-300 font-black text-amber-700">⏱️ 時間：<span id="timer">60</span></div>
+                <div class="bg-green-100 px-4 py-2 rounded-xl border-2 border-green-300 font-black text-green-700">🏆 得分：<span id="score">0</span></div>
+            </div>
+        </header>
+
+        <div class="flex flex-wrap justify-between items-center mb-6 gap-2 text-sm">
+            <div class="flex gap-2">
+                <button onclick="undo()" class="px-4 py-2 rounded-lg bg-white border-2 border-slate-200 hover:bg-slate-50 font-bold flex items-center shadow-sm">↩️ 上一步</button>
+                <button onclick="redo()" class="px-4 py-2 rounded-lg bg-white border-2 border-slate-200 hover:bg-slate-50 font-bold flex items-center shadow-sm">↪️ 下一步</button>
+                <button onclick="toggleLengths()" id="btn-toggle-lengths" class="px-4 py-2 rounded-lg bg-blue-50 border-2 border-blue-200 text-blue-700 hover:bg-blue-100 font-bold flex items-center ml-2 shadow-sm">📏 顯示數字</button>
+            </div>
+            <button onclick="resetGame()" class="px-4 py-2 rounded-lg bg-rose-500 text-white hover:bg-rose-600 transition-all font-bold border-b-4 border-rose-700 active:border-b-0 active:translate-y-1 shadow-sm">清空畫布</button>
+        </div>
+
+        <div class="relative flex justify-center bg-slate-50 rounded-2xl p-4 border-2 border-slate-200">
+            <canvas id="gameCanvas" width="640" height="400" class="rounded-lg bg-white shadow-sm"></canvas>
+            <div id="messageBox" class="absolute top-8 right-8 p-6 rounded-2xl hidden shadow-2xl text-white font-black text-xl animate-bounce z-20"></div>
+        </div>
+
+        <div class="mt-6 flex flex-col items-center gap-2">
+            <div id="instruction" class="bg-blue-600 text-white px-8 py-3 rounded-full font-bold shadow-lg guide-animation text-center min-w-[300px]">
+                請點擊一個點作為線段的「起點」
+            </div>
+            <div class="text-slate-400 font-bold text-sm flex gap-4">
+                <span>🖱️ 左鍵：選擇頂點 / 畫線</span>
+                <span>🖱️ 右鍵：取消目前的選擇</span>
+            </div>
+        </div>
+
+        <div class="mt-4 flex flex-col md:flex-row gap-4">
+            <div class="flex-1 p-4 bg-indigo-50 rounded-2xl border-2 border-indigo-200">
+                <h3 class="font-black text-indigo-700 mb-1 flex items-center text-base">
+                    <span class="mr-2">💡</span> 老師的錦囊：<span id="currentTaskName" class="ml-2 text-blue-600">正方形</span>
+                </h3>
+                <p id="levelHint" class="text-indigo-900 text-sm font-medium leading-relaxed"></p>
+            </div>
+
+            <div id="resultControls" class="flex-shrink-0 flex gap-2 items-center hidden">
+                <button onclick="resetGame(true)" class="px-6 py-4 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-black text-lg border-b-4 border-blue-700 active:border-b-0 active:translate-y-1 shadow-md">再次挑戰</button>
+                <button onclick="goHome()" class="px-6 py-4 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-black text-lg border-b-4 border-slate-400 active:border-b-0 active:translate-y-1 shadow-md">返回首頁</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gridSize = 40;
+        const hitRadius = 22; 
+        
+        let currentLevel = 'square';
+        let segments = []; 
+        let segmentsRedoStack = []; 
+        let activeStartPoint = null; 
+        let redLine = null; 
+        let isComplete = false;
+        let isChecking = false; 
+        let showLengths = true; 
+        
+        let mousePos = { x: 0, y: 0 };
+        let hoveredPoint = null;
+
+        let timeLeft = 60;
+        let timerInterval = null;
+        let gameScore = 0;
+        let messageTimer = null; 
+
+        const levels = {
+            square: { name: '正方形', hint: "正方形：四條邊要一樣長，四個角都是直角喔！" },
+            rectangle: { name: '長方形', hint: "長方形：對邊要一樣長，四個角都是直角喔！" },
+            parallelogram: { name: '平行四邊形', hint: "平行四邊形：兩組對邊要互相平行。" },
+            trapezoid: { name: '梯形', hint: "梯形：只有一組對邊平行，另一組不平行。" },
+            free: { name: '自由繪製', hint: "自由練習模式：畫出任何四邊形，老師會告訴你它是什麼形狀！" }
+        };
+
+        function startGame(lvl) {
+            document.getElementById('homeScreen').classList.add('hidden');
+            document.getElementById('gameScreen').classList.remove('hidden');
+            document.getElementById('resultControls').classList.add('hidden');
+            gameScore = 0; 
+            updateUI();
+            setLevel(lvl);
+            if (lvl !== 'free') {
+                startTimer();
+            } else {
+                document.getElementById('timer').innerText = "∞";
+                clearInterval(timerInterval);
+            }
+        }
+
+        function goHome() {
+            clearInterval(timerInterval);
+            document.getElementById('homeScreen').classList.remove('hidden');
+            document.getElementById('gameScreen').classList.add('hidden');
+            document.getElementById('resultControls').classList.add('hidden');
+            hideMessage();
+        }
+
+        function startTimer() {
+            timeLeft = 60;
+            updateUI();
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (timeLeft > 0 && !isComplete && !isChecking) {
+                    timeLeft--;
+                    updateUI();
+                } else if (timeLeft === 0) {
+                    document.getElementById('timer').classList.add('text-red-600');
+                }
+            }, 1000);
+        }
+
+        function updateUI() {
+            document.getElementById('timer').innerText = timeLeft;
+            document.getElementById('score').innerText = gameScore;
+        }
+
+        function generateRandomRedLine() {
+            if (currentLevel === 'free') return null;
+            const len = Math.floor(Math.random() * 3) + 3;
+            let p1, p2, sideType;
+            const pool = (currentLevel === 'parallelogram' || currentLevel === 'trapezoid') ? ['top', 'bottom'] : ['top', 'bottom', 'left', 'right'];
+            sideType = pool[Math.floor(Math.random() * pool.length)];
+            const centerX = 8; const centerY = 5;
+            if (sideType === 'top' || sideType === 'bottom') {
+                const y = sideType === 'top' ? centerY - 2 : centerY + 2;
+                const startX = centerX - Math.floor(len / 2);
+                p1 = { x: startX, y: y }; p2 = { x: startX + len, y: y };
+            } else {
+                const x = sideType === 'left' ? centerX - 3 : centerX + 3;
+                const startY = centerY - Math.floor(len / 2);
+                p1 = { x: x, y: startY }; p2 = { x: x, y: startY + len };
+            }
+            return { p1, p2, sideType };
+        }
+
+        function setLevel(lvl) {
+            currentLevel = lvl;
+            redLine = generateRandomRedLine();
+            segments = [];
+            segmentsRedoStack = [];
+            activeStartPoint = null;
+            isComplete = false;
+            isChecking = false;
+            document.getElementById('levelHint').innerText = levels[lvl].hint;
+            document.getElementById('currentTaskName').innerText = levels[lvl].name;
+            document.getElementById('instruction').innerText = "請點擊一個點作為線段的「起點」";
+            document.getElementById('timer').classList.remove('text-red-600');
+            document.getElementById('resultControls').classList.add('hidden');
+            hideMessage();
+            draw();
+        }
+
+        function toggleLengths() {
+            showLengths = !showLengths;
+            const btn = document.getElementById('btn-toggle-lengths');
+            btn.innerText = showLengths ? "📏 顯示數字" : "📏 隱藏數字";
+            btn.className = showLengths 
+                ? "px-4 py-2 rounded-lg bg-blue-50 border-2 border-blue-200 text-blue-700 shadow-sm font-bold flex items-center ml-2"
+                : "px-4 py-2 rounded-lg bg-slate-50 border-2 border-slate-200 text-slate-500 shadow-sm font-bold flex items-center ml-2";
+            draw();
+        }
+
+        function undo() {
+            if (isComplete || isChecking || segments.length === 0) return;
+            const removed = segments.pop();
+            segmentsRedoStack.push(removed);
+            draw();
+        }
+
+        function redo() {
+            if (isComplete || isChecking || segmentsRedoStack.length === 0) return;
+            const restored = segmentsRedoStack.pop();
+            segments.push(restored);
+            checkCompletion();
+            draw();
+        }
+
+        function getCentroidOfVisible() {
+            let pts = [];
+            if (redLine) { pts.push(redLine.p1); pts.push(redLine.p2); }
+            segments.forEach(seg => { pts.push(seg[0]); pts.push(seg[1]); });
+            if (activeStartPoint) pts.push(activeStartPoint);
+            if (pts.length === 0) return { x: 8, y: 5 };
+            let sx = 0, sy = 0;
+            pts.forEach(p => { sx += p.x; sy += p.y; });
+            return { x: sx / pts.length, y: sy / pts.length };
+        }
+
+        function drawLengthLabel(p1, p2, fixedSideType = null, isConfirmed = false) {
+            if (!showLengths) return;
+            const dist = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+            if (dist === 0) return;
+            const label = dist % 1 === 0 ? dist : dist.toFixed(1);
+            const midX = (p1.x + p2.x) / 2;
+            const midY = (p1.y + p2.y) / 2;
+            
+            let sideType = fixedSideType;
+            if (!sideType) {
+                const dx = Math.abs(p1.x - p2.x);
+                const dy = Math.abs(p1.y - p2.y);
+                const center = getCentroidOfVisible();
+                if (dx > dy) sideType = midY < center.y ? 'top' : 'bottom';
+                else sideType = midX < center.x ? 'left' : 'right';
+            }
+
+            let offX = 0, offY = 0;
+            switch(sideType) {
+                case 'top': offY = -22; break;
+                case 'bottom': offY = 22; break;
+                case 'left': offX = -25; break; 
+                case 'right': offX = 25; break;
+            }
+
+            ctx.save();
+            ctx.font = "bold 15px Arial";
+            ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            ctx.strokeStyle = "white"; ctx.lineWidth = 4;
+            ctx.strokeText(label, midX * gridSize + offX, midY * gridSize + offY);
+            ctx.fillStyle = isConfirmed ? "#1e293b" : "#94a3b8";
+            ctx.fillText(label, midX * gridSize + offX, midY * gridSize + offY);
+            ctx.restore();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#f1f5f9'; ctx.lineWidth = 1;
+            for (let x = 0; x <= canvas.width; x += gridSize) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for (let y = 0; y <= canvas.height; y += gridSize) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+            for (let x = 0; x <= canvas.width; x += gridSize) {
+                for (let y = 0; y <= canvas.height; y += gridSize) {
+                    const gx = x / gridSize, gy = y / gridSize;
+                    const isHovered = hoveredPoint && hoveredPoint.x === gx && hoveredPoint.y === gy;
+                    const isStart = activeStartPoint && activeStartPoint.x === gx && activeStartPoint.y === gy;
+                    if (isStart) {
+                        ctx.fillStyle = '#3b82f6'; ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2); ctx.fill();
+                    } else if (isHovered) {
+                        ctx.fillStyle = 'rgba(59, 130, 246, 0.2)'; ctx.beginPath(); ctx.arc(x, y, 16, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = '#3b82f6'; ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
+                    } else {
+                        ctx.fillStyle = '#cbd5e1'; ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+                    }
+                }
+            }
+            if (redLine) {
+                ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 8; ctx.lineCap = 'round';
+                ctx.beginPath(); ctx.moveTo(redLine.p1.x * gridSize, redLine.p1.y * gridSize); ctx.lineTo(redLine.p2.x * gridSize, redLine.p2.y * gridSize); ctx.stroke();
+                drawLengthLabel(redLine.p1, redLine.p2, redLine.sideType, true);
+            }
+            ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 6;
+            segments.forEach(seg => {
+                ctx.beginPath(); ctx.moveTo(seg[0].x * gridSize, seg[0].y * gridSize); ctx.lineTo(seg[1].x * gridSize, seg[1].y * gridSize); ctx.stroke();
+                drawLengthLabel(seg[0], seg[1], null, true);
+            });
+            if (!isComplete && !isChecking && activeStartPoint) {
+                const targetPoint = hoveredPoint ? hoveredPoint : { x: mousePos.x / gridSize, y: mousePos.y / gridSize };
+                ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 3; ctx.setLineDash([10, 5]);
+                ctx.beginPath(); ctx.moveTo(activeStartPoint.x * gridSize, activeStartPoint.y * gridSize); ctx.lineTo(targetPoint.x * gridSize, targetPoint.y * gridSize); ctx.stroke();
+                ctx.setLineDash([]); drawLengthLabel(activeStartPoint, targetPoint, null, false);
+            }
+            const drawDot = (p, color) => {
+                ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(p.x * gridSize, p.y * gridSize, 12, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.stroke();
+                ctx.fillStyle = color; ctx.beginPath(); ctx.arc(p.x * gridSize, p.y * gridSize, 6, 0, Math.PI * 2); ctx.fill();
+            };
+            if (redLine) { drawDot(redLine.p1, '#ef4444'); drawDot(redLine.p2, '#ef4444'); }
+            segments.forEach(seg => { drawDot(seg[0], '#3b82f6'); drawDot(seg[1], '#3b82f6'); });
+            if (!hoveredPoint) { ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(mousePos.x, mousePos.y, 10, 0, Math.PI * 2); ctx.stroke(); }
+        }
+
+        function getMouseInfo(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+            const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
+            const gx = Math.round(x / gridSize), gy = Math.round(y / gridSize);
+            const dist = Math.sqrt(Math.pow(gx * gridSize - x, 2) + Math.pow(gy * gridSize - y, 2));
+            return { gx, gy, px: x, py: y, isNear: dist < hitRadius };
+        }
+
+        canvas.addEventListener('mousemove', (e) => {
+            const info = getMouseInfo(e);
+            mousePos = { x: info.px, y: info.py };
+            hoveredPoint = info.isNear ? { x: info.gx, y: info.gy } : null;
+            draw();
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.button === 2) return; 
+            if (isComplete || isChecking) return;
+            const info = getMouseInfo(e);
+            if (!info.isNear) return;
+            const target = { x: info.gx, y: info.gy };
+            if (!activeStartPoint) {
+                activeStartPoint = target; document.getElementById('instruction').innerText = "選好了起點，請再點一個點當作「終點」";
+            } else {
+                if (target.x === activeStartPoint.x && target.y === activeStartPoint.y) return;
+                segments.push([activeStartPoint, target]);
+                segmentsRedoStack = []; activeStartPoint = null; 
+                document.getElementById('instruction').innerText = "完成一條線了！請繼續點擊下一條線的「起點」";
+                checkCompletion();
+            }
+            draw();
+        });
+
+        canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (isComplete || isChecking) return;
+            if (activeStartPoint) {
+                activeStartPoint = null;
+                document.getElementById('instruction').innerText = "已取消選擇，請重新點擊「起點」";
+                draw();
+            }
+        });
+
+        function checkCompletion() {
+            const allEdges = redLine ? [[redLine.p1, redLine.p2], ...segments] : [...segments];
+            if (allEdges.length < 4) return;
+            const adj = {}; const toKey = p => p ? `${p.x},${p.y}` : "null";
+            allEdges.forEach(edge => {
+                const k1 = toKey(edge[0]); const k2 = toKey(edge[1]);
+                if (!adj[k1]) adj[k1] = []; if (!adj[k2]) adj[k2] = [];
+                adj[k1].push(edge[1]); adj[k2].push(edge[0]);
+            });
+            const keys = Object.keys(adj);
+            const isEveryNodeDegreeTwo = keys.every(k => adj[k].length === 2);
+            if (keys.length === 4 && isEveryNodeDegreeTwo) {
+                isChecking = true; document.getElementById('instruction').innerText = "四邊形畫好了！正在檢查性質...";
+                setTimeout(() => {
+                    isComplete = true; isChecking = false; 
+                    if (currentLevel !== 'free') clearInterval(timerInterval);
+                    const p = []; let curr = redLine ? redLine.p1 : adj[Object.keys(adj)[0]][0];
+                    let prev = null;
+                    for(let i=0; i<4; i++) {
+                        p.push(curr); const neighbors = adj[toKey(curr)];
+                        const next = (prev && toKey(neighbors[0]) === toKey(prev)) ? neighbors[1] : neighbors[0];
+                        prev = curr; curr = next;
+                    }
+                    validateGeometry(p); draw();
+                }, 1500);
+            }
+        }
+
+        function checkSelfIntersection(p) {
+            function segmentsIntersect(a, b, c, d) {
+                function ccw(p1, p2, p3) {
+                    const val = (p2.y - p1.y) * (p3.x - p2.x) - (p2.x - p1.x) * (p3.y - p2.y);
+                    if (Math.abs(val) < 0.001) return 0;
+                    return val > 0 ? 1 : 2;
+                }
+                const o1 = ccw(a, b, c); const o2 = ccw(a, b, d);
+                const o3 = ccw(c, d, a); const o4 = ccw(c, d, b);
+                if (o1 !== o2 && o3 !== o4) return true;
+                return false;
+            }
+            if (segmentsIntersect(p[0], p[1], p[2], p[3])) return true;
+            if (segmentsIntersect(p[1], p[2], p[3], p[0])) return true;
+            return false;
+        }
+
+        function validateGeometry(p) {
+            const v = []; for(let i=0; i<4; i++) { let next = (i+1)%4; v.push({ x: p[next].x - p[i].x, y: p[next].y - p[i].y }); }
+            const getDistSq = (vec) => vec.x * vec.x + vec.y * vec.y;
+            const dot = (v1, v2) => v1.x * v2.x + v1.y * v2.y;
+            const cross = (v1, v2) => v1.x * v2.y - v1.y * v2.x;
+            const isPara = (v1, v2) => Math.abs(cross(v1, v2)) < 0.01;
+            
+            const isCrossed = checkSelfIntersection(p);
+            
+            // --- 凹四邊形判定邏輯 ---
+            // 利用相鄰邊向量的外積正負號來判斷內角方向
+            const crosses = [
+                v[0].x * v[1].y - v[0].y * v[1].x,
+                v[1].x * v[2].y - v[1].y * v[2].x,
+                v[2].x * v[3].y - v[2].y * v[3].x,
+                v[3].x * v[0].y - v[3].y * v[0].x
+            ];
+            const pos = crosses.filter(c => c > 0.01).length;
+            const neg = crosses.filter(c => c < -0.01).length;
+            const isConcave = (pos > 0 && neg > 0);
+            
+            let result = false; let msg = ""; let shapeName = "四邊形";
+            const s = [getDistSq(v[0]), getDistSq(v[1]), getDistSq(v[2]), getDistSq(v[3])];
+            const angles = [dot(v[0], v[1]), dot(v[1], v[2]), dot(v[2], v[3]), dot(v[3], v[0])];
+            const allAngles90 = angles.every(a => Math.abs(a) < 0.1);
+            const oppSidesPara = isPara(v[0], v[2]) && isPara(v[1], v[3]);
+            const allSidesEqual = s.every(side => Math.abs(side - s[0]) < 0.1);
+            const anyPara = isPara(v[0], v[2]) || isPara(v[1], v[3]);
+
+            if (isCrossed) {
+                msg = "這不是要求的形狀喔，再試試看！";
+                result = false;
+            } else if (isConcave) {
+                shapeName = "凹四邊形";
+                if (currentLevel === 'free') {
+                    msg = `畫好了！這是一個「${shapeName}」喔！✨`;
+                    result = true;
+                } else {
+                    msg = "這不是要求的形狀喔，再試試看！";
+                    result = false;
+                }
+            } else if (currentLevel === 'free') {
+                if (allSidesEqual && allAngles90) shapeName = "正方形";
+                else if (allAngles90) shapeName = "長方形";
+                else if (allSidesEqual) shapeName = "菱形";
+                else if (oppSidesPara) shapeName = "平行四邊形";
+                else if (anyPara) {
+                    const p1Para = isPara(v[0], v[2]);
+                    const sidesEqual = p1Para ? Math.abs(s[1] - s[3]) < 0.1 : Math.abs(s[0] - s[2]) < 0.1;
+                    const anyAngle90 = angles.some(a => Math.abs(a) < 0.1);
+                    if (sidesEqual) shapeName = "等腰梯形";
+                    else if (anyAngle90) shapeName = "直角梯形";
+                    else shapeName = "梯形";
+                } else {
+                    const kite1 = (Math.abs(s[0]-s[1]) < 0.1 && Math.abs(s[2]-s[3]) < 0.1);
+                    const kite2 = (Math.abs(s[1]-s[2]) < 0.1 && Math.abs(s[3]-s[0]) < 0.1);
+                    if (kite1 || kite2) shapeName = "箏形";
+                }
+                msg = `畫好了！這是一個「${shapeName}」喔！✨`; result = true;
+            } else {
+                switch(currentLevel) {
+                    case 'square': result = allSidesEqual && allAngles90; break;
+                    case 'rectangle': result = allAngles90; break;
+                    case 'parallelogram': result = oppSidesPara; break;
+                    case 'trapezoid': result = anyPara && !oppSidesPara; break;
+                }
+                if (result) {
+                    const timeBonus = (currentLevel === 'free') ? 0 : timeLeft; 
+                    gameScore = 100 + timeBonus;
+                    msg = `得分：${gameScore} (時間獎勵 ${timeBonus} 分)`;
+                } else {
+                    gameScore = 0;
+                    msg = "這不是要求的形狀喔，再試試看！";
+                }
+            }
+            updateUI();
+            showResultInPanel(msg, result);
+        }
+
+        function showResultInPanel(msg, success) {
+            const box = document.getElementById('messageBox');
+            box.innerText = msg; box.style.display = 'block';
+            box.className = `absolute top-8 right-8 p-6 rounded-2xl shadow-2xl text-white font-black text-xl z-20 ${success ? 'bg-green-500' : 'bg-orange-500'}`;
+            document.getElementById('instruction').innerText = "繪製完成！老師已經檢查過了。";
+            document.getElementById('resultControls').classList.remove('hidden');
+
+            if (messageTimer) clearTimeout(messageTimer);
+            messageTimer = setTimeout(() => { hideMessage(); }, 5000);
+        }
+
+        function hideMessage() { 
+            document.getElementById('messageBox').style.display = 'none'; 
+            if (messageTimer) clearTimeout(messageTimer);
+        }
+        
+        function resetGame(restart = false) { 
+            hideMessage();
+            if (restart) { 
+                gameScore = 0; updateUI(); setLevel(currentLevel); 
+                if (currentLevel !== 'free') startTimer();
+            } else { setLevel(currentLevel); }
+        }
+    </script>
+</body>
+</html>

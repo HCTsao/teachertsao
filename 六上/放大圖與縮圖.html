@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>縮圖與放大圖小幫手</title>
+    
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 引入 React 和 ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- 引入 Babel 用於解析 JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* 自定義捲軸樣式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+        
+        .animate-in {
+            animation: animateIn 0.5s ease-out forwards;
+        }
+        
+        @keyframes animateIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+    </style>
+</head>
+<body class="bg-blue-50 font-sans text-gray-800">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- Icons (Converted from Lucide for inline usage) ---
+        const IconBase = ({ children, className }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="24" height="24" viewBox="0 0 24 24" 
+                fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                className={className}
+            >
+                {children}
+            </svg>
+        );
+
+        const Ruler = ({ className }) => <IconBase className={className}><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/></IconBase>;
+        const Shapes = ({ className }) => <IconBase className={className}><path d="M8.3 10a.7.7 0 0 1-.626-1.079L11.4 3a.7.7 0 0 1 1.198-.043L16.3 8.9a.7.7 0 0 1-.572 1.1Z"/><rect x="3" y="14" width="7" height="7" rx="1"/><circle cx="17.5" cy="17.5" r="3.5"/></IconBase>;
+        const ImageIcon = ({ className }) => <IconBase className={className}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></IconBase>;
+        const Square = ({ className }) => <IconBase className={className}><rect width="18" height="18" x="3" y="3" rx="2"/></IconBase>;
+        const Circle = ({ className }) => <IconBase className={className}><circle cx="12" cy="12" r="10"/></IconBase>;
+        const Triangle = ({ className }) => <IconBase className={className}><path d="M13.73 4a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/></IconBase>;
+        const Upload = ({ className }) => <IconBase className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></IconBase>;
+        const Trash2 = ({ className }) => <IconBase className={className}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconBase>;
+        const ZoomIn = ({ className }) => <IconBase className={className}><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/><line x1="11" x2="11" y1="8" y2="14"/><line x1="8" x2="14" y1="11" y2="11"/></IconBase>;
+        const ZoomOut = ({ className }) => <IconBase className={className}><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/><line x1="8" x2="14" y1="11" y2="11"/></IconBase>;
+        const Wand2 = ({ className }) => <IconBase className={className}><path d="m19 2 2 2-2 2-2-2 2-2Z"/><path d="m8 14 6 6"/><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/></IconBase>; // Simplified Wand
+        const ArrowDown = ({ className }) => <IconBase className={className}><line x1="12" x2="12" y1="5" y2="19"/><polyline points="19 12 12 19 5 12"/></IconBase>;
+
+        // --- Helper Components ---
+
+        const FractionDisplay = ({ value, className = "" }) => {
+            if (typeof value === 'string' && value.includes('/')) {
+                const [numerator, denominator] = value.split('/');
+                if (!numerator || !denominator) return <span className={className}>{value}</span>;
+
+                return (
+                    <div className={`inline-flex flex-col items-center align-middle mx-1 font-serif leading-none ${className}`}>
+                        <span className="border-b-2 border-current w-full text-center px-1 mb-[1px]">{numerator}</span>
+                        <span className="text-center w-full">{denominator}</span>
+                    </div>
+                );
+            }
+            return <span className={`mx-1 font-serif font-bold ${className}`}>{value}</span>;
+        };
+
+        const ShapeVisual = ({ type, baseCm, scaleFactor = "1", color, bgColor, borderColor, isScaled }) => {
+            const PIXELS_PER_CM = 37.8;
+
+            let multiplier = 1;
+            if (scaleFactor.includes('/')) {
+                const [n, d] = scaleFactor.split('/');
+                multiplier = parseFloat(n) / parseFloat(d);
+            } else {
+                multiplier = parseFloat(scaleFactor);
+            }
+
+            const currentCm = isScaled ? baseCm * multiplier : baseCm;
+            const pixels = currentCm * PIXELS_PER_CM;
+            const displayLabel = Number(currentCm.toFixed(2)).toString();
+            const unit = "公分";
+
+            const labelClass = `absolute text-sm font-bold ${color} bg-white/90 px-1 rounded shadow-sm border border-gray-100 whitespace-nowrap z-10`;
+
+            if (type === 'circle') {
+                const diameter = pixels * 2;
+                return (
+                    <div className="relative flex items-center justify-center p-4">
+                        <div 
+                            style={{ width: diameter, height: diameter }} 
+                            className={`rounded-full border-[3px] ${borderColor} bg-opacity-20 ${bgColor} flex items-center justify-center relative`}
+                        >
+                            <div className={`absolute top-1/2 left-1/2 w-1/2 h-[2px] ${bgColor.replace('bg-', 'bg-')} origin-left bg-current`} />
+                            <span className={`${labelClass} top-1/2 left-1/2 -translate-y-6 translate-x-2`}>
+                                半徑 {displayLabel} {unit}
+                            </span>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (type === 'square') {
+                return (
+                    <div className="relative p-4">
+                        <div 
+                            style={{ width: pixels, height: pixels }} 
+                            className={`border-[3px] ${borderColor} bg-opacity-20 ${bgColor}`}
+                        ></div>
+                        <div className={`${labelClass} -bottom-4 left-1/2 -translate-x-1/2`}>
+                            邊長 {displayLabel} {unit}
+                        </div>
+                    </div>
+                );
+            }
+
+            if (type === 'rect') {
+                const widthPx = pixels;
+                const heightPx = pixels * 0.6;
+                const heightCm = currentCm * 0.6;
+                const heightLabel = Number((heightCm).toFixed(2)).toString();
+
+                return (
+                    <div className="relative p-4">
+                        <div 
+                            style={{ width: widthPx, height: heightPx }} 
+                            className={`border-[3px] ${borderColor} bg-opacity-20 ${bgColor}`}
+                        ></div>
+                        <div className={`${labelClass} -bottom-4 left-1/2 -translate-x-1/2`}>
+                            長 {displayLabel} {unit}
+                        </div>
+                        <div className={`${labelClass} -right-20 top-1/2 -translate-y-1/2`}>
+                            寬 {heightLabel} {unit}
+                        </div>
+                    </div>
+                );
+            }
+
+            if (type === 'triangle') {
+                return (
+                    <div className="relative p-4">
+                        <svg width={pixels} height={pixels} overflow="visible">
+                           <path 
+                             d={`M0 ${pixels} L${pixels} ${pixels} L0 0 Z`} 
+                             className={`${color.replace('text-', 'stroke-')} stroke-[3px] fill-current fill-opacity-20`} 
+                             fill="currentColor"
+                           />
+                        </svg>
+                        <div className={`${labelClass} -bottom-4 left-1/2 -translate-x-1/2`}>
+                            底 {displayLabel} {unit}
+                        </div>
+                        <div className={`${labelClass} -left-20 top-1/2 -translate-y-1/2`}>
+                            高 {displayLabel} {unit}
+                        </div>
+                    </div>
+                );
+            }
+        };
+
+        // --- Main Tabs ---
+
+        const ShapePlayground = () => {
+            const [shape, setShape] = useState('square');
+            const [mode, setMode] = useState('enlarge');
+            const [scaleInput, setScaleInput] = useState('2');
+            const [showResult, setShowResult] = useState(false); 
+
+            const shapes = [
+                { id: 'square', label: '正方形', icon: <Square className="w-5 h-5" /> },
+                { id: 'rect', label: '長方形', icon: <div className="w-6 h-4 border-2 border-current rounded-sm" /> },
+                { id: 'triangle', label: '直角三角形', icon: <Triangle className="w-5 h-5" /> },
+                { id: 'circle', label: '圓形', icon: <Circle className="w-5 h-5" /> },
+            ];
+
+            useEffect(() => {
+                setShowResult(false);
+            }, [shape, mode, scaleInput]);
+
+            const baseCm = 3; 
+            
+            let scaleValue = 1;
+            if (scaleInput.includes('/')) {
+                const [n, d] = scaleInput.split('/');
+                scaleValue = parseFloat(n) / parseFloat(d);
+            } else {
+                scaleValue = parseFloat(scaleInput) || 1;
+            }
+            
+            const visualScale = Math.min(Math.max(scaleValue, 0.1), 4); 
+
+            const resultTitle = mode === 'enlarge' 
+                ? (<span><FractionDisplay value={scaleInput} className="text-2xl" />倍放大圖</span>)
+                : (<span><FractionDisplay value={scaleInput} className="text-2xl" />倍縮圖</span>);
+
+            return (
+                <div className="flex flex-col gap-8 pb-12">
+                    <div className="bg-blue-50 p-6 rounded-2xl border-2 border-blue-100 flex flex-wrap gap-8 items-center justify-between sticky top-0 z-10 shadow-sm">
+                        <div className="flex gap-8 flex-wrap">
+                            <div className="flex flex-col gap-2">
+                                <label className="font-bold text-gray-700 text-lg">1. 選擇圖形：</label>
+                                <div className="flex gap-2">
+                                    {shapes.map((s) => (
+                                        <button
+                                            key={s.id}
+                                            onClick={() => setShape(s.id)}
+                                            className={`p-3 rounded-xl border-2 flex items-center gap-2 transition-all ${
+                                            shape === s.id 
+                                                ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-bold' 
+                                                : 'border-gray-200 bg-white hover:border-indigo-300'
+                                            }`}
+                                        >
+                                            {s.icon}
+                                            <span className="hidden sm:inline">{s.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col gap-2">
+                                <label className="font-bold text-gray-700 text-lg">2. 選擇模式與倍率：</label>
+                                <div className="flex items-center gap-3 bg-white p-2 rounded-xl border border-gray-200">
+                                    <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+                                        <button 
+                                            onClick={() => { setMode('enlarge'); setScaleInput('2'); }}
+                                            className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${mode === 'enlarge' ? 'bg-white shadow text-green-600' : 'text-gray-500'}`}
+                                        >
+                                            放大
+                                        </button>
+                                        <button 
+                                            onClick={() => { setMode('reduce'); setScaleInput('1/2'); }}
+                                            className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${mode === 'reduce' ? 'bg-white shadow text-orange-600' : 'text-gray-500'}`}
+                                        >
+                                            縮小
+                                        </button>
+                                    </div>
+                                    
+                                    <span className="font-bold text-gray-400">×</span>
+                                    
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="text" 
+                                            value={scaleInput}
+                                            onChange={(e) => setScaleInput(e.target.value)}
+                                            className="w-20 p-2 text-center text-xl font-bold border-2 border-indigo-200 rounded-lg focus:border-indigo-500 outline-none"
+                                            placeholder={mode === 'enlarge' ? '2' : '1/2'}
+                                        />
+                                        {scaleInput.includes('/') && (
+                                            <div className="bg-indigo-100 px-2 py-1 rounded-lg border border-indigo-300">
+                                                <FractionDisplay value={scaleInput} className="text-lg text-indigo-700" />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <span className="text-gray-500 font-medium">倍</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button 
+                            onClick={() => setShowResult(true)}
+                            className={`px-8 py-4 rounded-full text-xl font-bold shadow-lg flex items-center gap-2 transition-all transform hover:scale-105 active:scale-95 ${
+                                showResult 
+                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+                                : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:shadow-indigo-300'
+                            }`}
+                        >
+                            <Wand2 className="w-6 h-6" />
+                            Go! 開始變身
+                        </button>
+                    </div>
+
+                    <div className="flex flex-col gap-8 items-center justify-center w-full">
+                        {/* Original */}
+                        <div className="flex flex-col items-center gap-4 w-full">
+                            <div className="relative flex items-center justify-center w-full h-[300px] bg-gray-50 rounded-2xl border-2 border-dashed border-gray-300 overflow-hidden">
+                                <div className="absolute top-2 left-2 text-xs text-gray-400 bg-white px-2 rounded border">示意比例: 1cm ≈ 38px</div>
+                                <ShapeVisual 
+                                    type={shape} 
+                                    baseCm={baseCm} 
+                                    color="text-blue-500"
+                                    bgColor="bg-blue-500"
+                                    borderColor="border-blue-500"
+                                />
+                            </div>
+                            <div className="bg-gray-800 text-white px-4 py-1 rounded-full font-bold">原圖</div>
+                        </div>
+
+                        <div className="flex flex-col items-center justify-center text-gray-400 py-2">
+                             <ArrowDown className={`w-12 h-12 transition-all duration-500 ${showResult ? 'text-indigo-500 scale-125' : 'text-gray-200'}`} />
+                        </div>
+
+                        {/* Result */}
+                        <div className="flex flex-col items-center gap-4 w-full">
+                           <div className={`bg-pink-600 text-white px-6 py-2 rounded-full font-bold text-xl shadow-lg flex items-center transition-opacity duration-300 ${showResult ? 'opacity-100' : 'opacity-0'}`}>
+                                {resultTitle}
+                           </div>
+                           <div className={`relative flex items-center justify-center w-full min-h-[400px] bg-yellow-50 rounded-2xl border-4 border-yellow-200 shadow-inner overflow-auto transition-opacity duration-500 ${showResult ? 'opacity-100' : 'opacity-0'}`}>
+                                {showResult && (
+                                    <div className="animate-in fade-in zoom-in duration-500 p-8">
+                                         <ShapeVisual 
+                                            type={shape} 
+                                            baseCm={baseCm}
+                                            scaleFactor={scaleInput}
+                                            color="text-pink-500"
+                                            bgColor="bg-pink-500"
+                                            borderColor="border-pink-500"
+                                            isScaled={true}
+                                        />
+                                    </div>
+                                )}
+                                 {!showResult && (
+                                    <div className="text-gray-300 font-bold">等待變身...</div>
+                                )}
+                           </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const ImageScaler = () => {
+            const [image, setImage] = useState(null);
+            const [mode, setMode] = useState(null); 
+            const [scaleInput, setScaleInput] = useState('');
+            const [showResult, setShowResult] = useState(false); 
+            const [aspectRatio, setAspectRatio] = useState(1);
+            const fileInputRef = useRef(null);
+
+            const isReduction = mode === 'reduce';
+            const BASE_HEIGHT_CM = isReduction ? 8 : 5;
+            const PIXELS_PER_CM = 30; 
+            const ORIGINAL_HEIGHT_PX = BASE_HEIGHT_CM * PIXELS_PER_CM;
+
+            const handleUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        const img = new Image();
+                        img.src = ev.target.result;
+                        img.onload = () => {
+                             setAspectRatio(img.naturalWidth / img.naturalHeight);
+                             setImage(ev.target.result);
+                             setMode(null);
+                             setScaleInput('');
+                             setShowResult(false);
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const handleReset = () => {
+                setShowResult(false);
+            }
+
+            const getScaleFactor = () => {
+                if (!scaleInput) return 1;
+                let scale = 1;
+                if (scaleInput.includes('/')) {
+                    const [n, d] = scaleInput.split('/');
+                    scale = parseFloat(n) / parseFloat(d);
+                } else {
+                    scale = parseFloat(scaleInput);
+                }
+                return isNaN(scale) ? 1 : scale;
+            }
+
+            const scaleFactor = getScaleFactor();
+            const currentScaleHeight = ORIGINAL_HEIGHT_PX * scaleFactor;
+
+            const formatDim = (val) => Number(val.toFixed(2)).toString();
+
+            const displayOrigH = BASE_HEIGHT_CM;
+            const displayOrigW = Number((BASE_HEIGHT_CM * aspectRatio).toFixed(1)); 
+
+            const displayScaledH = formatDim(displayOrigH * scaleFactor);
+            const displayScaledW = formatDim(displayOrigW * scaleFactor);
+
+            const getResultTitle = () => {
+                if (!mode || !scaleInput) return "等待變身...";
+                return mode === 'enlarge' 
+                    ? (<span><FractionDisplay value={scaleInput} className="text-xl"/>倍放大圖</span>)
+                    : (<span><FractionDisplay value={scaleInput} className="text-xl"/>倍縮圖</span>);
+            };
+
+            return (
+                <div className="flex flex-col gap-6 pb-20">
+                    {!image && (
+                        <div 
+                            onClick={() => fileInputRef.current.click()}
+                            className="border-4 border-dashed border-pink-200 rounded-3xl h-64 flex flex-col items-center justify-center cursor-pointer hover:bg-pink-50 hover:border-pink-300 transition-colors group"
+                        >
+                            <div className="bg-pink-100 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform">
+                                <Upload className="w-10 h-10 text-pink-500" />
+                            </div>
+                            <h3 className="text-xl font-bold text-pink-700">點擊上傳圖片</h3>
+                            <p className="text-gray-400">支援 JPG, PNG</p>
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                onChange={handleUpload} 
+                                className="hidden" 
+                                accept="image/*"
+                            />
+                        </div>
+                    )}
+
+                    {image && (
+                        <>
+                            <div className="bg-pink-50 p-6 rounded-2xl border-2 border-pink-100 flex flex-wrap gap-6 items-center justify-between sticky top-0 z-10 shadow-sm">
+                                <div className="flex items-center gap-4 flex-wrap">
+                                    <div className="font-bold text-gray-700 text-lg">設定倍率：</div>
+                                    <div className="flex gap-2">
+                                        <label className={`flex items-center gap-2 cursor-pointer p-2 rounded-lg border-2 transition-all ${mode === 'enlarge' ? 'bg-white border-green-500 text-green-700 shadow' : 'border-transparent text-gray-500 hover:bg-white'}`}>
+                                            <input type="radio" name="mode" className="hidden" onChange={() => {setMode('enlarge'); setScaleInput('2'); handleReset();}} />
+                                            <ZoomIn className="w-5 h-5" /> 放大圖
+                                        </label>
+                                        <label className={`flex items-center gap-2 cursor-pointer p-2 rounded-lg border-2 transition-all ${mode === 'reduce' ? 'bg-white border-orange-500 text-orange-700 shadow' : 'border-transparent text-gray-500 hover:bg-white'}`}>
+                                            <input type="radio" name="mode" className="hidden" onChange={() => {setMode('reduce'); setScaleInput('1/2'); handleReset();}} />
+                                            <ZoomOut className="w-5 h-5" /> 縮圖
+                                        </label>
+                                    </div>
+                                    
+                                    {mode && (
+                                        <div className="flex items-center gap-2 animate-fade-in pl-2 border-l-2 border-pink-200">
+                                            <span className="font-bold">輸入倍數：</span>
+                                            <input 
+                                                type="text" 
+                                                value={scaleInput} 
+                                                onChange={(e) => {setScaleInput(e.target.value); handleReset();}}
+                                                placeholder={mode === 'enlarge' ? '2' : '1/2'}
+                                                className="w-24 p-2 text-center text-xl font-bold border-2 border-pink-300 rounded-lg focus:outline-none focus:border-pink-500"
+                                            />
+                                            {scaleInput.includes('/') && (
+                                                <div className="bg-pink-100 px-2 py-1 rounded-lg border border-pink-300">
+                                                    <FractionDisplay value={scaleInput} className="text-lg text-pink-700" />
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex gap-4">
+                                    <button 
+                                        onClick={() => setShowResult(true)}
+                                        disabled={!mode || !scaleInput}
+                                        className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white shadow-lg transition-all ${
+                                            (!mode || !scaleInput) 
+                                            ? 'bg-gray-300 cursor-not-allowed' 
+                                            : showResult 
+                                                ? 'bg-green-500 hover:bg-green-600'
+                                                : 'bg-gradient-to-r from-pink-500 to-rose-500 hover:scale-105'
+                                        }`}
+                                    >
+                                        <Wand2 className="w-5 h-5" />
+                                        {showResult ? '重新變身' : 'Go! 開始變身'}
+                                    </button>
+
+                                    <button 
+                                        onClick={() => setImage(null)}
+                                        className="flex items-center gap-2 text-gray-400 hover:text-red-500 font-bold px-4 py-3 hover:bg-red-50 rounded-xl transition-colors border-2 border-transparent hover:border-red-100"
+                                    >
+                                        <Trash2 className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col items-center gap-8 mt-4 w-full">
+                                {/* Original */}
+                                <div className="flex flex-col items-center gap-2">
+                                    <div className="bg-gray-800 text-white px-6 py-1 rounded-full font-bold text-lg">原圖</div>
+                                    <div className="border-4 border-gray-800 rounded-2xl bg-white p-6 shadow-lg relative inline-block transition-all duration-500">
+                                        <img 
+                                            src={image} 
+                                            alt="Original" 
+                                            style={{ height: `${ORIGINAL_HEIGHT_PX}px`, width: 'auto' }}
+                                            className="object-contain transition-all duration-500" 
+                                        />
+                                        
+                                        <div className="absolute -left-6 top-0 h-full flex flex-col items-center justify-center">
+                                            <div className="w-2 h-px bg-gray-600"></div>
+                                            <div className="w-px h-full bg-gray-600"></div>
+                                            <div className="w-2 h-px bg-gray-600"></div>
+                                            <div className="absolute -left-20 bg-gray-100 px-2 py-1 rounded text-xs font-bold text-gray-700 whitespace-nowrap shadow-sm border border-gray-300">
+                                                高 {formatDim(displayOrigH)} 公分
+                                            </div>
+                                        </div>
+
+                                        <div className="absolute left-0 -bottom-6 w-full flex flex-col items-center justify-center">
+                                            <div className="h-2 w-px bg-gray-600"></div>
+                                            <div className="h-px w-full bg-gray-600"></div>
+                                            <div className="h-2 w-px bg-gray-600"></div>
+                                            <div className="absolute top-2 bg-gray-100 px-2 py-1 rounded text-xs font-bold text-gray-700 whitespace-nowrap shadow-sm border border-gray-300">
+                                                寬 {formatDim(displayOrigW)} 公分
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col justify-center items-center text-gray-300 py-4">
+                                     <ArrowDown className={`w-12 h-12 transition-all duration-500 ${showResult ? 'text-pink-500 scale-125' : 'opacity-50'}`} />
+                                </div>
+
+                                {/* Result */}
+                                <div className="flex flex-col items-center gap-2 w-full transition-all duration-500">
+                                    <div className={`bg-pink-600 text-white px-6 py-1 rounded-full font-bold text-lg flex items-center min-h-[36px] transition-opacity ${showResult ? 'opacity-100' : 'opacity-0'}`}>
+                                        {getResultTitle()}
+                                    </div>
+                                    
+                                    <div className={`border-4 border-pink-500 rounded-2xl bg-white p-6 shadow-xl relative transition-all duration-700 ${showResult ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'}`}>
+                                        {showResult && (
+                                            <div className="relative inline-block">
+                                                <img 
+                                                    src={image} 
+                                                    alt="Scaled" 
+                                                    style={{ height: `${currentScaleHeight}px`, width: 'auto' }}
+                                                    className="object-contain transition-all duration-700" 
+                                                />
+                                                
+                                                <div className="absolute -left-6 top-0 h-full flex flex-col items-center justify-center">
+                                                    <div className="w-2 h-px bg-pink-500"></div>
+                                                    <div className="w-px h-full bg-pink-500"></div>
+                                                    <div className="w-2 h-px bg-pink-500"></div>
+                                                    <div className="absolute -left-20 bg-pink-50 px-2 py-1 rounded text-xs font-bold text-pink-600 whitespace-nowrap shadow-sm border border-pink-200">
+                                                        高 {displayScaledH} 公分
+                                                    </div>
+                                                </div>
+
+                                                <div className="absolute left-0 -bottom-6 w-full flex flex-col items-center justify-center">
+                                                    <div className="h-2 w-px bg-pink-500"></div>
+                                                    <div className="h-px w-full bg-pink-500"></div>
+                                                    <div className="h-2 w-px bg-pink-500"></div>
+                                                    <div className="absolute top-2 bg-pink-50 px-2 py-1 rounded text-xs font-bold text-pink-600 whitespace-nowrap shadow-sm border border-pink-200">
+                                                        寬 {displayScaledW} 公分
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {!showResult && (
+                                             <div className="h-[150px] w-[200px] flex flex-col items-center justify-center text-gray-300">
+                                                <p>等待變身...</p>
+                                             </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('shapes');
+
+            return (
+                <div className="min-h-screen font-sans text-gray-800">
+                    <header className="bg-indigo-600 text-white p-4 shadow-lg sticky top-0 z-50">
+                        <div className="max-w-6xl mx-auto flex items-center gap-3">
+                            <Ruler className="w-8 h-8" />
+                            <h1 className="text-2xl font-bold tracking-wider">縮圖與放大圖小幫手</h1>
+                        </div>
+                    </header>
+
+                    <main className="max-w-4xl mx-auto p-4 md:p-6">
+                        <div className="flex gap-4 mb-6">
+                            <button
+                                onClick={() => setActiveTab('shapes')}
+                                className={`flex-1 py-4 px-6 rounded-2xl text-lg font-bold flex items-center justify-center gap-2 transition-all shadow-sm ${
+                                activeTab === 'shapes' 
+                                    ? 'bg-white text-indigo-600 ring-4 ring-indigo-200 shadow-md' 
+                                    : 'bg-indigo-200 text-indigo-800 hover:bg-indigo-300'
+                                }`}
+                            >
+                                <Shapes className="w-6 h-6" />
+                                幾何圖形篇
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('images')}
+                                className={`flex-1 py-4 px-6 rounded-2xl text-lg font-bold flex items-center justify-center gap-2 transition-all shadow-sm ${
+                                activeTab === 'images' 
+                                    ? 'bg-white text-pink-600 ring-4 ring-pink-200 shadow-md' 
+                                    : 'bg-pink-200 text-pink-800 hover:bg-pink-300'
+                                }`}
+                            >
+                                <ImageIcon className="w-6 h-6" />
+                                生活圖片篇
+                            </button>
+                        </div>
+
+                        <div className="bg-white rounded-3xl p-6 shadow-xl min-h-[600px]">
+                            {activeTab === 'shapes' ? <ShapePlayground /> : <ImageScaler />}
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

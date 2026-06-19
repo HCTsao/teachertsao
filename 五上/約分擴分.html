@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分數擴分約分教學工具</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8fafc;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- 圖示組件 (SVG) ---
+        const IconBase = ({ children, size = 24, className = "" }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className}
+            >
+                {children}
+            </svg>
+        );
+
+        const PieChart = (props) => (
+            <IconBase {...props}>
+                <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+                <path d="M22 12A10 10 0 0 0 12 2v10z" />
+            </IconBase>
+        );
+
+        const BarChart3 = (props) => (
+            <IconBase {...props}>
+                <path d="M3 3v18h18" />
+                <path d="M18 17V9" />
+                <path d="M13 17V5" />
+                <path d="M8 17v-3" />
+            </IconBase>
+        );
+
+        const ArrowRight = (props) => (
+            <IconBase {...props}>
+                <path d="M5 12h14" />
+                <path d="m12 5 7 7-7 7" />
+            </IconBase>
+        );
+
+        const Scissors = (props) => (
+            <IconBase {...props}>
+                <circle cx="6" cy="6" r="3" />
+                <circle cx="6" cy="18" r="3" />
+                <path d="M20 4 8.12 15.88" />
+                <path d="M14.47 14.48 20 20" />
+                <path d="M8.12 8.12 12 12" />
+            </IconBase>
+        );
+
+        const Layers = (props) => (
+            <IconBase {...props}>
+                <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
+                <path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65" />
+                <path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65" />
+            </IconBase>
+        );
+
+        const RefreshCw = (props) => (
+            <IconBase {...props}>
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                <path d="M8 16H3v5" />
+            </IconBase>
+        );
+
+        // --- 專用組件 ---
+
+        // 垂直分數顯示組件
+        const Fraction = ({ n, d, color = "text-gray-800", size = "text-xl", label }) => {
+            // 如果是 1/1，顯示為 1
+            if (n === 1 && d === 1) {
+                return (
+                    <div className={`inline-flex flex-col items-center align-middle mx-1 font-mono font-bold ${color} ${size}`}>
+                        {label && <span className="text-xs text-gray-400 font-normal mb-1">{label}</span>}
+                        <span className="flex items-center justify-center h-full py-2">1</span>
+                    </div>
+                );
+            }
+
+            return (
+                <div className={`inline-flex flex-col items-center align-middle mx-1 font-mono font-bold ${color} ${size}`}>
+                    {label && <span className="text-xs text-gray-400 font-normal mb-1">{label}</span>}
+                    <span className="border-b-2 border-current px-2 leading-none pb-1">{n}</span>
+                    <span className="leading-none pt-1">{d}</span>
+                </div>
+            );
+        };
+
+        // 垂直算式顯示組件 (用於黃色說明區)
+        const VerticalMath = ({ n, d, operator, factor, resultN, resultD, colorClass }) => (
+            <div className="flex items-center gap-4 font-mono text-xl text-slate-700">
+                <div className="flex flex-col items-center">
+                    <div className="flex items-center">
+                        <span className="text-2xl">{n}</span>
+                        <span className={`ml-2 text-sm ${colorClass} font-bold`}>{operator} {factor}</span>
+                    </div>
+                    <div className="w-full h-0.5 bg-gray-800 my-1"></div>
+                    <div className="flex items-center">
+                        <span className="text-2xl">{d}</span>
+                        <span className={`ml-2 text-sm ${colorClass} font-bold`}>{operator} {factor}</span>
+                    </div>
+                </div>
+                <div className="text-2xl">=</div>
+                <div className="flex flex-col items-center">
+                    <span className={`text-2xl ${colorClass} font-bold`}>{resultN}</span>
+                    <div className="w-full h-0.5 bg-gray-800 my-1"></div>
+                    <span className={`text-2xl ${colorClass} font-bold`}>{resultD}</span>
+                </div>
+            </div>
+        );
+
+        const FractionApp = () => {
+            // --- 狀態管理 ---
+            const [mode, setMode] = useState('expand');
+            const [visualType, setVisualType] = useState('circle'); 
+            const [showResult, setShowResult] = useState(false);
+            
+            const [expNumerator, setExpNumerator] = useState(1);
+            const [expDenominator, setExpDenominator] = useState(2);
+            const [expMultiplier, setExpMultiplier] = useState(2);
+
+            const [redNumerator, setRedNumerator] = useState(4);
+            const [redDenominator, setRedDenominator] = useState(8);
+            const [redDivisor, setRedDivisor] = useState(2);
+
+            useEffect(() => {
+                setShowResult(false);
+            }, [mode, visualType, expNumerator, expDenominator, expMultiplier, redNumerator, redDenominator, redDivisor]);
+
+            // --- 數學輔助函數 ---
+            const getFactors = (num) => {
+                const factors = [];
+                for (let i = 1; i <= num; i++) {
+                if (num % i === 0) factors.push(i);
+                }
+                return factors;
+            };
+
+            const getCommonFactors = (n, d) => {
+                const nFactors = getFactors(n);
+                const dFactors = getFactors(d);
+                return nFactors.filter(f => dFactors.includes(f) && f > 1);
+            };
+
+            // --- 狀態校正 ---
+            useEffect(() => {
+                const common = getCommonFactors(redNumerator, redDenominator);
+                if (common.length > 0 && !common.includes(redDivisor)) {
+                    setRedDivisor(common[common.length-1]);
+                }
+            }, [mode, redNumerator, redDenominator, redDivisor]);
+
+            // --- 顏色映射 (USL 圓形分數板 vs 長條分數牆) ---
+            const getUnitColor = (denom, type) => {
+                if (type === 'circle') {
+                    // 圓形分數板：依指定顏色 (移除 7)
+                    const colors = {
+                        1: '#9333ea', // 1: 紫色 (Purple)
+                        2: '#dc2626', // 1/2: 紅色
+                        3: '#facc15', // 1/3: 黃色
+                        4: '#1e3a8a', // 1/4: 深藍色
+                        5: '#ec4899', // 1/5: 粉紅色
+                        6: '#f97316', // 1/6: 橘色
+                        // 7: Skipped
+                        8: '#16a34a', // 1/8: 綠色
+                        9: '#84cc16', // 1/9: Lime (自定)
+                        10: '#78350f', // 1/10: 咖啡色
+                        11: '#64748b', // 1/11: Slate (自定)
+                        12: '#000000', // 1/12: 黑色
+                        13: '#4f46e5', // 1/13: Indigo (自定)
+                        14: '#0ea5e9', // 1/14: Sky (自定)
+                        15: '#e11d48'  // 1/15: Rose (自定)
+                    };
+                    return colors[denom] || '#6366f1';
+                } else {
+                    // 長條分數牆：依指定顏色 (移除 7)
+                    const colors = {
+                        1: '#1e3a8a', // 1: 深藍色 (Dark Blue)
+                        2: '#78350f', // 1/2: 咖啡色
+                        3: '#000000', // 1/3: 黑色
+                        4: '#facc15', // 1/4: 黃色
+                        5: '#16a34a', // 1/5: 綠色
+                        6: '#f97316', // 1/6: 橘色
+                        // 7: Skipped
+                        8: '#dc2626', // 1/8: 紅色
+                        9: '#84cc16', // 1/9: Lime (自定)
+                        10: '#9333ea', // 1/10: 紫色
+                        11: '#64748b', // 1/11: Slate (自定)
+                        12: '#ec4899', // 1/12: 粉紅色
+                        13: '#4f46e5', // 1/13: Indigo (自定)
+                        14: '#0ea5e9', // 1/14: Sky (自定)
+                        15: '#e11d48'  // 1/15: Rose (自定)
+                    };
+                    return colors[denom] || '#6366f1';
+                }
+            };
+
+            const getTextColors = (denom, isSelected, type) => {
+                // 黃色或淺色背景要用黑字，其他深色背景用白字
+                if (!isSelected) return '#9ca3af'; // 未選中灰色
+                
+                if (type === 'circle') {
+                    // 圓形：3是黃色
+                    if (denom === 3) return '#000000';
+                } else {
+                    // 長條：4是黃色
+                    if (denom === 4) return '#000000';
+                }
+                return '#ffffff';
+            };
+
+            // --- 繪圖邏輯 ---
+            const renderVisuals = () => {
+                let baseN, baseD, factor;
+                
+                if (mode === 'expand') {
+                    baseN = expNumerator;
+                    baseD = expDenominator;
+                    factor = expMultiplier;
+                } else {
+                    baseN = redNumerator / redDivisor;
+                    baseD = redDenominator / redDivisor;
+                    factor = redDivisor;
+                }
+
+                const leftN = mode === 'expand' ? baseN : redNumerator;
+                const leftD = mode === 'expand' ? baseD : redDenominator;
+                
+                const rightN = mode === 'expand' ? baseN * factor : baseN;
+                const rightD = mode === 'expand' ? baseD * factor : baseD;
+
+                // 檢查是否可以約分 (用於控制按鈕顯示)
+                const canReduce = mode === 'expand' || getCommonFactors(redNumerator, redDenominator).length > 0;
+
+                return (
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-8 w-full p-4 transition-all duration-500">
+                    
+                    {/* 左側 */}
+                    <div className="flex flex-col items-center w-1/3">
+                        <span className="text-gray-500 font-bold mb-2 text-sm bg-slate-100 px-3 py-1 rounded-full">{mode === 'expand' ? '擴分前' : '約分前'}</span>
+                        {renderModel(leftN, leftD, false)}
+                        <div className="mt-4">
+                            <Fraction n={leftN} d={leftD} color="text-blue-600" size="text-3xl" />
+                        </div>
+                    </div>
+
+                    {/* 中間：操作按鈕/動畫 */}
+                    <div className="flex flex-col items-center justify-center text-gray-500 min-w-[160px] z-10">
+                        {!showResult ? (
+                        // 只有在可以約分(或擴分模式)時才顯示按鈕
+                        canReduce ? (
+                            <button
+                            onClick={() => setShowResult(true)}
+                            className={`
+                                group flex items-center gap-2 px-6 py-3 rounded-full font-bold text-white shadow-lg transform transition-all hover:scale-105 active:scale-95
+                                ${mode === 'expand' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-green-600 hover:bg-green-700'}
+                            `}
+                            >
+                            {mode === 'expand' ? <Scissors size={20} /> : <Layers size={20} />}
+                            <span>{mode === 'expand' ? '進行切割' : '進行合併'}</span>
+                            </button>
+                        ) : (
+                            // 無法約分時不顯示任何東西
+                            <div className="h-12 w-1"></div>
+                        )
+                        ) : (
+                        <div className="flex flex-col items-center animate-in fade-in slide-in-from-left-4 duration-500">
+                            <ArrowRight size={48} className="text-orange-500" />
+                            <div className="flex items-center gap-1 font-bold text-orange-600 bg-orange-100 px-4 py-2 rounded-full mt-2 text-sm shadow-sm border border-orange-200">
+                            {mode === 'expand' ? <span>每份切成 {factor} 小份</span> : <span>每 {factor} 份拼成 1 大份</span>}
+                            </div>
+                            <button onClick={() => setShowResult(false)} className="mt-4 text-slate-400 hover:text-slate-600 flex items-center gap-1 text-xs">
+                            <RefreshCw size={12}/> 重置
+                            </button>
+                        </div>
+                        )}
+                    </div>
+
+                    {/* 右側 */}
+                    <div className={`flex flex-col items-center w-1/3 transition-all duration-500 ${showResult ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'}`}>
+                        {showResult && (
+                        <>
+                            <span className="text-gray-500 font-bold mb-2 text-sm bg-slate-100 px-3 py-1 rounded-full">{mode === 'expand' ? '擴分後' : '約分後'}</span>
+                            {renderModel(rightN, rightD, true)}
+                            <div className="mt-4">
+                            <Fraction n={rightN} d={rightD} color="text-green-600" size="text-3xl" />
+                            </div>
+                        </>
+                        )}
+                    </div>
+                    </div>
+                );
+            };
+
+            const renderModel = (numerator, denominator, isResult) => {
+                // 1. 長條分數牆 (visualType === 'bar')
+                if (visualType === 'bar') {
+                    return (
+                        <div className="w-48 h-16 md:w-64 md:h-20 bg-gray-100 border-4 border-gray-700 rounded-lg p-1.5 flex items-center shadow-inner">
+                            <div className="w-full h-full flex border border-gray-400 bg-white shadow-sm overflow-hidden">
+                                {Array.from({ length: denominator }).map((_, i) => {
+                                    const isSelected = i < numerator;
+                                    const bgColor = isSelected ? getUnitColor(denominator, 'bar') : '#f3f4f6';
+                                    const txtColor = getTextColors(denominator, isSelected, 'bar');
+                                    
+                                    return (
+                                        <div 
+                                            key={i}
+                                            className="h-full flex flex-col items-center justify-center border-r border-white last:border-r-0 transition-all"
+                                            style={{ width: `${100/denominator}%`, backgroundColor: bgColor }}
+                                        >
+                                            <Fraction n={1} d={denominator} size="text-[10px] md:text-xs" color={`text-[${txtColor}]`} />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                }
+
+                // 2. 圓形 (SVG)
+                const renderCircle = () => {
+                    const startOffset = -Math.PI / 2;
+                    const getCoordinatesForPercent = (percent, radius = 1) => [
+                        Math.cos(2 * Math.PI * percent + startOffset) * radius,
+                        Math.sin(2 * Math.PI * percent + startOffset) * radius
+                    ];
+
+                    return (
+                        <svg viewBox="-1.1 -1.1 2.2 2.2" className="w-48 h-48">
+                            <circle cx="0" cy="0" r="1" fill="#f3f4f6" stroke="#d1d5db" strokeWidth="0.02" />
+                            
+                            {Array.from({ length: numerator }).map((_, i) => {
+                                const start = i / denominator;
+                                const end = (i + 1) / denominator;
+                                
+                                // 特殊處理：當分母為 1 時 (代表 1/1)，繪製一個完整的圓
+                                if (denominator === 1) {
+                                    return <circle key={i} cx="0" cy="0" r="1" fill={getUnitColor(denominator, 'circle')} stroke="white" strokeWidth="0.01" />;
+                                }
+
+                                const [startX, startY] = getCoordinatesForPercent(start);
+                                const [endX, endY] = getCoordinatesForPercent(end);
+                                const largeArcFlag = end - start > 0.5 ? 1 : 0;
+                                const d = `M 0 0 L ${startX} ${startY} A 1 1 0 ${largeArcFlag} 1 ${endX} ${endY} L 0 0`;
+                                return <path key={i} d={d} fill={getUnitColor(denominator, 'circle')} stroke="white" strokeWidth="0.01" />;
+                            })}
+
+                            {/* 分割線 - 只有當分母大於 1 時才畫 */}
+                            {denominator > 1 && Array.from({ length: denominator }).map((_, i) => {
+                                const [x, y] = getCoordinatesForPercent(i / denominator);
+                                return <line key={`line-${i}`} x1="0" y1="0" x2={x} y2={y} stroke="white" strokeWidth="0.02" />;
+                            })}
+                            
+                            <circle cx="0" cy="0" r="1" fill="none" stroke="#374151" strokeWidth="0.05" />
+
+                            {/* 單位分數文字 (垂直排列) */}
+                            {Array.from({ length: denominator }).map((_, i) => {
+                                // 如果分母是 1 (代表 1/1)，顯示大大的 "1"，不畫分數線
+                                if (denominator === 1) {
+                                    return (
+                                        <text 
+                                            key={`text-${i}`} 
+                                            x="0" y="0" 
+                                            fontSize="0.5" 
+                                            fill={getTextColors(denominator, true, 'circle')} 
+                                            textAnchor="middle" 
+                                            dominantBaseline="central"
+                                            className="font-mono font-bold select-none pointer-events-none"
+                                        >1</text>
+                                    );
+                                }
+
+                                const midPercent = (i + 0.5) / denominator;
+                                
+                                // 1. 半徑: 0.65，文字靠扇形內側
+                                const labelRadius = 0.65; 
+                                const [x, y] = getCoordinatesForPercent(midPercent, labelRadius);
+                                
+                                const fontSize = denominator > 10 ? 0.12 : denominator > 6 ? 0.15 : 0.18;
+                                const lineLength = fontSize * 0.8;
+                                
+                                // 2. 偏移量: 增加分子與分母的垂直間距
+                                const txtColor = getTextColors(denominator, i < numerator, 'circle');
+                                // 將分子往上移 (負更多)
+                                const numY = -fontSize * 0.7;
+                                // 將分母往下移 (正更多)
+                                const denY = fontSize * 0.9;
+
+                                return (
+                                    <g key={`text-${i}`} transform={`translate(${x}, ${y})`}>
+                                        {/* 分子 */}
+                                        <text 
+                                            y={numY} 
+                                            fontSize={fontSize} 
+                                            fill={txtColor} 
+                                            textAnchor="middle" 
+                                            className="font-mono font-bold select-none pointer-events-none"
+                                        >1</text>
+                                        
+                                        {/* 分數線 */}
+                                        <line 
+                                            x1={-lineLength} y1={0} 
+                                            x2={lineLength} y2={0} 
+                                            stroke={txtColor} 
+                                            strokeWidth={0.015} 
+                                        />
+                                        
+                                        {/* 分母 */}
+                                        <text 
+                                            y={denY} 
+                                            fontSize={fontSize} 
+                                            fill={txtColor} 
+                                            textAnchor="middle" 
+                                            className="font-mono font-bold select-none pointer-events-none"
+                                        >{denominator}</text>
+                                    </g>
+                                );
+                            })}
+                        </svg>
+                    );
+                };
+
+                return renderCircle();
+            };
+
+            return (
+                <div className="max-w-6xl mx-auto p-4 md:p-8 min-h-screen font-sans text-slate-800">
+                    <header className="mb-8 text-center">
+                        <h1 className="text-3xl font-bold text-slate-800 mb-2">分數教具實驗室</h1>
+                        <p className="text-slate-600">觀察切割與合併，發現分數相等的秘密！</p>
+                    </header>
+
+                    {/* 設定區 */}
+                    <div className="bg-white p-4 rounded-xl shadow-sm mb-6 border border-slate-200">
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                            <div className="bg-slate-100 p-1.5 rounded-full inline-flex">
+                                <button onClick={() => setMode('expand')} className={`px-6 py-2 rounded-full font-bold transition-all ${mode === 'expand' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 hover:text-gray-700'}`}>擴分 (切割)</button>
+                                <button onClick={() => setMode('reduce')} className={`px-6 py-2 rounded-full font-bold transition-all ${mode === 'reduce' ? 'bg-green-600 text-white shadow' : 'text-gray-500 hover:text-gray-700'}`}>約分 (合併)</button>
+                            </div>
+                            <div className="flex gap-3">
+                                {[{ id: 'circle', label: '圓形板', icon: PieChart }, { id: 'bar', label: '分數牆', icon: BarChart3 }].map(type => (
+                                    <button key={type.id} onClick={() => setVisualType(type.id)} className={`flex flex-col md:flex-row items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${visualType === type.id ? 'border-blue-500 bg-blue-50 text-blue-800' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}>
+                                        <type.icon className="w-5 h-5" />
+                                        <span className="text-sm font-medium">{type.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 控制面板 */}
+                    <div className="grid md:grid-cols-2 gap-6 mb-8">
+                        {/* 題目設定 */}
+                        <div className="bg-white rounded-2xl shadow-md p-6 border border-slate-200 flex flex-col items-center">
+                            <h3 className="text-sm font-bold text-gray-500 mb-4 uppercase tracking-wide bg-gray-100 px-3 py-1 rounded">1. 設定題目分數</h3>
+                            <div className="flex flex-col items-center gap-2">
+                                <div className="flex items-center gap-4">
+                                    {/* 分子控制 */}
+                                    <button className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold flex items-center justify-center disabled:opacity-30" 
+                                        onClick={() => mode === 'expand' ? setExpNumerator(Math.max(1, expNumerator - 1)) : setRedNumerator(Math.max(1, redNumerator - 1))} 
+                                        disabled={mode === 'expand' ? expNumerator <= 1 : redNumerator <= 1}>-</button>
+                                    <span className="text-3xl font-mono font-bold text-blue-900 w-8 text-center">{mode === 'expand' ? expNumerator : redNumerator}</span>
+                                    <button className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold flex items-center justify-center disabled:opacity-30" 
+                                        onClick={() => { 
+                                            // 允許分子等於分母 (1的等值分數)
+                                            if (mode === 'expand') setExpNumerator(Math.min(expDenominator, expNumerator + 1)); 
+                                            else setRedNumerator(Math.min(redDenominator, redNumerator + 1)); 
+                                        }} 
+                                        // 禁用條件：分子已經等於分母了，就不能再加了
+                                        disabled={mode === 'expand' ? expNumerator >= expDenominator : redNumerator >= redDenominator}>+</button>
+                                </div>
+                                <div className="w-32 h-1 bg-slate-800 my-1 rounded-full"></div>
+                                <div className="flex items-center gap-4">
+                                    {/* 分母控制 */}
+                                    <button className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold flex items-center justify-center disabled:opacity-30" onClick={() => { 
+                                        if (mode === 'expand') { 
+                                            let nextD = expDenominator - 1; 
+                                            if (nextD === 7) nextD = 6; // 跳過 7
+                                            if (nextD >= expNumerator) setExpDenominator(nextD); // 修改: 允許分母等於分子 (例如 1/1)
+                                        } else { 
+                                            let nextD = redDenominator - 1; 
+                                            if (nextD === 7) nextD = 6; // 跳過 7
+                                            if (nextD > redNumerator) setRedDenominator(nextD); 
+                                        } 
+                                    }} disabled={mode === 'expand' ? expDenominator <= expNumerator : redDenominator <= redNumerator + 1}>-</button>
+                                    <span className="text-3xl font-mono font-bold text-blue-900 w-8 text-center">{mode === 'expand' ? expDenominator : redDenominator}</span>
+                                    <button 
+                                        className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold flex items-center justify-center disabled:opacity-30" 
+                                        onClick={() => { 
+                                            // 擴分模式邏輯：
+                                            // 最大分母限制為 6 (因為跳過 7，而 8 的最小擴倍 2 倍是 16，超過 15)
+                                            const maxExpandBase = 6;
+                                            const maxReduceBase = 15;
+
+                                            if (mode === 'expand') { 
+                                                let nextD = expDenominator + 1; 
+                                                if (nextD === 7) nextD = 8; // 跳過 7
+                                                if (nextD <= maxExpandBase) {
+                                                    setExpDenominator(nextD);
+                                                    if (nextD * expMultiplier > 15) setExpMultiplier(2);
+                                                }
+                                            } else { 
+                                                let nextD = redDenominator + 1; 
+                                                if (nextD === 7) nextD = 8; // 跳過 7
+                                                if (nextD <= maxReduceBase) setRedDenominator(nextD); 
+                                            } 
+                                        }} 
+                                        disabled={mode === 'expand' ? expDenominator >= 6 : redDenominator >= 15}
+                                    >+</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 運算設定 */}
+                        <div className="bg-white rounded-2xl shadow-md p-6 border border-slate-200 flex flex-col items-center">
+                            <h3 className={`text-sm font-bold mb-4 uppercase tracking-wide px-3 py-1 rounded ${mode === 'expand' ? 'text-orange-600 bg-orange-50' : 'text-green-600 bg-green-50'}`}>2. {mode === 'expand' ? '設定切割份數' : '設定合併份數'}</h3>
+                            {mode === 'expand' ? (
+                                <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center gap-4">
+                                        <button className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold flex items-center justify-center disabled:opacity-30" 
+                                            onClick={() => setExpMultiplier(Math.max(1, expMultiplier - 1))} 
+                                            disabled={expMultiplier <= 1}>-</button>
+                                        <span className="text-3xl font-mono font-bold text-orange-600 w-8 text-center">{expMultiplier}</span>
+                                        <button className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold flex items-center justify-center disabled:opacity-30" 
+                                            onClick={() => setExpMultiplier(expMultiplier + 1)} 
+                                            disabled={expDenominator * (expMultiplier + 1) > 15}>+</button>
+                                    </div>
+                                    <span className="font-bold text-orange-700 text-sm">每一份切成 {expMultiplier} 小份</span>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center gap-2">
+                                    {getCommonFactors(redNumerator, redDenominator).length > 0 ? (
+                                        <>
+                                            <div className="flex items-center gap-4">
+                                                <button className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold flex items-center justify-center disabled:opacity-30" 
+                                                    onClick={() => {
+                                                        const factors = getCommonFactors(redNumerator, redDenominator);
+                                                        const currentIndex = factors.indexOf(redDivisor);
+                                                        if (currentIndex > 0) setRedDivisor(factors[currentIndex - 1]);
+                                                    }} 
+                                                    disabled={getCommonFactors(redNumerator, redDenominator).indexOf(redDivisor) <= 0}>-</button>
+                                                <span className="text-3xl font-mono font-bold text-green-600 w-8 text-center">{redDivisor}</span>
+                                                <button className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold flex items-center justify-center disabled:opacity-30" 
+                                                    onClick={() => {
+                                                        const factors = getCommonFactors(redNumerator, redDenominator);
+                                                        const currentIndex = factors.indexOf(redDivisor);
+                                                        if (currentIndex < factors.length - 1) setRedDivisor(factors[currentIndex + 1]);
+                                                    }} 
+                                                    disabled={getCommonFactors(redNumerator, redDenominator).indexOf(redDivisor) >= getCommonFactors(redNumerator, redDenominator).length - 1}>+</button>
+                                            </div>
+                                            <span className="font-bold text-green-700 text-sm">每 {redDivisor} 份拼成 1 大份</span>
+                                        </>
+                                    ) : (
+                                        <div className="text-red-500 bg-red-50 px-4 py-2 rounded-lg border border-red-100 font-bold text-sm">這個分數沒辦法再約分了！ (最簡分數)</div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 視覺呈現區 */}
+                    <div className="bg-white rounded-2xl shadow-xl p-2 border border-slate-200 min-h-[360px] flex items-center justify-center overflow-hidden relative">
+                        <div className="absolute top-3 left-4 text-slate-300 font-bold text-xs pointer-events-none uppercase tracking-widest">Visual Workspace</div>
+                        {renderVisuals()}
+                    </div>
+
+                    {/* 數學解釋區 */}
+                    {showResult && (
+                        <div className="mt-6 mx-auto max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+                            <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-6 text-center shadow-sm">
+                                <h3 className="text-lg font-bold text-yellow-800 mb-6 flex items-center justify-center gap-2">
+                                    {mode === 'expand' 
+                                        ? `💡 分子分母同時乘以 ${expMultiplier} 倍` 
+                                        : `💡 分子分母同時除以公因數 ${redDivisor}`
+                                    }
+                                </h3>
+                                <div className="flex justify-center">
+                                    {mode === 'expand' ? (
+                                        <VerticalMath n={expNumerator} d={expDenominator} operator="×" factor={expMultiplier} resultN={expNumerator * expMultiplier} resultD={expDenominator * expMultiplier} colorClass="text-blue-600" />
+                                    ) : (
+                                        <VerticalMath n={redNumerator} d={redDenominator} operator="÷" factor={redDivisor} resultN={redNumerator / redDivisor} resultD={redDenominator / redDivisor} colorClass="text-green-600" />
+                                    )}
+                                </div>
+                                <div className="mt-6 text-lg font-bold text-yellow-800 flex items-center justify-center gap-4">
+                                    <Fraction 
+                                        n={mode === 'expand' ? expNumerator : redNumerator} 
+                                        d={mode === 'expand' ? expDenominator : redDenominator} 
+                                        color="text-yellow-800"
+                                        size="text-2xl"
+                                    />
+                                    <span>和</span>
+                                    <Fraction 
+                                        n={mode === 'expand' ? expNumerator * expMultiplier : redNumerator / redDivisor} 
+                                        d={mode === 'expand' ? expDenominator * expMultiplier : redDenominator / redDivisor} 
+                                        color="text-yellow-800"
+                                        size="text-2xl"
+                                    />
+                                    <span>是</span>
+                                    <span className="border-2 border-current px-2 py-1 rounded-lg">等值分數</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<FractionApp />);
+    </script>
+</body>
+</html>

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>小數四則運算大冒險 - iPad 專業版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        body { 
+            font-family: 'Noto Sans TC', sans-serif; 
+            touch-action: manipulation;
+            overflow: hidden;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        .animate-pop { animation: pop 0.3s cubic-bezier(0.26, 0.53, 0.74, 1.48); }
+        @keyframes pop {
+            0% { transform: scale(0.98); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .key-btn:active {
+            transform: scale(0.9);
+            background-color: #f1f5f9;
+        }
+        /* 確保鍵盤不換行 */
+        .keypad-container {
+            display: flex;
+            flex-wrap: nowrap;
+            justify-content: center;
+            width: 100%;
+            overflow-x: auto;
+            padding-bottom: 5px;
+        }
+        .keypad-container::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-emerald-50 to-teal-100 h-screen flex items-center justify-center p-2">
+
+    <div id="app" class="max-w-5xl w-full bg-white rounded-[1.5rem] shadow-xl overflow-hidden border-4 border-white flex flex-col max-h-[98vh]">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-emerald-600 to-teal-600 p-3 md:p-5 text-white flex justify-between items-center shrink-0">
+            <div>
+                <h1 class="text-lg md:text-xl font-black flex items-center gap-2">
+                    <i data-lucide="zap" class="fill-yellow-400 text-yellow-400 w-5 h-5"></i> 小數大冒險
+                </h1>
+                <p class="text-emerald-100 text-[10px] md:text-xs font-medium tracking-wide">iPad最佳化版面</p>
+            </div>
+            <div class="bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-xl text-sm md:text-lg font-black">
+                積分: <span id="score-display">0</span>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div id="main-content" class="p-3 md:p-6 flex-1 overflow-y-auto">
+            <!-- JavaScript 注入 -->
+        </div>
+
+        <div class="bg-slate-50 p-2 text-center border-t border-slate-100 text-[10px] text-slate-400 font-bold tracking-widest uppercase shrink-0">
+            Decimal Quest &copy; Optimized Layout
+        </div>
+    </div>
+
+    <script>
+        // --- 狀態管理 ---
+        let state = {
+            gameState: 'menu',
+            currentLevel: 0,
+            currentSubLevel: 0,
+            score: 0,
+            question: null,
+            userAnswer: '',
+        };
+
+        const levels = [
+            { title: "第一關：小數加法", type: "add", subs: ["整數 + 二位小數", "二位小數 + 三位小數", "三位小數 + 三位小數"] },
+            { title: "第二關：小數減法", type: "sub", subs: ["二位小數 - 二位小數", "整數 - 二位小數", "二位小數 - 三位小數"] },
+            { title: "第三關：小數乘法", type: "mul", subs: ["一位小數 × 二位小數", "二位小數 × 整數", "二位小數 × 二位小數", "一位小數 × 三位小數"] },
+            { title: "第四關：小數除法", type: "div", subs: ["二位小數 ÷ 整數", "整數 ÷ 二位小數", "二位小數 ÷ 三位小數", "三位小數 ÷ 一位小數"] }
+        ];
+
+        // --- 運算工具 (處理 JS 浮點數誤差) ---
+        const calc = {
+            add: (a, b) => parseFloat((a + b).toFixed(6)),
+            sub: (a, b) => parseFloat((a - b).toFixed(6)),
+            mul: (a, b) => parseFloat((a * b).toFixed(8)),
+            div: (a, b) => parseFloat((a / b).toFixed(6))
+        };
+
+        function randDecimal(decimals, min = 0, max = 10) {
+            return parseFloat((Math.random() * (max - min) + min).toFixed(decimals));
+        }
+
+        function randInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        // --- 渲染引擎 ---
+        function render() {
+            const container = document.getElementById('main-content');
+            document.getElementById('score-display').innerText = state.score;
+
+            if (state.gameState === 'menu') renderMenu(container);
+            else if (state.gameState === 'playing') renderPlaying(container);
+            else if (state.gameState === 'level-complete') renderLevelComplete(container);
+            else if (state.gameState === 'finished') renderFinished(container);
+            lucide.createIcons();
+        }
+
+        function renderMenu(container) {
+            let html = `<div class="grid grid-cols-2 gap-3 md:gap-4 animate-pop">
+                <h2 class="col-span-full text-base md:text-xl font-bold text-slate-800 mb-1 text-center">選擇練習關卡：</h2>`;
+            levels.forEach((lvl, idx) => {
+                html += `
+                <button onclick="startLevel(${idx})" class="flex items-center justify-between p-3 md:p-5 bg-slate-50 border-2 border-transparent hover:border-emerald-400 hover:bg-emerald-50 rounded-xl transition-all active:scale-95 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 md:w-12 md:h-12 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-black text-sm md:text-xl shadow-md">${idx+1}</div>
+                        <div class="text-left">
+                            <div class="font-black text-xs md:text-lg text-slate-800">${lvl.title}</div>
+                            <div class="text-[9px] md:text-xs text-slate-500 font-bold">${lvl.subs.length} 種挑戰</div>
+                        </div>
+                    </div>
+                    <i data-lucide="chevron-right" class="text-slate-300 w-4 h-4 md:w-6 md:h-6"></i>
+                </button>`;
+            });
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        function renderPlaying(container) {
+            const q = state.question;
+            const lvl = levels[state.currentLevel];
+            
+            let html = `
+            <div class="space-y-4 md:space-y-6 animate-pop h-full flex flex-col">
+                <div class="flex items-center justify-between shrink-0">
+                    <button onclick="goToMenu()" class="text-slate-400 hover:text-slate-600 flex items-center gap-1 font-bold text-[10px] md:text-sm">
+                        <i data-lucide="arrow-left" class="w-3 h-3"></i> 返回選單
+                    </button>
+                    <div class="px-3 py-0.5 bg-emerald-50 text-emerald-600 rounded-full font-black text-[9px] md:text-xs border border-emerald-100">
+                        ${lvl.subs[state.currentSubLevel]}
+                    </div>
+                </div>
+
+                <!-- 題目顯示區 -->
+                <div class="flex items-center justify-center gap-3 md:gap-10 py-4 md:py-8 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 shadow-inner px-4 text-3xl md:text-6xl font-black text-slate-700 shrink-0">
+                    <span>${q.n1}</span>
+                    <span class="text-emerald-400">${q.op}</span>
+                    <span>${q.n2}</span>
+                    <span class="text-slate-200">=</span>
+                    <div id="answer-box" class="min-w-[120px] md:min-w-[200px] h-12 md:h-20 bg-white rounded-xl border-2 border-emerald-500 flex items-center justify-center text-emerald-600 shadow-md px-3">
+                        ${state.userAnswer || '<span class="text-slate-100 italic">?</span>'}
+                    </div>
+                </div>
+
+                <!-- 操作與鍵盤區 -->
+                <div id="keyboard-area" class="flex flex-col items-center gap-3 md:gap-5 flex-1 justify-center min-h-0">
+                    <div class="keypad-container gap-1 md:gap-2">
+                        ${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, '.'].map(k => `
+                            <button onclick="pressKey('${k}')" class="key-btn flex-1 min-w-[36px] h-12 md:h-16 bg-white border border-slate-200 rounded-lg text-lg md:text-2xl font-black text-slate-700 shadow-sm">
+                                ${k}
+                            </button>
+                        `).join('')}
+                        <button onclick="pressKey('delete')" class="key-btn flex-1 min-w-[45px] h-12 md:h-16 bg-slate-100 border border-slate-200 rounded-lg flex items-center justify-center text-slate-600 shadow-sm">
+                            <i data-lucide="delete" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                    
+                    <button onclick="checkAnswer()" class="w-full max-w-lg h-12 md:h-16 bg-emerald-600 text-white rounded-xl font-black text-base md:text-xl shadow-lg active:scale-95 transition-all">
+                        提交答案
+                    </button>
+                </div>
+            </div>`;
+            container.innerHTML = html;
+        }
+
+        // --- 優化：無閃爍輸入邏輯 ---
+        function pressKey(key) {
+            if (key === 'delete') {
+                state.userAnswer = state.userAnswer.slice(0, -1);
+            } else if (key === '.') {
+                if (!state.userAnswer.includes('.')) state.userAnswer += '.';
+            } else {
+                if (state.userAnswer.length < 12) state.userAnswer += key;
+            }
+            // 直接更新 DOM
+            const box = document.getElementById('answer-box');
+            if (box) {
+                box.innerHTML = state.userAnswer || '<span class="text-slate-100 italic">?</span>';
+            }
+        }
+
+        function generateQuestion() {
+            const lvl = levels[state.currentLevel];
+            const sub = state.currentSubLevel;
+            let q = { n1: 0, n2: 0, op: '', ans: 0 };
+            switch(lvl.type) {
+                case 'add':
+                    q.op = '+';
+                    if (sub === 0) { q.n1 = randInt(10, 50); q.n2 = randDecimal(2, 1, 9); }
+                    else if (sub === 1) { q.n1 = randDecimal(2, 1, 5); q.n2 = randDecimal(3, 0, 1); }
+                    else { q.n1 = randDecimal(3, 1, 4); q.n2 = randDecimal(3, 1, 4); }
+                    q.ans = calc.add(q.n1, q.n2);
+                    break;
+                case 'sub':
+                    q.op = '-';
+                    if (sub === 0) { q.n1 = randDecimal(2, 5, 9); q.n2 = randDecimal(2, 1, 4); }
+                    else if (sub === 1) { q.n1 = randInt(10, 15); q.n2 = randDecimal(2, 1, 9); }
+                    else { q.n1 = randDecimal(2, 5, 9); q.n2 = randDecimal(3, 1, 4); }
+                    q.ans = calc.sub(q.n1, q.n2);
+                    break;
+                case 'mul':
+                    q.op = '×';
+                    if (sub === 0) { q.n1 = randDecimal(1, 1, 5); q.n2 = randDecimal(2, 1, 3); }
+                    else if (sub === 1) { q.n1 = randDecimal(2, 1, 4); q.n2 = randInt(2, 8); }
+                    else if (sub === 2) { q.n1 = randDecimal(2, 0.5, 2); q.n2 = randDecimal(2, 0.5, 2); }
+                    else { q.n1 = randDecimal(1, 1, 5); q.n2 = randDecimal(3, 0.1, 0.5); }
+                    q.ans = calc.mul(q.n1, q.n2);
+                    break;
+                case 'div':
+                    q.op = '÷';
+                    if (sub === 0) {
+                        let a = randDecimal(2, 1, 5); let b = randInt(2, 4);
+                        q.n2 = b; q.n1 = calc.mul(a, b); q.ans = a;
+                    } else if (sub === 1) {
+                        let a = randDecimal(1, 1, 5); let b = randDecimal(2, 0.2, 0.5);
+                        q.n2 = b; q.n1 = calc.mul(a, b);
+                        while(!Number.isInteger(q.n1)) {
+                            a = randDecimal(1, 1, 5); b = randDecimal(2, 0.2, 0.5);
+                            q.n2 = b; q.n1 = calc.mul(a, b);
+                        }
+                        q.ans = a;
+                    } else if (sub === 2) {
+                        let a = randDecimal(1, 1, 5); let b = randDecimal(3, 0.1, 0.4);
+                        q.n2 = b; q.n1 = calc.mul(a, b); q.ans = a;
+                    } else {
+                        let a = randDecimal(2, 1, 5); let b = randDecimal(1, 0.1, 0.8);
+                        q.n2 = b; q.n1 = calc.mul(a, b); q.ans = a;
+                    }
+                    break;
+            }
+            state.question = q;
+        }
+
+        function checkAnswer() {
+            if (state.userAnswer === '') return;
+            const val = parseFloat(state.userAnswer);
+            const isCorrect = Math.abs(val - state.question.ans) < 0.000001;
+
+            const container = document.getElementById('keyboard-area');
+            if (isCorrect) {
+                state.score += 10;
+                renderResult(true, "太棒了！計算正確！");
+            } else {
+                renderResult(false, "答案好像不對喔，再試試！");
+            }
+        }
+
+        function renderResult(isCorrect, message) {
+            const container = document.getElementById('keyboard-area');
+            container.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-6 space-y-4 animate-pop h-full w-full">
+                <div class="w-16 h-16 rounded-full flex items-center justify-center ${isCorrect ? 'bg-green-100 text-green-500' : 'bg-red-100 text-red-500'} shadow-md border-2 border-white">
+                    <i data-lucide="${isCorrect ? 'check' : 'x'}" class="w-10 h-10"></i>
+                </div>
+                <h2 class="text-xl font-black ${isCorrect ? 'text-green-700' : 'text-red-700'}">${message}</h2>
+                <button onclick="${isCorrect ? 'handleNext()' : 'retry()'}" 
+                    class="w-full max-w-sm py-4 rounded-xl font-black text-lg text-white shadow-md active:scale-95 transition-all ${isCorrect ? 'bg-emerald-600' : 'bg-red-600'}">
+                    ${isCorrect ? '下一題' : '重試一下'}
+                </button>
+            </div>`;
+            lucide.createIcons();
+        }
+
+        function retry() { render(); }
+        function handleNext() {
+            state.currentSubLevel++;
+            state.userAnswer = '';
+            if (state.currentSubLevel < levels[state.currentLevel].subs.length) {
+                generateQuestion(); render();
+            } else {
+                state.currentLevel++;
+                if (state.currentLevel < levels.length) state.gameState = 'level-complete';
+                else state.gameState = 'finished';
+                render();
+            }
+        }
+
+        function renderLevelComplete(container) {
+            container.innerHTML = `
+            <div class="text-center py-6 space-y-5 animate-pop">
+                <div class="inline-flex items-center justify-center w-20 h-20 bg-yellow-100 text-yellow-500 rounded-full shadow-inner">
+                    <i data-lucide="award" class="w-10 h-10"></i>
+                </div>
+                <h2 class="text-2xl font-black text-slate-800">闖關成功！</h2>
+                <div class="flex flex-col gap-3 max-w-xs mx-auto">
+                    <button onclick="goToMenu()" class="bg-white border-2 border-slate-100 py-3 rounded-xl font-black text-slate-500 text-sm">返回選單</button>
+                    <button onclick="startLevel(${state.currentLevel})" class="bg-emerald-600 text-white py-3 rounded-xl font-black shadow-md text-sm">挑戰下一關</button>
+                </div>
+            </div>`;
+        }
+
+        function renderFinished(container) {
+            container.innerHTML = `
+            <div class="text-center py-6 space-y-5 animate-pop">
+                <div class="inline-flex items-center justify-center w-20 h-20 bg-indigo-100 text-indigo-500 rounded-full">
+                    <i data-lucide="trophy" class="w-10 h-10"></i>
+                </div>
+                <h2 class="text-3xl font-black text-slate-800">全能大師！</h2>
+                <div class="bg-slate-50 p-6 rounded-2xl border-2 border-white shadow-inner max-w-xs mx-auto">
+                    <div class="text-[10px] text-slate-400 font-black uppercase mb-1">總積分</div>
+                    <div class="text-5xl font-black text-emerald-600">${state.score}</div>
+                </div>
+                <button onclick="restart()" class="w-full max-w-xs mx-auto flex items-center justify-center gap-2 bg-emerald-600 text-white py-4 rounded-xl font-black text-lg active:scale-95">
+                    <i data-lucide="refresh-ccw" class="w-5 h-5"></i> 重新開始
+                </button>
+            </div>`;
+        }
+
+        function startLevel(idx) {
+            state.gameState = 'playing'; state.currentLevel = idx; state.currentSubLevel = 0;
+            state.userAnswer = ''; generateQuestion(); render();
+        }
+
+        function goToMenu() { state.gameState = 'menu'; render(); }
+        function restart() { state.score = 0; state.gameState = 'menu'; render(); }
+
+        render();
+    </script>
+</body>
+</html>

@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>解鎖數字密碼：策略對戰版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 樹狀結構容器 */
+        #tree-canvas {
+            position: relative;
+            min-height: 500px; /* 稍微縮小最小高度，適應整合介面 */
+            padding-top: 20px;
+            padding-bottom: 300px;
+            overflow: auto;
+            scrollbar-width: thin;
+            cursor: grab;
+            flex-grow: 1; /* 讓它填滿剩餘空間 */
+        }
+        #tree-canvas:active {
+            cursor: grabbing;
+        }
+
+        /* SVG 線條層 */
+        #svg-lines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* 樹狀結構節點 */
+        .tree-node-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 10;
+            margin: 0 15px;
+        }
+
+        .node-circle {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background-color: white;
+            border: 3px solid #3b82f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1e3a8a;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 50px;
+            position: relative;
+        }
+
+        .node-circle.clickable {
+            cursor: pointer;
+        }
+        .node-circle.clickable:hover {
+            background-color: #dbeafe;
+            transform: scale(1.1);
+        }
+
+        .node-circle.prime {
+            border-color: #ef4444;
+            color: #b91c1c;
+            background-color: #fef2f2;
+            cursor: default;
+        }
+
+        /* 輸入框樣式 */
+        .node-input {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: none;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1e3a8a;
+            background: transparent;
+            outline: none;
+        }
+        .node-input::-webkit-inner-spin-button, 
+        .node-input::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+
+        /* 特殊狀態樣式 */
+        .node-circle.active-input {
+            border-color: #f59e0b; /* Amber */
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.5);
+            transform: scale(1.1);
+            background-color: #fffbeb;
+        }
+
+        .node-circle.cpu-thinking {
+            border-color: #9333ea;
+            background-color: #f3e8ff;
+        }
+        
+        .dots::after {
+            content: '.';
+            animation: dot-anim 1.5s infinite steps(4);
+        }
+        @keyframes dot-anim {
+            0% { content: ''; }
+            25% { content: '.'; }
+            50% { content: '..'; }
+            75% { content: '...'; }
+        }
+
+        .children-row {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 30px;
+        }
+
+        body {
+            background-color: #f0f9ff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        .bottom-sheet {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.98);
+            border-top: 5px solid #fbbf24;
+            box-shadow: 0 -4px 30px rgba(0,0,0,0.15);
+            padding: 24px;
+            z-index: 50;
+            transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            max-height: 45vh;
+            overflow-y: auto;
+        }
+        .bottom-sheet.show {
+            transform: translateY(0);
+        }
+        
+        .error-shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+            border-color: #ef4444 !important;
+            background-color: #fee2e2 !important;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        /* 控制中心動畫 */
+        .fade-enter {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        .fade-enter-active {
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 0.3s, transform 0.3s;
+        }
+        .fade-exit {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .fade-exit-active {
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: opacity 0.3s, transform 0.3s;
+            position: absolute; /* 讓退出的元素不佔位 */
+            width: 100%;
+        }
+        
+        /* 隱藏/顯示控制 */
+        .view-section {
+            display: none;
+            width: 100%;
+            flex-direction: column;
+            align-items: center;
+        }
+        .view-section.active {
+            display: flex;
+            animation: fadeIn 0.4s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col items-center">
+
+    <!-- 頂部標題與模式選擇 -->
+    <div class="w-full bg-blue-800 text-white p-3 shadow-md z-40 flex-shrink-0">
+        <div class="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-center">
+            <h1 class="text-2xl font-bold mb-2 md:mb-0">🌲 解鎖數字密碼</h1>
+            <div id="mode-tabs" class="flex space-x-2 bg-blue-900 p-1 rounded-lg">
+                <button id="tab-single" onclick="switchMode('single')" class="px-4 py-1 rounded text-sm font-bold bg-blue-500 text-white shadow transition disabled:opacity-50 disabled:cursor-not-allowed">單人挑戰</button>
+                <button id="tab-double" onclick="switchMode('double')" class="px-4 py-1 rounded text-sm font-bold text-gray-300 hover:text-white transition disabled:opacity-50 disabled:cursor-not-allowed">雙人對戰</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 遊戲主區域 -->
+    <div class="w-full max-w-5xl mt-2 px-4 flex-grow flex flex-col overflow-hidden relative">
+        
+        <!-- 核心控制中心 (Control Center) -->
+        <div id="control-center" class="bg-white p-4 rounded-xl shadow-lg w-full max-w-2xl mx-auto z-30 transition-all duration-300 min-h-[120px] flex flex-col justify-center items-center relative border-t-4 border-blue-500">
+            
+            <!-- 1. 設定畫面 (Setup View) -->
+            <div id="view-setup" class="view-section active">
+                <h2 id="mode-title" class="text-xl font-bold text-gray-800 mb-2">單人挑戰 (VS 電腦)</h2>
+                <p id="mode-desc" class="text-gray-600 mb-4 text-sm">規則：猜拳贏了可以選擇先攻或後攻。<br>最後填寫數字的人負責解開密碼！</p>
+                
+                <div class="flex items-center space-x-3 mb-4">
+                    <label class="text-gray-700 font-bold">題目:</label>
+                    <input type="number" id="start-number" value="60" min="4" max="999" class="border-2 border-blue-300 rounded px-3 py-1 text-xl w-24 text-center focus:outline-none focus:border-blue-500">
+                    <button onclick="setRandomComposite()" class="bg-purple-100 hover:bg-purple-200 text-purple-700 px-3 py-1 rounded-lg text-sm font-bold transition">🎲 隨機</button>
+                    <button onclick="initGameFlow()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-6 rounded-lg shadow-lg transform transition hover:scale-105">開始</button>
+                </div>
+                
+                <div class="text-sm text-gray-500">
+                    <span class="mr-2">經典題：</span>
+                    <div class="inline-flex flex-wrap gap-1">
+                        <button onclick="setNumber(48)" class="bg-gray-100 px-2 py-1 rounded hover:bg-gray-200 font-mono text-xs">48</button>
+                        <button onclick="setNumber(60)" class="bg-gray-100 px-2 py-1 rounded hover:bg-gray-200 font-mono text-xs">60</button>
+                        <button onclick="setNumber(72)" class="bg-gray-100 px-2 py-1 rounded hover:bg-gray-200 font-mono text-xs">72</button>
+                        <button onclick="setNumber(96)" class="bg-gray-100 px-2 py-1 rounded hover:bg-gray-200 font-mono text-xs">96</button>
+                        <button onclick="setNumber(100)" class="bg-gray-100 px-2 py-1 rounded hover:bg-gray-200 font-mono text-xs">100</button>
+                        <button onclick="setNumber(120)" class="bg-gray-100 px-2 py-1 rounded hover:bg-gray-200 font-mono text-xs">120</button>
+                        <button onclick="setNumber(144)" class="bg-gray-100 px-2 py-1 rounded hover:bg-gray-200 font-mono text-xs">144</button>
+                        <button onclick="setNumber(180)" class="bg-gray-100 px-2 py-1 rounded hover:bg-gray-200 font-mono text-xs">180</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. 猜拳畫面 (RPS View) -->
+            <div id="view-rps" class="view-section">
+                <h3 id="rps-title" class="text-xl font-bold text-blue-900 mb-3">✌️ 猜拳決定這一輪！</h3>
+                
+                <!-- 單人數位猜拳 -->
+                <div id="rps-single-container" class="w-full flex flex-col items-center">
+                    <div id="rps-choices" class="flex justify-center space-x-6">
+                        <button onclick="playRPS('rock')" class="text-5xl hover:scale-125 transition transform p-2 rounded-full bg-gray-50 hover:bg-blue-100">✊</button>
+                        <button onclick="playRPS('paper')" class="text-5xl hover:scale-125 transition transform p-2 rounded-full bg-gray-50 hover:bg-blue-100">✋</button>
+                        <button onclick="playRPS('scissors')" class="text-5xl hover:scale-125 transition transform p-2 rounded-full bg-gray-50 hover:bg-blue-100">✌️</button>
+                    </div>
+                    <!-- 猜拳結果顯示區 -->
+                    <div id="rps-result" class="hidden flex-col items-center">
+                        <div class="flex items-center text-3xl mb-2 space-x-6">
+                            <span id="player-move"></span>
+                            <span class="text-lg text-gray-400">VS</span>
+                            <span id="cpu-move"></span>
+                        </div>
+                        <p id="rps-msg" class="text-lg font-bold text-blue-600 mb-2"></p>
+                    </div>
+                </div>
+
+                <!-- 雙人現實猜拳 -->
+                <div id="rps-double-container" class="hidden w-full flex-col items-center">
+                    <p class="text-lg text-blue-900 mb-3 font-bold">本輪由誰先攻？</p>
+                    <div class="flex space-x-4">
+                        <button onclick="chooseTurnDouble('A')" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-bold shadow transform hover:scale-105">
+                            🔵 玩家 A
+                        </button>
+                        <button onclick="chooseTurnDouble('B')" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-bold shadow transform hover:scale-105">
+                            🟢 玩家 B
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. 戰術選擇 (Strategy View) -->
+            <div id="view-strategy" class="view-section">
+                <h3 class="text-xl font-bold text-blue-900 mb-3">你贏了！請選擇戰術：</h3>
+                <div class="flex justify-center space-x-4">
+                    <button onclick="chooseTurn('attack')" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-bold shadow-lg transform transition hover:scale-105 leading-tight text-center">
+                        ⚔️ 我要先攻<br><span class="text-sm font-normal opacity-90">(出題)</span>
+                    </button>
+                    <button onclick="chooseTurn('defend')" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-bold shadow-lg transform transition hover:scale-105 leading-tight text-center">
+                        🛡️ 我要後攻<br><span class="text-sm font-normal opacity-90">(解題)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 4. 遊戲進行狀態 (Status View) -->
+            <div id="view-status" class="view-section w-full">
+                <div class="flex justify-between items-center w-full px-4">
+                    <div id="status-text" class="text-xl font-bold text-gray-800 flex-grow text-center">
+                        遊戲開始
+                    </div>
+                    <button onclick="resetGame()" class="text-red-500 hover:text-red-700 font-bold text-sm bg-red-50 px-3 py-1 rounded ml-4 border border-red-200">
+                        結束/重來
+                    </button>
+                </div>
+                <div id="cpu-msg-area" class="text-purple-600 font-bold text-sm mt-1 h-5"></div>
+            </div>
+
+        </div>
+
+        <!-- 錯誤提示條 (保持置頂) -->
+        <div id="top-error-msg" class="hidden fixed top-20 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-2 rounded-full shadow-lg font-bold z-50 animate-bounce">
+            錯誤訊息
+        </div>
+
+        <!-- 樹狀圖畫布 -->
+        <div id="tree-canvas" class="w-full flex justify-center" onmousedown="startDrag(event)">
+            <svg id="svg-lines"></svg>
+            <!-- Javascript Rendered Tree -->
+        </div>
+    </div>
+
+    <!-- 底部滑出面板：最終數字密碼 -->
+    <div id="final-sheet" class="bottom-sheet">
+        <div class="flex flex-col md:flex-row justify-between items-center max-w-4xl mx-auto h-full">
+            <div class="text-left mb-4 md:mb-0">
+                <h2 id="final-title" class="text-2xl font-bold text-blue-900 flex items-center mb-1">
+                    🎉 恭喜！分解完成
+                </h2>
+                <p id="final-desc" class="text-gray-600">請寫出最後的數字密碼：</p>
+            </div>
+            
+            <div id="final-input-area" class="flex-grow flex flex-col items-center md:items-end w-full md:w-auto">
+                <div class="flex items-center space-x-2 bg-gray-100 p-2 rounded-lg w-full md:w-auto justify-center shadow-inner">
+                    <span id="final-target-num" class="text-xl font-bold font-mono text-gray-700">12</span>
+                    <span class="text-xl text-gray-500">=</span>
+                    <input type="text" id="final-equation-input" placeholder="例如: 2x2x3" class="flex-grow md:w-64 text-center text-2xl p-2 border-2 border-blue-300 rounded focus:border-blue-600 outline-none bg-white text-blue-800 font-bold">
+                </div>
+                <div id="final-error" class="text-red-500 font-bold mt-2 h-6 text-sm"></div>
+            </div>
+
+            <!-- 電腦獲勝時的顯示區 -->
+            <div id="cpu-win-area" class="hidden flex-grow flex flex-col items-center justify-center bg-gray-100 p-4 rounded-lg border-2 border-purple-200">
+                <p class="text-purple-700 font-bold mb-1">電腦完成了最後一步！密碼是：</p>
+                <div id="cpu-final-answer" class="text-3xl font-mono font-bold text-gray-800 tracking-wider"></div>
+            </div>
+            
+            <button id="final-submit-btn" onclick="checkFinalEquation()" class="mt-4 md:mt-0 md:ml-6 bg-yellow-500 hover:bg-yellow-600 text-white text-lg font-bold py-3 px-10 rounded-xl shadow-lg transition transform hover:scale-105">
+                輸入密碼
+            </button>
+        </div>
+    </div>
+
+    <!-- 獲勝畫面 -->
+    <div id="victory-modal" class="hidden fixed inset-0 flex items-center justify-center z-[60] bg-black/50 backdrop-blur-sm">
+        <div class="relative bg-white p-10 rounded-3xl shadow-2xl text-center transform scale-110 border-4 border-yellow-400 max-w-lg mx-4">
+            <div id="victory-icon" class="text-7xl mb-4 animate-bounce">🏆</div>
+            <h2 id="victory-title" class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-500 to-red-500 mb-4">
+                挑戰成功！
+            </h2>
+            <p id="victory-msg" class="text-xl text-gray-700 font-bold mb-6 leading-relaxed">
+                恭喜解開了數字密碼！
+            </p>
+            <div class="bg-gray-100 p-4 rounded-lg mb-8">
+                <span class="text-gray-500 text-sm block mb-1">數字密碼</span>
+                <span id="victory-code" class="text-3xl font-mono font-bold text-blue-800"></span>
+            </div>
+            <button onclick="resetGame()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-12 rounded-full text-lg shadow-lg hover:shadow-xl transition">
+                再玩一次
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- 遊戲狀態與資料 ---
+        const GameState = {
+            SETUP: 'setup',
+            RPS: 'rps',
+            STRATEGY: 'strategy',
+            INPUT_PHASE: 'input_phase', 
+            TRANSITION: 'transition', 
+            GAME_OVER: 'game_over'
+        };
+
+        let gameData = {
+            state: GameState.SETUP,
+            mode: 'single', // 'single' | 'double'
+            root: null,
+            initiator: null, 
+            defender: null,
+            currentPlayer: null,
+            lastWinner: null,
+            allPrimes: [],
+            focusNodeId: null
+        };
+
+        let nodeIdCounter = 0;
+        const COMPOSITES_UNDER_100 = [
+            4, 6, 8, 9, 10, 12, 14, 15, 16, 18, 20, 21, 22, 24, 25, 26, 27, 28, 30, 
+            32, 33, 34, 35, 36, 38, 39, 40, 42, 44, 45, 46, 48, 49, 50, 51, 52, 54, 
+            55, 56, 57, 58, 60, 62, 63, 64, 65, 66, 68, 69, 70, 72, 74, 75, 76, 77, 
+            78, 80, 81, 82, 84, 85, 86, 87, 88, 90, 91, 92, 93, 94, 95, 96, 98, 99
+        ];
+
+        class Node {
+            constructor(value) {
+                this.id = nodeIdCounter++;
+                this.value = value;
+                this.left = null;
+                this.right = null;
+                this.isDecomposed = false;
+                this.isPlaceholder = false;
+                this.inputValue = '';
+                this.isCpuThinking = false;
+                this.isLocked = false;
+            }
+            isPrime() {
+                if (!this.value) return false;
+                const v = this.value;
+                if (v <= 1) return false;
+                if (v <= 3) return true;
+                if (v % 2 === 0 || v % 3 === 0) return false;
+                for (let i = 5; i * i <= v; i += 6) {
+                    if (v % i === 0 || v % (i + 2) === 0) return false;
+                }
+                return true;
+            }
+        }
+
+        // --- View Switching Helper ---
+        function switchView(viewId) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+        }
+
+        function setNumber(n) { document.getElementById('start-number').value = n; }
+        
+        function setRandomComposite() {
+            const val = COMPOSITES_UNDER_100[Math.floor(Math.random() * COMPOSITES_UNDER_100.length)];
+            setNumber(val);
+        }
+
+        function switchMode(mode) {
+            gameData.mode = mode;
+            const btnSingle = document.getElementById('tab-single');
+            const btnDouble = document.getElementById('tab-double');
+            const title = document.getElementById('mode-title');
+            const desc = document.getElementById('mode-desc');
+
+            if (mode === 'single') {
+                btnSingle.className = "px-4 py-1 rounded text-sm font-bold bg-blue-500 text-white shadow transition disabled:opacity-50 disabled:cursor-not-allowed";
+                btnDouble.className = "px-4 py-1 rounded text-sm font-bold text-gray-300 hover:text-white transition disabled:opacity-50 disabled:cursor-not-allowed";
+                title.innerText = "單人挑戰 (VS 電腦)";
+                desc.innerHTML = "規則：猜拳贏了可以選擇先攻或後攻。<br>最後填寫數字的人負責解開密碼！";
+            } else {
+                btnSingle.className = "px-4 py-1 rounded text-sm font-bold text-gray-300 hover:text-white transition disabled:opacity-50 disabled:cursor-not-allowed";
+                btnDouble.className = "px-4 py-1 rounded text-sm font-bold bg-green-500 text-white shadow transition disabled:opacity-50 disabled:cursor-not-allowed";
+                title.innerText = "雙人對戰模式";
+                desc.innerHTML = "規則：猜拳贏了可以選擇先攻或後攻。<br>最後填寫數字的人負責解開密碼！";
+            }
+        }
+
+        function initGameFlow() {
+            const startVal = parseInt(document.getElementById('start-number').value);
+            if (isNaN(startVal) || startVal < 4) { alert("請輸入大於 3 的合數"); return; }
+            const tempNode = new Node(startVal);
+            if (tempNode.isPrime()) { alert("這個數字已經是質數了，請輸入合數"); return; }
+
+            nodeIdCounter = 0;
+            gameData.root = new Node(startVal);
+            gameData.lastWinner = null;
+            gameData.state = GameState.SETUP;
+            gameData.focusNodeId = null;
+
+            document.getElementById('victory-modal').classList.add('hidden');
+            document.getElementById('final-sheet').classList.remove('show');
+            document.getElementById('tree-canvas').innerHTML = '<svg id="svg-lines"></svg>';
+
+            // Lock tabs
+            document.getElementById('tab-single').disabled = true;
+            document.getElementById('tab-double').disabled = true;
+
+            startNewRound();
+        }
+
+        function resetGame() {
+            gameData.state = GameState.SETUP;
+            
+            // Show Setup View
+            switchView('view-setup');
+            
+            document.getElementById('victory-modal').classList.add('hidden');
+            document.getElementById('final-sheet').classList.remove('show');
+
+            // Unlock tabs
+            document.getElementById('tab-single').disabled = false;
+            document.getElementById('tab-double').disabled = false;
+        }
+
+        function startNewRound() {
+            renderTree();
+            if (checkIfAllPrimes(gameData.root)) {
+                endGameSequence();
+                return;
+            }
+            
+            // Switch to RPS View
+            switchView('view-rps');
+            
+            if (gameData.mode === 'double') {
+                showDoubleModeSelector();
+            } else {
+                showSingleRPS();
+            }
+        }
+
+        function showDoubleModeSelector() {
+            gameData.state = GameState.RPS;
+            document.getElementById('rps-title').innerText = "🤝 新回合開始";
+            document.getElementById('rps-single-container').classList.add('hidden');
+            document.getElementById('rps-double-container').classList.remove('hidden');
+            document.getElementById('rps-double-container').classList.add('flex');
+        }
+
+        function chooseTurnDouble(winner) {
+            // winner wins the RPS, so they choose attack/defend.
+            // Simplified for UX: Winner attacks first? 
+            // The prompt says "Winner decides Attack or Defend".
+            // To keep it simple in one step as per previous logic "Winner Attacks First":
+            // V11 Logic was: Button "Player A Attacks" implies A won and chose Attack.
+            
+            // But V16 requirement says: "Please guess, winner decides first or second."
+            // For smooth UX in double mode without too many clicks, let's assume the button clicked
+            // means "This player won and chooses to Attack".
+            // Or we can add a strategy step for double mode too?
+            // Let's stick to V11 simplicity: "Player A Attacks" (A is Initiator).
+            
+            if (winner === 'A') {
+                setupRoles('A', 'B');
+            } else {
+                setupRoles('B', 'A');
+            }
+            startInputPhase();
+        }
+
+        function showSingleRPS() {
+            gameData.state = GameState.RPS;
+            document.getElementById('rps-title').innerText = "✌️ 猜拳決定這一輪！";
+            document.getElementById('rps-single-container').classList.remove('hidden');
+            document.getElementById('rps-double-container').classList.add('hidden');
+            document.getElementById('rps-double-container').classList.remove('flex');
+            
+            // Reset RPS UI
+            document.getElementById('rps-choices').classList.remove('hidden');
+            document.getElementById('rps-result').classList.add('hidden');
+            document.getElementById('rps-result').classList.remove('flex');
+        }
+
+        function playRPS(playerChoice) {
+            const choices = ['rock', 'paper', 'scissors'];
+            let cpuChoice = choices[Math.floor(Math.random() * 3)];
+            
+            // Reduce draw chance
+            if (cpuChoice === playerChoice && Math.random() < 0.8) {
+                const otherChoices = choices.filter(c => c !== playerChoice);
+                cpuChoice = otherChoices[Math.floor(Math.random() * otherChoices.length)];
+            }
+
+            const map = { 'rock': '✊', 'paper': '✋', 'scissors': '✌️' };
+            
+            document.getElementById('rps-choices').classList.add('hidden');
+            const resEl = document.getElementById('rps-result');
+            resEl.classList.remove('hidden');
+            resEl.classList.add('flex');
+            
+            document.getElementById('player-move').innerText = map[playerChoice];
+            document.getElementById('cpu-move').innerText = map[cpuChoice];
+
+            const msgEl = document.getElementById('rps-msg');
+            
+            let result = 'lose';
+            if (playerChoice === cpuChoice) result = 'draw';
+            else if (
+                (playerChoice === 'rock' && cpuChoice === 'scissors') ||
+                (playerChoice === 'paper' && cpuChoice === 'rock') ||
+                (playerChoice === 'scissors' && cpuChoice === 'paper')
+            ) result = 'win';
+
+            if (result === 'draw') {
+                msgEl.innerText = "平手！再來一次！";
+                setTimeout(() => {
+                    resEl.classList.add('hidden');
+                    resEl.classList.remove('flex');
+                    document.getElementById('rps-choices').classList.remove('hidden');
+                }, 1200);
+            } else if (result === 'win') {
+                msgEl.innerText = "你贏了！";
+                setTimeout(() => {
+                    switchView('view-strategy');
+                }, 1000);
+            } else {
+                msgEl.innerText = "電腦贏了！";
+                setTimeout(() => {
+                    // Computer logic
+                    let cpuDecision = Math.random() > 0.5 ? 'attack' : 'defend';
+                    
+                    // Smart AI: if only 1 step left, chose Defend to win
+                    const decomposableCount = getDecomposableCount(gameData.root);
+                    if (decomposableCount === 1) {
+                        cpuDecision = 'defend';
+                    }
+
+                    const cpuMsg = document.getElementById('cpu-msg-area');
+                    if (cpuDecision === 'attack') {
+                        setupRoles('B', 'A');
+                        cpuMsg.innerText = "電腦決定：先攻 (出題)";
+                    } else {
+                        setupRoles('A', 'B');
+                        cpuMsg.innerText = "電腦決定：後攻 (解題)";
+                    }
+                    
+                    startInputPhase();
+                }, 1500);
+            }
+        }
+
+        function getDecomposableCount(node) {
+            if (!node) return 0;
+            if (node.isDecomposed) {
+                return getDecomposableCount(node.left) + getDecomposableCount(node.right);
+            }
+            if (!node.isPrime() && !node.isPlaceholder) {
+                return 1;
+            }
+            return 0;
+        }
+
+        function chooseTurn(choice) {
+            if (choice === 'attack') setupRoles('A', 'B');
+            else setupRoles('B', 'A');
+            startInputPhase();
+        }
+
+        function setupRoles(first, second) {
+            gameData.initiator = first;
+            gameData.defender = second;
+            gameData.currentPlayer = first;
+        }
+
+        function startInputPhase() {
+            gameData.state = GameState.INPUT_PHASE;
+            switchView('view-status');
+            updateStatus();
+            
+            // Clean CPU msg if it was set
+            if(gameData.mode === 'single' && gameData.initiator === 'A') {
+                 document.getElementById('cpu-msg-area').innerText = "";
+            }
+
+            if (gameData.mode === 'single' && gameData.currentPlayer === 'B') {
+                setTimeout(cpuInitiateMove, 1000);
+            }
+        }
+
+        function updateStatus() {
+            const statusEl = document.getElementById('status-text');
+            const currentP = gameData.currentPlayer;
+            const pName = currentP === 'A' ? "玩家" : (gameData.mode === 'single' ? "電腦" : "玩家 B");
+            const color = currentP === 'A' ? "text-blue-600" : (gameData.mode === 'single' ? "text-purple-600" : "text-green-600");
+            
+            let actionText = "";
+            if (currentP === gameData.initiator) {
+                actionText = " (出題)";
+            } else {
+                actionText = " (解題)";
+            }
+            
+            let displayName = pName;
+            if (gameData.mode === 'double') {
+                displayName = currentP === 'A' ? "玩家 A" : "玩家 B";
+            }
+
+            statusEl.innerHTML = `輪到 <span class="${color} font-bold text-xl">${displayName}</span> 操作${actionText}`;
+        }
+
+        // --- Core Game Logic ---
+        function handleNodeClick(id) {
+            if (gameData.state !== GameState.INPUT_PHASE) return;
+            if (gameData.mode === 'single' && gameData.currentPlayer === 'B') return;
+            if (gameData.currentPlayer !== gameData.initiator) return;
+
+            const node = findNode(gameData.root, id);
+            if (!node || node.isDecomposed || node.isPrime()) return;
+
+            createPlaceholders(node);
+            renderTree();
+        }
+
+        function createPlaceholders(node) {
+            node.isDecomposed = true;
+            const left = new Node(null); left.isPlaceholder = true;
+            const right = new Node(null); right.isPlaceholder = true;
+            node.left = left;
+            node.right = right;
+            gameData.focusNodeId = left.id;
+        }
+
+        function handleCommit(e, nodeId, parentId) {
+            if (gameData.state !== GameState.INPUT_PHASE) return;
+
+            const valStr = e.target.value;
+            if (!valStr) return;
+            const val = parseInt(valStr);
+            const parent = findNode(gameData.root, parentId);
+            const node = findNode(parent, nodeId);
+            if (!parent || !node) return;
+
+            if (isNaN(val) || val <= 1) {
+                showError("請輸入有效數字 (大於1)");
+                e.target.value = ''; e.target.focus(); return;
+            }
+
+            const sibling = (parent.left === node) ? parent.right : parent.left;
+            const isSecondInput = sibling.isLocked && sibling.value;
+
+            if (isSecondInput) {
+                // Defender
+                if (sibling.value * val !== parent.value) {
+                    showError(`${sibling.value} x ${val} 不等於 ${parent.value}`);
+                    shakeNode(node.id);
+                    e.target.value = ''; e.target.focus(); return;
+                }
+                
+                lockNode(node, val);
+                gameData.lastWinner = gameData.currentPlayer;
+                gameData.state = GameState.TRANSITION;
+                
+                document.getElementById('cpu-msg-area').innerText = "";
+                setTimeout(() => { startNewRound(); }, 1000);
+
+            } else {
+                // Initiator
+                if (val >= parent.value) {
+                     showError(`${val} 不是 ${parent.value} 的因數`);
+                     shakeNode(node.id);
+                     e.target.value = ''; e.target.focus(); return;
+                }
+                if (parent.value % val !== 0) {
+                    showError(`${val} 不是 ${parent.value} 的因數`);
+                    shakeNode(node.id);
+                    e.target.value = ''; e.target.focus(); return;
+                }
+
+                lockNode(node, val);
+                gameData.currentPlayer = gameData.defender;
+                updateStatus();
+                
+                if (gameData.mode === 'single' && gameData.currentPlayer === 'B') {
+                    gameData.focusNodeId = null; 
+                    renderTree();
+                    const correctAnswer = parent.value / val;
+                    document.getElementById('cpu-msg-area').innerText = "電腦思考中...";
+                    setTimeout(() => cpuDefendMove(sibling, correctAnswer), 1000);
+                } else {
+                    gameData.focusNodeId = sibling.id;
+                    renderTree();
+                }
+            }
+        }
+
+        function lockNode(node, val) {
+            node.value = val;
+            node.isPlaceholder = false;
+            node.isLocked = true;
+            node.inputValue = val;
+            renderTree();
+        }
+
+        // --- AI ---
+        function cpuInitiateMove() {
+            if (gameData.state !== GameState.INPUT_PHASE) return;
+            const candidates = [];
+            findCandidates(gameData.root, candidates);
+            if (candidates.length === 0) return;
+            
+            const target = candidates[Math.floor(Math.random() * candidates.length)];
+            createPlaceholders(target);
+            renderTree();
+
+            const factor = getFactor(target.value);
+            const leftNode = target.left;
+            leftNode.isCpuThinking = true;
+            renderTree();
+
+            setTimeout(() => {
+                leftNode.isCpuThinking = false;
+                lockNode(leftNode, factor);
+                gameData.currentPlayer = 'A';
+                updateStatus();
+                gameData.focusNodeId = target.right.id;
+                renderTree();
+            }, 1500);
+        }
+
+        function cpuDefendMove(node, correctVal) {
+             if (gameData.state !== GameState.INPUT_PHASE) return;
+             node.isCpuThinking = true;
+             renderTree();
+             setTimeout(() => {
+                 node.isCpuThinking = false;
+                 lockNode(node, correctVal);
+                 gameData.lastWinner = 'B';
+                 gameData.state = GameState.TRANSITION;
+                 document.getElementById('cpu-msg-area').innerText = "";
+                 setTimeout(() => { startNewRound(); }, 1000);
+             }, 2000);
+        }
+
+        function findCandidates(node, list) {
+            if (!node) return;
+            if (!node.left && !node.right && !node.isPrime()) list.push(node);
+            else { findCandidates(node.left, list); findCandidates(node.right, list); }
+        }
+
+        function getFactor(val) {
+            for (let i = 2; i < val; i++) {
+                if (val % i === 0) return i;
+            }
+            return 2;
+        }
+
+        // --- Utils & Render ---
+        function findNode(node, id) {
+            if (!node) return null;
+            if (node.id === id) return node;
+            return findNode(node.left, id) || findNode(node.right, id);
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('top-error-msg');
+            el.innerText = msg;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 3000);
+        }
+
+        function shakeNode(id) {
+            const el = document.getElementById(typeof id === 'string' ? id : `circle-${id}`);
+            if (el) {
+                el.classList.remove('error-shake');
+                void el.offsetWidth;
+                el.classList.add('error-shake');
+            }
+        }
+
+        function renderTree() {
+            const container = document.getElementById('tree-canvas');
+            const svg = document.getElementById('svg-lines') || document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.id = "svg-lines";
+            container.innerHTML = '';
+            container.appendChild(svg);
+            if (gameData.root) {
+                container.appendChild(createNodeHtml(gameData.root, null));
+            }
+            setTimeout(drawSvgLines, 0);
+        }
+
+        function createNodeHtml(node, parentId) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'tree-node-wrapper';
+            wrapper.id = `node-${node.id}`;
+
+            const circle = document.createElement('div');
+            let classes = 'node-circle ';
+            
+            if (node.isCpuThinking) {
+                classes += 'cpu-thinking dots ';
+                circle.innerText = '';
+            }
+            else if (node.isPlaceholder && !node.isLocked) {
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.pattern = "[0-9]*";
+                input.className = 'node-input';
+                input.value = node.inputValue || '';
+                
+                if (node.id === gameData.focusNodeId) {
+                    classes += 'active-input ';
+                    setTimeout(() => input.focus(), 100);
+                }
+
+                input.oninput = (e) => { node.inputValue = e.target.value; };
+                input.onkeydown = (e) => { if (e.key === 'Enter') handleCommit(e, node.id, parentId); };
+                input.onblur = (e) => handleCommit(e, node.id, parentId);
+                circle.appendChild(input);
+            } 
+            else {
+                if (node.isPrime()) classes += 'prime ';
+                else if (!node.isDecomposed && !node.isPlaceholder) classes += 'clickable ';
+                circle.innerText = node.value;
+                if (!node.isDecomposed && !node.isPlaceholder && !node.isPrime()) {
+                    circle.onclick = () => handleNodeClick(node.id);
+                }
+            }
+            
+            circle.className = classes;
+            circle.id = `circle-${node.id}`;
+            wrapper.appendChild(circle);
+
+            if (node.left && node.right) {
+                const row = document.createElement('div');
+                row.className = 'children-row';
+                row.appendChild(createNodeHtml(node.left, node.id));
+                row.appendChild(createNodeHtml(node.right, node.id));
+                wrapper.appendChild(row);
+            }
+            return wrapper;
+        }
+
+        function drawSvgLines() {
+            const svg = document.getElementById('svg-lines');
+            const container = document.getElementById('tree-canvas');
+            if (!svg || !gameData.root) return;
+            svg.innerHTML = '';
+
+            function draw(node) {
+                if (!node || !node.left || !node.right) return;
+                const parentEl = document.getElementById(`circle-${node.id}`);
+                const leftEl = document.getElementById(`circle-${node.left.id}`);
+                const rightEl = document.getElementById(`circle-${node.right.id}`);
+
+                if (parentEl && leftEl && rightEl) {
+                    const cRect = container.getBoundingClientRect();
+                    const pRect = parentEl.getBoundingClientRect();
+                    const lRect = leftEl.getBoundingClientRect();
+                    const rRect = rightEl.getBoundingClientRect();
+
+                    const x1 = pRect.left + pRect.width / 2 - cRect.left + container.scrollLeft;
+                    const y1 = pRect.bottom - cRect.top + container.scrollTop;
+                    const x2l = lRect.left + lRect.width / 2 - cRect.left + container.scrollLeft;
+                    const y2l = lRect.top - cRect.top + container.scrollTop;
+                    const x2r = rRect.left + rRect.width / 2 - cRect.left + container.scrollLeft;
+                    const y2r = rRect.top - cRect.top + container.scrollTop;
+
+                    createLine(svg, x1, y1, x2l, y2l);
+                    createLine(svg, x1, y1, x2r, y2r);
+                }
+                draw(node.left);
+                draw(node.right);
+            }
+            draw(gameData.root);
+        }
+
+        function createLine(svg, x1, y1, x2, y2) {
+            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute("x1", x1);
+            line.setAttribute("y1", y1);
+            line.setAttribute("x2", x2);
+            line.setAttribute("y2", y2);
+            line.setAttribute("stroke", "#94a3b8");
+            line.setAttribute("stroke-width", "2");
+            svg.appendChild(line);
+        }
+
+        let isDragging = false;
+        let startX, scrollLeft;
+        function startDrag(e) {
+            if(e.target.tagName === 'INPUT') return;
+            isDragging = true;
+            const container = document.getElementById('tree-canvas');
+            startX = e.pageX - container.offsetLeft;
+            scrollLeft = container.scrollLeft;
+        }
+        window.addEventListener('mouseup', () => isDragging = false);
+        window.addEventListener('mousemove', (e) => {
+            if(!isDragging) return;
+            const container = document.getElementById('tree-canvas');
+            const x = e.pageX - container.offsetLeft;
+            const walk = (x - startX) * 1.5;
+            container.scrollLeft = scrollLeft - walk;
+        });
+        window.addEventListener('resize', () => setTimeout(drawSvgLines, 100));
+
+        // --- End Game ---
+        function checkIfAllPrimes(node) {
+            if (!node) return true;
+            if (node.isPlaceholder) return false;
+            if (!node.left && !node.right) return node.isPrime();
+            return checkIfAllPrimes(node.left) && checkIfAllPrimes(node.right);
+        }
+
+        function collectPrimes(node, list) {
+            if (!node) return;
+            if (!node.left && !node.right && !node.isPlaceholder) list.push(node.value);
+            else { collectPrimes(node.left, list); collectPrimes(node.right, list); }
+        }
+
+        function endGameSequence() {
+            gameData.state = GameState.GAME_OVER;
+            gameData.allPrimes = [];
+            collectPrimes(gameData.root, gameData.allPrimes);
+            gameData.allPrimes.sort((a,b) => a-b);
+            document.getElementById('final-sheet').classList.add('show');
+            
+            document.getElementById('final-target-num').innerText = gameData.root.value;
+            document.getElementById('final-error').innerText = '';
+
+            if (gameData.mode === 'single' && gameData.lastWinner === 'B') {
+                document.getElementById('final-title').innerText = "🤖 電腦完成了最後一步！";
+                document.getElementById('final-input-area').classList.add('hidden');
+                document.getElementById('final-submit-btn').classList.add('hidden');
+                document.getElementById('cpu-win-area').classList.remove('hidden');
+                document.getElementById('cpu-final-answer').innerText = "計算中...";
+                setTimeout(() => {
+                    const ans = `${gameData.root.value} = ${gameData.allPrimes.join(' x ')}`;
+                    document.getElementById('cpu-final-answer').innerText = ans;
+                    setTimeout(() => showVictoryModal('cpu', ans), 2000);
+                }, 1500);
+            } else {
+                document.getElementById('final-title').innerText = "🎉 恭喜！分解完成";
+                const finalDesc = document.getElementById('final-desc');
+                
+                // 明確的角色提示 (需求 2)
+                let winnerName = "你";
+                if (gameData.mode === 'double') {
+                    winnerName = `玩家 ${gameData.lastWinner}`;
+                }
+                finalDesc.innerText = `請 ${winnerName} 寫出最後的數字密碼：`;
+
+                document.getElementById('final-input-area').classList.remove('hidden');
+                document.getElementById('final-submit-btn').classList.remove('hidden');
+                document.getElementById('cpu-win-area').classList.add('hidden');
+                document.getElementById('final-equation-input').value = '';
+                setTimeout(() => document.getElementById('final-equation-input').focus(), 500);
+            }
+        }
+
+        function checkFinalEquation() {
+            const userStr = document.getElementById('final-equation-input').value;
+            const cleanStr = userStr.replace(/×/g, 'x').replace(/\*/g, 'x').replace(/X/g, 'x').toLowerCase();
+            
+            if (cleanStr.indexOf('x') === -1 && gameData.allPrimes.length > 1) {
+                document.getElementById('final-error').innerText = "請用 'x' 連接數字";
+                shakeNode('final-equation-input');
+                return;
+            }
+
+            const userNums = cleanStr.split('x').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+            
+            for(let i = 0; i < userNums.length - 1; i++) {
+                if(userNums[i] > userNums[i+1]) {
+                     document.getElementById('final-error').innerText = "請由小到大排列 (例如 2x2x3)";
+                     shakeNode('final-equation-input');
+                     return;
+                }
+            }
+
+            const sortedUserNums = [...userNums].sort((a, b) => a - b);
+
+            let isCorrect = true;
+            if (sortedUserNums.length !== gameData.allPrimes.length) isCorrect = false;
+            else {
+                for (let i = 0; i < sortedUserNums.length; i++) {
+                    if (sortedUserNums[i] !== gameData.allPrimes[i]) { isCorrect = false; break; }
+                }
+            }
+            
+            if(isCorrect) {
+                const finalStr = `${gameData.root.value} = ${cleanStr.split('x').join(' x ')}`;
+                const winner = gameData.mode === 'double' ? gameData.lastWinner : 'player';
+                showVictoryModal(winner, finalStr);
+            }
+            else {
+                document.getElementById('final-error').innerText = "密碼錯誤，請再檢查樹狀圖！";
+                shakeNode('final-equation-input');
+            }
+        }
+
+        function showVictoryModal(winner, code) {
+            document.getElementById('final-sheet').classList.remove('show');
+            const modal = document.getElementById('victory-modal');
+            modal.classList.remove('hidden');
+            document.getElementById('victory-code').innerText = code;
+            const title = document.getElementById('victory-title');
+            const msg = document.getElementById('victory-msg');
+            const icon = document.getElementById('victory-icon');
+
+            if (winner === 'cpu') {
+                icon.innerText = "🤖";
+                title.innerText = "電腦獲勝！";
+                title.className = "text-4xl font-bold text-purple-600 mb-4";
+                msg.innerText = "電腦成功解開了數字密碼。下次加油！";
+            } else {
+                icon.innerText = "🏆";
+                title.innerText = "挑戰成功！";
+                title.className = "text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-500 to-red-500 mb-4";
+                
+                // 明確的獲勝者提示 (需求 2)
+                if (gameData.mode === 'double') {
+                     msg.innerText = `恭喜 玩家 ${winner} 獲勝！`;
+                } else {
+                     msg.innerText = "恭喜你解開了數字密碼！";
+                }
+            }
+        }
+
+        function closeVictory() {
+            document.getElementById('victory-modal').classList.add('hidden');
+        }
+
+    </script>
+</body>
+</html>

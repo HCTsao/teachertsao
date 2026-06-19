@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pizza 分數：從操作到算式</title>
+    <style>
+        body {
+            font-family: 'Gen Jyuu Gothic', '微軟正黑體', sans-serif;
+            background-color: #FFF3E0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        h1 { color: #D84315; margin-bottom: 10px; }
+        
+        /* --- 直式分數顯示 --- */
+        .fraction {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            vertical-align: middle;
+            margin: 0 4px;
+            font-weight: bold;
+            color: #D84315;
+            font-size: 1.2em;
+        }
+        .fraction .top {
+            border-bottom: 2px solid #D84315;
+            padding: 1px 4px;
+            line-height: 1;
+            width: 100%;
+            text-align: center;
+        }
+        .fraction .bottom {
+            padding: 1px 4px;
+            line-height: 1;
+            width: 100%;
+            text-align: center;
+        }
+
+        .mixed-number {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            vertical-align: middle;
+            font-weight: bold;
+            color: #D84315;
+        }
+        .mixed-number .whole {
+            font-size: 1.6em;
+            line-height: 1;
+        }
+        
+        /* --- 控制面板 --- */
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 6px 0 #E65100;
+            margin-bottom: 25px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+            border: 2px solid #FFCC80;
+        }
+        
+        .mode-switch {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .mode-btn {
+            padding: 8px 20px;
+            border: 2px solid #E65100;
+            background: white;
+            color: #E65100;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            transition: 0.2s;
+        }
+        .mode-btn.active {
+            background: #E65100;
+            color: white;
+            box-shadow: 0 4px 10px rgba(230, 81, 0, 0.4);
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: #FFF8E1;
+            padding: 5px 15px;
+            border-radius: 10px;
+        }
+        input {
+            width: 50px;
+            padding: 5px;
+            font-size: 18px;
+            text-align: center;
+            border: 2px solid #FFB74D;
+            border-radius: 8px;
+            color: #BF360C;
+            font-weight: bold;
+        }
+
+        .action-btn {
+            background-color: #43A047;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #2E7D32;
+            transition: 0.1s;
+        }
+        .action-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0;
+        }
+        .action-btn:disabled {
+            background-color: #BDBDBD;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+        
+        /* --- 畫布與分區 --- */
+        #canvas-area {
+            width: 100%;
+            max-width: 900px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-height: 450px;
+        }
+
+        .zone-label {
+            font-size: 16px;
+            color: #8D6E63;
+            margin-bottom: 8px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .zone {
+            border: 3px dashed #FFCC80;
+            border-radius: 15px;
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            align-items: center;
+            min-height: 140px;
+            background-image: radial-gradient(#FFF3E0 10%, transparent 10%);
+            background-size: 20px 20px;
+            transition: 0.3s;
+        }
+        
+        /* Pizza 組合容器 */
+        .pizza-wrapper {
+            width: 100px;
+            height: 100px;
+            position: relative;
+            margin: 10px;
+        }
+
+        /* 單片 Pizza 切片 */
+        .slice-item {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            top: 0;
+            left: 0;
+            transition: all 0.3s ease;
+        }
+        
+        /* 縮小的切片 */
+        .small-slice {
+            width: 60px;
+            height: 60px;
+            filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.1));
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        @keyframes popIn {
+            0% { transform: scale(0); }
+            100% { transform: scale(1); }
+        }
+
+        /* --- 文字說明 --- */
+        .instruction-text {
+            font-size: 22px;
+            color: #5D4037;
+            margin: 10px 0;
+            text-align: center;
+            background: #FFE0B2;
+            padding: 15px;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 900px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            line-height: 1.6;
+        }
+        .highlight { color: #D84315; font-weight: bold; font-size: 1.2em; margin: 0 2px; }
+
+        /* --- 第三區塊：算式解析 --- */
+        #math-area {
+            width: 100%;
+            max-width: 900px;
+            margin-top: 20px;
+            background-color: #37474F; /* 黑板風格 */
+            color: #ECEFF1;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            display: none; /* 預設隱藏 */
+            animation: fadeIn 1s ease;
+            border: 4px solid #78909C;
+        }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .math-title {
+            font-size: 20px;
+            border-bottom: 2px solid #90A4AE;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            color: #FFB74D;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .math-step {
+            font-size: 24px;
+            margin: 10px 0;
+            line-height: 1.8;
+            font-family: 'Consolas', 'Monaco', monospace; /* 等寬字體更有算式感 */
+        }
+
+        .math-desc {
+            font-size: 18px;
+            color: #B0BEC5;
+            margin-left: 10px;
+            font-family: '微軟正黑體', sans-serif;
+        }
+
+        .math-result {
+            font-size: 28px;
+            color: #FFCA28;
+            font-weight: bold;
+            margin-top: 20px;
+            text-align: center;
+            background: rgba(255,255,255,0.1);
+            padding: 10px;
+            border-radius: 10px;
+        }
+        
+        /* SVG */
+        .pizza-shape {
+            width: 100px;
+            height: 100px;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            filter: drop-shadow(2px 4px 4px rgba(0,0,0,0.2));
+        }
+        .full-circle-anim { animation: pop 0.6s; }
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2) rotate(10deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🍕 Pizza 分數：從操作到算式</h1>
+
+    <div class="mode-switch">
+        <button class="mode-btn active" onclick="setMode('mixToImp')">1. 帶分數 ➜ 假分數 (切切樂)</button>
+        <button class="mode-btn" onclick="setMode('impToMix')">2. 假分數 ➜ 帶分數 (拼拼樂)</button>
+    </div>
+
+    <div class="controls" id="input-area"></div>
+
+    <div class="instruction-text" id="instruction">準備好要吃 Pizza 了嗎？</div>
+
+    <div id="canvas-area"></div>
+
+    <div id="math-area"></div>
+
+    <script>
+        let currentMode = 'mixToImp';
+        
+        // 狀態變數
+        let mixedState = {
+            whole: 0, num: 0, den: 0,
+            totalSlices: 0,
+            currentCount: 0,
+            isCut: false
+        };
+
+        let impState = {
+            totalPieces: 0,
+            piecesMoved: 0,
+            denominator: 0,
+            targetContainers: [] 
+        };
+
+        // 初始化
+        setMode('mixToImp');
+
+        // --- 輔助函式：產生 HTML 字串 ---
+        function getFractionHTML(num, den) {
+            return `<span class="fraction"><span class="top">${num}</span><span class="bottom">${den}</span></span>`;
+        }
+        function getMixedNumberHTML(whole, num, den) {
+            if (num === 0) return `<span class="mixed-number"><span class="whole">${whole}</span></span>`;
+            if (whole === 0) return getFractionHTML(num, den);
+            return `<span class="mixed-number"><span class="whole">${whole}</span>${getFractionHTML(num, den)}</span>`;
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // 隱藏算式區
+            document.getElementById('math-area').style.display = 'none';
+
+            const inputArea = document.getElementById('input-area');
+            const canvas = document.getElementById('canvas-area');
+            const instruction = document.getElementById('instruction');
+            
+            if (mode === 'mixToImp') {
+                inputArea.innerHTML = `
+                    <div class="input-group">
+                        <span>整數：</span><input type="number" id="m_whole" value="2" min="1" max="5">
+                    </div>
+                    <div class="input-group">
+                        <span>分數：</span>
+                        <div style="display:flex; flex-direction:column; align-items:center;">
+                            <input type="number" id="m_num" value="1" min="1" style="width:40px; border-bottom:2px solid #ccc; border-radius:0;">
+                            <input type="number" id="m_den" value="4" min="2" max="10" style="width:40px; border-top:none; border-radius:0;">
+                        </div>
+                    </div>
+                    <button class="action-btn" onclick="renderMixed()">1. 上菜</button>
+                    <button id="btn-cut" class="action-btn" style="background-color:#F57C00; display:none;" onclick="cutPizzas()">2. 切開！</button>
+                    <button id="btn-count" class="action-btn" style="background-color:#0288D1; display:none;" onclick="countOneSlice()">3. 數一片 ⬇️</button>
+                `;
+                canvas.innerHTML = `
+                    <div style="width:100%">
+                        <div class="zone-label">🍴 桌上的 Pizza</div>
+                        <div id="mixed-top-zone" class="zone" style="background-color:#FFFDE7;"></div>
+                    </div>
+                    <div style="width:100%">
+                        <div class="zone-label">🔢 數過的切片</div>
+                        <div id="mixed-bottom-zone" class="zone" style="background-color:#E1F5FE; min-height:100px;"></div>
+                    </div>
+                `;
+                instruction.innerText = "請輸入帶分數，然後按「上菜」。";
+            } else {
+                inputArea.innerHTML = `
+                    <div class="input-group">
+                        <span> Pizza 片數 (分子)：</span><input type="number" id="i_num" value="9" min="1">
+                    </div>
+                    <div class="input-group">
+                        <span> 幾片拼成圓 (分母)：</span><input type="number" id="i_den" value="4" min="2" max="10">
+                    </div>
+                    <button class="action-btn" onclick="initImproperBoard()">1. 準備</button>
+                    <button id="btn-move-one" class="action-btn" style="background-color:#F57C00; box-shadow: 0 4px 0 #E65100; display:none;" onclick="moveOnePiece()">2. 拼一片 ➡️</button>
+                `;
+                canvas.innerHTML = `
+                    <div style="width:100%">
+                        <div class="zone-label">🍴 散落的 Pizza 片</div>
+                        <div id="source-zone" class="zone" style="background-color:#FFFDE7;"></div>
+                    </div>
+                    <div style="text-align:center; font-size:24px; color:#F57C00;">⬇️ 拼湊中 ⬇️</div>
+                    <div style="width:100%">
+                        <div class="zone-label">🍽️ 拼湊區 (每 ${getFractionHTML('?', '?')} 片拼成一個圓)</div>
+                        <div id="target-zone" class="zone" style="background-color:#EFEBE9;"></div>
+                    </div>
+                `;
+                instruction.innerText = "設定好 Pizza 數量，按下「準備」。";
+            }
+        }
+
+        // ==========================
+        // 模式一：帶分數 -> 假分數
+        // ==========================
+        function renderMixed() {
+            const whole = parseInt(document.getElementById('m_whole').value);
+            const num = parseInt(document.getElementById('m_num').value);
+            const den = parseInt(document.getElementById('m_den').value);
+            
+            if(num >= den) { alert("帶分數的分子不能比分母大！"); return; }
+            
+            // 重置
+            document.getElementById('math-area').style.display = 'none';
+            mixedState = { whole, num, den, totalSlices: (whole * den) + num, currentCount: 0, isCut: false };
+
+            const btnCut = document.getElementById('btn-cut');
+            const btnCount = document.getElementById('btn-count');
+            btnCut.style.display = 'inline-block';
+            btnCut.disabled = false;
+            btnCount.style.display = 'none';
+            btnCount.disabled = false;
+            btnCount.innerText = "3. 數一片 ⬇️";
+
+            document.getElementById('mixed-bottom-zone').innerHTML = '';
+            document.getElementById('instruction').innerHTML = `這是帶分數： ${getMixedNumberHTML(whole, num, den)}<br>如果不切開，很難數總共有幾小片。`;
+
+            // 渲染
+            const topZone = document.getElementById('mixed-top-zone');
+            topZone.innerHTML = '';
+            for(let i=0; i<whole; i++) {
+                let pizzaHTML = `<div class="pizza-wrapper" id="pizza-group-${i}">`;
+                for(let s=0; s<den; s++) pizzaHTML += createSliceDiv(den, s, `slice-w${i}-${s}`, false); 
+                pizzaHTML += `</div>`;
+                topZone.innerHTML += pizzaHTML;
+            }
+            let fracHTML = `<div class="pizza-wrapper" id="pizza-group-frac">`;
+            for(let s=0; s<num; s++) fracHTML += createSliceDiv(den, s, `slice-f-${s}`, true); 
+            fracHTML += `</div>`;
+            topZone.innerHTML += fracHTML;
+        }
+
+        function cutPizzas() {
+            const { whole, den } = mixedState;
+            for(let i=0; i<whole; i++) {
+                for(let s=0; s<den; s++) {
+                    const sliceEl = document.getElementById(`slice-w${i}-${s}`);
+                    if(sliceEl) sliceEl.innerHTML = getSliceSVGPath(den, true); 
+                }
+            }
+            mixedState.isCut = true;
+            document.getElementById('btn-cut').disabled = true;
+            document.getElementById('btn-count').style.display = 'inline-block';
+            document.getElementById('instruction').innerHTML = `切好了！現在每個大 Pizza 都是 ${den} 片。<br>請按按鈕，我們一片一片拿下來數。`;
+        }
+
+        function countOneSlice() {
+            if(!mixedState.isCut) return;
+            if(mixedState.currentCount >= mixedState.totalSlices) return;
+
+            let targetId = '';
+            const piecesFromWhole = mixedState.whole * mixedState.den;
+            if (mixedState.currentCount < piecesFromWhole) {
+                const wIndex = Math.floor(mixedState.currentCount / mixedState.den);
+                const sIndex = mixedState.currentCount % mixedState.den;
+                targetId = `slice-w${wIndex}-${sIndex}`;
+            } else {
+                const sIndex = mixedState.currentCount - piecesFromWhole;
+                targetId = `slice-f-${sIndex}`;
+            }
+
+            const topSlice = document.getElementById(targetId);
+            if(topSlice) { topSlice.style.opacity = '0'; topSlice.style.transform = 'scale(0.5)'; }
+
+            const bottomZone = document.getElementById('mixed-bottom-zone');
+            const smallSlice = document.createElement('div');
+            smallSlice.className = 'small-slice';
+            smallSlice.innerHTML = getSliceSVGPath(mixedState.den, true); 
+            bottomZone.appendChild(smallSlice);
+
+            mixedState.currentCount++;
+            const fractionText = getFractionHTML(mixedState.currentCount, mixedState.den);
+            
+            if(mixedState.currentCount >= mixedState.totalSlices) {
+                document.getElementById('btn-count').disabled = true;
+                document.getElementById('btn-count').innerText = "數完了！";
+                document.getElementById('instruction').innerHTML = `✅ 全部數完了！總共是 ${fractionText}。`;
+                
+                // 顯示算式
+                showMathForMixed();
+            } else {
+                document.getElementById('instruction').innerHTML = `目前數到了： ${fractionText}`;
+            }
+        }
+
+        // --- 顯示帶分數轉假分數的算式 ---
+        function showMathForMixed() {
+            const { whole, num, den, totalSlices } = mixedState;
+            const mathArea = document.getElementById('math-area');
+            mathArea.style.display = 'block';
+            mathArea.innerHTML = `
+                <div class="math-title">📝 數學算式筆記</div>
+                <div class="math-step">
+                    ${den} × ${whole} = ${den * whole} 
+                    <span class="math-desc">➞ 每個 Pizza 切 ${den} 片，有 ${whole} 個 Pizza，切成 ${den * whole} 片</span>
+                </div>
+                <div class="math-step">
+                    ${den * whole} + ${num} = ${totalSlices} 
+                    <span class="math-desc">➞ ${den * whole} 片加上原本的 ${num} 片，總共 ${totalSlices} 片</span>
+                </div>
+                <div class="math-result">
+                    答案是：${getFractionHTML(totalSlices, den)}
+                </div>
+            `;
+            // 自動捲動到算式區
+            mathArea.scrollIntoView({behavior: "smooth"});
+        }
+
+        // ==========================
+        // 模式二：假分數 -> 帶分數
+        // ==========================
+        function initImproperBoard() {
+            const num = parseInt(document.getElementById('i_num').value);
+            const den = parseInt(document.getElementById('i_den').value);
+            
+            // 重置
+            document.getElementById('math-area').style.display = 'none';
+            const labels = document.querySelectorAll('.zone-label');
+            if(labels.length > 1) labels[1].innerHTML = `🍽️ 拼湊區 (每 ${den} 片拼成一個完整的圓)`;
+
+            impState = { totalPieces: num, piecesMoved: 0, denominator: den, targetContainers: [] };
+            const containersNeeded = Math.ceil(num / den);
+            for(let i=0; i<containersNeeded; i++) impState.targetContainers.push(0); 
+
+            const btnMove = document.getElementById('btn-move-one');
+            btnMove.style.display = 'inline-block';
+            btnMove.disabled = false;
+            btnMove.innerText = "2. 拼一片 ➡️";
+
+            const sourceZone = document.getElementById('source-zone');
+            sourceZone.innerHTML = '';
+            for(let i=0; i<num; i++) sourceZone.innerHTML += `<div id="piece-${i}" class="pizza-shape">${createRandomSliceSVG(den)}</div>`;
+
+            const targetZone = document.getElementById('target-zone');
+            targetZone.innerHTML = '';
+            for(let i=0; i<containersNeeded; i++) targetZone.innerHTML += `<div id="container-${i}" class="pizza-shape">${createFullPizzaSVG(0, den, '', true, '#eee')}</div>`;
+
+            document.getElementById('instruction').innerHTML = `現在有 <span class="highlight">${num}</span> 片 Pizza。<br>請按下按鈕，把它們拼成完整的 Pizza！`;
+        }
+
+        function moveOnePiece() {
+            if (impState.piecesMoved >= impState.totalPieces) return;
+            const pieceIndex = impState.totalPieces - 1 - impState.piecesMoved;
+            const pieceToRemove = document.getElementById(`piece-${pieceIndex}`);
+            if(pieceToRemove) { pieceToRemove.style.opacity = '0'; pieceToRemove.style.transform = 'translateY(50px) scale(0)'; }
+
+            const currentContainerIndex = Math.floor(impState.piecesMoved / impState.denominator);
+            impState.targetContainers[currentContainerIndex]++;
+            const newCount = impState.targetContainers[currentContainerIndex];
+            
+            const containerEl = document.getElementById(`container-${currentContainerIndex}`);
+            const percent = (newCount / impState.denominator) * 100;
+            const isFull = (newCount === impState.denominator);
+            
+            containerEl.innerHTML = createFullPizzaSVG(percent, impState.denominator, '', true, '#FFCA28');
+            if(isFull) {
+                containerEl.classList.add('full-circle-anim');
+                setTimeout(() => containerEl.classList.remove('full-circle-anim'), 600);
+            }
+
+            impState.piecesMoved++;
+            const whole = Math.floor(impState.piecesMoved / impState.denominator);
+            const remainder = impState.piecesMoved % impState.denominator;
+            
+            let msg = `拼了 ${impState.piecesMoved} 片... `;
+            if(remainder === 0 && impState.piecesMoved > 0) msg += `🎉 完成了第 <span class="highlight">${whole}</span> 個完整的 Pizza！`;
+            else msg += `目前完成了 ${whole} 個完整 Pizza，第 ${whole + 1} 個還在拼 (目前 ${remainder} 片)。`;
+            
+            if(impState.piecesMoved >= impState.totalPieces) {
+                document.getElementById('btn-move-one').disabled = true;
+                document.getElementById('btn-move-one').innerText = "拼完了！";
+                document.getElementById('instruction').innerHTML = `✅ 全部拼完了！<br>答案是： ${getMixedNumberHTML(whole, remainder, impState.denominator)} 個 Pizza`;
+                
+                // 顯示算式
+                showMathForImproper();
+            } else {
+                document.getElementById('instruction').innerHTML = msg;
+            }
+        }
+
+        // --- 顯示假分數轉帶分數的算式 ---
+        function showMathForImproper() {
+            const { totalPieces, denominator } = impState;
+            const whole = Math.floor(totalPieces / denominator);
+            const remainder = totalPieces % denominator;
+            
+            const mathArea = document.getElementById('math-area');
+            mathArea.style.display = 'block';
+            
+            mathArea.innerHTML = `
+                <div class="math-title">📝 數學算式筆記</div>
+                <div class="math-step">
+                    ${totalPieces} ÷ ${denominator} = ${whole} ... ${remainder}
+                </div>
+                <div class="math-step">
+                    <span class="math-desc">
+                        ➞ 總共有 ${totalPieces} 片 Pizza，每 ${denominator} 片拼成一個完整的 Pizza<br>
+                        ➞ 可以拼成 ${whole} 個完整的 Pizza，還剩下 ${remainder} 片
+                    </span>
+                </div>
+                <div class="math-result">
+                    答案是：${getMixedNumberHTML(whole, remainder, denominator)}
+                </div>
+            `;
+            mathArea.scrollIntoView({behavior: "smooth"});
+        }
+
+        // ==========================
+        // SVG 繪圖工具
+        // ==========================
+        function createSliceDiv(den, index, id, showLines) {
+            const angle = 360 / den;
+            const rotation = angle * index; 
+            return `<div id="${id}" class="slice-item" style="transform: rotate(${rotation}deg);">${getSliceSVGPath(den, showLines)}</div>`;
+        }
+
+        function getSliceSVGPath(den, showLines) {
+            const radius = 45;
+            const cx = 50; const cy = 50;
+            const angle = 360 / den;
+            const startRad = -Math.PI / 2;
+            const endRad = startRad + (angle * Math.PI / 180);
+            const x1 = cx + radius * Math.cos(startRad); const y1 = cy + radius * Math.sin(startRad);
+            const x2 = cx + radius * Math.cos(endRad); const y2 = cy + radius * Math.sin(endRad);
+            const largeArcFlag = angle > 180 ? 1 : 0;
+            const strokeColor = showLines ? "#E65100" : "#FFCA28"; 
+            const strokeWidth = showLines ? "2" : "1";
+            return `<svg viewBox="0 0 100 100" style="overflow:visible;"><path d="M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z" fill="#FFCA28" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-linejoin="round"/></svg>`;
+        }
+
+        function createFullPizzaSVG(percentage, den, id, showLines, fillColor) {
+            const radius = 45;
+            const cx = 50; const cy = 50;
+            const plate = `<circle cx="50" cy="50" r="45" fill="#F5F5F5" stroke="#ddd" stroke-width="2" stroke-dasharray="4"/>`;
+            if (percentage <= 0.1) return `<svg class="pizza-shape" viewBox="0 0 100 100">${plate}</svg>`;
+
+            const isFull = percentage >= 99.9;
+            let pathHTML = '';
+            if(isFull) pathHTML = `<circle cx="50" cy="50" r="45" fill="${fillColor}" stroke="#E65100" stroke-width="4"/>`;
+            else {
+                const endAngle = (percentage / 100) * 360;
+                const startRad = -Math.PI / 2;
+                const endRad = startRad + (endAngle * Math.PI / 180);
+                const x1 = cx + radius * Math.cos(startRad); const y1 = cy + radius * Math.sin(startRad);
+                const x2 = cx + radius * Math.cos(endRad); const y2 = cy + radius * Math.sin(endRad);
+                const largeArcFlag = endAngle > 180 ? 1 : 0;
+                pathHTML = `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z" fill="${fillColor}" stroke="#E65100" stroke-width="3" stroke-linejoin="round"/>`;
+            }
+            let linesHTML = '';
+            if(showLines && percentage > 0) {
+                const limitAngle = isFull ? 360 : (percentage / 100) * 360;
+                for(let i=0; i<den; i++) {
+                    const angle = (i * 360) / den;
+                    if(angle < limitAngle || (i===0 && percentage > 0)) { 
+                        const rad = (angle - 90) * (Math.PI / 180);
+                        const lx = cx + radius * Math.cos(rad); const ly = cy + radius * Math.sin(rad);
+                        linesHTML += `<line x1="${cx}" y1="${cy}" x2="${lx}" y2="${ly}" stroke="#F57F17" stroke-width="2" />`;
+                    }
+                }
+            }
+            return `<svg id="${id}" class="pizza-shape" viewBox="0 0 100 100">${isFull?'':plate}${pathHTML}${linesHTML}</svg>`;
+        }
+
+        function createRandomSliceSVG(den) {
+            const radius = 45;
+            const cx = 50; const cy = 50;
+            const angle = 360 / den;
+            const startRad = -Math.PI / 2;
+            const endRad = startRad + (angle * Math.PI / 180);
+            const x1 = cx + radius * Math.cos(startRad); const y1 = cy + radius * Math.sin(startRad);
+            const x2 = cx + radius * Math.cos(endRad); const y2 = cy + radius * Math.sin(endRad);
+            const largeArcFlag = angle > 180 ? 1 : 0;
+            const rot = Math.random()*40 - 20;
+            return `<svg viewBox="0 0 100 100" style="overflow:visible;"><g transform="rotate(${rot}, 50, 50)"><path d="M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z" fill="#FFCA28" stroke="#E65100" stroke-width="3" stroke-linejoin="round"/><circle cx="${cx + radius*0.6 * Math.cos(startRad + 0.5*(endRad-startRad))}" cy="${cy + radius*0.6 * Math.sin(startRad + 0.5*(endRad-startRad))}" r="4" fill="#D84315" opacity="0.8"/></g></svg>`;
+        }
+    </script>
+</body>
+</html>

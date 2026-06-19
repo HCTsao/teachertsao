@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>柱體體積教學實驗室</title>
+    <!-- 引入穩定版本的 Library -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #f8fafc; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
+        .canvas-wrapper { width: 100%; height: 65vh; cursor: default; position: relative; overflow: hidden; }
+        .canvas-3d { width: 100%; height: 100%; }
+        .glass-panel { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); }
+        .quiz-input-field { width: 4.5rem; text-align: center; font-weight: bold; font-size: 1.25rem; border-bottom: 2px solid #6366f1; padding: 0.25rem; background: transparent; }
+        .quiz-input-field:focus { outline: none; border-bottom-color: #4338ca; }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .step-card { transition: all 0.5s ease; border-left: 4px solid transparent; }
+        .step-hidden { opacity: 0; transform: translateY(20px); pointer-events: none; height: 0; margin: 0; padding: 0; overflow: hidden; }
+        .step-visible { opacity: 1; transform: translateY(0); height: auto; margin-bottom: 1rem; padding: 0.5rem; }
+        .nav-btn { transition: all 0.3s ease; }
+        .nav-btn-active { background-color: #4f46e5; color: white; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.4); }
+        .btn-choice { transition: all 0.2s ease; }
+        .btn-choice:hover { transform: scale(1.05); }
+        .dim-label { position: absolute; pointer-events: none; font-weight: bold; font-size: 14px; padding: 2px 8px; border-radius: 6px; background: rgba(255, 255, 255, 0.95); border: 1px solid rgba(79, 70, 229, 0.3); white-space: nowrap; z-index: 10; display: none; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+
+    <!-- 頁籤導航 -->
+    <nav class="bg-white shadow-sm p-2 flex justify-center gap-2 z-30">
+        <button onclick="switchTab('cuboid')" id="tab-cuboid" class="nav-btn nav-btn-active px-6 py-2 rounded-lg font-bold">柱體的體積(長方體)</button>
+        <button onclick="switchTab('parallelogram')" id="tab-parallelogram" class="nav-btn bg-slate-100 text-slate-600 px-6 py-2 rounded-lg font-bold text-sm md:text-base">柱體的體積(底面為平行四邊形)</button>
+        <button onclick="switchTab('triangular')" id="tab-triangular" class="nav-btn bg-slate-100 text-slate-600 px-6 py-2 rounded-lg font-bold">柱體的體積(三角柱)</button>
+        <button onclick="switchTab('cylinder')" id="tab-cylinder" class="nav-btn bg-slate-100 text-slate-600 px-6 py-2 rounded-lg font-bold">柱體的體積(圓柱)</button>
+    </nav>
+
+    <!-- 頂部控制與標題區 -->
+    <header class="bg-white shadow-md p-4 z-20">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+            <h1 id="header-title" class="text-2xl font-bold text-indigo-600">柱體體積推導</h1>
+            
+            <!-- 長方體專用控制 -->
+            <div id="cuboid-controls" class="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-indigo-50 p-3 rounded-xl border border-indigo-100 transition-all">
+                <div class="flex flex-col"><span class="text-xs font-bold text-indigo-700">長: <span id="label-l">5</span> cm</span><input type="range" id="input-l" min="2" max="10" value="5" class="accent-indigo-600"></div>
+                <div class="flex flex-col"><span class="text-xs font-bold text-pink-700">寬: <span id="label-w">4</span> cm</span><input type="range" id="input-w" min="2" max="10" value="4" class="accent-pink-600"></div>
+                <div class="flex flex-col"><span class="text-xs font-bold text-emerald-700">柱高: <span id="label-h">3</span> cm</span><input type="range" id="input-h" min="2" max="10" value="3" class="accent-emerald-600"></div>
+            </div>
+
+            <button onclick="startTeachingCuboid()" id="btn-start-cuboid" class="bg-indigo-600 text-white px-8 py-2 rounded-full font-bold text-lg hover:bg-indigo-700 transition-all shadow-lg">開始教學</button>
+        </div>
+    </header>
+
+    <main class="relative flex-1 overflow-hidden">
+        <!-- 1. 長方體教學區 -->
+        <div id="container-cuboid" class="canvas-wrapper">
+            <div id="canvas-cuboid" class="canvas-3d"></div>
+            <div id="label-dim-l" class="dim-label text-indigo-600 border-indigo-500">長: 5cm</div>
+            <div id="label-dim-w" class="dim-label text-pink-600 border-pink-500">寬: 4cm</div>
+            <div id="label-dim-h1" class="dim-label text-emerald-600 border-emerald-500">高: 1cm</div>
+
+            <div class="absolute right-6 top-6 w-72 md:w-80 flex flex-col gap-3 pointer-events-none">
+                <div class="glass-panel p-5 rounded-2xl shadow-xl pointer-events-auto">
+                    <h2 class="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-3 border-b pb-2">公式推導紀錄</h2>
+                    <div id="step-2-ui" class="step-card step-hidden border-indigo-500 bg-white/50 rounded-lg">
+                        <p class="text-xs text-gray-500">推導結果 1</p>
+                        <p class="text-md font-bold text-indigo-600">一層的體積 = 底面積</p>
+                        <p class="text-sm font-bold text-gray-700 mt-1"><span id="rec-area-val">20</span> cm³</p>
+                    </div>
+                    <div id="step-3-ui" class="step-card step-hidden border-emerald-500 bg-white/50 rounded-lg">
+                        <p class="text-xs text-gray-500">推導結果 2</p>
+                        <p class="text-md font-bold text-emerald-700">體積 = 底面積 × 柱高</p>
+                        <p class="text-lg font-bold text-indigo-800 mt-1"><span id="rec-area2">20</span> × <span id="rec-h-val">3</span> = <span id="rec-vol">60</span> cm³</p>
+                    </div>
+                </div>
+                <button onclick="resetViewCuboid()" class="pointer-events-auto w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-blue-700 transition">回到原位</button>
+            </div>
+
+            <div id="quiz-modal-cuboid" class="absolute bottom-10 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 hidden z-30">
+                <div class="glass-panel p-6 rounded-3xl shadow-2xl border-b-8 border-indigo-600 flex flex-col md:flex-row items-center gap-6" onmousedown="event.stopPropagation()">
+                    <div class="flex-1 text-center md:text-left"><h3 id="quiz-text-cuboid" class="text-gray-800 font-bold leading-relaxed"></h3></div>
+                    <div id="quiz-input-area-cuboid" class="flex items-center gap-2 text-xl font-bold"></div>
+                </div>
+                <p id="quiz-msg-cuboid" class="text-red-500 text-sm mt-2 text-center font-bold hidden">答案不對喔，再觀察一下圖示！</p>
+            </div>
+        </div>
+
+        <!-- 2. 平行四邊形教學區 -->
+        <div id="container-parallelogram" class="canvas-wrapper hidden">
+            <div id="canvas-parallelogram" class="canvas-3d"></div>
+            
+            <!-- 操作按鈕 (移至右上角直向排列) -->
+            <div class="absolute top-24 right-6 flex flex-col gap-4 z-30">
+                <button onclick="resetPrismPara()" class="bg-slate-500 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-slate-600 transition-all">原始形狀</button>
+                <button id="btn-para-cut" onclick="cutPrismPara()" class="bg-indigo-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-indigo-700 transition-all">切割</button>
+                <button id="btn-para-rearrange" onclick="rearrangePrismPara()" class="bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-emerald-700 transition-all opacity-50 cursor-not-allowed" disabled>平移重組</button>
+            </div>
+
+            <!-- 觀念引導面板 (置底) -->
+            <div id="para-instruction-panel" class="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-4xl px-4 flex flex-col gap-4 pointer-events-none hidden z-20">
+                <div class="glass-panel p-6 rounded-2xl shadow-xl pointer-events-auto text-lg leading-relaxed border-l-8 border-indigo-500">
+                    <h2 class="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-3 border-b pb-2">觀念引導</h2>
+                    <div id="para-quiz-content">
+                        <p class="font-bold text-slate-700 mb-4 text-base">
+                            底面為平行四邊形的四角柱經過切割重組，變成一個長方體。<br>
+                            想一想，一開始的四角柱體積，和切割重組後的長方體體積一樣嗎？
+                        </p>
+                        <div class="flex gap-4">
+                            <button onclick="handleParaAnswer(true)" class="btn-choice flex-1 bg-indigo-600 text-white py-2 rounded-lg font-bold shadow-md hover:bg-indigo-700">一樣</button>
+                            <button onclick="handleParaAnswer(false)" class="btn-choice flex-1 bg-slate-200 text-slate-600 py-2 rounded-lg font-bold shadow-sm hover:bg-slate-300">不一樣</button>
+                        </div>
+                    </div>
+                    <div id="para-conclusion" class="hidden mt-6 pt-4 border-t border-slate-200">
+                        <p class="text-emerald-600 font-bold bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-base">
+                            💡 所以底面為平行四邊形的四角柱，也可以用「底面積 × 柱高」的公式來計算。<br>
+                            <span class="text-sm font-normal text-slate-500">(底面積就是平行四邊形的面積)</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 三角柱教學區 -->
+        <div id="container-triangular" class="canvas-wrapper hidden">
+            <div id="canvas-triangular" class="canvas-3d"></div>
+            
+            <!-- 操作按鈕 (移至右上角直向排列) -->
+            <div class="absolute top-24 right-6 flex flex-col gap-4 z-30">
+                <button onclick="resetPrismTri()" class="bg-slate-500 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-slate-600 transition-all">原始三角柱</button>
+                <button id="btn-tri-copy" onclick="copyPrismTri()" class="bg-indigo-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-indigo-700 transition-all">複製一個</button>
+                <button id="btn-tri-combine" onclick="combinePrismTri()" class="bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-emerald-700 transition-all opacity-50 cursor-not-allowed" disabled>合體</button>
+            </div>
+
+            <!-- 觀念引導面板 (置底) -->
+            <div id="tri-instruction-panel" class="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-4xl px-4 flex flex-col gap-4 pointer-events-none hidden z-20">
+                <div class="glass-panel p-6 rounded-2xl shadow-xl pointer-events-auto text-lg leading-relaxed border-l-8 border-indigo-500">
+                    <h2 class="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-3 border-b pb-2">觀念引導</h2>
+                    <div id="tri-quiz-content">
+                        <p class="font-bold text-slate-700 mb-4 text-base">
+                            兩個相同的三角柱，
+                            可以拼成一個底面為平行四邊形的四角柱。<br>
+                            想一想，三角柱的體積會是這個四角柱體積的多少倍？
+                        </p>
+                        <div class="flex gap-4">
+                            <button onclick="handleTriAnswer(true)" class="btn-choice flex-1 bg-indigo-600 text-white py-2 rounded-lg font-bold shadow-md hover:bg-indigo-700 flex items-center justify-center">
+                                <div class="inline-flex flex-col items-center leading-none mr-1">
+                                    <span class="border-b border-white px-1">1</span>
+                                    <span>2</span>
+                                </div>
+                                倍
+                            </button>
+                            <button onclick="handleTriAnswer(false)" class="btn-choice flex-1 bg-slate-200 text-slate-600 py-2 rounded-lg font-bold shadow-sm hover:bg-slate-300">2倍</button>
+                        </div>
+                    </div>
+                    <div id="tri-conclusion" class="hidden mt-6 pt-4 border-t border-slate-200">
+                        <p class="text-indigo-600 font-bold bg-indigo-50 p-4 rounded-xl border border-indigo-100 text-base">
+                            💡 因為三角柱的底面積也是平行四邊形的 
+                            <span class="inline-flex flex-col items-center align-middle leading-none mx-1" style="vertical-align: middle;">
+                                <span class="border-b border-indigo-600 text-[10px] px-0.5">1</span>
+                                <span class="text-[10px]">2</span>
+                            </span>
+                            倍，所以體積公式同樣是：<br>
+                            <span class="block text-xl text-center mt-2 font-bold text-indigo-700">底面積 × 柱高</span>
+                            <span class="text-sm font-normal text-slate-500 block text-center mt-1">(底面積即為三角形面積)</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. 圓柱教學區 -->
+        <div id="container-cylinder" class="canvas-wrapper hidden">
+            <div id="canvas-cylinder" class="canvas-3d"></div>
+            
+            <!-- 操作按鈕 (移至右上角直向排列) -->
+            <div class="absolute top-24 right-6 flex flex-col gap-4 z-30">
+                <button id="btn-cyl-reset" onclick="resetCylinder()" class="bg-slate-500 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-slate-600 transition-all">原始圓柱</button>
+                <button id="btn-cyl-cut" onclick="cutCylinder()" class="bg-indigo-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-indigo-700 transition-all">切割</button>
+                <button id="btn-cyl-rearrange" onclick="rearrangeCylinder()" class="bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-emerald-700 transition-all opacity-50 cursor-not-allowed" disabled>重組形狀</button>
+            </div>
+
+            <!-- 觀念引導面板 (置底) -->
+            <div id="cyl-instruction-panel" class="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-4xl px-4 flex flex-col gap-4 pointer-events-none hidden z-20">
+                <div class="glass-panel p-6 rounded-2xl shadow-xl pointer-events-auto text-lg leading-relaxed border-l-8 border-indigo-500">
+                    <h2 class="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-3 border-b pb-2">觀念引導</h2>
+                    <div id="cyl-quiz-content">
+                        <p class="font-bold text-slate-700 mb-4 text-base">
+                            將圓柱切割、重新排列後，<br>
+                            看起來像什麼形體？
+                        </p>
+                        <div class="flex gap-4">
+                            <button onclick="handleCylAnswer(true)" class="btn-choice flex-1 bg-indigo-600 text-white py-2 rounded-lg font-bold shadow-md hover:bg-indigo-700">長方體</button>
+                            <button onclick="handleCylAnswer(false)" class="btn-choice flex-1 bg-slate-200 text-slate-600 py-2 rounded-lg font-bold shadow-sm hover:bg-slate-300">球體</button>
+                        </div>
+                    </div>
+                    <div id="cyl-conclusion" class="hidden mt-6 pt-4 border-t border-slate-200">
+                        <p class="text-indigo-600 font-bold bg-indigo-50 p-4 rounded-xl border border-indigo-100 text-base">
+                            💡 所以圓柱也可以用「底面積 × 柱高」的體積公式來計算。<br>
+                            <span class="text-sm font-normal text-slate-500">(底面積就是圓面積)</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentTab = 'cuboid';
+        const sleep = ms => new Promise(res => setTimeout(res, ms));
+
+        // --- 通用 3D 基礎功能 ---
+        function createScene(containerId) {
+            const canvasEl = document.getElementById(containerId);
+            if (!canvasEl) return null;
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf8fafc);
+            const camera = new THREE.PerspectiveCamera(40, canvasEl.clientWidth / canvasEl.clientHeight, 0.1, 1000);
+            camera.position.set(8, 14, 14);
+            camera.lookAt(0, 1, 0);
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(canvasEl.clientWidth, canvasEl.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            canvasEl.appendChild(renderer.domElement);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+            const light = new THREE.DirectionalLight(0xffffff, 0.6);
+            light.position.set(10, 20, 10);
+            scene.add(light);
+            scene.add(new THREE.GridHelper(20, 20, 0xd1d5db, 0xe5e7eb));
+            return { scene, camera, renderer, canvasEl };
+        }
+
+        // --- 1. 長方體模組 ---
+        let c3d = null, layersC = [], wireframeC, isAnimatingC = false, teachingStepC = 0, layersGroupC;
+        function initCuboid() {
+            c3d = createScene('canvas-cuboid');
+            if(!c3d) return;
+            c3d.camera.position.set(12, 10, 15);
+            c3d.camera.lookAt(0, 0, 0);
+            layersGroupC = new THREE.Group();
+            c3d.scene.add(layersGroupC);
+            updateModelCuboid();
+            animateCuboid();
+        }
+        function updateModelCuboid() {
+            if (isAnimatingC || !c3d) return;
+            const L = parseInt(document.getElementById('input-l').value);
+            const W = parseInt(document.getElementById('input-w').value);
+            const H = parseInt(document.getElementById('input-h').value);
+            document.getElementById('label-l').innerText = L;
+            document.getElementById('label-w').innerText = W;
+            document.getElementById('label-h').innerText = H;
+            while(layersGroupC.children.length > 0) layersGroupC.remove(layersGroupC.children[0]);
+            if (wireframeC) c3d.scene.remove(wireframeC);
+            const geo = new THREE.BoxGeometry(L, H, W);
+            wireframeC = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0x94a3b8 }));
+            wireframeC.position.y = H/2;
+            c3d.scene.add(wireframeC);
+            layersC = [];
+            for (let i = 0; i < H; i++) {
+                const layer = new THREE.Mesh(new THREE.BoxGeometry(L, 1, W), new THREE.MeshPhongMaterial({ color: i === 0 ? 0x6366f1 : 0x818cf8, transparent: true, opacity: 0.85 }));
+                layer.add(new THREE.LineSegments(new THREE.EdgesGeometry(layer.geometry), new THREE.LineBasicMaterial({ color: 0x4338ca, linewidth: 2 })));
+                layer.position.set(0, i + 0.5, 0);
+                layer.visible = false;
+                layersGroupC.add(layer);
+                layersC.push(layer);
+            }
+            teachingStepC = 0; resetUICuboid();
+            syncLabelsCuboid();
+        }
+        async function startTeachingCuboid() {
+            if (isAnimatingC) return;
+            TWEEN.removeAll(); updateModelCuboid();
+            isAnimatingC = true; teachingStepC = 1;
+            document.getElementById('btn-start-cuboid').disabled = true;
+            const first = layersC[0];
+            first.visible = true; first.scale.set(0.01, 0.01, 0.01); first.position.y = 0.01;
+            new TWEEN.Tween(first.scale).to({ x: 1, z: 1 }, 1000).easing(TWEEN.Easing.Quadratic.Out).onComplete(() => {
+                isAnimatingC = false; showQuizCuboid(1);
+            }).start();
+        }
+        function showQuizCuboid(step) {
+            const modal = document.getElementById('quiz-modal-cuboid');
+            const L = parseInt(document.getElementById('input-l').value);
+            const W = parseInt(document.getElementById('input-w').value);
+            modal.style.display = 'block';
+            if (step === 1) {
+                document.getElementById('quiz-text-cuboid').innerHTML = `<div class="text-sm font-bold text-gray-700">長方體的底面是一個長 ${L}cm、寬 ${W}cm 的長方形，<br>請算出長方體的｢底面積｣是多少？</div>`;
+                document.getElementById('quiz-input-area-cuboid').innerHTML = `<input type="number" id="ans-a" class="quiz-input-field" placeholder="？"> <span class="text-sm ml-1 text-slate-500">cm²</span> <button onclick="checkQuizCuboid(1)" class="bg-indigo-600 text-white px-5 py-2 rounded-xl ml-4 font-bold">確定</button>`;
+            } else if (step === 2) {
+                document.getElementById('quiz-text-cuboid').innerHTML = `<div class="text-lg font-bold text-gray-700">現在變成高 1cm 的長方體，<br>想想看，這一層的體積是多少？</div>`;
+                document.getElementById('quiz-input-area-cuboid').innerHTML = `<input type="number" id="ans-a" class="quiz-input-field" placeholder="？"> <span class="text-sm ml-1 text-slate-500">cm³</span> <button onclick="checkQuizCuboid(2)" class="bg-indigo-600 text-white px-5 py-2 rounded-xl ml-4 font-bold">確定</button>`;
+            } else if (step === 3) {
+                const H = parseInt(document.getElementById('input-h').value);
+                document.getElementById('quiz-text-cuboid').innerHTML = `<div class="text-lg font-bold text-gray-700">一層的體積是 ${L*W}cm³，<br>現在總共疊了 ${H}層，<br>體積要怎麼計算？</div>`;
+                document.getElementById('quiz-input-area-cuboid').innerHTML = `(<input type="number" id="ans-a" class="quiz-input-field" placeholder="？">) × (<input type="number" id="ans-b" class="quiz-input-field" placeholder="？">) <button onclick="checkQuizCuboid(3)" class="bg-indigo-600 text-white px-5 py-2 rounded-xl ml-4 font-bold">確定</button>`;
+            }
+        }
+        async function checkQuizCuboid(step) {
+            const L = parseInt(document.getElementById('input-l').value);
+            const W = parseInt(document.getElementById('input-w').value);
+            const H = parseInt(document.getElementById('input-h').value);
+            const ansA = parseInt(document.getElementById('ans-a').value);
+            if (step === 1 && ansA === L*W) {
+                document.getElementById('quiz-modal-cuboid').style.display = 'none';
+                teachingStepC = 2; isAnimatingC = true;
+                new TWEEN.Tween(layersC[0].scale).to({ y: 1 }, 800).easing(TWEEN.Easing.Back.Out).start();
+                new TWEEN.Tween(layersC[0].position).to({ y: 0.5 }, 800).easing(TWEEN.Easing.Back.Out).onComplete(() => { isAnimatingC = false; showQuizCuboid(2); }).start();
+            } else if (step === 2 && ansA === L*W) {
+                document.getElementById('quiz-modal-cuboid').style.display = 'none';
+                document.getElementById('step-2-ui').classList.remove('step-hidden'); document.getElementById('step-2-ui').classList.add('step-visible');
+                document.getElementById('rec-area-val').innerText = L*W;
+                await sleep(1000);
+                teachingStepC = 3; isAnimatingC = true;
+                for (let i = 1; i < layersC.length; i++) {
+                    layersC[i].visible = true; layersC[i].position.y = 10;
+                    new TWEEN.Tween(layersC[i].position).to({ y: i + 0.5 }, 600).easing(TWEEN.Easing.Bounce.Out).start();
+                    await sleep(400);
+                }
+                isAnimatingC = false; showQuizCuboid(3);
+            } else if (step === 3) {
+                const ansB = parseInt(document.getElementById('ans-b').value);
+                if ((ansA === L*W && ansB === H) || (ansA === H && ansB === L*W)) {
+                    document.getElementById('quiz-modal-cuboid').style.display = 'none';
+                    document.getElementById('step-3-ui').classList.remove('step-hidden'); document.getElementById('step-3-ui').classList.add('step-visible');
+                    document.getElementById('rec-area2').innerText = L*W; document.getElementById('rec-h-val').innerText = H; document.getElementById('rec-vol').innerText = L*W*H;
+                    document.getElementById('btn-start-cuboid').disabled = false;
+                } else showErrCuboid();
+            } else showErrCuboid();
+        }
+        function showErrCuboid() { const m = document.getElementById('quiz-msg-cuboid'); m.classList.remove('hidden'); setTimeout(() => m.classList.add('hidden'), 2000); }
+        function resetUICuboid() { document.querySelectorAll('.step-card').forEach(el => { el.classList.add('step-hidden'); el.classList.remove('step-visible'); }); document.getElementById('quiz-modal-cuboid').style.display = 'none'; }
+        function resetViewCuboid() { if(c3d) new TWEEN.Tween(c3d.camera.position).to({x:12, y:10, z:15}, 600).start(); }
+        function syncLabelsCuboid() {
+            if (currentTab !== 'cuboid' || !c3d) return;
+            const L = parseInt(document.getElementById('input-l').value);
+            const W = parseInt(document.getElementById('input-w').value);
+            const H = parseInt(document.getElementById('input-h').value);
+            syncLabelEl(document.getElementById('label-dim-l'), new THREE.Vector3(0, 0, W/2 + 0.6), teachingStepC >= 1, c3d);
+            syncLabelEl(document.getElementById('label-dim-w'), new THREE.Vector3(L/2 + 0.6, 0, 0), teachingStepC >= 1, c3d);
+            syncLabelEl(document.getElementById('label-dim-h1'), new THREE.Vector3(-L/2 - 0.8, (teachingStepC >= 3 ? H/2 : 0.5), W/2), teachingStepC >= 2, c3d);
+        }
+        function animateCuboid() { requestAnimationFrame(animateCuboid); TWEEN.update(); if(currentTab === 'cuboid' && c3d) { c3d.renderer.render(c3d.scene, c3d.camera); syncLabelsCuboid(); } }
+
+        // --- 2. 平行四邊形模組 ---
+        let p3d = null, partA_P, partB_P, wholeMesh_P;
+        const BASE_W = 6, BASE_D = 4, PRISM_H = 4, OFFSET_P = 2;
+        function initParallelogram() {
+            p3d = createScene('canvas-parallelogram');
+            if(!p3d) return;
+            const ex = { depth: PRISM_H, bevelEnabled: false };
+            const wholeS = new THREE.Shape();
+            wholeS.moveTo(0, 0); wholeS.lineTo(BASE_W, 0); wholeS.lineTo(BASE_W + OFFSET_P, BASE_D); wholeS.lineTo(OFFSET_P, BASE_D); wholeS.lineTo(0, 0);
+            wholeMesh_P = new THREE.Mesh(new THREE.ExtrudeGeometry(wholeS, ex), new THREE.MeshPhongMaterial({ color: 0x6366f1, transparent: true, opacity: 0.85 }));
+            const shapeB = new THREE.Shape(); shapeB.moveTo(0, 0); shapeB.lineTo(OFFSET_P, 0); shapeB.lineTo(OFFSET_P, BASE_D); shapeB.lineTo(0, 0);
+            partB_P = new THREE.Mesh(new THREE.ExtrudeGeometry(shapeB, ex), new THREE.MeshPhongMaterial({ color: 0x818cf8, transparent: true, opacity: 0.9 }));
+            const shapeA = new THREE.Shape(); shapeA.moveTo(OFFSET_P, 0); shapeA.lineTo(BASE_W, 0); shapeA.lineTo(BASE_W + OFFSET_P, BASE_D); shapeA.lineTo(OFFSET_P, BASE_D); shapeA.lineTo(OFFSET_P, 0);
+            partA_P = new THREE.Mesh(new THREE.ExtrudeGeometry(shapeA, ex), new THREE.MeshPhongMaterial({ color: 0x6366f1, transparent: true, opacity: 0.8 }));
+            [wholeMesh_P, partA_P, partB_P].forEach(m => {
+                m.rotation.x = -Math.PI / 2; m.position.set(-(BASE_W + OFFSET_P)/2, 0, BASE_D/2);
+                m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0x4338ca })));
+                p3d.scene.add(m);
+            });
+            partB_P.userData.initX = partB_P.position.x;
+            resetPrismPara();
+            animatePara();
+        }
+        function resetPrismPara() {
+            if(!p3d) return;
+            TWEEN.removeAll(); wholeMesh_P.visible = true; partA_P.visible = false; partB_P.visible = false;
+            partB_P.position.x = partB_P.userData.initX;
+            document.getElementById('para-instruction-panel').classList.add('hidden');
+            document.getElementById('para-conclusion').classList.add('hidden');
+            document.getElementById('btn-para-rearrange').disabled = true;
+            document.getElementById('btn-para-rearrange').classList.add('opacity-50', 'cursor-not-allowed');
+            new TWEEN.Tween(p3d.camera.position).to({x: 8, y: 14, z: 14}, 800).start();
+        }
+        function cutPrismPara() { 
+            TWEEN.removeAll(); wholeMesh_P.visible = false; partA_P.visible = true; partB_P.visible = true; 
+            new TWEEN.Tween(partB_P.position).to({ x: partB_P.userData.initX - 2.5 }, 500).easing(TWEEN.Easing.Quadratic.Out).start(); 
+            document.getElementById('btn-para-rearrange').disabled = false;
+            document.getElementById('btn-para-rearrange').classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+        function rearrangePrismPara() { TWEEN.removeAll(); wholeMesh_P.visible = false; partA_P.visible = true; partB_P.visible = true; new TWEEN.Tween(partB_P.position).to({ x: partB_P.userData.initX + BASE_W }, 1000).easing(TWEEN.Easing.Quadratic.InOut).onComplete(() => { document.getElementById('para-instruction-panel').classList.remove('hidden'); }).start(); }
+        function handleParaAnswer(isSame) { if(isSame) document.getElementById('para-conclusion').classList.remove('hidden'); }
+        function animatePara() { requestAnimationFrame(animatePara); if(currentTab === 'parallelogram' && p3d) p3d.renderer.render(p3d.scene, p3d.camera); }
+
+        // --- 3. 三角柱模組 ---
+        let t3d = null, tri1, tri2;
+        const T_W = 6, T_D = 4, T_H = 4, T_OFFSET = 2; // 底面寬、高, 柱高
+        function initTriangular() {
+            t3d = createScene('canvas-triangular');
+            if(!t3d) return;
+            const ex = { depth: T_H, bevelEnabled: false };
+            const shape = new THREE.Shape();
+            // 三角形底面頂點
+            shape.moveTo(0, 0); shape.lineTo(T_W, 0); shape.lineTo(T_OFFSET, T_D); shape.lineTo(0, 0);
+            const geo = new THREE.ExtrudeGeometry(shape, ex);
+            tri1 = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: 0x6366f1, transparent: true, opacity: 0.85 }));
+            tri2 = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: 0x818cf8, transparent: true, opacity: 0.85 }));
+            [tri1, tri2].forEach(m => {
+                m.rotation.x = -Math.PI / 2; // 立起來
+                m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0x4338ca })));
+                t3d.scene.add(m);
+            });
+            resetPrismTri();
+            animateTri();
+        }
+        function resetPrismTri() {
+            if(!t3d) return;
+            TWEEN.removeAll();
+            const startX = -(T_W + T_OFFSET) / 2;
+            tri1.position.set(startX, 0, T_D/2);
+            tri1.rotation.set(-Math.PI / 2, 0, 0);
+            
+            tri2.visible = false;
+            tri2.position.set(startX + T_W + 1, 0, T_D/2);
+            tri2.rotation.set(-Math.PI / 2, 0, 0);
+            
+            document.getElementById('tri-instruction-panel').classList.add('hidden');
+            document.getElementById('tri-conclusion').classList.add('hidden');
+            document.getElementById('btn-tri-copy').disabled = false;
+            document.getElementById('btn-tri-combine').disabled = true;
+            document.getElementById('btn-tri-combine').classList.add('opacity-50', 'cursor-not-allowed');
+            new TWEEN.Tween(t3d.camera.position).to({x: 8, y: 14, z: 14}, 800).start();
+        }
+        function copyPrismTri() {
+            TWEEN.removeAll();
+            tri2.visible = true;
+            const startX = -(T_W + T_OFFSET) / 2;
+            new TWEEN.Tween(tri2.position).to({ x: startX + T_W + 2 }, 500).easing(TWEEN.Easing.Quadratic.Out).start();
+            document.getElementById('btn-tri-combine').disabled = false;
+            document.getElementById('btn-tri-combine').classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+        function combinePrismTri() {
+            TWEEN.removeAll();
+            const startX = -(T_W + T_OFFSET) / 2;
+            // 翻轉拼合法：
+            // 1. 繞 Z 軸旋轉 180 度 (上下顛倒)，形成倒置三角形
+            // 2. 移動到精確對齊的位置
+            new TWEEN.Tween(tri2.rotation).to({ z: Math.PI }, 1000).easing(TWEEN.Easing.Quadratic.InOut).start();
+            new TWEEN.Tween(tri2.position)
+                .to({ 
+                    x: startX + T_W + T_OFFSET, // 精確對齊右側頂點
+                    y: 0, 
+                    z: T_D/2 - T_D               // 對準深度
+                }, 1000)
+                .easing(TWEEN.Easing.Quadratic.InOut)
+                .onComplete(() => {
+                    document.getElementById('tri-instruction-panel').classList.remove('hidden');
+                }).start();
+        }
+        function handleTriAnswer(isHalf) { if(isHalf) document.getElementById('tri-conclusion').classList.remove('hidden'); }
+        function animateTri() { requestAnimationFrame(animateTri); TWEEN.update(); if(currentTab === 'triangular' && t3d) t3d.renderer.render(t3d.scene, t3d.camera); }
+
+        // --- 4. 圓柱模組 ---
+        let cyl3d = null, cylSectors = [], wholeCyl;
+        const CYL_R = 4, CYL_H = 4, CYL_SEGS = 64;
+        
+        function initCylinder() {
+            cyl3d = createScene('canvas-cylinder');
+            if (!cyl3d) return;
+            const ex = { depth: CYL_H, bevelEnabled: false };
+            
+            // 原始完整圓柱
+            const wholeShape = new THREE.Shape();
+            wholeShape.absarc(0, 0, CYL_R, 0, Math.PI * 2, false);
+            wholeCyl = new THREE.Mesh(new THREE.ExtrudeGeometry(wholeShape, ex), new THREE.MeshPhongMaterial({ color: 0x6366f1, transparent: true, opacity: 0.85 }));
+            wholeCyl.rotation.x = -Math.PI / 2;
+            
+            // 手動繪製上下底圓框，避免側邊線條
+            const edgeMat = new THREE.LineBasicMaterial({ color: 0x4338ca });
+            const topRing = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(new THREE.Path().absarc(0,0,CYL_R,0,Math.PI*2).getPoints(64)), edgeMat);
+            topRing.position.z = CYL_H;
+            const botRing = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(new THREE.Path().absarc(0,0,CYL_R,0,Math.PI*2).getPoints(64)), edgeMat);
+            wholeCyl.add(topRing); wholeCyl.add(botRing);
+            
+            cyl3d.scene.add(wholeCyl);
+
+            // 切割後的扇形
+            const angle = Math.PI * 2 / CYL_SEGS;
+            for (let i = 0; i < CYL_SEGS; i++) {
+                const shape = new THREE.Shape();
+                shape.moveTo(0, 0); shape.lineTo(CYL_R, 0); shape.absarc(0, 0, CYL_R, 0, angle, false); shape.lineTo(0, 0);
+                const mat = new THREE.MeshPhongMaterial({ color: i % 2 === 0 ? 0x6366f1 : 0x818cf8, transparent: true, opacity: 0.9 });
+                const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, ex), mat);
+                mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({ color: 0x4338ca, linewidth: 1 })));
+                mesh.rotation.x = -Math.PI / 2;
+                cyl3d.scene.add(mesh);
+                cylSectors.push({ mesh, index: i });
+            }
+            resetCylinder();
+            animateCylinder();
+        }
+
+        function resetCylinder() {
+            if (!cyl3d) return;
+            TWEEN.removeAll();
+            wholeCyl.visible = true;
+            const angle = Math.PI * 2 / CYL_SEGS;
+            cylSectors.forEach(item => {
+                item.mesh.visible = false;
+                item.mesh.rotation.set(-Math.PI / 2, 0, item.index * angle);
+                item.mesh.position.set(0, 0, 0);
+            });
+            document.getElementById('cyl-instruction-panel').classList.add('hidden');
+            document.getElementById('cyl-conclusion').classList.add('hidden');
+            document.getElementById('btn-cyl-rearrange').disabled = true;
+            document.getElementById('btn-cyl-rearrange').classList.add('opacity-50', 'cursor-not-allowed');
+            new TWEEN.Tween(cyl3d.camera.position).to({x: 10, y: 15, z: 15}, 800).start();
+        }
+
+        function cutCylinder() {
+            TWEEN.removeAll();
+            wholeCyl.visible = false;
+            const angle = Math.PI * 2 / CYL_SEGS;
+            cylSectors.forEach(item => {
+                item.mesh.visible = true;
+                // 不做位移動畫，只顯示切割線 (即顯示所有扇形)
+            });
+            document.getElementById('btn-cyl-rearrange').disabled = false;
+            document.getElementById('btn-cyl-rearrange').classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        function rearrangeCylinder() {
+            TWEEN.removeAll();
+            const arcLen = (Math.PI * 2 * CYL_R) / CYL_SEGS;
+            const totalLen = (Math.PI * CYL_R);
+            
+            cylSectors.forEach(item => {
+                const i = item.index;
+                const isEven = i % 2 === 0;
+                // 分兩排：上半圓(0-31) 與 下半圓(32-63)
+                // 視覺上讓它們像手風琴拉開
+                // 偶數朝下(Z-)，奇數朝上(Z+) 插入
+                // 這裡簡化為線性排列
+                // 0,2,4... 在一排; 1,3,5... 在另一排，然後咬合
+                
+                // 為了視覺效果，我們將原本圓周上的順序線性化
+                // 假設 0 是最左邊
+                const xPos = (i * arcLen / 2) - totalLen / 2; 
+                
+                // 旋轉歸零，並設定正確朝向
+                // 偶數：尖端朝 Z- (後)
+                // 奇數：尖端朝 Z+ (前)
+                new TWEEN.Tween(item.mesh.rotation)
+                    .to({ x: -Math.PI/2, y: 0, z: isEven ? -Math.PI/2 : Math.PI/2 }, 1000)
+                    .easing(TWEEN.Easing.Quadratic.InOut)
+                    .start();
+
+                new TWEEN.Tween(item.mesh.position)
+                    .to({ x: xPos, y: 0, z: isEven ? -CYL_R/2 : CYL_R/2 }, 1000)
+                    .easing(TWEEN.Easing.Quadratic.InOut)
+                    .onComplete(() => {
+                         if(i === CYL_SEGS-1) document.getElementById('cyl-instruction-panel').classList.remove('hidden');
+                    })
+                    .start();
+            });
+            // 移除攝影機自動移動，保持定點
+            // new TWEEN.Tween(cyl3d.camera.position).to({x: 0, y: 15, z: 20}, 1000).start();
+        }
+
+        function handleCylAnswer(isCorrect) {
+            if (isCorrect) document.getElementById('cyl-conclusion').classList.remove('hidden');
+        }
+
+        function animateCylinder() { 
+            requestAnimationFrame(animateCylinder); 
+            TWEEN.update(); 
+            if(currentTab === 'cylinder' && cyl3d) cyl3d.renderer.render(cyl3d.scene, cyl3d.camera); 
+        }
+
+
+        // --- 通用工具 ---
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.canvas-wrapper').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('nav-btn-active', 'bg-slate-100', 'text-slate-600'));
+            
+            document.getElementById(`tab-${tab}`).classList.add('nav-btn-active');
+            document.getElementById(`container-${tab}`).classList.remove('hidden');
+            
+            const cuboidCtrl = document.getElementById('cuboid-controls');
+            const startBtn = document.getElementById('btn-start-cuboid');
+            
+            // 控制項顯示邏輯
+            if (tab === 'cuboid') {
+                cuboidCtrl.classList.remove('hidden');
+                startBtn.classList.remove('hidden');
+                document.getElementById('header-title').innerText = "柱體體積推導";
+                updateModelCuboid();
+            } else {
+                cuboidCtrl.classList.add('hidden');
+                startBtn.classList.add('hidden');
+                document.getElementById('header-title').innerText = "柱體體積推導";
+                if (tab === 'parallelogram') resetPrismPara();
+                else if (tab === 'triangular') resetPrismTri();
+                else if (tab === 'cylinder') {
+                     if(!cyl3d) initCylinder();
+                     else resetCylinder();
+                }
+            }
+            onResize();
+        }
+
+        function syncLabelEl(el, vec3D, visible, ref) {
+            if (!visible || !el || !ref) { if(el) el.style.display = 'none'; return; }
+            const v = vec3D.clone().project(ref.camera);
+            const x = (v.x * 0.5 + 0.5) * ref.renderer.domElement.clientWidth;
+            const y = (v.y * -0.5 + 0.5) * ref.renderer.domElement.clientHeight;
+            el.style.left = `${x}px`; el.style.top = `${y}px`; el.style.display = 'block';
+        }
+
+        function onResize() {
+            [c3d, p3d, t3d, cyl3d].forEach(ref => {
+                if (ref && ref.renderer) {
+                    const parent = ref.canvasEl;
+                    ref.renderer.setSize(parent.clientWidth, parent.clientHeight);
+                    ref.camera.aspect = parent.clientWidth / parent.clientHeight;
+                    ref.camera.updateProjectionMatrix();
+                }
+            });
+        }
+
+        window.onload = () => {
+            initCuboid();
+            initParallelogram();
+            initTriangular();
+            window.addEventListener('resize', onResize);
+            document.body.addEventListener('wheel', (e) => {
+                const ref = currentTab === 'cuboid' ? c3d : (currentTab === 'parallelogram' ? p3d : (currentTab === 'triangular' ? t3d : cyl3d));
+                if(ref) {
+                    ref.camera.position.multiplyScalar(1 + e.deltaY * 0.001);
+                    const len = ref.camera.position.length();
+                    if (len < 5) ref.camera.position.setLength(5);
+                    if (len > 50) ref.camera.position.setLength(50);
+                }
+            }, { passive: false });
+            document.querySelectorAll('.quiz-input-field, button, input').forEach(el => {
+                el.onmousedown = e => e.stopPropagation();
+            });
+        };
+    </script>
+</body>
+</html>

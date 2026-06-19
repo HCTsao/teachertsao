@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三年級數學：認識除法互動教具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes zoomIn {
+            from { opacity: 0; transform: scale(0.5); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .animate-zoom-in { animation: zoomIn 0.3s ease-out forwards; }
+        
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .animate-slide-in-left { animation: slideInLeft 0.3s ease-out forwards; }
+
+        @keyframes bounce-slow {
+            0%, 100% { transform: translateY(-10%) translateX(-50%); }
+            50% { transform: translateY(-30%) translateX(-50%); }
+        }
+        .animate-bounce-child { animation: bounce-slow 3s infinite ease-in-out; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen p-4 md:p-6 font-sans text-slate-800">
+
+    <div class="max-w-6xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden border-4 border-slate-200">
+        
+        <!-- 標籤頁導覽 -->
+        <div id="tab-container" class="grid grid-cols-2 md:grid-cols-4 bg-slate-100 p-2 gap-2">
+            <button onclick="setActiveTab('incl_minus')" id="tab-incl_minus" class="tab-btn py-2 px-1 rounded-xl font-bold text-sm transition bg-white shadow-md text-indigo-600 border-b-4 border-indigo-500 scale-105">分裝(連減)</button>
+            <button onclick="setActiveTab('incl_multi')" id="tab-incl_multi" class="tab-btn py-2 px-1 rounded-xl font-bold text-sm transition text-slate-500 hover:bg-slate-50">分裝(乘法)</button>
+            <button onclick="setActiveTab('part_minus')" id="tab-part_minus" class="tab-btn py-2 px-1 rounded-xl font-bold text-sm transition text-slate-500 hover:bg-slate-50">平分(連減)</button>
+            <button onclick="setActiveTab('part_multi')" id="tab-part_multi" class="tab-btn py-2 px-1 rounded-xl font-bold text-sm transition text-slate-500 hover:bg-slate-50">平分(乘法)</button>
+        </div>
+
+        <div class="p-6 flex flex-col lg:flex-row gap-8">
+            
+            <!-- 左側：互動操作區 -->
+            <div class="flex-1">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex-1 text-center px-4">
+                        <h2 id="scenario-title" class="text-xl font-black text-slate-700">分裝</h2>
+                        <p id="scenario-desc" class="text-indigo-600 mt-1 font-bold bg-indigo-50 py-2 px-4 rounded-lg inline-block border border-indigo-100 leading-relaxed shadow-sm text-base">
+                            載入中...
+                        </p>
+                    </div>
+                    <button onclick="toggleSettings()" class="p-2 rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
+
+                <!-- 設定區 -->
+                <div id="settings-panel" class="hidden mb-6 p-4 bg-indigo-50/50 rounded-2xl border-2 border-indigo-100 flex flex-wrap gap-6 justify-center animate-in slide-in-from-top">
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm font-bold text-slate-600">全部數量 (上限20)：</span>
+                        <button onclick="adjustTotal(-1)" class="w-8 h-8 bg-white border border-slate-300 rounded-full flex items-center justify-center hover:bg-slate-100 shadow-sm">-</button>
+                        <span id="display-total" class="text-xl font-mono font-bold w-8 text-center">12</span>
+                        <button onclick="adjustTotal(1)" class="w-8 h-8 bg-white border border-slate-300 rounded-full flex items-center justify-center hover:bg-slate-100 shadow-sm">+</button>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span id="divisor-label" class="text-sm font-bold text-slate-600">每盤裝幾個：</span>
+                        <button onclick="adjustDivisor(-1)" class="w-8 h-8 bg-white border border-slate-300 rounded-full flex items-center justify-center hover:bg-slate-100 shadow-sm">-</button>
+                        <span id="display-divisor" class="text-xl font-mono font-bold w-8 text-center">3</span>
+                        <button onclick="adjustDivisor(1)" class="w-8 h-8 bg-white border border-slate-300 rounded-full flex items-center justify-center hover:bg-slate-100 shadow-sm">+</button>
+                    </div>
+                </div>
+
+                <!-- 物品堆 -->
+                <div class="bg-orange-50 rounded-2xl p-4 mb-6 border-2 border-orange-100 min-h-[140px] flex justify-center shadow-inner relative">
+                    <div id="items-grid" class="grid grid-cols-5 gap-4">
+                    </div>
+                </div>
+
+                <!-- 盤子顯示區 -->
+                <div id="plates-container" class="flex flex-row justify-center gap-6 overflow-x-auto py-8 min-h-[120px]">
+                </div>
+
+                <!-- 按鈕區 -->
+                <div class="mt-8 flex gap-3">
+                    <button id="next-btn" onclick="handleNext()" class="flex-1 py-4 rounded-xl font-bold text-lg shadow-md bg-indigo-500 hover:bg-indigo-600 text-white transition flex items-center justify-center gap-2 active:scale-95">
+                        下一步
+                    </button>
+                    <button onclick="resetStep()" class="px-5 py-4 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 右側：算式與解釋區 -->
+            <div class="w-full lg:w-[360px] space-y-4">
+                <!-- 紀錄面板 -->
+                <div id="history-panel" class="p-5 rounded-2xl border-2 min-h-[180px] flex flex-col shadow-sm">
+                    <div id="history-header" class="flex items-center gap-2 mb-3 font-bold border-b pb-1 text-sm text-red-700 border-red-200">
+                    </div>
+                    <div id="history-list" class="flex-1 flex flex-col justify-center items-center text-center font-bold">
+                    </div>
+                    <div id="history-footer" class="mt-3 pt-2 border-t text-center">
+                        <span id="status-prefix" class="text-xs opacity-70">目前裝了 </span>
+                        <span id="current-plates" class="text-2xl font-black text-red-700">0</span>
+                        <span id="status-unit" class="text-xs opacity-70"> 盤</span>
+                    </div>
+                </div>
+
+                <!-- 除法總結 -->
+                <div id="summary-panel" class="hidden p-6 rounded-2xl bg-indigo-700 text-white border-4 border-indigo-400 shadow-xl animate-zoom-in">
+                    <div class="flex items-center gap-2 mb-6 font-bold text-base border-b border-white/20 pb-2">
+                        除法算式與說數學
+                    </div>
+                    
+                    <div class="relative flex items-center justify-center gap-4 text-4xl font-mono mb-12">
+                        <!-- 被除數 -->
+                        <div class="relative">
+                            <span id="formula-total">12</span>
+                            <div id="arrow-1" class="hidden absolute -bottom-8 left-0 right-0 flex justify-center text-yellow-300 animate-bounce">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
+                            </div>
+                        </div>
+                        
+                        <!-- 除號與除數 -->
+                        <div class="flex items-center gap-1 relative">
+                            <span id="formula-divide" class="text-white/40">÷</span>
+                            <span id="formula-divisor">3</span>
+                            <div id="arrow-2" class="hidden absolute -bottom-8 left-0 right-0 flex justify-center">
+                                <svg class="text-yellow-300 animate-bounce" style="margin-left:-1.2rem" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
+                            </div>
+                        </div>
+                        
+                        <div class="text-white/40">=</div>
+                        
+                        <!-- 商 (修正後的箭頭定位) -->
+                        <div class="relative">
+                            <span id="formula-result">4</span>
+                            <div id="arrow-3" class="hidden absolute -bottom-8 left-0 right-0 flex justify-center text-yellow-300 animate-bounce">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="flex gap-2 justify-center">
+                            <button onclick="setExplStep(1)" class="expl-btn w-9 h-9 rounded-full font-bold bg-white/10 text-white hover:bg-white/20">1</button>
+                            <button onclick="setExplStep(2)" class="expl-btn w-9 h-9 rounded-full font-bold bg-white/10 text-white hover:bg-white/20">2</button>
+                            <button onclick="setExplStep(3)" class="expl-btn w-9 h-9 rounded-full font-bold bg-white/10 text-white hover:bg-white/20">3</button>
+                        </div>
+                        
+                        <div id="expl-text-box" class="min-h-[70px] bg-white/10 rounded-xl p-4 flex flex-col items-center justify-center text-center border border-white/5">
+                            <p id="expl-text" class="text-lg font-bold text-yellow-100 leading-tight">
+                            </p>
+                        </div>
+
+                        <div class="mt-4 pt-4 border-t border-white/10 text-center">
+                            <div id="read-aloud" class="text-sm font-medium opacity-90 leading-relaxed">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 狀態管理 ---
+        let state = {
+            activeTab: 'incl_minus',
+            step: 0,
+            explStep: 0,
+            total: 12,
+            divisor: 3,
+            showSettings: false,
+            itemsInitialized: false 
+        };
+
+        const childEmojis = ['🧒', '👧', '👦', '🧒🏻', '👧🏼', '👦🏽', '🧒🏾', '👧🏿', '🧒🏼', '👦🏻'];
+
+        function toChineseNum(num) {
+            const dict = { 
+                1:'一', 2:'二', 3:'三', 4:'四', 5:'五', 6:'六', 7:'七', 8:'八', 9:'九', 10:'十',
+                11:'十一', 12:'十二', 13:'十三', 14:'十四', 15:'十五', 16:'十六', 17:'十七', 18:'十八', 19:'十九', 20:'二十'
+            };
+            return dict[num] || num;
+        }
+
+        function setActiveTab(tab) {
+            state.activeTab = tab;
+            state.step = 0;
+            state.explStep = 0;
+            state.showSettings = false;
+            state.itemsInitialized = false; 
+            if (tab.startsWith('incl')) {
+                if (state.total > 20) state.total = 12;
+                if (state.divisor > 6) state.divisor = 3;
+            } else {
+                if (state.total > 20) state.total = 20;
+                if (state.divisor > 6) state.divisor = 5;
+            }
+            document.getElementById('history-list').innerHTML = '';
+            render();
+        }
+
+        function toggleSettings() {
+            state.showSettings = !state.showSettings;
+            render();
+        }
+
+        function adjustTotal(delta) {
+            let newTotal = Math.max(state.divisor, Math.min(20, state.total + delta));
+            const remainder = newTotal % state.divisor;
+            if (remainder !== 0) {
+                newTotal = (delta > 0) ? newTotal + (state.divisor - remainder) : newTotal - remainder;
+            }
+            if (newTotal > 0 && newTotal <= 20) {
+                state.total = newTotal;
+                state.step = 0;
+                state.explStep = 0;
+                state.itemsInitialized = false;
+                document.getElementById('history-list').innerHTML = '';
+                render();
+            }
+        }
+
+        function adjustDivisor(delta) {
+            let newDiv = Math.max(2, Math.min(6, state.divisor + delta));
+            if (state.total % newDiv === 0) {
+                state.divisor = newDiv;
+            } else {
+                let targetTotal = state.total;
+                while (targetTotal % newDiv !== 0 && targetTotal <= 20) targetTotal++;
+                if (targetTotal > 20) {
+                    targetTotal = state.total;
+                    while (targetTotal % newDiv !== 0 && targetTotal > 0) targetTotal--;
+                }
+                state.total = targetTotal;
+                state.divisor = newDiv;
+            }
+            state.step = 0;
+            state.explStep = 0;
+            state.itemsInitialized = false;
+            document.getElementById('history-list').innerHTML = '';
+            render();
+        }
+
+        function handleNext() {
+            const maxStep = state.total / state.divisor;
+            if (state.step < maxStep) {
+                state.step++;
+                state.explStep = 0;
+                render();
+            }
+        }
+
+        function resetStep() {
+            state.step = 0;
+            state.explStep = 0;
+            document.getElementById('history-list').innerHTML = '';
+            render();
+        }
+
+        function setExplStep(s) {
+            state.explStep = s;
+            render();
+        }
+
+        // --- 核心渲染引擎 (穩定渲染) ---
+        function render() {
+            const isIncl = state.activeTab.startsWith('incl');
+            const isMinus = state.activeTab.endsWith('minus');
+            const maxStep = state.total / state.divisor;
+            const finished = state.step === maxStep;
+
+            // 1. Tab UI
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                const id = btn.id.replace('tab-', '');
+                btn.className = `tab-btn py-2 px-1 rounded-xl font-bold text-sm transition ${id === state.activeTab ? 'bg-white shadow-md text-indigo-600 border-b-4 border-indigo-500 scale-105' : 'text-slate-500 hover:bg-slate-50'}`;
+            });
+
+            // 2. Scenario Info
+            document.getElementById('scenario-title').innerText = isIncl ? '分裝' : '平分';
+            const desc = isIncl ? `把 ${state.total} 個蛋糕，${state.divisor} 個裝一盤，最多可以裝成幾盤？` : `把 ${state.total} 片餅乾，平分給 ${state.divisor} 個小朋友，盡量分完，一個小朋友分到幾片餅乾？`;
+            document.getElementById('scenario-desc').innerText = desc;
+
+            // 3. Settings
+            document.getElementById('settings-panel').classList.toggle('hidden', !state.showSettings);
+            document.getElementById('display-total').innerText = state.total;
+            document.getElementById('divisor-label').innerText = isIncl ? '每盤裝幾個：' : '小朋友人數：';
+            document.getElementById('display-divisor').innerText = state.divisor;
+
+            // 4. Items Grid (不閃爍)
+            const itemsGrid = document.getElementById('items-grid');
+            if (!state.itemsInitialized) {
+                itemsGrid.innerHTML = '';
+                const itemEmoji = isIncl ? '🍰' : '🍪';
+                for (let i = 0; i < state.total; i++) {
+                    const div = document.createElement('div');
+                    div.id = `item-stable-${i}`;
+                    div.className = `text-3xl transition-all duration-700 flex items-center justify-center scale-100 opacity-100`;
+                    div.innerText = itemEmoji;
+                    itemsGrid.appendChild(div);
+                }
+                state.itemsInitialized = true;
+            }
+            for (let i = 0; i < state.total; i++) {
+                const node = document.getElementById(`item-stable-${i}`);
+                if (node) {
+                    const gone = i < state.step * state.divisor;
+                    node.style.opacity = gone ? '0' : '1';
+                    node.style.transform = gone ? 'scale(0)' : 'scale(1)';
+                }
+            }
+
+            // 5. Plates (不閃爍)
+            const platesContainer = document.getElementById('plates-container');
+            let plateDisplayCount = isIncl ? (finished ? maxStep : state.step + 1) : state.divisor;
+            
+            if (platesContainer.children.length !== plateDisplayCount) {
+                platesContainer.innerHTML = '';
+                for (let i = 0; i < plateDisplayCount; i++) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = "relative group";
+                    if (!isIncl) {
+                        const kid = document.createElement('div');
+                        kid.className = "absolute -top-8 left-1/2 -translate-x-1/2 text-2xl animate-bounce-child";
+                        kid.style.animationDelay = `${i * 0.2}s`;
+                        kid.innerText = childEmojis[i % childEmojis.length];
+                        wrapper.appendChild(kid);
+                    }
+                    const plate = document.createElement('div');
+                    plate.id = `plate-body-${i}`;
+                    const plateGrid = document.createElement('div');
+                    plateGrid.id = `plate-grid-${i}`;
+                    plateGrid.className = "grid grid-cols-2 gap-1 p-1";
+                    plate.appendChild(plateGrid);
+                    wrapper.appendChild(plate);
+                    platesContainer.appendChild(wrapper);
+                }
+            }
+
+            const itemEmoji = isIncl ? '🍰' : '🍪';
+            for (let i = 0; i < plateDisplayCount; i++) {
+                const plateBody = document.getElementById(`plate-body-${i}`);
+                const plateGrid = document.getElementById(`plate-grid-${i}`);
+                if (!plateBody || !plateGrid) continue;
+
+                const isActive = isIncl ? (i < state.step) : (state.step > 0);
+                plateBody.className = `relative w-20 h-20 rounded-full border-2 transition-all flex items-center justify-center ${isActive ? 'bg-white border-orange-400 shadow-md scale-105' : 'bg-slate-50/50 border-slate-100 opacity-20'} ${!isIncl ? 'border-blue-200' : ''}`;
+
+                const targetCount = isIncl ? (i < state.step ? state.divisor : 0) : state.step;
+                const currentCount = plateGrid.children.length;
+
+                if (currentCount < targetCount) {
+                    for (let j = currentCount; j < targetCount; j++) {
+                        const span = document.createElement('span');
+                        span.className = "text-lg animate-zoom-in";
+                        span.innerText = itemEmoji;
+                        plateGrid.appendChild(span);
+                    }
+                } else if (currentCount > targetCount) { plateGrid.innerHTML = ''; }
+            }
+
+            // 6. Next Button
+            const nextBtn = document.getElementById('next-btn');
+            nextBtn.disabled = finished;
+            nextBtn.className = finished ? "flex-1 py-4 rounded-xl font-bold text-lg shadow-md bg-slate-300 text-white cursor-not-allowed" : "flex-1 py-4 rounded-xl font-bold text-lg shadow-md bg-indigo-500 hover:bg-indigo-600 text-white transition flex items-center justify-center gap-2 active:scale-95";
+            nextBtn.innerText = finished ? '分完了！' : (isIncl ? `裝第 ${state.step + 1} 盤(${state.divisor}個)` : `每人各發 1 個`);
+
+            // 7. History Panel (穩定增量)
+            const historyList = document.getElementById('history-list');
+            const historyHeader = document.getElementById('history-header');
+            const historyPanel = document.getElementById('history-panel');
+
+            if (isMinus) {
+                historyHeader.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1"><line x1="5" y1="12" x2="19" y2="12"></line></svg> 連減過程紀錄`;
+                historyHeader.className = "flex items-center gap-2 mb-3 font-bold border-b pb-1 text-sm text-red-700 border-red-200";
+                historyPanel.className = "p-5 rounded-2xl border-2 min-h-[180px] flex flex-col shadow-sm bg-red-50 border-red-100";
+                document.getElementById('current-plates').className = "text-2xl font-black text-red-700";
+                document.getElementById('status-prefix').innerText = isIncl ? '目前裝了 ' : '目前每個人分了 ';
+                document.getElementById('status-unit').innerText = isIncl ? ' 盤' : ' 個';
+            } else {
+                historyHeader.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> 乘法累積紀錄`;
+                historyHeader.className = "flex items-center gap-2 mb-3 font-bold border-b pb-1 text-sm text-blue-700 border-blue-200";
+                historyPanel.className = "p-5 rounded-2xl border-2 min-h-[180px] flex flex-col shadow-sm bg-blue-50 border-blue-100";
+                document.getElementById('current-plates').className = "text-2xl font-black text-blue-700";
+                document.getElementById('status-prefix').innerText = isIncl ? '目前裝了 ' : '目前每個人分了 ';
+                document.getElementById('status-unit').innerText = isIncl ? ' 盤' : ' 個';
+            }
+
+            if (state.step === 0) {
+                historyList.innerHTML = '<p class="text-slate-300 text-sm italic">點擊按鈕開始分配</p>';
+            } else {
+                if (historyList.children.length !== state.step || historyList.querySelector('p')) {
+                    if (state.step === 1 || historyList.querySelector('p')) historyList.innerHTML = '';
+                    for (let i = historyList.children.length; i < state.step; i++) {
+                        const div = document.createElement('div');
+                        div.className = `text-xl font-mono animate-slide-in-left ${isMinus ? 'text-red-600' : 'text-blue-600'}`;
+                        if (isMinus) {
+                            let currVal = state.total - (i * state.divisor);
+                            div.innerText = `${currVal} - ${state.divisor} = ${currVal - state.divisor}`;
+                        } else {
+                            const v1 = isIncl ? state.divisor : (i + 1);
+                            const v2 = isIncl ? (i + 1) : state.divisor;
+                            div.innerText = `${v1} × ${v2} = ${v1 * v2}`;
+                        }
+                        historyList.appendChild(div);
+                    }
+                }
+            }
+            document.getElementById('current-plates').innerText = state.step;
+
+            // 8. Summary Panel
+            const summaryPanel = document.getElementById('summary-panel');
+            if (finished) {
+                summaryPanel.classList.remove('hidden');
+                document.getElementById('formula-total').innerText = state.total;
+                document.getElementById('formula-divisor').innerText = state.divisor;
+                document.getElementById('formula-result').innerText = state.total / state.divisor;
+
+                document.getElementById('formula-total').className = (state.explStep === 1) ? 'text-yellow-300 font-black scale-110 transition-all' : 'transition-all';
+                document.getElementById('formula-divide').className = (state.explStep === 2) ? 'text-yellow-300 font-black scale-110 transition-all' : 'text-white/40 transition-all';
+                document.getElementById('formula-divisor').className = (state.explStep === 2) ? 'text-yellow-300 font-black scale-110 transition-all' : 'transition-all';
+                document.getElementById('formula-result').className = (state.explStep === 3) ? 'text-yellow-300 font-black scale-110 transition-all' : 'transition-all';
+                
+                document.getElementById('arrow-1').classList.toggle('hidden', state.explStep !== 1);
+                document.getElementById('arrow-2').classList.toggle('hidden', state.explStep !== 2);
+                document.getElementById('arrow-3').classList.toggle('hidden', state.explStep !== 3);
+
+                const explText = document.getElementById('expl-text');
+                if (state.explStep === 0) {
+                    explText.innerHTML = '<span class="text-white font-bold text-lg animate-pulse">說說看每個數字代表什麼意思？</span>';
+                } else {
+                    if (state.explStep === 1) explText.innerText = `「${state.total}」代表總共有 ${state.total} 個${isIncl ? '蛋糕' : '餅乾'}`;
+                    else if (state.explStep === 2) explText.innerText = isIncl ? `「÷${state.divisor}」代表每 ${state.divisor} 個裝成一盤` : `「÷${state.divisor}」代表平分給 ${state.divisor} 個小朋友`;
+                    else if (state.explStep === 3) explText.innerText = isIncl ? `「${state.total / state.divisor}」代表最後裝成了 ${state.total / state.divisor} 盤` : `「${state.total / state.divisor}」代表一個小朋友分到 ${state.total / state.divisor} 片`;
+                }
+
+                const readAloud = document.getElementById('read-aloud');
+                readAloud.innerHTML = `讀作：<span class="text-yellow-300">${toChineseNum(state.total)}</span> 除以 <span class="text-yellow-300">${toChineseNum(state.divisor)}</span> 等於 <span class="text-yellow-300">${toChineseNum(state.total/state.divisor)}</span>`;
+
+                document.querySelectorAll('.expl-btn').forEach((btn, idx) => {
+                    btn.className = (state.explStep === idx + 1) ? "expl-btn w-9 h-9 rounded-full font-bold bg-yellow-400 text-indigo-900 scale-110 shadow-lg" : "expl-btn w-9 h-9 rounded-full font-bold bg-white/10 text-white hover:bg-white/20";
+                });
+            } else {
+                summaryPanel.classList.add('hidden');
+            }
+        }
+        render();
+    </script>
+</body>
+</html>

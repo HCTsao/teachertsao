@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分數、小數、百分率的轉換</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        /* 3D Flip Animation Styles */
+        .perspective-1000 {
+            perspective: 1000px;
+        }
+        .preserve-3d {
+            transform-style: preserve-3d;
+        }
+        .backface-hidden {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        .rotate-y-180 {
+            transform: rotateY(180deg);
+        }
+        
+        /* Transition Utilities */
+        .transition-transform-1000 {
+            transition-property: transform;
+            transition-duration: 1000ms;
+        }
+        
+        /* Card Interactions */
+        .card-container.matched {
+            opacity: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-50 font-sans text-slate-800 p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto">
+        
+        <!-- Header -->
+        <header class="mb-6 text-center">
+            <h1 class="text-2xl md:text-3xl font-bold text-indigo-600 flex items-center justify-center gap-3 mb-2">
+                <i data-lucide="star" class="w-8 h-8 text-yellow-400 fill-yellow-400"></i>
+                分數、小數、百分率的轉換
+                <i data-lucide="star" class="w-8 h-8 text-yellow-400 fill-yellow-400"></i>
+            </h1>
+            <p class="text-slate-500">找出上下兩區數值相等的卡牌！</p>
+        </header>
+
+        <!-- Controls Panel -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6">
+            <div class="flex flex-col md:flex-row gap-4 justify-between items-center">
+                
+                <!-- Mode Selector -->
+                <div class="flex bg-slate-100 p-1 rounded-xl w-full md:w-auto overflow-x-auto" id="mode-selector">
+                    <button onclick="setMode('frac-dec')" id="btn-frac-dec" class="flex-1 md:flex-none whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-all">分數 ↔ 小數</button>
+                    <button onclick="setMode('frac-perc')" id="btn-frac-perc" class="flex-1 md:flex-none whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-all">分數 ↔ 百分率</button>
+                    <button onclick="setMode('dec-perc')" id="btn-dec-perc" class="flex-1 md:flex-none whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-all">小數 ↔ 百分率</button>
+                </div>
+
+                <!-- Difficulty & Stats -->
+                <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                    
+                    <!-- Difficulty Toggle -->
+                    <div class="flex items-center gap-2" id="difficulty-container">
+                        <span class="text-sm font-bold text-slate-400 uppercase tracking-wider">難度</span>
+                        <div class="flex bg-slate-100 p-1 rounded-lg">
+                            <button onclick="setDifficulty('basic')" id="btn-diff-basic" class="px-3 py-1 rounded-md text-sm font-medium transition-colors">基礎</button>
+                            <button onclick="setDifficulty('advanced')" id="btn-diff-advanced" class="px-3 py-1 rounded-md text-sm font-medium transition-colors">進階</button>
+                        </div>
+                    </div>
+
+                    <!-- Reset Button -->
+                    <button onclick="initGame()" class="p-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-full transition-colors" title="重新開始">
+                        <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center text-sm font-medium text-slate-600">
+                <span id="status-text">模式: 分數與小數 (基礎)</span>
+                <span class="bg-slate-100 px-3 py-1 rounded-full">步數: <span id="move-count">0</span></span>
+            </div>
+        </div>
+
+        <!-- Game Area Split Layout -->
+        <div class="flex flex-col gap-6 max-w-3xl mx-auto perspective-1000">
+            
+            <!-- Top Section (Blue Cards) -->
+            <div id="grid-top" class="flex flex-wrap justify-center gap-4 min-h-[144px]">
+                <!-- Cards injected here -->
+            </div>
+
+            <!-- Divider -->
+            <div class="relative w-full h-px bg-slate-200 my-2">
+                <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-50 px-3 text-slate-400 text-xs font-bold tracking-widest uppercase">
+                    MATCH
+                </div>
+            </div>
+
+            <!-- Bottom Section (Red Cards) -->
+            <div id="grid-bottom" class="flex flex-wrap justify-center gap-4 min-h-[144px]">
+                <!-- Cards injected here -->
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Winning Modal -->
+    <div id="win-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-300">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl max-w-sm w-full text-center transform scale-100 transition-transform duration-300">
+            <div class="inline-flex p-4 rounded-full bg-yellow-100 mb-6">
+                <i data-lucide="trophy" class="w-12 h-12 text-yellow-500"></i>
+            </div>
+            <h2 class="text-3xl font-bold text-slate-800 mb-2">太棒了！</h2>
+            <p class="text-slate-500 mb-6">你總共用了 <span id="final-moves" class="text-indigo-600 font-bold text-lg">0</span> 步完成挑戰。</p>
+            
+            <button onclick="initGame()" class="w-full py-3 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-colors shadow-lg shadow-indigo-200">
+                再玩一次
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- Data ---
+        const mathData = [
+            // 1/2 系列
+            { val: 0.5, frac: "1/2", dec: "0.5", perc: "50%", isAdvanced: false },
+            // 1/4 系列
+            { val: 0.25, frac: "1/4", dec: "0.25", perc: "25%", isAdvanced: false },
+            { val: 0.75, frac: "3/4", dec: "0.75", perc: "75%", isAdvanced: false },
+            // 1/5 系列
+            { val: 0.2, frac: "1/5", dec: "0.2", perc: "20%", isAdvanced: false },
+            { val: 0.4, frac: "2/5", dec: "0.4", perc: "40%", isAdvanced: false },
+            { val: 0.6, frac: "3/5", dec: "0.6", perc: "60%", isAdvanced: false },
+            { val: 0.8, frac: "4/5", dec: "0.8", perc: "80%", isAdvanced: false },
+            // 1/8 系列
+            { val: 0.125, frac: "1/8", dec: "0.125", perc: "12.5%", isAdvanced: false },
+            { val: 0.375, frac: "3/8", dec: "0.375", perc: "37.5%", isAdvanced: false },
+            { val: 0.625, frac: "5/8", dec: "0.625", perc: "62.5%", isAdvanced: false },
+            { val: 0.875, frac: "7/8", dec: "0.875", perc: "87.5%", isAdvanced: false },
+            // 1/10 系列
+            { val: 0.1, frac: "1/10", dec: "0.1", perc: "10%", isAdvanced: false },
+            { val: 0.3, frac: "3/10", dec: "0.3", perc: "30%", isAdvanced: false },
+            { val: 0.7, frac: "7/10", dec: "0.7", perc: "70%", isAdvanced: false },
+            { val: 0.9, frac: "9/10", dec: "0.9", perc: "90%", isAdvanced: false },
+            // 進階題
+            { val: 1.5, frac: "1 1/2", dec: "1.5", perc: "150%", isAdvanced: true },
+            { val: 1.25, frac: "1 1/4", dec: "1.25", perc: "125%", isAdvanced: true },
+            { val: 2.75, frac: "2 3/4", dec: "2.75", perc: "275%", isAdvanced: true },
+            { val: 1.2, frac: "1 1/5", dec: "1.2", perc: "120%", isAdvanced: true },
+            { val: 2.5, frac: "2 1/2", dec: "2.5", perc: "250%", isAdvanced: true },
+            { val: 3.125, frac: "3 1/8", dec: "3.125", perc: "312.5%", isAdvanced: true },
+            { val: 1.8, frac: "1 4/5", dec: "1.8", perc: "180%", isAdvanced: true },
+            { val: 4.4, frac: "4 2/5", dec: "4.4", perc: "440%", isAdvanced: true },
+        ];
+
+        // --- State ---
+        let currentMode = 'frac-dec';
+        let currentDifficulty = 'basic';
+        let cards = [];
+        let flippedIndices = [];
+        let matchedPairIds = [];
+        let moves = 0;
+        let isProcessing = false;
+
+        // --- DOM Elements ---
+        const gridTopEl = document.getElementById('grid-top');
+        const gridBottomEl = document.getElementById('grid-bottom');
+        const movesEl = document.getElementById('move-count');
+        const finalMovesEl = document.getElementById('final-moves');
+        const winModalEl = document.getElementById('win-modal');
+        const statusTextEl = document.getElementById('status-text');
+        const diffContainerEl = document.getElementById('difficulty-container');
+
+        // --- Logic ---
+
+        function setMode(mode) {
+            currentMode = mode;
+            if (mode.includes('perc')) {
+                currentDifficulty = 'basic';
+            }
+            updateControlsUI();
+            initGame();
+        }
+
+        function setDifficulty(diff) {
+            currentDifficulty = diff;
+            updateControlsUI();
+            initGame();
+        }
+
+        function updateControlsUI() {
+            // Update Mode Buttons
+            ['frac-dec', 'frac-perc', 'dec-perc'].forEach(m => {
+                const btn = document.getElementById(`btn-${m}`);
+                if (m === currentMode) {
+                    btn.className = "flex-1 md:flex-none whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-all bg-white text-indigo-600 shadow-sm";
+                } else {
+                    btn.className = "flex-1 md:flex-none whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-all text-slate-500 hover:text-slate-700";
+                }
+            });
+
+            // Update Difficulty Buttons
+            const btnBasic = document.getElementById('btn-diff-basic');
+            const btnAdv = document.getElementById('btn-diff-advanced');
+
+            if (currentDifficulty === 'basic') {
+                btnBasic.className = "px-3 py-1 rounded-md text-sm font-medium transition-colors bg-green-100 text-green-700";
+                btnAdv.className = "px-3 py-1 rounded-md text-sm font-medium transition-colors text-slate-400";
+            } else {
+                btnBasic.className = "px-3 py-1 rounded-md text-sm font-medium transition-colors text-slate-400";
+                btnAdv.className = "px-3 py-1 rounded-md text-sm font-medium transition-colors bg-red-100 text-red-700";
+            }
+
+            // Show/Hide Difficulty Controls
+            if (currentMode.includes('perc')) {
+                diffContainerEl.style.display = 'none';
+            } else {
+                diffContainerEl.style.display = 'flex';
+            }
+
+            // Update Status Text
+            let modeText = currentMode === 'frac-dec' ? '分數與小數' : currentMode === 'frac-perc' ? '分數與百分率' : '小數與百分率';
+            let diffText = currentDifficulty === 'basic' ? '基礎' : '進階';
+            statusTextEl.textContent = `模式: ${modeText} (${diffText})`;
+        }
+
+        function generateContentHTML(value) {
+            if (typeof value === 'string' && value.includes('/')) {
+                const parts = value.split(' ');
+                let integer = null;
+                let fraction = value;
+
+                if (parts.length > 1) {
+                    integer = parts[0];
+                    fraction = parts[1];
+                }
+
+                const [num, den] = fraction.split('/');
+                
+                let html = '<div class="flex items-center justify-center gap-1">';
+                if (integer) {
+                    html += `<span class="text-xl md:text-2xl font-bold font-mono mr-1">${integer}</span>`;
+                }
+                html += `
+                    <div class="flex flex-col items-center">
+                        <span class="text-lg md:text-xl font-bold leading-none border-b-2 border-current px-1 pb-0.5">${num}</span>
+                        <span class="text-lg md:text-xl font-bold leading-none pt-0.5">${den}</span>
+                    </div>
+                </div>`;
+                return html;
+            }
+            return `<span class="text-xl md:text-3xl font-bold font-mono">${value}</span>`;
+        }
+
+        function getCardBackClass(theme) {
+            if (theme === 'red') {
+                return 'bg-gradient-to-br from-rose-500 to-red-600 border-rose-200';
+            }
+            return 'bg-gradient-to-br from-indigo-500 to-purple-600 border-indigo-200';
+        }
+
+        function getCardFrontClass(theme) {
+             if (theme === 'red') {
+                return 'border-rose-300 bg-rose-50 text-rose-800';
+            }
+            return 'border-indigo-200 bg-white text-slate-700';
+        }
+
+        function getLabelClass(theme) {
+            if (theme === 'red') return 'text-rose-400';
+            return 'text-slate-400';
+        }
+
+        function initGame() {
+            // Reset State
+            moves = 0;
+            flippedIndices = [];
+            matchedPairIds = [];
+            isProcessing = false;
+            movesEl.textContent = moves;
+            winModalEl.classList.add('hidden');
+
+            // Filter Data
+            let eligibleData = mathData.filter(item => {
+                if (currentDifficulty === 'basic') return !item.isAdvanced;
+                return true;
+            });
+
+            // Randomly select 5 items
+            const shuffledData = [...eligibleData].sort(() => 0.5 - Math.random());
+            const selectedData = shuffledData.slice(0, 5);
+
+            // Generate Deck parts separated by type
+            let deckTop = [];
+            let deckBottom = [];
+
+            selectedData.forEach((item, index) => {
+                let contentA, contentB, labelA, labelB;
+
+                switch (currentMode) {
+                    case 'frac-dec':
+                        contentA = item.frac; labelA = '分數';
+                        contentB = item.dec; labelB = '小數';
+                        break;
+                    case 'frac-perc':
+                        contentA = item.frac; labelA = '分數';
+                        contentB = item.perc; labelB = '百分率';
+                        break;
+                    case 'dec-perc':
+                        contentA = item.dec; labelA = '小數';
+                        contentB = item.perc; labelB = '百分率';
+                        break;
+                    default:
+                        contentA = item.frac; contentB = item.dec;
+                }
+
+                // Top Deck (Type A - Blue)
+                deckTop.push({
+                    id: `card-${index}-a`,
+                    pairId: index,
+                    content: contentA,
+                    type: labelA,
+                    theme: 'blue'
+                });
+
+                // Bottom Deck (Type B - Red)
+                deckBottom.push({
+                    id: `card-${index}-b`,
+                    pairId: index,
+                    content: contentB,
+                    type: labelB,
+                    theme: 'red'
+                });
+            });
+
+            // Shuffle each part independently
+            deckTop.sort(() => 0.5 - Math.random());
+            deckBottom.sort(() => 0.5 - Math.random());
+
+            // Combine for state management, but render separately
+            // Indices 0-4 will be Top, 5-9 will be Bottom
+            cards = [...deckTop, ...deckBottom];
+
+            renderGrid();
+        }
+
+        function renderGrid() {
+            gridTopEl.innerHTML = '';
+            gridBottomEl.innerHTML = '';
+
+            cards.forEach((card, index) => {
+                const cardEl = document.createElement('div');
+                // Use w-28 h-36 for consistent sizing, allowing flex wrap to center them nicely
+                cardEl.className = `card-container relative w-24 h-32 md:w-32 md:h-40 cursor-pointer transition-transform-1000 transform preserve-3d group hover:-translate-y-1`;
+                cardEl.dataset.index = index;
+                cardEl.onclick = () => handleCardClick(index);
+
+                const backClass = getCardBackClass(card.theme);
+                const frontClass = getCardFrontClass(card.theme);
+                const labelClass = getLabelClass(card.theme);
+                const contentHTML = generateContentHTML(card.content);
+
+                cardEl.innerHTML = `
+                    <div class="card-inner absolute inset-0 w-full h-full transition-transform-1000 preserve-3d shadow-md rounded-xl">
+                        <!-- Back -->
+                        <div class="absolute inset-0 w-full h-full backface-hidden rounded-xl flex items-center justify-center border-2 ${backClass}">
+                            <span class="text-white opacity-20 text-4xl font-bold">?</span>
+                        </div>
+                        <!-- Front -->
+                        <div class="card-front absolute inset-0 w-full h-full backface-hidden rotate-y-180 rounded-xl border-2 flex flex-col items-center justify-center p-2 ${frontClass}">
+                            <span class="text-xs uppercase tracking-tighter mb-2 ${labelClass}">${card.type}</span>
+                            ${contentHTML}
+                        </div>
+                    </div>
+                `;
+
+                // Append to correct container based on index
+                // Since we built cards as [...Top(5), ...Bottom(5)]
+                if (index < 5) {
+                    gridTopEl.appendChild(cardEl);
+                } else {
+                    gridBottomEl.appendChild(cardEl);
+                }
+            });
+        }
+
+        function handleCardClick(index) {
+            // Checks
+            if (isProcessing) return;
+            if (flippedIndices.includes(index)) return;
+            if (matchedPairIds.includes(cards[index].pairId)) return;
+
+            // Flip Logic
+            flippedIndices.push(index);
+            
+            // Find element (could be in top or bottom)
+            const cardEl = document.querySelector(`.card-container[data-index='${index}']`);
+            const innerEl = cardEl.querySelector('.card-inner');
+            innerEl.classList.add('rotate-y-180');
+
+            if (flippedIndices.length === 2) {
+                moves++;
+                movesEl.textContent = moves;
+                checkForMatch();
+            }
+        }
+
+        function checkForMatch() {
+            isProcessing = true;
+            const [idx1, idx2] = flippedIndices;
+            const card1 = cards[idx1];
+            const card2 = cards[idx2];
+
+            if (card1.pairId === card2.pairId) {
+                // Match!
+                matchedPairIds.push(card1.pairId);
+                
+                // Change style to Green
+                setTimeout(() => {
+                    [idx1, idx2].forEach(idx => {
+                        const cardEl = document.querySelector(`.card-container[data-index='${idx}']`);
+                        const el = cardEl.querySelector('.card-front');
+                        el.className = `card-front absolute inset-0 w-full h-full backface-hidden rotate-y-180 rounded-xl border-2 flex flex-col items-center justify-center p-2 border-green-400 bg-green-50 text-slate-700`;
+                    });
+                }, 200);
+
+                // Fade out
+                setTimeout(() => {
+                    [idx1, idx2].forEach(idx => {
+                        const cardEl = document.querySelector(`.card-container[data-index='${idx}']`);
+                        cardEl.classList.add('matched');
+                    });
+                    flippedIndices = [];
+                    isProcessing = false;
+                    checkWin();
+                }, 1000);
+
+            } else {
+                // No Match
+                setTimeout(() => {
+                    [idx1, idx2].forEach(idx => {
+                        const cardEl = document.querySelector(`.card-container[data-index='${idx}']`);
+                        const el = cardEl.querySelector('.card-inner');
+                        el.classList.remove('rotate-y-180');
+                    });
+                    flippedIndices = [];
+                    isProcessing = false;
+                }, 1200);
+            }
+        }
+
+        function checkWin() {
+            if (matchedPairIds.length === 5) {
+                finalMovesEl.textContent = moves;
+                setTimeout(() => {
+                    winModalEl.classList.remove('hidden');
+                }, 500);
+            }
+        }
+
+        // --- Initialization ---
+        lucide.createIcons();
+        updateControlsUI();
+        initGame();
+
+    </script>
+</body>
+</html>

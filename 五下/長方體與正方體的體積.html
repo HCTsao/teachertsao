@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>國小五年級數學 - 體積推導實驗室</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #f8fafc; }
+        #canvas-container { width: 100%; height: 65vh; cursor: move; }
+        .step-card { transition: all 0.5s ease; }
+        .step-hidden { opacity: 0; transform: translateY(20px); pointer-events: none; }
+        .step-visible { opacity: 1; transform: translateY(0); }
+        .highlight { font-weight: bold; padding: 2px 4px; border-radius: 4px; }
+        
+        /* 底部問答視窗樣式 */
+        #quiz-modal {
+            display: none;
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            width: 95%;
+            max-width: 600px;
+        }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .quiz-input-field {
+            width: 4rem;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.25rem;
+            border-bottom: 2px solid #6366f1;
+            padding: 0.25rem;
+            background: transparent;
+        }
+        .quiz-input-field:focus {
+            outline: none;
+            border-bottom-color: #4338ca;
+        }
+        .btn-disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+
+    <!-- 上方標題與操作區 -->
+    <div class="bg-white shadow-md p-4 z-10">
+        <div class="max-w-6xl mx-auto flex flex-col md:flex-row gap-6 items-center">
+            <div class="flex-1 text-center md:text-left">
+                <h1 id="main-title" class="text-2xl font-bold text-indigo-600">長方體體積推導</h1>
+            </div>
+            
+            <!-- 參數調整 -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                <div class="flex flex-col">
+                    <span id="text-l" class="text-xs font-bold text-indigo-700"><span id="title-l">長</span>: <span>5</span> cm</span>
+                    <input type="range" id="input-l" min="1" max="10" value="5" class="accent-indigo-600">
+                </div>
+                <div class="flex flex-col">
+                    <span id="text-w" class="text-xs font-bold text-pink-700"><span id="title-w">寬</span>: <span>4</span> cm</span>
+                    <input type="range" id="input-w" min="1" max="10" value="4" class="accent-pink-600">
+                </div>
+                <div class="flex flex-col">
+                    <span id="text-h" class="text-xs font-bold text-green-700"><span id="title-h">高</span>: <span>3</span> cm</span>
+                    <input type="range" id="input-h" min="1" max="10" value="3" class="accent-green-600">
+                </div>
+            </div>
+
+            <!-- 控制按鈕 -->
+            <div class="flex gap-4 justify-center">
+                <button id="btn-start" class="bg-indigo-500 text-white px-8 py-2 rounded-lg shadow hover:bg-indigo-600 transition font-bold text-lg">開始教學</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 中間 3D 顯示區 -->
+    <div id="canvas-container" class="relative flex-1">
+        
+        <!-- 右側紀錄面板與回到原位按鈕 -->
+        <div class="absolute right-4 top-4 flex flex-col gap-3 w-64 md:w-80 pointer-events-none">
+            <!-- 紀錄面板 -->
+            <div id="formula-panel" class="bg-white/90 backdrop-blur p-4 rounded-xl shadow-lg border border-indigo-100">
+                <h3 class="font-bold text-gray-800 mb-3 text-center border-b pb-2">公式推導紀錄</h3>
+                <div id="step-1-ui" class="step-card p-2 rounded-lg mb-1 step-hidden">
+                    <p class="text-xs text-gray-500">第一步：一排積木</p>
+                    <p class="text-md"><span id="ui-label-l">長</span> = <span id="calc-l" class="highlight text-indigo-600">5</span> 個</p>
+                </div>
+                <div id="step-2-ui" class="step-card p-2 rounded-lg mb-1 step-hidden">
+                    <p class="text-xs text-gray-500">第二步：一層積木</p>
+                    <p class="text-md"><span id="calc-l2">5</span> × <span id="calc-w" class="highlight text-pink-600">4</span> = <span id="calc-base" class="font-bold text-gray-800">20</span></p>
+                    <p id="formula-text-2" class="text-sm text-gray-600 font-bold mt-1">➔ 一層的數量 = 長 × 寬</p>
+                </div>
+                <div id="step-3-ui" class="step-card p-2 rounded-lg step-hidden">
+                    <p class="text-xs text-gray-500">第三步：整體積木</p>
+                    <p class="text-md"><span id="calc-l3" class="text-indigo-600">5</span> × <span id="calc-w3" class="text-pink-600">4</span> × <span id="calc-h" class="highlight text-green-600">3</span> = <span id="calc-total" class="font-bold text-indigo-700 text-xl">60</span></p>
+                    <p id="formula-text-3" class="text-sm font-bold text-indigo-600 mt-1">➔ 體積 = 長 × 寬 × 高</p>
+                </div>
+            </div>
+            
+            <!-- 回到原位按鈕 (橫向) -->
+            <button id="btn-reset-view" class="pointer-events-auto w-full bg-blue-600 text-white font-bold py-3 rounded-lg shadow-lg hover:bg-blue-700 transition stop-3d-prop">
+                回到原位
+            </button>
+        </div>
+
+        <!-- 底部問答區 -->
+        <div id="quiz-modal" class="bg-white p-6 rounded-2xl shadow-2xl border-t-4 border-indigo-500">
+            <div class="flex flex-col md:flex-row items-center gap-4">
+                <div class="flex-1 text-left">
+                    <h2 id="quiz-title" class="text-sm font-bold text-indigo-400 uppercase tracking-wider">思考題</h2>
+                    <p id="quiz-question" class="text-gray-800 font-medium text-lg mb-2">問題內容</p>
+                    
+                    <!-- 1. 單一填空區 -->
+                    <div id="quiz-single-container" class="flex gap-2 items-center">
+                        <input type="number" id="quiz-input-single" class="quiz-input-field stop-3d-prop" placeholder="數字">
+                        <button id="btn-check-single" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition ml-2 stop-3d-prop">確定</button>
+                    </div>
+
+                    <!-- 2. 二連算式區 ( ) X ( ) -->
+                    <div id="quiz-double-container" class="hidden flex gap-2 items-center text-xl font-bold">
+                        <span>(</span>
+                        <input type="number" id="quiz-double-a" class="quiz-input-field stop-3d-prop" placeholder="?">
+                        <span>)</span>
+                        <span class="mx-1 text-indigo-600">×</span>
+                        <span>(</span>
+                        <input type="number" id="quiz-double-b" class="quiz-input-field stop-3d-prop" placeholder="?">
+                        <span>)</span>
+                        <button id="btn-check-double" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition ml-4 stop-3d-prop">確定</button>
+                    </div>
+
+                    <!-- 3. 三連算式區 ( ) X ( ) X ( ) -->
+                    <div id="quiz-triple-container" class="hidden flex gap-2 items-center text-xl font-bold">
+                        <span>(</span>
+                        <input type="number" id="quiz-triple-a" class="quiz-input-field stop-3d-prop" placeholder="?">
+                        <span>)</span>
+                        <span class="mx-1 text-indigo-600">×</span>
+                        <span>(</span>
+                        <input type="number" id="quiz-triple-b" class="quiz-input-field stop-3d-prop" placeholder="?">
+                        <span>)</span>
+                        <span class="mx-1 text-indigo-600">×</span>
+                        <span>(</span>
+                        <input type="number" id="quiz-triple-c" class="quiz-input-field stop-3d-prop" placeholder="?">
+                        <span>)</span>
+                        <button id="btn-check-triple" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition ml-4 stop-3d-prop">確定</button>
+                    </div>
+                </div>
+            </div>
+            <p id="quiz-error" class="text-red-500 text-xs mt-2 hidden text-center md:text-left">答案不對喔，再觀察一下圖示！</p>
+        </div>
+    </div>
+
+    <script>
+        let scene, camera, renderer, cubesGroup, wireframeBox;
+        const container = document.getElementById('canvas-container');
+        let cubes = []; 
+        let isAnimating = false;
+        let currentStep = 0; 
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf1f5f9);
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(12, 10, 15);
+            camera.lookAt(0, 0, 0);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+            
+            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            directionalLight.position.set(10, 20, 10);
+            scene.add(directionalLight);
+            
+            const grid = new THREE.GridHelper(20, 20, 0xcbd5e1, 0xe2e8f0);
+            grid.position.y = -0.5;
+            scene.add(grid);
+            
+            cubesGroup = new THREE.Group();
+            scene.add(cubesGroup);
+            
+            updateModel();
+            animate();
+            
+            bindStopPropagation();
+
+            container.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const zoomFactor = 1 + e.deltaY * 0.001;
+                camera.position.multiplyScalar(zoomFactor);
+                const dist = camera.position.length();
+                if (dist < 5) camera.position.setLength(5);
+                if (dist > 40) camera.position.setLength(40);
+            }, { passive: false });
+        }
+
+        function bindStopPropagation() {
+            const elements = document.querySelectorAll('.stop-3d-prop');
+            elements.forEach(el => {
+                el.addEventListener('mousedown', (e) => e.stopPropagation());
+                el.addEventListener('touchstart', (e) => e.stopPropagation());
+            });
+        }
+
+        function createCube(x, y, z, color) {
+            const geometry = new THREE.BoxGeometry(0.95, 0.95, 0.95);
+            const material = new THREE.MeshPhongMaterial({ color, transparent: true, opacity: 0.9 });
+            const cube = new THREE.Mesh(geometry, material);
+            cube.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry), new THREE.LineBasicMaterial({ color: 0x4338ca })));
+            cube.position.set(x, y, z);
+            return cube;
+        }
+
+        function updateModel() {
+            if (isAnimating) return;
+            currentStep = 0;
+            resetUI();
+            updateStartButtonState();
+            
+            const l = parseInt(document.getElementById('input-l').value);
+            const w = parseInt(document.getElementById('input-w').value);
+            const h = parseInt(document.getElementById('input-h').value);
+            const isCube = (l === w && w === h);
+
+            document.getElementById('title-l').innerText = isCube ? "邊長" : "長";
+            document.getElementById('title-w').innerText = isCube ? "邊長" : "寬";
+            document.getElementById('title-h').innerText = isCube ? "邊長" : "高";
+
+            document.getElementById('main-title').innerText = isCube ? "正方體體積推導" : "長方體體積推導";
+            document.getElementById('text-l').querySelector('span:last-child').innerText = l;
+            document.getElementById('text-w').querySelector('span:last-child').innerText = w;
+            document.getElementById('text-h').querySelector('span:last-child').innerText = h;
+            
+            document.getElementById('ui-label-l').innerText = isCube ? "邊長" : "長";
+            document.getElementById('formula-text-2').innerText = isCube ? "➔ 一層的數量 = 邊長 × 邊長" : "➔ 一層的數量 = 長 × 寬";
+            document.getElementById('formula-text-3').innerText = isCube ? "➔ 體積 = 邊長 × 邊長 × 邊長" : "➔ 體積 = 長 × 寬 × 高";
+            
+            document.getElementById('calc-l').innerText = l; document.getElementById('calc-l2').innerText = l; document.getElementById('calc-l3').innerText = l;
+            document.getElementById('calc-w').innerText = w; document.getElementById('calc-w3').innerText = w;
+            document.getElementById('calc-h').innerText = h; document.getElementById('calc-base').innerText = l * w;
+            document.getElementById('calc-total').innerText = l * w * h;
+
+            while(cubesGroup.children.length > 0) cubesGroup.remove(cubesGroup.children[0]);
+            if (wireframeBox) scene.remove(wireframeBox);
+            
+            const wireGeo = new THREE.BoxGeometry(l, h, w);
+            wireframeBox = new THREE.LineSegments(new THREE.EdgesGeometry(wireGeo), new THREE.LineBasicMaterial({ color: 0x94a3b8 }));
+            wireframeBox.position.set((l-1)/2, (h-1)/2, (w-1)/2);
+            scene.add(wireframeBox);
+
+            cubes = [];
+            for (let y = 0; y < h; y++) {
+                cubes[y] = [];
+                for (let z = 0; z < w; z++) {
+                    cubes[y][z] = [];
+                    for (let x = 0; x < l; x++) {
+                        let color = (y === 0 && z === 0) ? 0x6366f1 : (y === 0 ? 0xf472b6 : 0x4ade80);
+                        const cube = createCube(x, y, z, color);
+                        cube.visible = false;
+                        cubesGroup.add(cube);
+                        cubes[y][z][x] = cube;
+                    }
+                }
+            }
+        }
+
+        function resetUI() {
+            document.querySelectorAll('.step-card').forEach(el => {
+                el.classList.add('step-hidden');
+                el.classList.remove('step-visible', 'bg-white/80', 'border-l-4', 'border-indigo-500', 'border-pink-500', 'border-green-500');
+            });
+            document.getElementById('quiz-modal').style.display = 'none';
+        }
+
+        function updateStartButtonState() {
+            const btn = document.getElementById('btn-start');
+            if (isAnimating) {
+                btn.classList.add('btn-disabled');
+                btn.disabled = true;
+            } else {
+                btn.classList.remove('btn-disabled');
+                btn.disabled = false;
+            }
+        }
+
+        function showQuiz(step, subStep = 1) {
+            const l = parseInt(document.getElementById('input-l').value);
+            const w = parseInt(document.getElementById('input-w').value);
+            const h = parseInt(document.getElementById('input-h').value);
+            
+            ['quiz-single-container', 'quiz-double-container', 'quiz-triple-container'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById('quiz-error').classList.add('hidden');
+            document.getElementById('quiz-modal').style.display = 'block';
+
+            if (step === 1) {
+                document.getElementById('quiz-question').innerText = "觀察剛才堆疊的一排，總共有幾個積木？";
+                document.getElementById('quiz-single-container').classList.remove('hidden');
+                document.getElementById('quiz-input-single').value = "";
+                setupButton('btn-check-single', () => {
+                    if (parseInt(document.getElementById('quiz-input-single').value) === l) handleSuccess(1);
+                    else showError();
+                });
+            } else if (step === 2) {
+                if (subStep === 1) {
+                    document.getElementById('quiz-question').innerText = `這一層總共排了幾排？`;
+                    document.getElementById('quiz-single-container').classList.remove('hidden');
+                    document.getElementById('quiz-input-single').value = "";
+                    setupButton('btn-check-single', () => {
+                        if (parseInt(document.getElementById('quiz-input-single').value) === w) showQuiz(2, 2);
+                        else showError();
+                    });
+                } else {
+                    document.getElementById('quiz-question').innerText = "寫出算式，求出一層總共有幾個積木？";
+                    document.getElementById('quiz-double-container').classList.remove('hidden');
+                    document.getElementById('quiz-double-a').value = ""; document.getElementById('quiz-double-b').value = "";
+                    setupButton('btn-check-double', () => {
+                        const a = parseInt(document.getElementById('quiz-double-a').value);
+                        const b = parseInt(document.getElementById('quiz-double-b').value);
+                        if ((a === l && b === w) || (a === w && b === l)) handleSuccess(2);
+                        else showError();
+                    });
+                }
+            } else if (step === 3) {
+                if (subStep === 1) {
+                    document.getElementById('quiz-question').innerText = `剛才的一層有 ${l * w} 個，現在總共疊了幾層？`;
+                    document.getElementById('quiz-single-container').classList.remove('hidden');
+                    document.getElementById('quiz-input-single').value = "";
+                    setupButton('btn-check-single', () => {
+                        if (parseInt(document.getElementById('quiz-input-single').value) === h) showQuiz(3, 2);
+                        else showError();
+                    });
+                } else {
+                    document.getElementById('quiz-question').innerText = "寫出算式，求出這個立體形體總共有幾個積木？";
+                    document.getElementById('quiz-triple-container').classList.remove('hidden');
+                    document.getElementById('quiz-triple-a').value = ""; document.getElementById('quiz-triple-b').value = ""; document.getElementById('quiz-triple-c').value = "";
+                    setupButton('btn-check-triple', () => {
+                        const a = parseInt(document.getElementById('quiz-triple-a').value);
+                        const b = parseInt(document.getElementById('quiz-triple-b').value);
+                        const c = parseInt(document.getElementById('quiz-triple-c').value);
+                        const inputs = [a, b, c].sort();
+                        const expected = [l, w, h].sort();
+                        if (inputs.every((v, i) => v === expected[i])) handleSuccess(3);
+                        else showError();
+                    });
+                }
+            }
+        }
+
+        function setupButton(btnId, callback) {
+            const btn = document.getElementById(btnId);
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            newBtn.addEventListener('click', callback);
+            newBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+            newBtn.addEventListener('touchstart', (e) => e.stopPropagation());
+        }
+
+        function showError() { document.getElementById('quiz-error').classList.remove('hidden'); }
+
+        async function handleSuccess(step) {
+            document.getElementById('quiz-modal').style.display = 'none';
+            const el = document.getElementById(`step-${step}-ui`);
+            el.classList.remove('step-hidden');
+            el.classList.add('step-visible', 'bg-white/80', 'border-l-4', step === 1 ? 'border-indigo-500' : (step === 2 ? 'border-pink-500' : 'border-green-500'));
+            currentStep = step;
+            updateStartButtonState(); 
+            
+            await sleep(800);
+            if (step === 1) playAnimation2();
+            else if (step === 2) playAnimation3();
+            else {
+                updateStartButtonState();
+            }
+        }
+
+        const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+        async function playAnimation1() {
+            if (isAnimating) return;
+            
+            // 重啟前清空狀態
+            currentStep = 0; 
+            resetUI();
+            
+            // 修正：必須在 isAnimating 設為 true 之前重設積木顯示，否則 updateModel 會被跳過
+            updateModel(); 
+            
+            isAnimating = true; 
+            updateStartButtonState();
+
+            const l = parseInt(document.getElementById('input-l').value);
+            for (let x = 0; x < l; x++) { 
+                if (cubes[0] && cubes[0][0] && cubes[0][0][x]) {
+                    cubes[0][0][x].visible = true; 
+                }
+                await sleep(350); 
+            }
+            isAnimating = false; 
+            updateStartButtonState();
+            showQuiz(1);
+        }
+
+        async function playAnimation2() {
+            isAnimating = true;
+            updateStartButtonState();
+            const l = parseInt(document.getElementById('input-l').value);
+            const w = parseInt(document.getElementById('input-w').value);
+            for (let z = 1; z < w; z++) {
+                for (let x = 0; x < l; x++) {
+                    if (cubes[0] && cubes[0][z] && cubes[0][z][x]) {
+                        cubes[0][z][x].visible = true;
+                    }
+                }
+                await sleep(500);
+            }
+            isAnimating = false; 
+            updateStartButtonState();
+            showQuiz(2, 1);
+        }
+
+        async function playAnimation3() {
+            isAnimating = true;
+            updateStartButtonState();
+            const l = parseInt(document.getElementById('input-l').value);
+            const w = parseInt(document.getElementById('input-w').value);
+            const h = parseInt(document.getElementById('input-h').value);
+            for (let y = 1; y < h; y++) {
+                for (let z = 0; z < w; z++) {
+                    for (let x = 0; x < l; x++) {
+                        if (cubes[y] && cubes[y][z] && cubes[y][z][x]) {
+                            cubes[y][z][x].visible = true;
+                        }
+                    }
+                }
+                await sleep(700);
+            }
+            isAnimating = false; 
+            updateStartButtonState();
+            showQuiz(3, 1);
+        }
+
+        function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
+
+        let isMouseDown = false, mouseX = 0, mouseY = 0;
+        container.addEventListener('mousedown', () => isMouseDown = true);
+        window.addEventListener('mouseup', () => isMouseDown = false);
+        window.addEventListener('mousemove', (e) => {
+            if (!isMouseDown) return;
+            scene.rotation.y += (e.clientX - mouseX) * 0.01;
+            scene.rotation.x += (e.clientY - mouseY) * 0.01;
+            mouseX = e.clientX; mouseY = e.clientY;
+        });
+
+        document.getElementById('input-l').addEventListener('input', updateModel);
+        document.getElementById('input-w').addEventListener('input', updateModel);
+        document.getElementById('input-h').addEventListener('input', updateModel);
+        document.getElementById('btn-start').addEventListener('click', playAnimation1);
+        
+        document.getElementById('btn-reset-view').addEventListener('click', () => {
+            scene.rotation.x = 0;
+            scene.rotation.y = 0;
+            camera.position.set(12, 10, 15);
+            camera.lookAt(0, 0, 0);
+        });
+
+        window.onload = init;
+        window.onresize = () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        };
+    </script>
+</body>
+</html>

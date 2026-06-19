@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分數乘法約分大冒險</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
+
+        body {
+            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            color: white;
+            overflow: hidden;
+        }
+
+        .game-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .fraction-line {
+            height: 4px;
+            background: white;
+            width: 100%;
+            border-radius: 2px;
+            margin: 8px 0;
+        }
+
+        .number-box {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            min-width: 130px;
+            min-height: 130px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid transparent;
+            font-size: 2.2rem;
+            position: relative;
+            padding: 10px;
+        }
+
+        .number-box:hover:not(.locked) {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        .selected {
+            background: #facc15 !important;
+            border-color: #fef08a !important;
+            color: #1e293b !important;
+            box-shadow: 0 0 25px #facc15;
+        }
+
+        /* 歷史約分紀錄樣式 */
+        .history-item {
+            position: relative;
+            display: inline-block;
+            margin-right: 10px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            line-height: 1;
+        }
+
+        .slash-line {
+            position: absolute;
+            top: 50%;
+            left: -15%;
+            width: 130%;
+            height: 3px;
+            transform: translateY(-50%) rotate(-25deg);
+            pointer-events: none;
+            border-radius: 2px;
+        }
+
+        .current-num {
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .warning-shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        .celebration {
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .input-glow:focus {
+            box-shadow: 0 0 15px #3b82f6;
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        .timer-low {
+            color: #ef4444 !important;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- 啟動畫面 -->
+    <div id="startOverlay" class="fixed inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center p-6 text-center">
+        <div class="max-w-md w-full space-y-8">
+            <h1 class="text-6xl font-black text-yellow-400 mb-4" style="font-family: 'ZCOOL KuaiLe', sans-serif;">分數乘法<br>約分大冒險</h1>
+            <div class="bg-white/10 p-6 rounded-2xl border border-white/20 text-left space-y-4">
+                <p class="text-blue-300 font-bold">挑戰指令：</p>
+                <ul class="list-disc list-inside text-gray-200 space-y-2 text-lg">
+                    <li>挑戰 3 道題目，每關時間遞減！</li>
+                    <li>點選一組分子分母，輸入公因數。</li>
+                    <li>找出「最大公因數」可獲得高手獎勵！</li>
+                </ul>
+            </div>
+            <button onclick="startGame()" class="w-full bg-yellow-500 hover:bg-yellow-400 text-slate-900 py-6 rounded-2xl text-3xl font-black transition-all transform hover:scale-105 shadow-2xl">
+                開始冒險
+            </button>
+        </div>
+    </div>
+
+    <!-- 頂部資訊欄 -->
+    <div class="max-w-4xl w-full flex justify-between items-end mb-4 px-4">
+        <div>
+            <h1 class="text-3xl font-black text-yellow-400 tracking-wider mb-1" style="font-family: 'ZCOOL KuaiLe', sans-serif;">分數乘法：約分大冒險</h1>
+            <div class="flex gap-4 items-center">
+                <p class="text-blue-300">第 <span id="roundDisplay" class="text-white font-bold">1</span> / 3 題</p>
+                <p class="text-blue-300">剩餘：<span id="timer" class="text-2xl font-mono text-white">60</span> 秒</p>
+            </div>
+        </div>
+        <div class="text-right">
+            <p class="text-gray-400 uppercase text-xs tracking-widest">Total Score</p>
+            <p id="score" class="text-5xl font-black text-green-400">0</p>
+        </div>
+    </div>
+
+    <!-- 遊戲主卡片 -->
+    <div class="max-w-5xl w-full game-card rounded-3xl p-10 relative overflow-hidden shadow-2xl">
+        
+        <!-- 答對動畫層 -->
+        <div id="successOverlay" class="absolute inset-0 bg-green-500/90 z-20 hidden flex flex-col items-center justify-center celebration p-6 text-center">
+            <span class="text-9xl mb-4">🎉</span>
+            <h2 class="text-6xl font-black text-white mb-4">答對了！</h2>
+            <div id="addedScoreDisplay" class="space-y-2 mb-8"></div>
+            <button onclick="nextRound()" class="bg-white text-green-600 px-16 py-4 rounded-full text-3xl font-black hover:bg-green-50 transition shadow-2xl">
+                下一題
+            </button>
+        </div>
+
+        <div class="flex flex-col items-center gap-12">
+            <div class="flex items-center gap-10">
+                <!-- 分數 1 -->
+                <div class="flex flex-col items-center">
+                    <div id="num1" class="number-box" onclick="handleSelect('num1')"></div>
+                    <div class="fraction-line"></div>
+                    <div id="den1" class="number-box" onclick="handleSelect('den1')"></div>
+                </div>
+                <div class="text-6xl font-black text-gray-500">×</div>
+                <!-- 分數 2 -->
+                <div class="flex flex-col items-center">
+                    <div id="num2" class="number-box" onclick="handleSelect('num2')"></div>
+                    <div class="fraction-line"></div>
+                    <div id="den2" class="number-box" onclick="handleSelect('den2')"></div>
+                </div>
+                <div class="text-6xl font-black text-gray-500">=</div>
+                <!-- 答案輸入 -->
+                <div class="flex flex-col items-center gap-2">
+                    <input type="number" id="ansNum" class="w-28 h-28 bg-gray-800 border-4 border-gray-600 rounded-2xl text-center text-5xl font-black input-glow" placeholder="">
+                    <div class="fraction-line"></div>
+                    <input type="number" id="ansDen" class="w-28 h-28 bg-gray-800 border-4 border-gray-600 rounded-2xl text-center text-5xl font-black input-glow" placeholder="">
+                </div>
+            </div>
+
+            <!-- 控制區 -->
+            <div class="w-full flex flex-col items-center gap-6">
+                <div id="message" class="text-2xl text-blue-300 font-bold h-10 text-center">挑戰開始！點擊分子與分母吧</div>
+                <button onclick="checkFinalAnswer()" class="bg-blue-600 hover:bg-blue-500 text-white px-20 py-5 rounded-3xl text-2xl font-black transition-all transform hover:scale-105 shadow-xl">
+                    檢查最後答案
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 結算排行榜 -->
+    <div id="gameOverModal" class="fixed inset-0 bg-black/95 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-gray-800 p-8 rounded-3xl max-w-md w-full text-center border border-gray-600">
+            <h2 class="text-4xl font-black text-yellow-400 mb-2">冒險結束！</h2>
+            <p class="text-gray-400 mb-2">總得分</p>
+            <div id="finalScore" class="text-7xl font-black text-white mb-8">0</div>
+            
+            <div id="nameInputArea" class="mb-8 space-y-4">
+                <input type="text" id="playerName" maxlength="8" class="w-full bg-gray-700 border-2 border-gray-500 rounded-2xl p-4 text-white text-center text-2xl outline-none focus:border-yellow-500" placeholder="你的名字">
+                <button onclick="submitScore()" class="w-full bg-yellow-500 hover:bg-yellow-400 text-black py-4 rounded-2xl font-black text-xl transition">記錄排行榜</button>
+            </div>
+            
+            <div class="bg-black/30 rounded-2xl p-6 mb-8 text-left">
+                <h3 class="text-blue-400 font-bold mb-4">🏆 TOP 5 排行榜</h3>
+                <ul id="leaderboard" class="space-y-2"></ul>
+            </div>
+            
+            <button onclick="resetWholeGame()" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-2xl font-black text-xl transition">重新挑戰</button>
+        </div>
+    </div>
+
+    <!-- 約分彈窗 -->
+    <div id="simplifyModal" class="fixed inset-0 bg-black/80 z-40 hidden flex items-center justify-center">
+        <div class="bg-white p-8 rounded-3xl max-w-xs w-full text-center shadow-2xl">
+            <h3 class="text-2xl font-black text-gray-800 mb-2">進行約分</h3>
+            <p id="simplifyText" class="text-gray-600 mb-6 font-bold"></p>
+            <input type="number" id="divisorInput" class="w-full border-4 border-blue-100 rounded-2xl p-4 text-center text-4xl font-black text-blue-600 mb-6 outline-none focus:border-blue-500">
+            <div class="flex gap-3">
+                <button onclick="applySimplification()" class="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-black">確認</button>
+                <button onclick="closeModal()" class="flex-1 bg-gray-200 text-gray-600 py-4 rounded-2xl font-black">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const pairColors = ['#ff5c5c', '#5ce1ff', '#ffb35c', '#da5cff', '#5cff9d'];
+
+        let gameState = {
+            data: {},
+            selected: null,
+            score: 0,
+            round: 1,
+            maxRounds: 3,
+            timeLeft: 60,
+            timerId: null,
+            simStepCount: 0
+        };
+
+        function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+        function isComposite(n) {
+            if (n <= 3) return false;
+            for (let i = 2; i <= Math.sqrt(n); i++) if (n % i === 0) return true;
+            return false;
+        }
+
+        function startGame() {
+            document.getElementById('startOverlay').classList.add('hidden');
+            resetWholeGame();
+        }
+
+        function startTimer() {
+            clearInterval(gameState.timerId);
+            gameState.timerId = setInterval(() => {
+                gameState.timeLeft--;
+                const timerEl = document.getElementById('timer');
+                timerEl.innerText = gameState.timeLeft;
+                if (gameState.timeLeft <= 10) timerEl.classList.add('timer-low');
+                else timerEl.classList.remove('timer-low');
+                if (gameState.timeLeft <= 0) {
+                    clearInterval(gameState.timerId);
+                    showWarning("時間到！請填寫最終答案");
+                    checkFinalAnswer(true);
+                }
+            }, 1000);
+        }
+
+        function initLevel() {
+            document.getElementById('successOverlay').classList.add('hidden');
+            document.getElementById('roundDisplay').innerText = gameState.round;
+            gameState.timeLeft = 60 - (gameState.round - 1) * 10;
+            document.getElementById('timer').innerText = gameState.timeLeft;
+            document.getElementById('timer').classList.remove('timer-low');
+
+            const factors = [2, 3, 4, 5, 6, 7];
+            const getRnd = () => factors[Math.floor(Math.random() * factors.length)] * (Math.floor(Math.random() * 3) + 2);
+            
+            gameState.data = {
+                num1: { current: getRnd(), color: 'white', history: [] },
+                den1: { current: getRnd(), color: 'white', history: [] },
+                num2: { current: getRnd(), color: 'white', history: [] },
+                den2: { current: getRnd(), color: 'white', history: [] }
+            };
+
+            if(gcd(gameState.data.num1.current, gameState.data.den2.current) === 1 && 
+               gcd(gameState.data.num2.current, gameState.data.den1.current) === 1) {
+                gameState.data.num1.current *= 2;
+                gameState.data.den2.current *= 2;
+            }
+
+            gameState.simStepCount = 0;
+            document.getElementById('ansNum').value = '';
+            document.getElementById('ansDen').value = '';
+            document.getElementById('message').innerText = "點擊分子和分母開始約分！";
+            document.getElementById('message').className = "text-2xl text-blue-300 font-bold h-10 text-center";
+            
+            renderNumbers();
+            startTimer();
+        }
+
+        function renderNumbers() {
+            ['num1', 'den1', 'num2', 'den2'].forEach(id => {
+                const el = document.getElementById(id);
+                const info = gameState.data[id];
+                el.innerHTML = '';
+                
+                info.history.forEach(h => {
+                    const span = document.createElement('span');
+                    span.className = 'history-item';
+                    span.innerText = h.val;
+                    span.style.color = h.color;
+                    const slash = document.createElement('div');
+                    slash.className = 'slash-line';
+                    slash.style.backgroundColor = h.color;
+                    span.appendChild(slash);
+                    el.appendChild(span);
+                });
+
+                const cur = document.createElement('span');
+                cur.className = info.color === 'white' ? 'text-white' : 'current-num';
+                cur.innerText = info.current;
+                if(info.color !== 'white') cur.style.color = info.color;
+                el.appendChild(cur);
+                el.classList.remove('selected');
+            });
+        }
+
+        function handleSelect(id) {
+            if (gameState.selected === id) {
+                document.getElementById(id).classList.remove('selected');
+                gameState.selected = null;
+                return;
+            }
+            if (!gameState.selected) {
+                gameState.selected = id;
+                document.getElementById(id).classList.add('selected');
+            } else {
+                const firstId = gameState.selected;
+                const t1 = firstId.startsWith('num');
+                const t2 = id.startsWith('num');
+                if (t1 === t2) {
+                    showWarning(t1 ? "分子和分子不能約分哦！" : "分母和分母不能約分哦！");
+                    document.getElementById(firstId).classList.remove('selected');
+                    gameState.selected = null;
+                    return;
+                }
+                const v1 = gameState.data[firstId].current;
+                const v2 = gameState.data[id].current;
+                if (gcd(v1, v2) > 1) {
+                    openModal(firstId, id);
+                } else {
+                    showWarning("這兩個數沒有公因數喔！");
+                    document.getElementById(firstId).classList.remove('selected');
+                    gameState.selected = null;
+                }
+            }
+        }
+
+        function showWarning(txt) {
+            const msg = document.getElementById('message');
+            msg.innerText = txt;
+            msg.className = "text-2xl text-red-400 font-bold h-10 text-center warning-shake";
+            setTimeout(() => msg.classList.remove('warning-shake'), 500);
+        }
+
+        function openModal(id1, id2) {
+            gameState.currentPair = [id1, id2];
+            document.getElementById('simplifyModal').classList.remove('hidden');
+            document.getElementById('simplifyText').innerText = `${gameState.data[id1].current} 和 ${gameState.data[id2].current} 的公因數是？`;
+            document.getElementById('divisorInput').value = '';
+            document.getElementById('divisorInput').focus();
+        }
+
+        function closeModal() {
+            document.getElementById('simplifyModal').classList.add('hidden');
+            if (gameState.selected) document.getElementById(gameState.selected).classList.remove('selected');
+            gameState.selected = null;
+        }
+
+        function applySimplification() {
+            const div = parseInt(document.getElementById('divisorInput').value);
+            const [i1, i2] = gameState.currentPair;
+            const v1 = gameState.data[i1].current;
+            const v2 = gameState.data[i2].current;
+            const maxD = gcd(v1, v2);
+
+            if (v1 % div === 0 && v2 % div === 0 && div > 1) {
+                const activeColor = pairColors[gameState.simStepCount % pairColors.length];
+                
+                let bonus = 10;
+                let bonusMsg = "約分成功！+10 分";
+                if (div === maxD && isComposite(maxD)) {
+                    bonus = 40;
+                    bonusMsg = "✨ 高手約分！+40 分 ✨"; // 修改：精簡文字
+                }
+
+                gameState.data[i1].history.push({ val: v1, color: activeColor });
+                gameState.data[i2].history.push({ val: v2, color: activeColor });
+                
+                gameState.data[i1].current /= div;
+                gameState.data[i2].current /= div;
+                
+                gameState.data[i1].color = activeColor;
+                gameState.data[i2].color = activeColor;
+                
+                gameState.simStepCount++;
+                gameState.score += bonus;
+                document.getElementById('score').innerText = gameState.score;
+                
+                closeModal();
+                renderNumbers();
+                document.getElementById('message').innerText = bonusMsg;
+                document.getElementById('message').className = "text-2xl text-yellow-400 font-black h-10 text-center celebration";
+            } else {
+                alert("這不是正確的公因數喔！");
+            }
+        }
+
+        function checkFinalAnswer(isTimeUp = false) {
+            const uN = parseInt(document.getElementById('ansNum').value);
+            const uD = parseInt(document.getElementById('ansDen').value);
+            const cN = gameState.data.num1.current * gameState.data.num2.current;
+            const cD = gameState.data.den1.current * gameState.data.den2.current;
+
+            if (!isTimeUp && (isNaN(uN) || isNaN(uD))) return;
+
+            if (uN === cN && uD === cD && gcd(cN, cD) === 1) {
+                clearInterval(gameState.timerId);
+                const timeBonus = Math.max(0, gameState.timeLeft * 5);
+                gameState.score += 50 + timeBonus;
+                document.getElementById('score').innerText = gameState.score;
+                document.getElementById('addedScoreDisplay').innerHTML = `
+                    <div class="text-4xl font-bold text-white">答對分數 +50 分</div>
+                    <div class="text-4xl font-black text-yellow-300">時間獎勵 +${timeBonus} 分</div>
+                `;
+                document.getElementById('successOverlay').classList.remove('hidden');
+            } else if (uN === cN && uD === cD && gcd(cN, cD) > 1) {
+                showWarning("還能再約分喔！");
+            } else if(!isTimeUp) {
+                showWarning("答案不正確，檢查看看！");
+            }
+        }
+
+        function nextRound() {
+            if (gameState.round >= gameState.maxRounds) {
+                document.getElementById('finalScore').innerText = gameState.score;
+                document.getElementById('gameOverModal').classList.remove('hidden');
+            } else {
+                gameState.round++;
+                initLevel();
+            }
+        }
+
+        function submitScore() {
+            const name = document.getElementById('playerName').value.trim() || "匿名英雄";
+            let scores = JSON.parse(localStorage.getItem('math_adventure_scores') || '[]');
+            scores.push({ name, score: gameState.score, date: Date.now() });
+            scores.sort((a, b) => b.score - a.score);
+            localStorage.setItem('math_adventure_scores', JSON.stringify(scores.slice(0, 5)));
+            document.getElementById('nameInputArea').classList.add('hidden');
+            updateLeaderboard();
+        }
+
+        function updateLeaderboard() {
+            const scores = JSON.parse(localStorage.getItem('math_adventure_scores') || '[]');
+            const list = document.getElementById('leaderboard');
+            list.innerHTML = scores.map((s, i) => `
+                <li class="flex justify-between items-center text-white p-2 border-b border-white/10">
+                    <span class="font-bold">${i+1}. ${s.name}</span>
+                    <span class="font-black text-green-400">${s.score}</span>
+                </li>`).join('') || '<li class="text-gray-500">尚無紀錄</li>';
+        }
+
+        function resetWholeGame() {
+            gameState.score = 0;
+            gameState.round = 1;
+            document.getElementById('score').innerText = '0';
+            document.getElementById('gameOverModal').classList.add('hidden');
+            document.getElementById('nameInputArea').classList.remove('hidden');
+            document.getElementById('playerName').value = '';
+            initLevel();
+        }
+    </script>
+</body>
+</html>

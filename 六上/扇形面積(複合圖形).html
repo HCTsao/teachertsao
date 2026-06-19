@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>複合圖形面積教學</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        @keyframes pulse-opacity {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        /* Digging effect: Visible -> Disappears */
+        @keyframes dig-effect {
+            0%, 20% { opacity: 0; }   /* Start invisible (Full Shape) */
+            50%, 80% { opacity: 1; }  /* Appear (The Cut) */
+            100% { opacity: 0; }      /* Fade out */
+        }
+        /* Reveal effect: Invisible -> Visible */
+        @keyframes reveal-effect {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+        /* Rotate Reveal Loop for Problem 5 */
+        @keyframes rotate-reveal-loop {
+            0% { transform: rotate(0deg); opacity: 0; }
+            20% { opacity: 1; } 
+            40%, 80% { transform: rotate(180deg); opacity: 1; } 
+            100% { transform: rotate(180deg); opacity: 0; }
+        }
+
+        /* Cycle Highlight for 2 items */
+        @keyframes cycle-highlight-2 {
+            0%, 45% { opacity: 1; } 
+            50%, 100% { opacity: 0.3; } 
+        }
+
+        /* Accumulate Highlight for 4 items (Square triangles) 
+           Total 4s cycle.
+           1: 0-90% ON
+           2: 25-90% ON
+           3: 50-90% ON
+           4: 75-90% ON
+           90-100% ALL OFF
+        */
+        @keyframes acc-4-1 {
+            0%, 90% { opacity: 1; fill: #fbbf24; } 
+            95%, 100% { opacity: 0; fill: #fbbf24; }
+        }
+        @keyframes acc-4-2 {
+            0%, 24% { opacity: 0; fill: #fbbf24; }
+            25%, 90% { opacity: 1; fill: #fbbf24; } 
+            95%, 100% { opacity: 0; fill: #fbbf24; }
+        }
+        @keyframes acc-4-3 {
+            0%, 49% { opacity: 0; fill: #fbbf24; }
+            50%, 90% { opacity: 1; fill: #fbbf24; } 
+            95%, 100% { opacity: 0; fill: #fbbf24; }
+        }
+        @keyframes acc-4-4 {
+            0%, 74% { opacity: 0; fill: #fbbf24; }
+            75%, 90% { opacity: 1; fill: #fbbf24; } 
+            95%, 100% { opacity: 0; fill: #fbbf24; }
+        }
+
+        /* Accumulate Highlight for 8 items */
+        @keyframes acc-8-1 {
+            0%, 90% { opacity: 1; fill: #ef4444; }
+            95%, 100% { opacity: 0.2; fill: #fca5a5; }
+        }
+        @keyframes acc-8-2 {
+            0%, 10% { opacity: 0.2; fill: #fca5a5; }
+            11%, 90% { opacity: 1; fill: #ef4444; }
+            95%, 100% { opacity: 0.2; fill: #fca5a5; }
+        }
+        @keyframes acc-8-3 {
+            0%, 21% { opacity: 0.2; fill: #fca5a5; }
+            22%, 90% { opacity: 1; fill: #ef4444; }
+            95%, 100% { opacity: 0.2; fill: #fca5a5; }
+        }
+        @keyframes acc-8-4 {
+            0%, 32% { opacity: 0.2; fill: #fca5a5; }
+            33%, 90% { opacity: 1; fill: #ef4444; }
+            95%, 100% { opacity: 0.2; fill: #fca5a5; }
+        }
+        @keyframes acc-8-5 {
+            0%, 43% { opacity: 0.2; fill: #fca5a5; }
+            44%, 90% { opacity: 1; fill: #ef4444; }
+            95%, 100% { opacity: 0.2; fill: #fca5a5; }
+        }
+        @keyframes acc-8-6 {
+            0%, 54% { opacity: 0.2; fill: #fca5a5; }
+            55%, 90% { opacity: 1; fill: #ef4444; }
+            95%, 100% { opacity: 0.2; fill: #fca5a5; }
+        }
+        @keyframes acc-8-7 {
+            0%, 65% { opacity: 0.2; fill: #fca5a5; }
+            66%, 90% { opacity: 1; fill: #ef4444; }
+            95%, 100% { opacity: 0.2; fill: #fca5a5; }
+        }
+        @keyframes acc-8-8 {
+            0%, 76% { opacity: 0.2; fill: #fca5a5; }
+            77%, 90% { opacity: 1; fill: #ef4444; }
+            95%, 100% { opacity: 0.2; fill: #fca5a5; }
+        }
+
+        .animate-pulse-slow { animation: pulse-opacity 2s infinite; }
+        .animate-dig { animation: dig-effect 3s infinite; }
+        .animate-reveal { animation: reveal-effect 1s forwards; }
+        .animate-rotate-loop { animation: rotate-reveal-loop 4s infinite; }
+        
+        .animate-bounce-short { animation: bounce 0.5s ease-in-out 1; }
+        .animate-shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(-5%); }
+            50% { transform: translateY(0); }
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+        /* Fraction Styles */
+        .frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; font-size: 0.8em; margin: 0 0.2em; }
+        .frac-n { border-bottom: 1px solid currentColor; padding: 0 2px; line-height: 1; }
+        .frac-d { padding: 0 2px; line-height: 1; }
+
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    </style>
+</head>
+<body class="bg-indigo-50 font-sans">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // Icons
+        const Play = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>);
+        const RotateCcw = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>);
+        const Check = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"></polyline></svg>);
+        const ArrowRight = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>);
+        const HelpCircle = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>);
+        const Calculator = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="16" y1="14" x2="16" y2="18"></line><path d="M16 10h.01"></path><path d="M12 10h.01"></path><path d="M8 10h.01"></path><path d="M12 14h.01"></path><path d="M8 14h.01"></path><path d="M12 18h.01"></path><path d="M8 18h.01"></path></svg>);
+        const Scissors = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><line x1="20" y1="4" x2="8.12" y2="15.88"></line><line x1="14.47" y1="14.48" x2="20" y2="20"></line><line x1="8.12" y1="8.12" x2="12" y2="12"></line></svg>);
+
+        // Fraction Component
+        const Frac = ({ n, d }) => (
+            <span className="frac">
+                <span className="frac-n">{n}</span>
+                <span className="frac-d">{d}</span>
+            </span>
+        );
+
+        const { useState, useEffect } = React;
+        const formatNum = (num) => parseFloat(num.toFixed(2));
+
+        const PROBLEMS = [
+            {
+                id: 0,
+                name: "課本第3題",
+                params: { SIDE: 20, PI: 3.14 },
+                getValues: (p) => ({ 
+                    squareArea: p.SIDE * p.SIDE,
+                    sectorArea: formatNum(p.SIDE * p.SIDE * p.PI / 4),
+                    finalArea: formatNum((p.SIDE * p.SIDE) - (p.SIDE * p.SIDE * p.PI / 4))
+                }),
+                steps: (vals, p) => [
+                    { 
+                        title: "觀察圖形", 
+                        instruction: "請問藍色區域的面積怎麼算？\n\n仔細觀察，它是一個正方形，被挖掉了一個白色的扇形。", 
+                        action: "next", 
+                        hint: "藍色面積 = 正方形面積 - 空白扇形面積", 
+                        mode: "intro" 
+                    },
+                    { 
+                        title: "第一步：計算正方形面積", 
+                        instruction: "我們先算出整個大正方形的面積。", 
+                        subInstruction: `邊長 ${p.SIDE}cm 的正方形面積 = ?`, 
+                        action: "input", 
+                        correctAnswer: vals.squareArea.toString(), 
+                        hint: "正方形面積 = 邊長 × 邊長", 
+                        mode: "calc_square" 
+                    },
+                    { 
+                        title: "第二步：計算空白扇形面積", 
+                        instruction: (
+                            <>接著，算出被挖掉的白色扇形面積。<br/>這是一個半徑 {p.SIDE}cm 的 <Frac n="1" d="4" /> 圓。</>
+                        ), 
+                        subInstruction: `半徑 ${p.SIDE}cm 的 <span class="frac"><span class="frac-n">1</span><span class="frac-d">4</span></span> 圓面積 = ?\n(圓周率用${p.PI}計算)`, 
+                        action: "input", 
+                        correctAnswer: vals.sectorArea.toString(), 
+                        validate: (val) => Math.abs(parseFloat(val) - vals.sectorArea) < 0.5,
+                        hint: `圓面積 = 半徑 × 半徑 × ${p.PI}\n扇形是圓的 1/4`, 
+                        mode: "calc_sector" 
+                    },
+                    { 
+                        title: "第三步：計算藍色區域面積", 
+                        instruction: "最後，用正方形面積減去空白扇形面積，就是答案囉！", 
+                        subInstruction: `正方形(${vals.squareArea}) - 扇形(${vals.sectorArea}) = ?`, 
+                        action: "input", 
+                        correctAnswer: vals.finalArea.toString(), 
+                        validate: (val) => Math.abs(parseFloat(val) - vals.finalArea) < 0.5,
+                        hint: "把剛剛算出來的兩個數字相減。", 
+                        mode: "calc_final" 
+                    },
+                    { title: "恭喜完成！", instruction: "", action: "reset", mode: "done" }
+                ]
+            },
+            {
+                id: 1,
+                name: "課本第4題",
+                params: { R: 10, PI: 3.14 },
+                getValues: (p) => ({ 
+                    sectorArea: formatNum(p.R * p.R * p.PI / 4),
+                    triArea: formatNum(p.R * p.R / 2),
+                    finalArea: formatNum((p.R * p.R * p.PI / 4) - (p.R * p.R / 2))
+                }),
+                steps: (vals, p) => [
+                    { 
+                        title: "觀察圖形", 
+                        instruction: "請問橘色區域的面積怎麼算？\n\n它是一個扇形，被剪掉了一個白色的直角三角形。", 
+                        action: "next", 
+                        hint: "橘色面積 = 扇形面積 - 三角形面積", 
+                        mode: "intro" 
+                    },
+                    { 
+                        title: "第一步：計算扇形面積", 
+                        instruction: (
+                            <>我們先算整個 <Frac n="1" d="4" /> 圓（扇形）的面積。<br/>半徑是 {p.R}cm。</>
+                        ), 
+                        subInstruction: `半徑 ${p.R}cm 的 <span class="frac"><span class="frac-n">1</span><span class="frac-d">4</span></span> 圓面積 = ?\n(圓周率用${p.PI}計算)`, 
+                        action: "input", 
+                        correctAnswer: vals.sectorArea.toString(), 
+                        validate: (val) => Math.abs(parseFloat(val) - vals.sectorArea) < 0.5,
+                        hint: `扇形面積 = 半徑 × 半徑 × ${p.PI} ÷ 4`, 
+                        mode: "calc_sector" 
+                    },
+                    { 
+                        title: "第二步：計算三角形面積", 
+                        instruction: "接著，算出要被剪掉的直角三角形面積。\n它的底和高都是半徑。", 
+                        subInstruction: `底 ${p.R}cm、高 ${p.R}cm 的三角形面積 = ?`, 
+                        action: "input", 
+                        correctAnswer: vals.triArea.toString(), 
+                        hint: "三角形面積 = 底 × 高 ÷ 2", 
+                        mode: "calc_tri" 
+                    },
+                    { 
+                        title: "第三步：計算塗色面積", 
+                        instruction: "最後，用扇形面積減去三角形面積，就是答案囉！", 
+                        subInstruction: `扇形(${vals.sectorArea}) - 三角形(${vals.triArea}) = ?`, 
+                        action: "input", 
+                        correctAnswer: vals.finalArea.toString(), 
+                        validate: (val) => Math.abs(parseFloat(val) - vals.finalArea) < 0.5,
+                        hint: "把剛剛算出來的兩個數字相減。", 
+                        mode: "calc_final" 
+                    },
+                    { title: "恭喜完成！", instruction: "", action: "reset", mode: "done" }
+                ]
+            },
+            {
+                id: 2,
+                name: "課本第5題",
+                params: { R: 10, PI: 3.14 },
+                getValues: (p) => ({ 
+                    sectorArea: formatNum(p.R * p.R * p.PI / 4),
+                    triArea: formatNum(p.R * p.R / 2),
+                    halfLeaf: formatNum((p.R * p.R * p.PI / 4) - (p.R * p.R / 2)),
+                    totalLeaf: formatNum(((p.R * p.R * p.PI / 4) - (p.R * p.R / 2)) * 2)
+                }),
+                steps: (vals, p) => [
+                    { 
+                        title: "觀察圖形", 
+                        instruction: "請問中間綠色葉子形狀的面積怎麼算？\n\n這是一個葉形，它其實是由「兩個半片葉子」組成的！\n(就像是把第4題的形狀重複兩次)", 
+                        action: "next", 
+                        hint: "畫一條對角線，你就會看到兩個一樣的形狀。", 
+                        mode: "intro" 
+                    },
+                    { 
+                        title: "第一步：分析圖形", 
+                        instruction: "我們畫一條粉紅色的對角線。\n\n看到了嗎？葉形被分成了上下兩個一樣的形狀。", 
+                        subInstruction: "我們只要算出一半的面積，再乘以 2 就好了。", 
+                        action: "next", 
+                        hint: "先專注算其中一半。", 
+                        mode: "analyze" 
+                    },
+                    { 
+                        title: "第二步：計算扇形面積", 
+                        instruction: (
+                            <>我們先算一半的「扇形」面積。<br/>這是一個半徑 {p.R}cm 的 <Frac n="1" d="4" /> 圓。</>
+                        ), 
+                        subInstruction: `半徑 ${p.R}cm 的 <span class="frac"><span class="frac-n">1</span><span class="frac-d">4</span></span> 圓面積 = ?\n(圓周率用${p.PI}計算)`, 
+                        action: "input", 
+                        correctAnswer: vals.sectorArea.toString(), 
+                        validate: (val) => Math.abs(parseFloat(val) - vals.sectorArea) < 0.5,
+                        hint: `扇形面積 = 半徑 × 半徑 × ${p.PI} ÷ 4`, 
+                        mode: "calc_sector_only" 
+                    },
+                    { 
+                        title: "第三步：計算三角形面積", 
+                        instruction: "接著，我們算要減掉的「直角三角形」面積。\n\n(注意：只算黃色部分)", 
+                        subInstruction: `底 ${p.R}cm、高 ${p.R}cm 的三角形面積 = ?`, 
+                        action: "input", 
+                        correctAnswer: vals.triArea.toString(), 
+                        hint: "三角形面積 = 底 × 高 ÷ 2", 
+                        mode: "calc_tri_only" 
+                    },
+                    { 
+                        title: "第四步：計算半片葉子面積", 
+                        instruction: "半片葉子 = 扇形 - 三角形。\n\n(看動畫：用扇形挖掉三角形，就是半片葉子)", 
+                        subInstruction: `扇形(${vals.sectorArea}) - 三角形(${vals.triArea}) = ?`, 
+                        action: "input", 
+                        correctAnswer: vals.halfLeaf.toString(), 
+                        validate: (val) => Math.abs(parseFloat(val) - vals.halfLeaf) < 0.5,
+                        hint: "相減算出半邊的面積。", 
+                        mode: "calc_half" 
+                    },
+                    { 
+                        title: "第五步：計算總面積", 
+                        instruction: "太棒了！半片葉子是 28.5。\n因為有兩個一模一樣的形狀，所以總面積是...？\n\n(看動畫：上下兩片葉子正在輪流閃爍)", 
+                        subInstruction: `半片葉子(${vals.halfLeaf}) × 2 = ?`, 
+                        action: "input", 
+                        correctAnswer: vals.totalLeaf.toString(), 
+                        validate: (val) => Math.abs(parseFloat(val) - vals.totalLeaf) < 0.5,
+                        hint: "把剛剛算出來的答案乘以 2。", 
+                        mode: "calc_total" 
+                    },
+                    { title: "恭喜完成！", instruction: "", action: "reset", mode: "done" }
+                ]
+            },
+            {
+                id: 3,
+                name: "課本第6題",
+                params: { BIG_SIDE: 4, SMALL_SIDE: 2, PI: 3.14 }, // R = 2
+                getValues: (p) => ({ 
+                    // Leaf calculation for R=2
+                    sectorArea: formatNum(p.SMALL_SIDE * p.SMALL_SIDE * p.PI / 4), // 2*2*3.14/4 = 3.14
+                    triArea: formatNum(p.SMALL_SIDE * p.SMALL_SIDE / 2), // 2*2/2 = 2
+                    oneLeaf: formatNum(((p.SMALL_SIDE * p.SMALL_SIDE * p.PI / 4) - (p.SMALL_SIDE * p.SMALL_SIDE / 2)) * 2), // (3.14-2)*2 = 2.28
+                    // Half leaf unit
+                    halfLeafUnit: formatNum((p.SMALL_SIDE * p.SMALL_SIDE * p.PI / 4) - (p.SMALL_SIDE * p.SMALL_SIDE / 2)),
+                    totalArea: formatNum(((p.SMALL_SIDE * p.SMALL_SIDE * p.PI / 4) - (p.SMALL_SIDE * p.SMALL_SIDE / 2)) * 8) // 1.14 * 8 = 9.12
+                }),
+                steps: (vals, p) => [
+                    { 
+                        title: "觀察圖形", 
+                        instruction: "這朵花由 4 片葉子組成，請問塗色面積是多少？\n\n正方形邊長是 4cm。", 
+                        action: "next", 
+                        hint: "我們可以把它切成 4 個小正方形來看。", 
+                        mode: "intro" 
+                    },
+                    { 
+                        title: "第一步：分析圖形", 
+                        instruction: "畫出十字虛線，把大正方形分成 4 個小正方形。\n每個小正方形的邊長是 2cm。\n\n看到了嗎？每個小正方形裡都有一片葉子。", 
+                        subInstruction: "我們先專注算左上角那片葉子的「一半」。", 
+                        action: "next", 
+                        hint: "目標：算出半片葉子。", 
+                        mode: "analyze" 
+                    },
+                    { 
+                        title: "第二步：計算扇形面積", 
+                        instruction: (
+                            <>我們先算左上角小正方形裡的「扇形」面積。<br/>半徑是 2cm 的 <Frac n="1" d="4" /> 圓。</>
+                        ), 
+                        subInstruction: `半徑 2cm 的 <span class="frac"><span class="frac-n">1</span><span class="frac-d">4</span></span> 圓面積 = ?\n(圓周率用${p.PI}計算)`, 
+                        action: "input", 
+                        correctAnswer: vals.sectorArea.toString(), 
+                        validate: (val) => Math.abs(parseFloat(val) - vals.sectorArea) < 0.1,
+                        hint: `扇形面積 = 半徑 × 半徑 × ${p.PI} ÷ 4`, 
+                        mode: "calc_sector_only" 
+                    },
+                    { 
+                        title: "第三步：計算三角形面積", 
+                        instruction: "接著，算要減掉的「直角三角形」面積。\n\n(注意：只算黃色部分)", 
+                        subInstruction: `底 2cm、高 2cm 的三角形面積 = ?`, 
+                        action: "input", 
+                        correctAnswer: vals.triArea.toString(), 
+                        hint: "三角形面積 = 底 × 高 ÷ 2", 
+                        mode: "calc_tri_only" 
+                    },
+                    { 
+                        title: "第四步：計算半片葉子面積", 
+                        instruction: "半片葉子 = 扇形 - 三角形。\n(看動畫：挖掉三角形，剩下半片葉子)\n\n請輸入半片葉子的面積。", 
+                        subInstruction: `${vals.sectorArea} - ${vals.triArea} = ?`, 
+                        action: "input", 
+                        correctAnswer: vals.halfLeafUnit.toString(), 
+                        validate: (val) => Math.abs(parseFloat(val) - vals.halfLeafUnit) < 0.1,
+                        hint: "相減算出半片葉子。", 
+                        mode: "calc_half_leaf" 
+                    },
+                    { 
+                        title: "第五步：計算總面積", 
+                        instruction: "一片葉子有 2 個半片，總共有 4 片葉子。\n所以這朵花總共有 8 個半片！\n\n(看動畫：8 個半片葉子累積點數中...)", 
+                        subInstruction: `半片葉子(${vals.halfLeafUnit}) × 8 = ?`, 
+                        action: "input", 
+                        correctAnswer: vals.totalArea.toString(), 
+                        validate: (val) => Math.abs(parseFloat(val) - vals.totalArea) < 0.1,
+                        hint: "把半片葉子面積乘以 8。", 
+                        mode: "calc_total" 
+                    },
+                    { title: "恭喜完成！", instruction: "", action: "reset", mode: "done" }
+                ]
+            },
+            {
+                id: 4,
+                name: "課本做做看",
+                params: { R: 5, PI: 3.14 },
+                getValues: (p) => ({ 
+                    circleArea: formatNum(p.R * p.R * p.PI), // 78.5
+                    oneTriArea: formatNum(p.R * p.R / 2), // 5*5/2 = 12.5
+                    squareArea: formatNum(p.R * p.R / 2 * 4), // 50
+                    finalArea: formatNum((p.R * p.R * p.PI) - 50) // 28.5
+                }),
+                steps: (vals, p) => [
+                    { 
+                        title: "觀察圖形", 
+                        instruction: "請問紫色區域的面積是多少？\n\n這是一個圓形，中間挖掉了一個白色的正方形。", 
+                        action: "next", 
+                        hint: "紫色面積 = 圓面積 - 正方形面積", 
+                        mode: "intro" 
+                    },
+                    { 
+                        title: "第一步：計算圓面積", 
+                        instruction: "我們先算出外面大圓的面積。\n半徑是 5cm。", 
+                        subInstruction: `半徑 5cm 的圓面積 = ?\n(圓周率用${p.PI}計算)`, 
+                        action: "input", 
+                        correctAnswer: vals.circleArea.toString(), 
+                        hint: "圓面積 = 半徑 × 半徑 × 圓周率", 
+                        mode: "calc_circle" 
+                    },
+                    { 
+                        title: "第二步：計算一個等腰直角三角形", 
+                        instruction: "中間的正方形，其實可以切成 4 個等腰直角三角形。\n我們先算其中一個。\n\n底和高都是圓的半徑(5cm)。", 
+                        subInstruction: `底 5cm、高 5cm 的三角形面積 = ?`, 
+                        action: "input", 
+                        correctAnswer: vals.oneTriArea.toString(), 
+                        hint: "三角形面積 = 底 × 高 ÷ 2", 
+                        mode: "calc_one_tri" 
+                    },
+                    { 
+                        title: "第三步：計算正方形面積", 
+                        instruction: "一個三角形是 12.5。\n正方形由 4 個三角形組成，所以面積是？\n\n(看動畫：4 個三角形依序累積點數)", 
+                        subInstruction: `三角形(${vals.oneTriArea}) × 4 = ?`, 
+                        action: "input", 
+                        correctAnswer: vals.squareArea.toString(), 
+                        hint: "乘以 4 就是正方形面積。", 
+                        mode: "calc_four_tri" 
+                    },
+                    { 
+                        title: "第四步：計算塗色面積", 
+                        instruction: "最後，用圓面積減去正方形面積，就是答案囉！\n\n(看動畫：圓形挖掉正方形)", 
+                        subInstruction: `圓形(${vals.circleArea}) - 正方形(${vals.squareArea}) = ?`, 
+                        action: "input", 
+                        correctAnswer: vals.finalArea.toString(), 
+                        validate: (val) => Math.abs(parseFloat(val) - vals.finalArea) < 0.5,
+                        hint: "把剛剛算出來的兩個數字相減。", 
+                        mode: "calc_final" 
+                    },
+                    { title: "恭喜完成！", instruction: "", action: "reset", mode: "done" }
+                ]
+            }
+        ];
+
+        const AreaTutor = () => {
+          const [currentProbId, setCurrentProbId] = useState(0);
+          const [step, setStep] = useState(0);
+          const [feedback, setFeedback] = useState("");
+          const [inputValue, setInputValue] = useState("");
+          const [showHint, setShowHint] = useState(false);
+          const [displayMode, setDisplayMode] = useState("intro"); 
+          const [isAnimDone, setIsAnimDone] = useState(false);
+
+          const currentProb = PROBLEMS[currentProbId];
+          const vals = currentProb.getValues(currentProb.params);
+          const steps = currentProb.steps(vals, currentProb.params);
+          const currentStep = steps[step];
+
+          useEffect(() => {
+            setInputValue("");
+            setFeedback("");
+            setShowHint(false);
+            setIsAnimDone(false); // Reset animation state on step change
+            setDisplayMode(currentStep.mode);
+          }, [step, currentProbId]);
+
+          const handleTabChange = (id) => { setCurrentProbId(id); setStep(0); setDisplayMode("intro"); }
+          const handleNext = () => setStep(prev => Math.min(prev + 1, steps.length - 1));
+          const handleReset = () => setStep(0);
+          const checkAnswer = () => {
+            const val = parseFloat(inputValue);
+            // Allow small error margin for float calculation
+            const correct = currentStep.validate 
+                ? currentStep.validate(inputValue) 
+                : Math.abs(val - parseFloat(currentStep.correctAnswer)) < 0.1;
+            setFeedback(correct ? "correct" : "incorrect");
+          };
+
+          // ... (renderProblem3, 4, 5, 6 functions omitted for brevity, assumed unchanged) ...
+          const renderProblem3 = () => {
+              const sqX = 75;
+              const sqY = 100;
+              const sqSize = 200;
+              
+              const squareFill = (displayMode === 'calc_square') ? "#67e8f9" : "#f1f5f9"; 
+              
+              let sectorOpacity = 1;
+              let sectorFill = "white";
+              let sectorClass = "";
+
+              if (displayMode === 'calc_square') {
+                  sectorOpacity = 0; 
+              } else if (displayMode === 'calc_sector') {
+                  sectorFill = "#fef08a"; 
+                  sectorClass = "animate-pulse-slow";
+              } else if (displayMode === 'calc_final') {
+                  sectorClass = "animate-dig"; 
+              } 
+
+              const pathSquare = `M ${sqX},${sqY} h ${sqSize} v ${sqSize} h -${sqSize} Z`;
+              const pathSector = `M ${sqX},${sqY+sqSize} L ${sqX+sqSize},${sqY+sqSize} A ${sqSize},${sqSize} 0 0,0 ${sqX},${sqY} Z`;
+              const pathBlueBorder = `M ${sqX},${sqY} L ${sqX+sqSize},${sqY} L ${sqX+sqSize},${sqY+sqSize} A ${sqSize},${sqSize} 0 0,0 ${sqX},${sqY} Z`;
+
+              return (
+                <svg viewBox="0 0 350 400" className="w-full h-full drop-shadow-md">
+                    <defs>
+                        <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" strokeWidth="1"/></pattern>
+                        <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#67e8f9" /><stop offset="100%" stopColor="#22d3ee" /></linearGradient>
+                    </defs>
+                    <rect width="350" height="400" fill="url(#grid)" opacity="0.4" />
+
+                    <path d={pathSquare} 
+                          fill={displayMode === 'calc_square' ? "url(#blueGrad)" : (displayMode === 'calc_sector' ? "#f1f5f9" : "url(#blueGrad)")} 
+                          stroke="#94a3b8" strokeWidth="2" 
+                          style={{ transition: 'fill 0.5s' }} />
+
+                    <path d={pathSector} 
+                          fill={sectorFill} 
+                          stroke="#cbd5e1" strokeWidth="2" strokeDasharray="4,4"
+                          style={{ opacity: sectorOpacity, transition: 'opacity 0.5s' }} 
+                          className={sectorClass} />
+
+                    {(displayMode === 'intro' || displayMode === 'calc_final' || displayMode === 'done') && (
+                        <path d={pathBlueBorder} fill="none" stroke="#0891b2" strokeWidth="2" />
+                    )}
+
+                    <line x1={sqX-10} y1={sqY} x2={sqX-10} y2={sqY+sqSize} stroke="#64748b" strokeWidth="2" />
+                    <line x1={sqX-15} y1={sqY} x2={sqX-5} y2={sqY} stroke="#64748b" strokeWidth="2" />
+                    <line x1={sqX-15} y1={sqY+sqSize} x2={sqX-5} y2={sqY+sqSize} stroke="#64748b" strokeWidth="2" />
+                    <text x={sqX-25} y={sqY + sqSize/2} textAnchor="end" dominantBaseline="middle" className="text-lg font-bold fill-slate-600">20cm</text>
+
+                    <line x1={sqX} y1={sqY+sqSize+10} x2={sqX+sqSize} y2={sqY+sqSize+10} stroke="#64748b" strokeWidth="2" />
+                    <line x1={sqX} y1={sqY+sqSize+5} x2={sqX} y2={sqY+sqSize+15} stroke="#64748b" strokeWidth="2" />
+                    <line x1={sqX+sqSize} y1={sqY+sqSize+5} x2={sqX+sqSize} y2={sqY+sqSize+15} stroke="#64748b" strokeWidth="2" />
+                    <text x={sqX + sqSize/2} y={sqY+sqSize+35} textAnchor="middle" className="text-lg font-bold fill-slate-600">20cm</text>
+
+                    <path d={`M ${sqX},${sqY+20} L ${sqX+20},${sqY+20} L ${sqX+20},${sqY}`} fill="none" stroke="#64748b" strokeWidth="2" />
+                </svg>
+              );
+          };
+
+          const renderProblem4 = () => {
+              const cx = 75;
+              const cy = 300;
+              const r = 200; 
+              
+              const pathSector = `M ${cx},${cy} L ${cx+r},${cy} A ${r},${r} 0 0,0 ${cx},${cy-r} Z`;
+              const pathTriangle = `M ${cx},${cy} L ${cx+r},${cy} L ${cx},${cy-r} Z`;
+              
+              let triOpacity = 0;
+              let triClass = "";
+              let sectorFill = "url(#orangeGrad)"; 
+              
+              if (displayMode === 'calc_sector') {
+              } else if (displayMode === 'calc_tri') {
+                  triOpacity = 0.5;
+                  sectorFill = "url(#orangeGrad)";
+                  triClass = "animate-pulse-slow";
+              } else if (displayMode === 'calc_final') {
+                  triOpacity = 1;
+                  triClass = "animate-dig"; 
+              } else if (displayMode === 'done' || displayMode === 'intro') {
+                  triOpacity = 1;
+              }
+
+              return (
+                <svg viewBox="0 0 350 400" className="w-full h-full drop-shadow-md">
+                    <defs>
+                        <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" strokeWidth="1"/></pattern>
+                        <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#fdba74" /><stop offset="100%" stopColor="#fb923c" /></linearGradient>
+                    </defs>
+                    <rect width="350" height="400" fill="url(#grid)" opacity="0.4" />
+
+                    <path d={pathSector} fill={sectorFill} stroke="#f97316" strokeWidth="2" />
+
+                    <path d={pathTriangle} 
+                          fill="white" 
+                          stroke={displayMode === 'calc_tri' ? "#f97316" : "white"} 
+                          strokeWidth="2"
+                          strokeDasharray={displayMode === 'calc_tri' ? "4,4" : "0"}
+                          style={{ opacity: triOpacity, transition: 'opacity 0.5s' }}
+                          className={triClass} />
+                    
+                    {displayMode === 'calc_final' && (
+                        <g className="animate-bounce-short" style={{ transformBox: 'fill-box', transformOrigin: 'center', transform: 'translate(150px, 200px)' }}>
+                             <Scissors className="w-8 h-8 text-slate-500" />
+                        </g>
+                    )}
+
+                    <line x1={cx-10} y1={cy} x2={cx-10} y2={cy-r} stroke="#64748b" strokeWidth="2" />
+                    <line x1={cx-15} y1={cy} x2={cx-5} y2={cy} stroke="#64748b" strokeWidth="2" />
+                    <line x1={cx-15} y1={cy-r} x2={cx-5} y2={cy-r} stroke="#64748b" strokeWidth="2" />
+                    <text x={cx-25} y={cy - r/2} textAnchor="end" dominantBaseline="middle" className="text-lg font-bold fill-slate-600">10cm</text>
+
+                    <line x1={cx} y1={cy+10} x2={cx+r} y2={cy+10} stroke="#64748b" strokeWidth="2" />
+                    <line x1={cx} y1={cy+5} x2={cx} y2={cy+15} stroke="#64748b" strokeWidth="2" />
+                    <line x1={cx+r} y1={cy+5} x2={cx+r} y2={cy+15} stroke="#64748b" strokeWidth="2" />
+                    <text x={cx + r/2} y={cy+35} textAnchor="middle" className="text-lg font-bold fill-slate-600">10cm</text>
+
+                    <rect x={cx} y={cy-20} width="20" height="20" fill="none" stroke="#64748b" strokeWidth="2" />
+                </svg>
+              );
+          };
+
+          const renderProblem5 = () => {
+              const sqX = 75;
+              const sqY = 100;
+              const sqSize = 200;
+              
+              const pathTriangle = `M 75,300 L 75,100 L 275,300 Z`;
+              const pathSectorFull = `M 75,300 L 75,100 A 200,200 0 0,1 275,300 Z`;
+              
+              let bow1Opacity = 1;
+              let bow2Opacity = 1;
+              let highlightClass = "";
+              let showDiagonal = false;
+              let showTriangleCut = false;
+              let showSectorOnly = false;
+              let showTriOnly = false;
+              let animateBlink = false;
+
+              if (displayMode === 'intro') {
+                  showDiagonal = true;
+              } else if (displayMode === 'analyze') {
+                  showDiagonal = true;
+                  bow2Opacity = 0.3; 
+                  // highlightClass = "animate-pulse-slow"; 
+              } else if (displayMode === 'calc_sector_only') {
+                  showSectorOnly = true;
+              } else if (displayMode === 'calc_tri_only') {
+                  showTriOnly = true;
+              } else if (displayMode === 'calc_half') {
+                  bow2Opacity = 0; // Hide bottom half
+                  showSectorOnly = true; 
+                  showTriangleCut = true; 
+              } else if (displayMode === 'calc_total' || displayMode === 'done') {
+                  bow2Opacity = 1;
+                  if(displayMode === 'calc_total') animateBlink = true;
+              }
+
+              return (
+                <svg viewBox="0 0 350 400" className="w-full h-full drop-shadow-md">
+                    <defs>
+                        <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" strokeWidth="1"/></pattern>
+                        <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#bef264" /><stop offset="100%" stopColor="#84cc16" /></linearGradient>
+                    </defs>
+                    <rect width="350" height="400" fill="url(#grid)" opacity="0.4" />
+                    
+                    {/* Square Border */}
+                    <rect x={sqX} y={sqY} width={sqSize} height={sqSize} fill="none" stroke="#94a3b8" strokeWidth="2" />
+
+                    {/* Sector Only Mode */}
+                    {showSectorOnly && (
+                        <path d={pathSectorFull} fill="url(#greenGrad)" stroke="#84cc16" strokeWidth="2" />
+                    )}
+
+                    {/* Triangle Only Mode */}
+                    {showTriOnly && (
+                        <path d={pathTriangle} fill="#fef08a" stroke="#eab308" strokeWidth="2" />
+                    )}
+
+                    {/* Normal Leaf Modes (Bow 1 & Bow 2) */}
+                    {!showSectorOnly && !showTriOnly && (
+                        <>
+                            {/* Bow 2 (Bottom-Left) */}
+                            <path d={`M 275,300 A 200,200 0 0,1 75,100 L 275,300 Z`} 
+                                  fill="url(#greenGrad)" stroke="#84cc16" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'cycle-highlight-2 2s infinite', animationDelay: '1s'} : {opacity: bow2Opacity}} />
+
+                            {/* Bow 1 (Top-Right) */}
+                            <path d={`M 75,100 A 200,200 0 0,1 275,300 L 75,100 Z`} 
+                                  fill="url(#greenGrad)" stroke="#84cc16" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'cycle-highlight-2 2s infinite', animationDelay: '0s'} : {opacity: bow1Opacity}} />
+                        </>
+                    )}
+
+                    {/* Visual Aid for Subtraction (Ghost Digging Triangle) */}
+                    {showTriangleCut && (
+                        <path d={pathTriangle} fill="white" stroke="none" className="animate-dig" />
+                    )}
+
+                    {/* Diagonal Line */}
+                    {showDiagonal && (
+                        <line x1={sqX} y1={sqY} x2={sqX+sqSize} y2={sqY+sqSize} stroke="#f472b6" strokeWidth="3" strokeDasharray="6,4" />
+                    )}
+
+                    {displayMode === 'calc_half' && (
+                        <g className="animate-bounce-short" style={{ transformBox: 'fill-box', transformOrigin: 'center', transform: 'translate(120px, 200px)' }}>
+                             <Scissors className="w-8 h-8 text-slate-500" />
+                        </g>
+                    )}
+
+                    {/* Dimensions */}
+                    <text x={sqX + sqSize/2} y={sqY - 10} textAnchor="middle" className="text-lg font-bold fill-slate-600">10cm</text>
+                    <line x1={sqX} y1={sqY-5} x2={sqX+sqSize} y2={sqY-5} stroke="#64748b" strokeWidth="2" />
+                    <line x1={sqX} y1={sqY-10} x2={sqX} y2={sqY} stroke="#64748b" strokeWidth="2" />
+                    <line x1={sqX+sqSize} y1={sqY-10} x2={sqX+sqSize} y2={sqY} stroke="#64748b" strokeWidth="2" />
+
+                    <text x={sqX - 25} y={sqY + sqSize/2} textAnchor="end" dominantBaseline="middle" className="text-lg font-bold fill-slate-600">10cm</text>
+                    <line x1={sqX-10} y1={sqY} x2={sqX-10} y2={sqY+sqSize} stroke="#64748b" strokeWidth="2" />
+                    <line x1={sqX-15} y1={sqY} x2={sqX-5} y2={sqY} stroke="#64748b" strokeWidth="2" />
+                    <line x1={sqX-15} y1={sqY+sqSize} x2={sqX-5} y2={sqY+sqSize} stroke="#64748b" strokeWidth="2" />
+
+                </svg>
+              );
+          };
+
+          const renderProblem6 = () => {
+              const r = 100; 
+              
+              const leafTL_H1 = `M 75,100 A 100,100 0 0,0 175,200 L 75,100 Z`; 
+              const leafTL_H2 = `M 75,100 L 175,200 A 100,100 0 0,0 75,100 Z`; 
+
+              const leafTR_H3 = `M 275,100 A 100,100 0 0,1 175,200 L 275,100 Z`; 
+              const leafTR_H4 = `M 275,100 L 175,200 A 100,100 0 0,1 275,100 Z`; 
+
+              const leafBR_H7 = `M 175,200 A 100,100 0 0,0 275,300 L 175,200 Z`; 
+              const leafBR_H8 = `M 175,200 L 275,300 A 100,100 0 0,0 175,200 Z`; 
+
+              const leafBL_H5 = `M 175,200 A 100,100 0 0,1 75,300 L 175,200 Z`; 
+              const leafBL_H6 = `M 175,200 L 75,300 A 100,100 0 0,1 175,200 Z`; 
+
+              const pathSectorTL = `M 175,100 L 75,100 A 100,100 0 0,0 175,200 Z`; 
+              const pathTriangleTL = `M 175,100 L 75,100 L 175,200 Z`;
+              const pathHalfLeafTL = leafTL_H1; 
+
+              let opacityOther = 1;
+              let showGrid = false;
+              let showSectorOnly = false;
+              let showTriOnly = false;
+              let showDigging = false;
+              let animateBlink = false;
+
+              if (displayMode === 'intro') {
+              } else if (displayMode === 'analyze') {
+                  showGrid = true;
+                  opacityOther = 0.3; 
+              } else if (displayMode === 'calc_sector_only') {
+                  showSectorOnly = true;
+                  showGrid = true;
+                  opacityOther = 0;
+              } else if (displayMode === 'calc_tri_only') {
+                  showTriOnly = true;
+                  showGrid = true;
+                  opacityOther = 0;
+              } else if (displayMode === 'calc_half_leaf') {
+                  showSectorOnly = true; 
+                  showDigging = true;    
+                  showGrid = true;
+                  opacityOther = 0;
+              } else if (displayMode === 'calc_total' || displayMode === 'done') {
+                  showGrid = true;
+                  opacityOther = 1; 
+                  if(displayMode === 'calc_total') animateBlink = true;
+              }
+
+              return (
+                <svg viewBox="0 0 350 400" className="w-full h-full drop-shadow-md">
+                    <defs>
+                        <linearGradient id="redGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#fca5a5" /><stop offset="100%" stopColor="#ef4444" /></linearGradient>
+                    </defs>
+                    <rect width="350" height="400" fill="url(#grid)" opacity="0.4" />
+                    
+                    {/* Big Square Border */}
+                    <rect x={75} y={100} width={200} height={200} fill="none" stroke="#94a3b8" strokeWidth="2" />
+
+                    {/* Special Calculation Modes */}
+                    {showSectorOnly && (
+                        <path d={pathSectorTL} fill={showTriOnly ? "#f1f5f9" : "url(#redGrad)"} stroke="#ef4444" strokeWidth="2" />
+                    )}
+                    {showTriOnly && (
+                        <path d={pathTriangleTL} fill="#fef08a" stroke="#eab308" strokeWidth="2" />
+                    )}
+                    {showDigging && (
+                        <path d={pathTriangleTL} fill="white" stroke="none" className="animate-dig" />
+                    )}
+
+                    {/* Full Leaves View */}
+                    {!showSectorOnly && !showTriOnly && !showDigging && (
+                        <g>
+                            {/* TL */}
+                            <path d={leafTL_H1} fill="url(#redGrad)" stroke="#ef4444" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'acc-8-1 9s infinite'} : {}} />
+                            <path d={leafTL_H2} fill="url(#redGrad)" stroke="#ef4444" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'acc-8-8 9s infinite'} : {opacity: opacityOther}} />
+
+                            {/* TR */}
+                            <path d={leafTR_H3} fill="url(#redGrad)" stroke="#ef4444" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'acc-8-2 9s infinite'} : {opacity: opacityOther}} />
+                            <path d={leafTR_H4} fill="url(#redGrad)" stroke="#ef4444" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'acc-8-3 9s infinite'} : {opacity: opacityOther}} />
+                            
+                            {/* BR */}
+                            <path d={leafBR_H7} fill="url(#redGrad)" stroke="#ef4444" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'acc-8-4 9s infinite'} : {opacity: opacityOther}} />
+                            <path d={leafBR_H8} fill="url(#redGrad)" stroke="#ef4444" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'acc-8-5 9s infinite'} : {opacity: opacityOther}} />
+                            
+                            {/* BL */}
+                            <path d={leafBL_H6} fill="url(#redGrad)" stroke="#ef4444" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'acc-8-6 9s infinite'} : {opacity: opacityOther}} />
+                            <path d={leafBL_H5} fill="url(#redGrad)" stroke="#ef4444" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'acc-8-7 9s infinite'} : {opacity: opacityOther}} />
+                        </g>
+                    )}
+
+                    {/* Grid Lines */}
+                    {(showGrid || displayMode === 'analyze' || displayMode === 'intro') && (
+                        <>
+                            <line x1={175} y1={100} x2={175} y2={300} stroke="#f472b6" strokeWidth="2" strokeDasharray="6,4" />
+                            <line x1={75} y1={200} x2={275} y2={200} stroke="#f472b6" strokeWidth="2" strokeDasharray="6,4" />
+                        </>
+                    )}
+
+                    {/* Dimensions */}
+                    <text x={175} y={90} textAnchor="middle" className="text-lg font-bold fill-slate-600">4cm</text>
+                    <line x1={75} y1={95} x2={275} y2={95} stroke="#64748b" strokeWidth="2" />
+                    <line x1={75} y1={90} x2={75} y2={100} stroke="#64748b" strokeWidth="2" />
+                    <line x1={275} y1={90} x2={275} y2={100} stroke="#64748b" strokeWidth="2" />
+
+                    <text x={285} y={200} textAnchor="start" dominantBaseline="middle" className="text-lg font-bold fill-slate-600">4cm</text>
+                    <line x1={280} y1={100} x2={280} y2={300} stroke="#64748b" strokeWidth="2" />
+                    <line x1={275} y1={100} x2={285} y2={100} stroke="#64748b" strokeWidth="2" />
+                    <line x1={275} y1={300} x2={285} y2={300} stroke="#64748b" strokeWidth="2" />
+
+                </svg>
+              );
+          };
+
+          // Render Practice Problem (Circle - Square)
+          const renderPractice = () => {
+              const cx = 175;
+              const cy = 200;
+              const r = 100; // 5cm -> 100px scale
+              
+              // Circle
+              const pathCircle = `M ${cx-r},${cy} a ${r},${r} 0 1,0 ${2*r},0 a ${r},${r} 0 1,0 -${2*r},0`;
+              
+              // Inscribed Square (Diamond)
+              const pathSquare = `M ${cx},${cy-r} L ${cx+r},${cy} L ${cx},${cy+r} L ${cx-r},${cy} Z`;
+              
+              // 4 Triangles
+              const pathT1 = `M ${cx},${cy} L ${cx-r},${cy} L ${cx},${cy-r} Z`; // TL (1)
+              const pathT2 = `M ${cx},${cy} L ${cx},${cy-r} L ${cx+r},${cy} Z`; // TR (2)
+              const pathT3 = `M ${cx},${cy} L ${cx+r},${cy} L ${cx},${cy+r} Z`; // BR (3)
+              const pathT4 = `M ${cx},${cy} L ${cx},${cy+r} L ${cx-r},${cy} Z`; // BL (4)
+
+              // Animations
+              let circleFill = "url(#purpleGrad)";
+              let squareOpacity = 1;
+              let squareClass = "";
+              let animateTri = false;
+              let animateOneTri = false;
+              let showIntroHelper = false;
+
+              if (displayMode === 'intro') {
+                showIntroHelper = true; // Show diagonals and center mark
+                squareOpacity = 0; // Hide white square to see lines, but show triangles? 
+                // Better: Just show the square area as white with opacity, or fully white.
+                // Request: "Middle square should be white so I can see lines behind it" 
+                // Actually if it's white, it blocks lines. If it's transparent, we see lines.
+                // Let's make it white with 0.8 opacity or just draw lines on top.
+                squareOpacity = 1;
+              } else if (displayMode === 'calc_circle') {
+                  squareOpacity = 0; // Show full circle
+              } else if (displayMode === 'calc_one_tri') {
+                  // Hide Circle color
+                  circleFill = "transparent";
+                  animateOneTri = true;
+                  squareOpacity = 0; 
+              } else if (displayMode === 'calc_four_tri') {
+                  circleFill = "transparent";
+                  animateTri = true;
+                  squareOpacity = 0;
+              } else if (displayMode === 'calc_final') {
+                  squareClass = "animate-dig";
+              }
+
+              return (
+                <svg viewBox="0 0 350 400" className="w-full h-full drop-shadow-md">
+                    <defs>
+                        <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#d8b4fe" /><stop offset="100%" stopColor="#a855f7" /></linearGradient>
+                    </defs>
+                    <rect width="350" height="400" fill="url(#grid)" opacity="0.4" />
+
+                    {/* Circle Base */}
+                    <circle cx={cx} cy={cy} r={r} fill={circleFill} stroke="#9333ea" strokeWidth="2" />
+
+                    {/* Square (White) */}
+                    {!animateTri && !animateOneTri && (
+                        <path d={pathSquare} fill="white" stroke="#94a3b8" strokeWidth="2" 
+                              style={{ opacity: squareOpacity }} className={squareClass} />
+                    )}
+
+                    {/* Intro Helper Lines (On Top of Square) */}
+                    {showIntroHelper && (
+                        <>
+                            <line x1={cx} y1={cy-r} x2={cx} y2={cy+r} stroke="#64748b" strokeWidth="2" strokeDasharray="4,4" />
+                            <line x1={cx-r} y1={cy} x2={cx+r} y2={cy} stroke="#64748b" strokeWidth="2" strokeDasharray="4,4" />
+                            {/* Right Angle at Center (Bottom-Right quadrant) */}
+                            <path d={`M ${cx},${cy+15} L ${cx+15},${cy+15} L ${cx+15},${cy}`} fill="none" stroke="#64748b" strokeWidth="2" />
+                        </>
+                    )}
+
+                    {/* 1 Triangle Highlight (TL) */}
+                    {animateOneTri && (
+                         <>
+                            <path d={pathT1} fill="#fbbf24" stroke="#d97706" strokeWidth="2" />
+                            {/* Right Angle at Center (Top-Left quadrant for T1) */}
+                            <path d={`M ${cx},${cy-15} L ${cx-15},${cy-15} L ${cx-15},${cy}`} fill="none" stroke="#64748b" strokeWidth="2" />
+                         </>
+                    )}
+
+                    {/* 4 Triangles Animation (TL->TR->BR->BL) */}
+                    {animateTri && (
+                        <g>
+                            <path d={pathT1} fill="#fbbf24" stroke="#d97706" strokeWidth="2" style={{animation: 'acc-4-1 4s infinite'}} />
+                            <path d={pathT2} fill="#fbbf24" stroke="#d97706" strokeWidth="2" style={{animation: 'acc-4-2 4s infinite'}} />
+                            <path d={pathT3} fill="#fbbf24" stroke="#d97706" strokeWidth="2" style={{animation: 'acc-4-3 4s infinite'}} />
+                            <path d={pathT4} fill="#fbbf24" stroke="#d97706" strokeWidth="2" style={{animation: 'acc-4-4 4s infinite'}} />
+                        </g>
+                    )}
+
+                    {/* Radius Label - Always on top */}
+                    {(showIntroHelper || displayMode === 'calc_circle' || displayMode === 'calc_one_tri') && (
+                        <g>
+                            {/* 12 o'clock radius */}
+                            <line x1={cx} y1={cy} x2={cx} y2={cy-r} stroke="#475569" strokeWidth="2" />
+                            <circle cx={cx} cy={cy} r={3} fill="#475569" />
+                            <text x={cx+5} y={cy-50} className="text-lg font-bold fill-slate-700 bg-white/60">5cm</text>
+                        </g>
+                    )}
+
+                </svg>
+              );
+          };
+
+          return (
+            <div className="flex flex-col items-center min-h-screen p-4 font-sans bg-gray-50">
+              <div className="w-full max-w-5xl flex gap-2 mb-4">
+                  {PROBLEMS.map(p => (
+                      <button key={p.id} onClick={() => handleTabChange(p.id)} className={`flex-1 py-3 px-6 rounded-xl font-bold text-lg transition-all shadow-sm ${currentProbId === p.id ? 'bg-indigo-600 text-white shadow-md transform scale-105' : 'bg-white text-gray-500 hover:bg-indigo-50'}`}>
+                          {p.name}
+                      </button>
+                  ))}
+              </div>
+              <div className="max-w-5xl w-full bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row border-4 border-white min-h-[500px]">
+                <div className="w-full md:w-1/2 bg-slate-50 p-6 flex flex-col items-center justify-center border-r border-slate-200 relative overflow-hidden">
+                  <div className="absolute top-4 left-4 bg-white/80 backdrop-blur px-3 py-1 rounded-full text-slate-500 font-bold text-sm flex items-center gap-2 shadow-sm z-10"><Calculator className="w-4 h-4" /> 互動教學板</div>
+                  <div className="relative w-full max-w-[350px] aspect-[3.5/4] select-none">
+                      {currentProbId === 0 && renderProblem3()}
+                      {currentProbId === 1 && renderProblem4()}
+                      {currentProbId === 2 && renderProblem5()}
+                      {currentProbId === 3 && renderProblem6()}
+                      {currentProbId === 4 && renderPractice()}
+                  </div>
+                  <div className="mt-2 bg-yellow-50 border border-yellow-200 p-3 rounded-lg text-xs text-yellow-800 flex gap-2 max-w-[90%]"><HelpCircle className="w-4 h-4 flex-shrink-0" /><span>小提示：圓周率我們使用 3.14 來計算喔！</span></div>
+                </div>
+                <div className="w-full md:w-1/2 p-8 flex flex-col relative bg-white">
+                  <div className="flex gap-2 mb-8 justify-center">{steps.map((s, idx) => (<div key={idx} className={`h-2 rounded-full transition-all duration-300 ${idx === step ? 'w-8 bg-indigo-600' : 'w-2 bg-indigo-100'}`} />))}</div>
+                  <div className="flex-1 flex flex-col justify-center">
+                    <h1 className="text-2xl font-extrabold text-slate-800 mb-4">{currentStep.title}</h1>
+                    <div className="text-lg text-slate-600 mb-8 leading-relaxed font-medium whitespace-pre-line">
+                        {typeof currentStep.instruction === 'string' ? currentStep.instruction : currentStep.instruction}
+                    </div>
+                    <div className="min-h-[160px]">
+                      {currentStep.action === 'next' && (
+                        <button onClick={handleNext} className="w-full group bg-indigo-600 hover:bg-indigo-700 text-white text-xl py-4 rounded-2xl font-bold transition-all shadow-lg hover:shadow-indigo-200 flex items-center justify-center gap-3"><Play className="w-6 h-6 fill-current group-hover:scale-110 transition-transform" /> 開始學習</button>
+                      )}
+                      
+                      {currentStep.action === 'input' && (
+                        <div className="space-y-6 animate-fade-in-up">
+                          <div className="bg-slate-50 border-2 border-indigo-100 p-6 rounded-2xl">
+                            <p className="font-bold text-indigo-900 mb-2 text-sm uppercase tracking-wider">計算題</p>
+                            <p className="text-xl text-slate-700 font-mono mb-4 whitespace-pre-line text-center" dangerouslySetInnerHTML={{__html: currentStep.subInstruction}}></p>
+                            
+                            <div className="flex flex-col gap-4">
+                                <div className="flex items-center gap-2">
+                                    <input 
+                                        type="number" 
+                                        value={inputValue} 
+                                        onChange={(e) => { setInputValue(e.target.value); setFeedback(""); }} 
+                                        placeholder="?" 
+                                        className="flex-1 border-2 border-slate-200 rounded-xl px-5 py-3 text-xl focus:outline-none focus:border-indigo-500 text-center font-bold text-slate-700" 
+                                        onKeyDown={(e) => e.key === 'Enter' && checkAnswer()} 
+                                    />
+                                    <span className="text-xl font-bold text-slate-600 shrink-0">cm<sup className="text-xs">2</sup></span>
+                                </div>
+                                <button onClick={checkAnswer} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold text-lg shadow-md transition-all">檢查</button>
+                            </div>
+
+                          </div>
+                          {feedback === 'correct' && (<div className="bg-green-100 text-green-800 p-4 rounded-xl flex items-center gap-4 animate-bounce-short border border-green-200"><div className="bg-green-500 text-white p-1 rounded-full"><Check className="w-5 h-5" /></div><span className="font-bold text-lg">完全正確！</span><button onClick={handleNext} className="ml-auto bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold text-sm flex items-center gap-1 shadow-sm">下一步 <ArrowRight className="w-4 h-4" /></button></div>)}
+                          {feedback === 'incorrect' && (<div className="bg-red-50 text-red-800 p-4 rounded-xl flex items-center gap-4 animate-shake border border-red-100"><span className="font-bold">答案不太對喔...</span><button onClick={() => setShowHint(true)} className="ml-auto text-sm font-bold underline hover:text-red-900">看提示</button></div>)}
+                        </div>
+                      )}
+                      {currentStep.action === 'reset' && (
+                        <div className="text-center py-4"><div className="inline-block p-4 bg-green-100 rounded-full mb-4"><Check className="w-12 h-12 text-green-600" /></div><h3 className="text-2xl font-bold text-slate-800 mb-2">太厲害了！</h3><p className="text-slate-600 mb-8">你已經學會了這一題的算法。</p><button onClick={handleReset} className="bg-slate-800 hover:bg-slate-900 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center justify-center gap-2 mx-auto"><RotateCcw className="w-5 h-5" /> 再玩一次</button></div>
+                      )}
+                    </div>
+                  </div>
+                  {showHint && currentStep.hint && (<div className="absolute bottom-24 left-8 right-8 bg-yellow-100 border-l-4 border-yellow-500 p-4 rounded shadow-lg animate-fade-in z-20"><div className="flex justify-between items-start"><p className="text-yellow-800 font-medium whitespace-pre-line">{currentStep.hint}</p><button onClick={() => setShowHint(false)} className="text-yellow-600 hover:text-yellow-800">✕</button></div></div>)}
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<AreaTutor />);
+    </script>
+</body>
+</html>

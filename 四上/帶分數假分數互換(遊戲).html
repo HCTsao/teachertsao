@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>分數轉換小遊戲</title>
+  <!-- 引入 Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入 Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* 隱藏預設數字輸入框的上下箭頭 */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+      -webkit-appearance: none; 
+      margin: 0; 
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+  </style>
+</head>
+<body class="font-sans">
+
+  <!-- ================= 首頁畫面 ================= -->
+  <div id="home-screen" class="min-h-screen bg-blue-100 flex flex-col items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-xl p-8 max-w-lg w-full text-center border-4 border-blue-400">
+      <h1 class="text-4xl font-bold text-blue-600 mb-8 flex items-center justify-center gap-3">
+        <i data-lucide="star" class="text-yellow-400 w-10 h-10 fill-current"></i>
+        分數轉換大挑戰
+        <i data-lucide="star" class="text-yellow-400 w-10 h-10 fill-current"></i>
+      </h1>
+      <p class="text-lg text-gray-600 mb-8">每關有 5 題，答得越快分數越高喔！</p>
+      <div class="flex flex-col gap-4">
+        <button onclick="startGame('I2M')" class="group relative w-full flex justify-center py-4 px-4 border border-transparent text-xl font-bold rounded-2xl text-white bg-green-500 hover:bg-green-600 focus:outline-none focus:ring-4 focus:ring-green-300 transition-all transform hover:scale-105 shadow-lg">
+          <i data-lucide="play" class="w-6 h-6 mr-2"></i> 關卡一：假分數 換 帶分數
+        </button>
+        <button onclick="startGame('M2I')" class="group relative w-full flex justify-center py-4 px-4 border border-transparent text-xl font-bold rounded-2xl text-white bg-orange-500 hover:bg-orange-600 focus:outline-none focus:ring-4 focus:ring-orange-300 transition-all transform hover:scale-105 shadow-lg">
+          <i data-lucide="play" class="w-6 h-6 mr-2"></i> 關卡二：帶分數 換 假分數
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 遊戲畫面 ================= -->
+  <div id="game-screen" class="min-h-screen bg-blue-50 flex flex-col items-center py-10 px-4 hidden">
+    <div class="max-w-3xl w-full">
+      <!-- 頂部導航與狀態資訊 -->
+      <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <button onclick="goHome()" class="flex items-center text-blue-600 hover:text-blue-800 font-bold bg-white px-4 py-2 rounded-full shadow-md transition-colors">
+          <i data-lucide="arrow-left" class="w-5 h-5 mr-1"></i> 回首頁
+        </button>
+        
+        <div class="flex gap-3">
+          <div class="bg-white text-blue-800 font-bold px-4 py-2 rounded-full shadow-md text-lg">
+            第 <span id="question-count">1</span> / 5 題
+          </div>
+          <div id="timer-container" class="font-bold px-4 py-2 rounded-full shadow-md text-lg flex items-center bg-white text-gray-700">
+            <i data-lucide="timer" class="w-5 h-5 mr-1"></i> <span id="time-left">60</span> 秒
+          </div>
+          <div class="bg-yellow-400 text-yellow-900 font-black px-6 py-2 rounded-full shadow-md text-lg flex items-center">
+            <i data-lucide="star" class="w-5 h-5 mr-1 fill-current"></i> <span id="current-score">0</span> 分
+          </div>
+        </div>
+      </div>
+
+      <!-- 遊戲主要區塊 -->
+      <div class="bg-white rounded-3xl shadow-xl p-8 border-4 border-blue-300 flex flex-col items-center transition-all">
+        <h2 id="game-title" class="text-2xl font-bold text-gray-700 mb-6 pb-4 border-b-2 border-gray-100 w-full text-center">
+          標題
+        </h2>
+
+        <!-- 老師的小提示區塊 -->
+        <div id="hint-box" class="hidden bg-yellow-50 text-yellow-800 p-4 rounded-xl mb-6 border-2 border-yellow-300 w-full text-center text-lg shadow-sm">
+          <span class="font-bold mr-2">💡 老師的小提示：</span>
+          <span id="hint-text"></span>
+        </div>
+
+        <div class="flex flex-col md:flex-row items-center justify-center gap-8 w-full mb-10">
+          
+          <!-- 顯示題目 (假轉帶) -->
+          <div id="display-i2m" class="hidden flex items-center justify-center bg-blue-100 rounded-2xl p-6 min-w-[150px] shadow-inner">
+            <div class="flex flex-col items-center text-5xl font-black text-blue-800">
+              <span id="q-i2m-impNum"></span>
+              <hr class="w-full border-4 border-blue-800 my-2" />
+              <span id="q-i2m-den"></span>
+            </div>
+          </div>
+
+          <!-- 顯示題目 (帶轉假) -->
+          <div id="display-m2i" class="hidden flex items-center justify-center bg-blue-100 rounded-2xl p-6 min-w-[150px] shadow-inner">
+            <div class="flex items-center text-5xl font-black text-orange-800">
+              <span id="q-m2i-whole" class="mr-3 text-6xl"></span>
+              <div class="flex flex-col items-center">
+                <span id="q-m2i-numPart"></span>
+                <hr class="w-full border-4 border-orange-800 my-2" />
+                <span id="q-m2i-den"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="text-5xl font-black text-gray-400">=</div>
+
+          <!-- 輸入答案區 -->
+          <div class="flex items-center justify-center bg-gray-50 rounded-2xl p-6 min-w-[200px] border-2 border-dashed border-gray-300">
+            
+            <!-- 假轉帶 輸入框 -->
+            <div id="input-i2m" class="hidden flex items-center gap-4">
+              <input type="number" id="ans-i2m-whole" oninput="checkInputs()" class="w-20 h-20 text-center text-4xl font-bold rounded-xl border-2 border-gray-300 focus:border-green-500 focus:ring-4 focus:ring-green-200 outline-none" />
+              <div class="flex flex-col items-center gap-2">
+                <input type="number" id="ans-i2m-num" oninput="checkInputs()" class="w-16 h-16 text-center text-3xl font-bold rounded-xl border-2 border-gray-300 focus:border-green-500 focus:ring-4 focus:ring-green-200 outline-none" />
+                <hr class="w-full border-4 border-gray-800" />
+                <input type="number" id="ans-i2m-den" oninput="checkInputs()" class="w-16 h-16 text-center text-3xl font-bold rounded-xl border-2 border-gray-300 focus:border-green-500 focus:ring-4 focus:ring-green-200 outline-none" />
+              </div>
+            </div>
+
+            <!-- 帶轉假 輸入框 -->
+            <div id="input-m2i" class="hidden flex flex-col items-center gap-3">
+              <input type="number" id="ans-m2i-num" oninput="checkInputs()" class="w-24 h-20 text-center text-4xl font-bold rounded-xl border-2 border-gray-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-200 outline-none" />
+              <hr class="w-full border-4 border-gray-800" />
+              <input type="number" id="ans-m2i-den" oninput="checkInputs()" class="w-24 h-20 text-center text-4xl font-bold rounded-xl border-2 border-gray-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-200 outline-none" />
+            </div>
+
+          </div>
+        </div>
+
+        <!-- 按鈕與回饋區 -->
+        <div class="w-full flex flex-col items-center h-32 justify-center">
+          
+          <!-- 確定送出按鈕 -->
+          <div id="submit-section">
+            <button id="submit-btn" onclick="checkAnswer()" disabled class="bg-gray-300 cursor-not-allowed text-white font-bold py-4 px-12 rounded-full text-2xl shadow-lg transition-all transform hover:-translate-y-1">
+              確定送出
+            </button>
+          </div>
+
+          <!-- 答對回饋 -->
+          <div id="feedback-correct" class="hidden flex flex-col items-center animate-bounce">
+            <div class="flex items-center text-green-500 text-3xl font-bold mb-4">
+              <i data-lucide="check-circle" class="w-10 h-10 mr-2"></i> 太棒了！答對囉！
+            </div>
+            <button id="next-btn" onclick="handleNext()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-10 rounded-full text-xl shadow-md transition-colors">
+              下一題 ➔
+            </button>
+          </div>
+
+          <!-- 答錯回饋 -->
+          <div id="feedback-incorrect" class="hidden flex flex-col items-center">
+            <div class="flex items-center text-red-500 text-2xl font-bold mb-4">
+              <i data-lucide="x-circle" class="w-8 h-8 mr-2"></i> 哎呀，算錯了。再檢查看看！
+            </div>
+            <button onclick="resetFeedback()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-8 rounded-full text-lg transition-colors">
+              重新輸入
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 結算畫面 ================= -->
+  <div id="result-screen" class="min-h-screen bg-blue-100 flex flex-col items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl shadow-xl p-10 max-w-md w-full text-center border-4 border-yellow-400">
+      <i data-lucide="trophy" class="w-24 h-24 text-yellow-500 mx-auto mb-6"></i>
+      <h2 class="text-4xl font-bold text-gray-800 mb-4">挑戰完成！</h2>
+      <p class="text-xl text-gray-600 mb-4">你在這 5 題中總共獲得了：</p>
+      <div id="final-score" class="text-7xl font-black text-orange-500 mb-10">0</div>
+      <button onclick="goHome()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-8 rounded-2xl text-xl shadow-lg transition-transform transform hover:scale-105">
+        回首頁再玩一次
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= 遊戲邏輯 ================= -->
+  <script>
+    // 初始化 Lucide Icons
+    lucide.createIcons();
+
+    // 遊戲狀態變數
+    let mode = null;
+    let score = 0;
+    let questionCount = 1;
+    let timeLeft = 60;
+    let timerInterval = null;
+    let currentQuestion = null;
+    let isAnswered = false;
+
+    // 畫面切換函數
+    function showScreen(screenId) {
+      document.getElementById('home-screen').classList.add('hidden');
+      document.getElementById('game-screen').classList.add('hidden');
+      document.getElementById('result-screen').classList.add('hidden');
+      document.getElementById(screenId).classList.remove('hidden');
+    }
+
+    function goHome() {
+      clearInterval(timerInterval);
+      showScreen('home-screen');
+    }
+
+    function startGame(selectedMode) {
+      mode = selectedMode;
+      score = 0;
+      questionCount = 1;
+      updateScoreUI();
+      generateQuestion();
+      showScreen('game-screen');
+    }
+
+    // 生成題目邏輯
+    function generateQuestion() {
+      isAnswered = false;
+      const den = Math.floor(Math.random() * 8) + 2; 
+      const whole = Math.floor(Math.random() * 5) + 1; 
+      const numPart = Math.floor(Math.random() * (den - 1)) + 1; 
+      const impNum = (whole * den) + numPart; 
+
+      currentQuestion = { den, whole, numPart, impNum };
+
+      // 更新進度文字
+      document.getElementById('question-count').innerText = questionCount;
+      
+      // 更新標題與畫面排版
+      if (mode === 'I2M') {
+        document.getElementById('game-title').innerText = '將「假分數」換成「帶分數」';
+        document.getElementById('display-i2m').classList.remove('hidden');
+        document.getElementById('display-m2i').classList.add('hidden');
+        document.getElementById('input-i2m').classList.remove('hidden');
+        document.getElementById('input-m2i').classList.add('hidden');
+        
+        // 填入題目數字
+        document.getElementById('q-i2m-impNum').innerText = impNum;
+        document.getElementById('q-i2m-den').innerText = den;
+      } else {
+        document.getElementById('game-title').innerText = '將「帶分數」換成「假分數」';
+        document.getElementById('display-i2m').classList.add('hidden');
+        document.getElementById('display-m2i').classList.remove('hidden');
+        document.getElementById('input-i2m').classList.add('hidden');
+        document.getElementById('input-m2i').classList.remove('hidden');
+        
+        // 填入題目數字
+        document.getElementById('q-m2i-whole').innerText = whole;
+        document.getElementById('q-m2i-numPart').innerText = numPart;
+        document.getElementById('q-m2i-den').innerText = den;
+      }
+
+      // 準備提示文字
+      const hintText = mode === 'I2M' 
+        ? `試試看用 ${impNum} ÷ ${den}，商填在整數，餘數填在分子喔！` 
+        : `試試看 ${whole} × ${den} + ${numPart}，算出來就是假分數的分子喔！`;
+      document.getElementById('hint-text').innerText = hintText;
+
+      resetInputs();
+      resetFeedback();
+      startTimer();
+    }
+
+    // 計時器邏輯
+    function startTimer() {
+      clearInterval(timerInterval);
+      timeLeft = 60;
+      updateTimerUI();
+      
+      document.getElementById('hint-box').classList.add('hidden');
+      const timerContainer = document.getElementById('timer-container');
+      timerContainer.classList.remove('bg-red-100', 'text-red-600', 'animate-pulse');
+      timerContainer.classList.add('bg-white', 'text-gray-700');
+
+      timerInterval = setInterval(() => {
+        if (!isAnswered && timeLeft > 0) {
+          timeLeft--;
+          updateTimerUI();
+          
+          if (timeLeft <= 30) {
+            document.getElementById('hint-box').classList.remove('hidden');
+            timerContainer.classList.add('bg-red-100', 'text-red-600', 'animate-pulse');
+            timerContainer.classList.remove('bg-white', 'text-gray-700');
+          }
+          if (timeLeft === 0) {
+            clearInterval(timerInterval);
+          }
+        }
+      }, 1000);
+    }
+
+    function updateTimerUI() {
+      document.getElementById('time-left').innerText = timeLeft;
+    }
+
+    function updateScoreUI() {
+      document.getElementById('current-score').innerText = score;
+    }
+
+    // 輸入驗證：按鈕啟用/停用
+    function checkInputs() {
+      let isValid = false;
+      if (mode === 'I2M') {
+        const w = document.getElementById('ans-i2m-whole').value;
+        const n = document.getElementById('ans-i2m-num').value;
+        const d = document.getElementById('ans-i2m-den').value;
+        isValid = (w !== '' && n !== '' && d !== '');
+      } else {
+        const n = document.getElementById('ans-m2i-num').value;
+        const d = document.getElementById('ans-m2i-den').value;
+        isValid = (n !== '' && d !== '');
+      }
+
+      const btn = document.getElementById('submit-btn');
+      if (isValid) {
+        btn.disabled = false;
+        btn.classList.remove('bg-gray-300', 'cursor-not-allowed');
+        btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+      } else {
+        btn.disabled = true;
+        btn.classList.add('bg-gray-300', 'cursor-not-allowed');
+        btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+      }
+    }
+
+    // 清空輸入框
+    function resetInputs() {
+      document.getElementById('ans-i2m-whole').value = '';
+      document.getElementById('ans-i2m-num').value = '';
+      document.getElementById('ans-i2m-den').value = '';
+      document.getElementById('ans-m2i-num').value = '';
+      document.getElementById('ans-m2i-den').value = '';
+      checkInputs();
+    }
+
+    // 清除回饋畫面，恢復送出按鈕
+    function resetFeedback() {
+      document.getElementById('submit-section').classList.remove('hidden');
+      document.getElementById('feedback-correct').classList.add('hidden');
+      document.getElementById('feedback-incorrect').classList.add('hidden');
+    }
+
+    // 檢查答案邏輯
+    function checkAnswer() {
+      let isCorrect = false;
+
+      if (mode === 'I2M') {
+        const w = parseInt(document.getElementById('ans-i2m-whole').value);
+        const n = parseInt(document.getElementById('ans-i2m-num').value);
+        const d = parseInt(document.getElementById('ans-i2m-den').value);
+        if (w === currentQuestion.whole && n === currentQuestion.numPart && d === currentQuestion.den) {
+          isCorrect = true;
+        }
+      } else {
+        const n = parseInt(document.getElementById('ans-m2i-num').value);
+        const d = parseInt(document.getElementById('ans-m2i-den').value);
+        if (n === currentQuestion.impNum && d === currentQuestion.den) {
+          isCorrect = true;
+        }
+      }
+
+      document.getElementById('submit-section').classList.add('hidden');
+
+      if (isCorrect) {
+        isAnswered = true;
+        clearInterval(timerInterval); // 停止計時
+        const timeBonus = timeLeft > 0 ? timeLeft : 0;
+        score += (10 + timeBonus);
+        updateScoreUI();
+        
+        document.getElementById('feedback-correct').classList.remove('hidden');
+        document.getElementById('next-btn').innerText = questionCount >= 5 ? '查看總成績 ➔' : '下一題 ➔';
+      } else {
+        document.getElementById('feedback-incorrect').classList.remove('hidden');
+      }
+    }
+
+    // 進入下一題或結算
+    function handleNext() {
+      if (questionCount >= 5) {
+        document.getElementById('final-score').innerText = score;
+        showScreen('result-screen');
+      } else {
+        questionCount++;
+        generateQuestion();
+      }
+    }
+  </script>
+</body>
+</html>

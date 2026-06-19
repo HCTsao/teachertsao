@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>分數四則運算大冒險 - iPad 專業版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        body { 
+            font-family: 'Noto Sans TC', sans-serif; 
+            touch-action: manipulation;
+            overflow: hidden;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        .fraction-line { height: 3px; background-color: #334155; border-radius: 2px; width: 100%; }
+        .animate-pop { animation: pop 0.3s cubic-bezier(0.26, 0.53, 0.74, 1.48); }
+        @keyframes pop {
+            0% { transform: scale(0.98); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .key-btn:active {
+            transform: scale(0.9);
+            background-color: #f1f5f9;
+        }
+        .input-focus {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+            background-color: #eff6ff !important;
+        }
+        .keypad-container {
+            display: flex;
+            flex-wrap: nowrap;
+            justify-content: center;
+            width: 100%;
+            overflow-x: auto;
+            padding-bottom: 5px;
+        }
+        .keypad-container::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-cyan-50 to-blue-100 h-screen flex items-center justify-center p-2">
+
+    <div id="app" class="max-w-5xl w-full bg-white rounded-[1.5rem] shadow-xl overflow-hidden border-4 border-white flex flex-col max-h-[98vh]">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 p-3 md:p-5 text-white flex justify-between items-center shrink-0">
+            <div>
+                <h1 class="text-lg md:text-xl font-black flex items-center gap-2">
+                    <i data-lucide="star" class="fill-yellow-400 text-yellow-400 w-5 h-5"></i> 分數大冒險
+                </h1>
+                <p class="text-blue-100 text-[10px] md:text-xs font-medium tracking-wide">iPad最佳化版面</p>
+            </div>
+            <div class="bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-xl text-sm md:text-lg font-black">
+                積分: <span id="score-display">0</span>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div id="main-content" class="p-3 md:p-6 flex-1 overflow-y-auto">
+            <!-- JavaScript 注入 -->
+        </div>
+
+        <div class="bg-slate-50 p-2 text-center border-t border-slate-100 text-[10px] text-slate-400 font-bold tracking-widest uppercase shrink-0">
+            Fraction Quest &copy; Optimized Layout
+        </div>
+    </div>
+
+    <script>
+        // --- 核心分數邏輯 ---
+        class Fraction {
+            constructor(w, n, d) {
+                this.w = w;
+                this.n = n;
+                this.d = d === 0 ? 1 : d;
+                this.simplify();
+            }
+            simplify() {
+                let totalN = this.w * this.d + this.n;
+                const common = this.gcd(Math.abs(totalN), Math.abs(this.d));
+                totalN /= common;
+                let newD = this.d / common;
+                this.w = Math.floor(totalN / newD);
+                this.n = totalN % newD;
+                this.d = newD;
+            }
+            gcd(a, b) { return b === 0 ? a : this.gcd(b, a % b); }
+            static fromString(w, n, d) { return new Fraction(parseInt(w || 0), parseInt(n || 0), parseInt(d || 1)); }
+            isEqual(other) {
+                const v1 = (this.w * this.d + this.n) * other.d;
+                const v2 = (other.w * other.d + other.n) * this.d;
+                return v1 === v2;
+            }
+        }
+
+        let state = {
+            gameState: 'menu',
+            currentLevel: 0,
+            currentSubLevel: 0,
+            score: 0,
+            question: null,
+            answerMode: null,
+            userAnswer: { w: '', n: '', d: '' },
+            activeField: 'w' // 'w' 整數, 'n' 分子, 'd' 分母
+        };
+
+        const levels = [
+            { title: "第一關：分數加法", type: "add", subs: ["真分數 + 真分數", "帶分數 + 帶分數 (不進位)", "帶分數 + 帶分數 (進位)"] },
+            { title: "第二關：分數減法", type: "sub", subs: ["真分數 - 真分數", "帶分數 - 帶分數 (不借位)", "帶分數 - 帶分數 (要借位)", "整數 - 帶分數"] },
+            { title: "第三關：分數乘法", type: "mul", subs: ["整數 × 分數", "分數 × 整數", "真分數 × 真分數", "帶分數 × 帶分數"] },
+            { title: "第四關：分數除法", type: "div", subs: ["分數 ÷ 整數", "真分數 ÷ 真分數", "整數 ÷ 分數", "帶分數 ÷ 帶分數"] }
+        ];
+
+        function render() {
+            const container = document.getElementById('main-content');
+            document.getElementById('score-display').innerText = state.score;
+            if (state.gameState === 'menu') renderMenu(container);
+            else if (state.gameState === 'playing') renderPlaying(container);
+            else if (state.gameState === 'level-complete') renderLevelComplete(container);
+            else if (state.gameState === 'finished') renderFinished(container);
+            lucide.createIcons();
+        }
+
+        function renderMenu(container) {
+            let html = `<div class="grid grid-cols-2 gap-3 md:gap-4 animate-pop">
+                <h2 class="col-span-full text-base md:text-xl font-bold text-slate-800 mb-1 text-center">選擇練習關卡：</h2>`;
+            levels.forEach((lvl, idx) => {
+                html += `
+                <button onclick="startLevel(${idx})" class="flex items-center justify-between p-3 md:p-5 bg-slate-50 border-2 border-transparent hover:border-blue-400 hover:bg-blue-50 rounded-xl transition-all active:scale-95 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 md:w-12 md:h-12 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-sm md:text-xl shadow-md">${idx+1}</div>
+                        <div class="text-left">
+                            <div class="font-black text-xs md:text-lg text-slate-800">${lvl.title}</div>
+                            <div class="text-[9px] md:text-xs text-slate-500 font-bold">${lvl.subs.length} 種挑戰</div>
+                        </div>
+                    </div>
+                    <i data-lucide="chevron-right" class="text-slate-300 w-4 h-4 md:w-6 md:h-6"></i>
+                </button>`;
+            });
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        function renderPlaying(container) {
+            const q = state.question;
+            const lvl = levels[state.currentLevel];
+            let html = `
+            <div class="space-y-4 md:space-y-6 animate-pop h-full flex flex-col">
+                <div class="flex items-center justify-between shrink-0">
+                    <button onclick="goToMenu()" class="text-slate-400 hover:text-slate-600 flex items-center gap-1 font-bold text-[10px] md:text-sm">
+                        <i data-lucide="arrow-left" class="w-3 h-3"></i> 返回選單
+                    </button>
+                    <div class="px-3 py-0.5 bg-blue-50 text-blue-600 rounded-full font-black text-[9px] md:text-xs border border-blue-100">
+                        ${lvl.subs[state.currentSubLevel]}
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-center gap-3 md:gap-6 py-4 md:py-8 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 shadow-inner px-4 shrink-0">
+                    ${formatFractionHTML(q.f1)}
+                    <span class="text-2xl md:text-4xl font-light text-slate-300">${q.op}</span>
+                    ${formatFractionHTML(q.f2)}
+                    <span class="text-2xl md:text-4xl font-light text-slate-300">=</span>
+                    <div class="w-12 h-12 md:w-20 md:h-20 bg-white rounded-xl border-2 border-blue-200 flex items-center justify-center text-xl md:text-3xl font-black text-blue-600 shadow-md">?</div>
+                </div>
+
+                <div id="answer-area" class="flex flex-col items-center gap-4 flex-1 justify-center min-h-0">
+                    ${!state.answerMode ? renderModeSelection() : renderInputAndKeypad()}
+                </div>
+            </div>`;
+            container.innerHTML = html;
+        }
+
+        function renderModeSelection() {
+            return `
+            <div class="text-center space-y-4 animate-pop">
+                <h3 class="text-sm md:text-lg font-black text-slate-700 flex items-center justify-center gap-2">
+                    <i data-lucide="mouse-pointer-2" class="text-blue-500 w-4 h-4 md:w-5 md:h-5"></i> 第一步：請選擇答案形式
+                </h3>
+                <div class="flex justify-center gap-3">
+                    <button onclick="setMode('integer')" class="px-6 py-4 bg-white border-2 border-slate-200 rounded-xl font-black text-sm md:text-xl text-slate-700 hover:border-blue-400 hover:text-blue-600 transition-all active:scale-95 shadow-sm">整數</button>
+                    <button onclick="setMode('proper')" class="px-6 py-4 bg-white border-2 border-slate-200 rounded-xl font-black text-sm md:text-xl text-slate-700 hover:border-blue-400 hover:text-blue-600 transition-all active:scale-95 shadow-sm">真/假分數</button>
+                    <button onclick="setMode('mixed')" class="px-6 py-4 bg-white border-2 border-slate-200 rounded-xl font-black text-sm md:text-xl text-slate-700 hover:border-blue-400 hover:text-blue-600 transition-all active:scale-95 shadow-sm">帶分數</button>
+                </div>
+            </div>`;
+        }
+
+        function renderInputAndKeypad() {
+            let inputHtml = `
+            <div class="w-full flex flex-col items-center gap-4 animate-pop">
+                <div class="flex items-center gap-3">
+                    <span class="text-[9px] font-black text-slate-400 uppercase">目前選擇：${getModeName(state.answerMode)}</span>
+                    <button onclick="resetMode()" class="text-[9px] text-blue-500 font-bold hover:underline">重選形式</button>
+                </div>
+                
+                <div class="flex items-center gap-3">`;
+
+            if (state.answerMode === 'integer' || state.answerMode === 'mixed') {
+                inputHtml += `
+                <div onclick="setActiveField('w')" class="cursor-pointer flex flex-col items-center gap-1">
+                    <div id="box-w" class="w-14 h-14 md:w-20 md:h-20 bg-white border-2 border-slate-200 rounded-xl flex items-center justify-center text-xl md:text-3xl font-black text-slate-700 ${state.activeField==='w'?'input-focus':''}">
+                        ${state.userAnswer.w}
+                    </div>
+                    <span class="text-[8px] font-bold text-slate-400 uppercase">整數</span>
+                </div>`;
+            }
+
+            if (state.answerMode === 'proper' || state.answerMode === 'mixed') {
+                inputHtml += `
+                <div class="flex flex-col gap-2">
+                    <div onclick="setActiveField('n')" class="cursor-pointer flex flex-col items-center">
+                        <div id="box-n" class="w-12 h-10 md:w-16 md:h-14 bg-white border-2 border-slate-200 rounded-lg flex items-center justify-center text-lg md:text-2xl font-black text-slate-700 ${state.activeField==='n'?'input-focus':''}">
+                            ${state.userAnswer.n}
+                        </div>
+                    </div>
+                    <div class="fraction-line"></div>
+                    <div onclick="setActiveField('d')" class="cursor-pointer flex flex-col items-center">
+                        <div id="box-d" class="w-12 h-10 md:w-16 md:h-14 bg-white border-2 border-slate-200 rounded-lg flex items-center justify-center text-lg md:text-2xl font-black text-slate-700 ${state.activeField==='d'?'input-focus':''}">
+                            ${state.userAnswer.d}
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            inputHtml += `</div>
+
+                <div class="flex flex-col items-center gap-3 w-full max-w-2xl mt-2">
+                    <div class="keypad-container gap-1 md:gap-2">
+                        ${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(k => `
+                            <button onclick="pressKey('${k}')" class="key-btn flex-1 min-w-[36px] h-12 md:h-16 bg-white border border-slate-200 rounded-lg text-lg md:text-2xl font-black text-slate-700 shadow-sm">
+                                ${k}
+                            </button>
+                        `).join('')}
+                        <button onclick="pressKey('delete')" class="key-btn flex-1 min-w-[45px] h-12 md:h-16 bg-slate-100 border border-slate-200 rounded-lg flex items-center justify-center text-slate-600 shadow-sm">
+                            <i data-lucide="delete" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                    <button onclick="checkAnswer()" class="w-full h-12 md:h-16 bg-blue-600 text-white rounded-xl font-black text-base md:text-xl shadow-lg active:scale-95 transition-all mt-1">提交答案</button>
+                </div>
+            </div>`;
+            return inputHtml;
+        }
+
+        function formatFractionHTML(f) {
+            let html = `<div class="flex items-center gap-2 text-xl md:text-4xl font-bold text-slate-700">`;
+            if (f.w !== 0) html += `<span class="px-1">${f.w}</span>`;
+            if (f.n !== 0) {
+                html += `
+                <div class="flex flex-col items-center justify-center px-1">
+                    <div class="border-b-2 md:border-b-4 border-slate-700 pb-0.5 px-2 leading-none text-base md:text-3xl">${f.n}</div>
+                    <div class="pt-0.5 px-2 leading-none text-base md:text-3xl">${f.d}</div>
+                </div>`;
+            }
+            if (f.w === 0 && f.n === 0) html += `<span>0</span>`;
+            html += `</div>`;
+            return html;
+        }
+
+        function setActiveField(field) {
+            state.activeField = field;
+            ['w', 'n', 'd'].forEach(f => {
+                const el = document.getElementById(`box-${f}`);
+                if (el) {
+                    if (f === field) el.classList.add('input-focus');
+                    else el.classList.remove('input-focus');
+                }
+            });
+        }
+
+        function pressKey(key) {
+            let field = state.activeField;
+            if (key === 'delete') {
+                state.userAnswer[field] = state.userAnswer[field].slice(0, -1);
+            } else {
+                if (state.userAnswer[field].length < 3) state.userAnswer[field] += key;
+            }
+            const el = document.getElementById(`box-${field}`);
+            if (el) el.innerText = state.userAnswer[field];
+        }
+
+        function startLevel(idx) {
+            state.gameState = 'playing'; state.currentLevel = idx; state.currentSubLevel = 0;
+            state.answerMode = null; generateQuestion(); render();
+        }
+
+        function generateQuestion() {
+            const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+            const getDiffD = () => {
+                const d1 = rand(2, 9);
+                let d2 = rand(2, 9);
+                while (d2 === d1) d2 = rand(2, 9);
+                return [d1, d2];
+            };
+
+            let q = { op: '', f1: null, f2: null, ans: null };
+            const lvl = levels[state.currentLevel]; const sub = state.currentSubLevel;
+
+            if (lvl.type === 'add' || lvl.type === 'sub') {
+                const op = lvl.type === 'add' ? '+' : '-';
+                q.op = op;
+                const [d1, d2] = getDiffD();
+                if (lvl.type === 'add') {
+                    if (sub === 0) { q.f1 = new Fraction(0, rand(1, d1-1), d1); q.f2 = new Fraction(0, rand(1, d2-1), d2); }
+                    else if (sub === 1) { q.f1 = new Fraction(rand(1, 2), 1, d1); q.f2 = new Fraction(rand(1, 2), 1, d2); }
+                    else { q.f1 = new Fraction(rand(1, 2), d1-1, d1); q.f2 = new Fraction(rand(1, 2), d2-1, d2); }
+                } else {
+                    if (sub === 0) { q.f1 = new Fraction(0, d1-1, d1); q.f2 = new Fraction(0, 1, d2); }
+                    else if (sub === 1) { q.f1 = new Fraction(4, d1-1, d1); q.f2 = new Fraction(1, 1, d2); }
+                    else if (sub === 2) { q.f1 = new Fraction(4, 1, d1); q.f2 = new Fraction(1, d2-1, d2); }
+                    else { q.f1 = new Fraction(rand(4, 5), 0, 1); q.f2 = new Fraction(rand(1, 2), 1, d2); }
+                }
+                let t1 = (q.f1.w * q.f1.d + q.f1.n) * q.f2.d;
+                let t2 = (q.f2.w * q.f2.d + q.f2.n) * q.f1.d;
+                q.ans = new Fraction(0, op === '+' ? t1 + t2 : t1 - t2, q.f1.d * q.f2.d);
+            } 
+            else if (lvl.type === 'mul' || lvl.type === 'div') {
+                const factor = rand(2, 3);
+                const d1 = factor * rand(1, 3); 
+                const d2 = factor * rand(1, 3);
+                q.op = lvl.type === 'mul' ? '×' : '÷';
+                if (lvl.type === 'mul') {
+                    if (sub === 0) { q.f1 = new Fraction(rand(2, 4), 0, 1); q.f2 = new Fraction(0, 1, q.f1.w); }
+                    else if (sub === 1) { q.f1 = new Fraction(0, 1, factor); q.f2 = new Fraction(factor * rand(1, 2), 0, 1); }
+                    else if (sub === 2) { q.f1 = new Fraction(0, factor, rand(4, 9)); q.f2 = new Fraction(0, rand(1, 3), factor); }
+                    else { q.f1 = new Fraction(1, 1, factor); q.f2 = new Fraction(1, 1, factor); }
+                    q.ans = new Fraction(0, (q.f1.w * q.f1.d + q.f1.n) * (q.f2.w * q.f2.d + q.f2.n), q.f1.d * q.f2.d);
+                } else {
+                    if (sub === 0) { q.f1 = new Fraction(0, factor, 9); q.f2 = new Fraction(factor, 0, 1); }
+                    else if (sub === 1) { q.f1 = new Fraction(0, 1, factor); q.f2 = new Fraction(0, 1, factor*2); }
+                    else if (sub === 2) { q.f1 = new Fraction(factor * 2, 0, 1); q.f2 = new Fraction(0, factor, 5); }
+                    else { q.f1 = new Fraction(1, 1, factor); q.f2 = new Fraction(1, 1, factor); }
+                    q.ans = new Fraction(0, (q.f1.w * q.f1.d + q.f1.n) * q.f2.d, q.f1.d * (q.f2.w * q.f2.d + q.f2.n));
+                }
+            }
+            q.ans.simplify(); state.question = q;
+        }
+
+        function checkAnswer() {
+            const { w, n, d } = state.userAnswer;
+            const vW = parseInt(w || 0); const vN = parseInt(n || 0); const vD = parseInt(d || 1);
+            if (state.answerMode === 'mixed' && vW > 0 && vN >= vD) {
+                renderResult(false, "注意：帶分數的分數部分必須是「真分數」喔！"); return;
+            }
+            const userFrac = Fraction.fromString(w, n, d);
+            if (userFrac.isEqual(state.question.ans)) {
+                state.score += 10; renderResult(true, "太棒了！計算正確！");
+            } else renderResult(false, "答案不太對喔，再檢查一下！");
+        }
+
+        function renderResult(isCorrect, message) {
+            const container = document.getElementById('answer-area');
+            container.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-6 space-y-4 animate-pop h-full w-full">
+                <div class="w-16 h-16 rounded-full flex items-center justify-center ${isCorrect ? 'bg-green-100 text-green-500' : 'bg-red-100 text-red-500'} shadow-md border-2 border-white">
+                    <i data-lucide="${isCorrect ? 'check' : 'x'}" class="w-10 h-10"></i>
+                </div>
+                <h2 class="text-xl font-black ${isCorrect ? 'text-green-700' : 'text-red-700'}">${message}</h2>
+                <button onclick="${isCorrect ? 'handleNext()' : 'retry()'}" 
+                    class="w-full max-w-xs py-4 rounded-xl font-black text-lg text-white shadow-md active:scale-95 transition-all ${isCorrect ? 'bg-green-600' : 'bg-red-600'}">
+                    ${isCorrect ? '下一題' : '重試一下'}
+                </button>
+            </div>`;
+            lucide.createIcons();
+        }
+
+        function retry() { render(); }
+        function handleNext() {
+            state.currentSubLevel++; state.userAnswer = { w: '', n: '', d: '' };
+            if (state.currentSubLevel < levels[state.currentLevel].subs.length) { generateQuestion(); state.answerMode = null; render(); }
+            else { state.currentLevel++; if (state.currentLevel < levels.length) state.gameState = 'level-complete'; else state.gameState = 'finished'; render(); }
+        }
+
+        function renderLevelComplete(container) {
+            container.innerHTML = `
+            <div class="text-center py-6 space-y-5 animate-pop">
+                <div class="inline-flex items-center justify-center w-20 h-20 bg-yellow-100 text-yellow-500 rounded-full shadow-inner">
+                    <i data-lucide="award" class="w-10 h-10"></i>
+                </div>
+                <h2 class="text-2xl font-black text-slate-800">闖關成功！</h2>
+                <div class="flex flex-col gap-3 max-w-xs mx-auto">
+                    <button onclick="goToMenu()" class="bg-white border-2 border-slate-100 py-3 rounded-xl font-black text-slate-500 text-sm">返回選單</button>
+                    <button onclick="startLevel(${state.currentLevel})" class="bg-blue-600 text-white py-3 rounded-xl font-black shadow-md text-sm">挑戰下一關</button>
+                </div>
+            </div>`;
+        }
+
+        function renderFinished(container) {
+            container.innerHTML = `
+            <div class="text-center py-6 space-y-5 animate-pop">
+                <div class="inline-flex items-center justify-center w-20 h-20 bg-indigo-100 text-indigo-500 rounded-full">
+                    <i data-lucide="trophy" class="w-10 h-10"></i>
+                </div>
+                <h2 class="text-3xl font-black text-slate-800">分數全能大師！</h2>
+                <div class="bg-slate-50 p-6 rounded-2xl border-2 border-white shadow-inner max-w-xs mx-auto">
+                    <div class="text-[10px] text-slate-400 font-black uppercase mb-1">總積分</div>
+                    <div class="text-5xl font-black text-blue-600">${state.score}</div>
+                </div>
+                <button onclick="restart()" class="w-full max-w-xs mx-auto flex items-center justify-center gap-2 bg-blue-600 text-white py-4 rounded-xl font-black text-lg active:scale-95">
+                    <i data-lucide="refresh-ccw" class="w-5 h-5"></i> 重新開始
+                </button>
+            </div>`;
+        }
+
+        // --- 核心變動：設定輸入模式與初始焦點 ---
+        function setMode(m) { 
+            state.answerMode = m; 
+            state.userAnswer = { w: '', n: '', d: '' }; 
+            
+            // 預設填寫順序邏輯
+            if (m === 'integer') {
+                state.activeField = 'w';
+            } else if (m === 'proper') {
+                state.activeField = 'd'; // 真/假分數：預設先填分母
+            } else if (m === 'mixed') {
+                state.activeField = 'w'; // 帶分數：預設先填整數 (之後順序: 整數 -> 分母 -> 分子)
+            }
+            
+            render(); 
+        }
+
+        function resetMode() { state.answerMode = null; render(); }
+        function goToMenu() { state.gameState = 'menu'; render(); }
+        function restart() { state.score = 0; state.gameState = 'menu'; render(); }
+        function getModeName(m) { return m === 'integer' ? '整數' : m === 'proper' ? '真/假分數' : '帶分數'; }
+
+        render();
+    </script>
+</body>
+</html>

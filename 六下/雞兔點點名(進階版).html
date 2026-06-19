@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>雞兔點點名 - 邏輯挑戰版</title>
+    <style>
+        :root {
+            --table-green: #2d5a27;
+            --primary: #f1c40f;
+            --white: #ffffff;
+            --dark: #2c3e50;
+            --secondary: #3498db;
+            --success: #27ae60;
+            --error: #e74c3c;
+        }
+
+        body {
+            font-family: 'Segoe UI', "Microsoft JhengHei", sans-serif;
+            background-color: #1a1a1a;
+            margin: 0;
+            overflow: hidden;
+            color: var(--white);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* 啟動與設定畫面 */
+        #start-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, #34495e 0%, #2c3e50 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+            text-align: center;
+        }
+
+        .start-box {
+            background: rgba(255,255,255,0.1);
+            padding: 30px;
+            border-radius: 30px;
+            border: 2px solid var(--primary);
+            backdrop-filter: blur(10px);
+            width: 420px;
+        }
+
+        .start-box h1 { margin-top: 0; color: var(--primary); font-size: 2.2rem; }
+        
+        /* 牌桌容器 */
+        #table {
+            width: 98vw;
+            height: 95vh;
+            max-width: 1200px;
+            max-height: 850px;
+            background: radial-gradient(circle, var(--table-green) 0%, #1e3d1a 100%);
+            border: 12px solid #5d4037;
+            border-radius: 120px;
+            position: relative;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.5), 0 20px 50px rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            visibility: hidden;
+        }
+
+        .player-area {
+            position: absolute;
+            bottom: 20px;
+            width: 95%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .leg-count { font-weight: bold; color: var(--primary); font-size: 1.3rem; margin-top: 5px; }
+
+        .hand { 
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            min-height: 120px;
+            gap: 5px;
+            flex-wrap: wrap; 
+            max-height: 220px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        
+        .card {
+            width: 65px; height: 95px;
+            background: white; border-radius: 8px;
+            color: black; display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            cursor: pointer; transition: transform 0.2s;
+            padding: 5px; box-sizing: border-box;
+        }
+        .card:hover { transform: translateY(-10px); }
+
+        .card-val { font-size: 0.8rem; font-weight: bold; color: #666; margin-top: 4px; }
+        .card-svg { width: 100%; height: 50px; }
+
+        .center-area {
+            display: flex; flex-direction: column; align-items: center; gap: 15px; z-index: 5;
+            margin-bottom: 220px;
+        }
+
+        .target-box {
+            background: rgba(0,0,0,0.7); padding: 15px 30px;
+            border-radius: 15px; border: 2px solid var(--primary); text-align: center;
+        }
+        .target-stats { font-size: 1.8rem; font-weight: bold; color: var(--primary); }
+
+        .flying-card {
+            position: fixed; z-index: 2000; pointer-events: none;
+            transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        .piles { display: flex; gap: 40px; }
+        .pile {
+            width: 70px; height: 100px;
+            border-radius: 8px; border: 2px dashed rgba(255,255,255,0.3);
+            display: flex; justify-content: center; align-items: center;
+        }
+        .draw-pile { background: linear-gradient(135deg, #7f8c8d 0%, #34495e 100%); border: none; }
+
+        .status-container { display: flex; gap: 10px; margin-top: 10px; justify-content: center; }
+        .status-tag {
+            padding: 5px 15px; border-radius: 20px; font-size: 0.9rem; font-weight: bold;
+        }
+        .tag-prediction { background: var(--secondary); color: white; }
+        .tag-swaps { background: var(--error); color: white; }
+
+        /* 彈窗與引導 */
+        #modal-overlay {
+            position: fixed; top:0; left:0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); display: none;
+            justify-content: center; align-items: center; z-index: 4000;
+        }
+
+        .modal {
+            background: white; color: #333; padding: 25px;
+            border-radius: 25px; width: 620px; text-align: center;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+            max-height: 95vh; overflow-y: auto;
+        }
+
+        .completed-equations { text-align: left; margin-bottom: 10px; }
+        .equation-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        .equation-item { 
+            background: #e8f5e9; padding: 10px 14px; border-radius: 8px;
+            font-size: 1.1rem; font-weight: bold; color: var(--success);
+            border-left: 5px solid var(--success); flex: 1;
+            white-space: nowrap;
+        }
+        .equation-desc {
+            font-size: 0.9rem; color: #444; font-weight: bold; flex: 1.8;
+            line-height: 1.4;
+        }
+
+        .math-display {
+            background: #f1f1f1; padding: 15px; border-radius: 10px;
+            font-size: 1.8rem; min-height: 2.2rem; margin-bottom: 15px;
+            font-weight: bold; border: 2px solid #ccc; display: flex;
+            justify-content: center; align-items: center; color: #222;
+        }
+
+        .math-keypad {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+        }
+
+        .key {
+            padding: 15px 0; background: #fff; border: 1px solid #ddd;
+            border-radius: 10px; font-size: 1.4rem; font-weight: bold;
+            cursor: pointer; box-shadow: 0 3px 0 #ccc; user-select: none;
+            color: #333;
+        }
+        .key:active { transform: translateY(2px); box-shadow: 0 1px 0 #ccc; }
+        .key.op { background: #e3f2fd; color: var(--secondary); }
+        .key.action { background: #ffebee; color: var(--error); }
+        .key.submit { background: var(--success); color: white; grid-column: span 2; box-shadow: 0 4px 0 #1e8449; }
+
+        .guide-hint { 
+            font-size: 1.05rem; color: #444; margin-bottom: 15px; 
+            background: #fffde7; padding: 12px; border-radius: 10px; 
+            border-left: 5px solid var(--primary); text-align: left;
+            line-height: 1.5;
+        }
+
+        .radio-group { display: flex; gap: 10px; margin: 15px 0; }
+        .radio-btn {
+            flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 10px;
+            cursor: pointer; font-weight: bold; background: white;
+            display: flex; justify-content: center; align-items: center;
+            color: #333; transition: all 0.2s;
+        }
+        .radio-btn.selected { border-color: var(--secondary); background: #e3f2fd; color: var(--secondary); }
+
+        button.primary-btn {
+            background: var(--success); color: white; border: none; padding: 12px 30px;
+            border-radius: 40px; font-size: 1.1rem; cursor: pointer; box-shadow: 0 4px 0 #1e8449;
+        }
+
+        #game-msg {
+            position: absolute; top: 130px; font-size: 1.1rem;
+            background: rgba(0,0,0,0.6); padding: 8px 30px; border-radius: 30px; color: var(--primary);
+        }
+    </style>
+</head>
+<body onclick="resumeAudio()">
+
+<div id="start-screen">
+    <div class="start-box">
+        <h1>🐤 雞兔點點名：挑戰 🐰</h1>
+        <div id="target-setup-info" style="font-size: 1.2rem; color: #fff; margin: 15px 0; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px;">
+            題目載入中...
+        </div>
+        
+        <div style="text-align:left; color:#fff;">
+            <label>1. 選擇起始手牌：</label>
+            <div class="radio-group">
+                <div class="radio-btn selected" id="opt-chicken" onclick="setAdvancedType('chicken')">全部都是雞</div>
+                <div class="radio-btn" id="opt-rabbit" onclick="setAdvancedType('rabbit')">全部都是兔</div>
+            </div>
+            
+            <label>2. 預測需更換幾張牌能達成目標？</label>
+            <input type="number" id="predict-input" style="width:100%; padding:12px; margin-top:8px; border-radius:10px; border:none; font-size:1.1rem; color:#333;" placeholder="請輸入交換次數">
+        </div>
+
+        <button class="primary-btn" style="margin-top:25px; width: 100%;" onclick="startGame()">開始挑戰</button>
+    </div>
+</div>
+
+<div id="table">
+    <div id="game-msg">請點擊卡片更換動物</div>
+
+    <div class="center-area">
+        <div class="target-box">
+            <h3 style="margin:0; font-size: 0.9rem; color:#aaa; letter-spacing: 1px;">目標任務</h3>
+            <div id="target-info" class="target-stats">-- 隻，-- 隻腳</div>
+            <div class="status-container">
+                <div class="status-tag tag-prediction">預測：<span id="display-prediction">0</span> 次</div>
+                <div class="status-tag tag-swaps">已換：<span id="swap-count">0</span> 次</div>
+            </div>
+        </div>
+        
+        <div class="piles">
+            <div class="pile draw-pile" id="draw-pile"></div>
+            <div class="pile discard-pile" id="discard-pile">
+                <div id="last-discard-ui"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="player-0" class="player-area">
+        <div class="hand" id="hand-0"></div>
+        <div class="leg-count" id="leg-0">0 隻腳</div>
+        <div style="font-size: 0.9rem; color: #ccc; margin-top: 5px;">你的目前手牌</div>
+    </div>
+</div>
+
+<div id="modal-overlay">
+    <div class="modal" id="modal-content"></div>
+</div>
+
+<script>
+    // --- 音效管理 ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function resumeAudio() { if (audioCtx.state === 'suspended') audioCtx.resume(); }
+    function playSound(type) {
+        if (audioCtx.state === 'suspended') return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        const now = audioCtx.currentTime;
+        if (type === 'deal') {
+            osc.frequency.setValueAtTime(800, now); osc.frequency.exponentialRampToValueAtTime(400, now+0.1);
+            gain.gain.setValueAtTime(0.08, now); gain.gain.exponentialRampToValueAtTime(0.01, now+0.1);
+            osc.start(now); osc.stop(now+0.1);
+        } else if (type === 'correct') {
+            osc.frequency.setValueAtTime(523, now); osc.frequency.setValueAtTime(659, now+0.1); osc.frequency.setValueAtTime(783, now+0.2);
+            gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now+0.4);
+            osc.start(now); osc.stop(now+0.4);
+        } else if (type === 'wrong') {
+            osc.frequency.setValueAtTime(220, now); osc.frequency.linearRampToValueAtTime(110, now+0.3);
+            gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now+0.3);
+            osc.start(now); osc.stop(now+0.3);
+        }
+    }
+
+    const CHICKEN_SVG = `<svg class="card-svg" viewBox="0 0 100 100"><circle cx="50" cy="45" r="25" fill="#FFEB3B"/><path d="M75,40 L85,45 L75,50 Z" fill="#FF9800"/><circle cx="60" cy="38" r="3" fill="black"/><path d="M40,70 L40,85 M60,70 L60,85 M35,85 L45,85 M55,85 L65,85" stroke="#FF9800" stroke-width="4" stroke-linecap="round"/><path d="M30,45 Q20,35 30,25" fill="none" stroke="#FFEB3B" stroke-width="4"/></svg>`;
+    const RABBIT_SVG = `<svg class="card-svg" viewBox="0 0 100 100"><ellipse cx="50" cy="55" r="30" rx="35" ry="25" fill="#f0f0f0"/><circle cx="70" cy="45" r="18" fill="#f0f0f0"/><ellipse cx="65" cy="20" rx="6" ry="15" fill="#f0f0f0" transform="rotate(-10, 65, 20)"/><ellipse cx="75" cy="20" rx="6" ry="15" fill="#f0f0f0" transform="rotate(10, 75, 20)"/><circle cx="80" cy="42" r="2" fill="black"/><path d="M30,75 L30,90 M45,75 L45,90 M60,75 L60,90 M75,75 L75,90" stroke="#d0d0d0" stroke-width="4" stroke-linecap="round"/><circle cx="20" cy="55" r="8" fill="#f0f0f0"/></svg>`;
+    const CHICKEN = { id: 'chicken', name: '雞', legs: 2, svg: CHICKEN_SVG };
+    const RABBIT = { id: 'rabbit', name: '兔', legs: 4, svg: RABBIT_SVG };
+
+    let state = {
+        target: { heads: 0, legs: 0 },
+        hand: [],
+        swapsCount: 0,
+        prediction: 0,
+        advancedStartType: 'chicken',
+        isAnimating: false,
+        guideStep: 1,
+        currentMathInput: "",
+        correctEquations: []
+    };
+
+    function initNewProblem() {
+        // 動物數量限制為 5 ~ 16 隻
+        const heads = Math.floor(Math.random() * 12) + 5; 
+        
+        let rabbits;
+        // 提高答案介於 4~8 次之間的機率
+        if (Math.random() < 0.75) {
+            const minW = Math.max(1, 4);
+            const maxW = Math.min(heads - 1, 8);
+            rabbits = (maxW >= minW) ? Math.floor(Math.random() * (maxW - minW + 1)) + minW : Math.floor(Math.random() * (heads - 1)) + 1;
+        } else {
+            rabbits = Math.floor(Math.random() * (heads - 1)) + 1;
+        }
+        state.target = { heads, legs: rabbits * 4 + (heads - rabbits) * 2 };
+        document.getElementById('target-setup-info').innerHTML = `目標：共 <b>${state.target.heads}</b> 隻，<b>${state.target.legs}</b> 隻腳`;
+    }
+
+    function setAdvancedType(type) {
+        state.advancedStartType = type;
+        document.getElementById('opt-chicken').classList.toggle('selected', type === 'chicken');
+        document.getElementById('opt-rabbit').classList.toggle('selected', type === 'rabbit');
+    }
+
+    function startGame() {
+        const predInput = document.getElementById('predict-input');
+        const pred = parseInt(predInput.value);
+        if (isNaN(pred) || pred < 0) {
+            alert("請輸入預測次數！");
+            return;
+        }
+        state.prediction = pred;
+        state.swapsCount = 0;
+        state.isGameOver = false;
+        state.correctEquations = [];
+        document.getElementById('swap-count').innerText = "0";
+        document.getElementById('display-prediction').innerText = pred;
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('table').style.visibility = 'visible';
+        document.getElementById('target-info').innerText = `${state.target.heads} 隻，${state.target.legs} 隻腳`;
+
+        state.hand = [];
+        const type = state.advancedStartType === 'chicken' ? CHICKEN : RABBIT;
+        for(let i=0; i<state.target.heads; i++) state.hand.push({...type});
+        renderHand();
+    }
+
+    function renderHand() {
+        const handEl = document.getElementById('hand-0');
+        handEl.innerHTML = '';
+        state.hand.forEach((card, idx) => {
+            const cardDiv = document.createElement('div');
+            cardDiv.className = 'card';
+            cardDiv.id = `card-0-${idx}`;
+            cardDiv.innerHTML = `${card.svg}<div class="card-val">${card.legs} 隻腳</div>`;
+            cardDiv.onclick = () => handleSwap(idx);
+            handEl.appendChild(cardDiv);
+        });
+        const curLegs = state.hand.reduce((s, c) => s + c.legs, 0);
+        const legDisplay = document.getElementById('leg-0');
+        legDisplay.innerText = `${curLegs} 隻腳`;
+        legDisplay.style.color = curLegs === state.target.legs ? 'var(--success)' : 'var(--primary)';
+    }
+
+    async function handleSwap(idx) {
+        if (state.isAnimating || state.isGameOver) return;
+        state.isAnimating = true;
+        
+        const cardEl = document.getElementById(`card-0-${idx}`);
+        const discardPile = document.getElementById('discard-pile');
+        const drawPile = document.getElementById('draw-pile');
+
+        await flyCard(cardEl, discardPile);
+        const discarded = {...state.hand[idx]};
+        document.getElementById('last-discard-ui').innerHTML = `<div class="card" style="cursor:default">${discarded.svg}<div class="card-val">${discarded.legs} 隻腳</div></div>`;
+
+        const newType = discarded.id === 'chicken' ? {...RABBIT} : {...CHICKEN};
+        state.hand[idx] = newType;
+        state.swapsCount++;
+        document.getElementById('swap-count').innerText = state.swapsCount;
+
+        cardEl.style.visibility = 'hidden';
+        renderHand();
+        const newCardEl = document.getElementById(`card-0-${idx}`);
+        newCardEl.style.visibility = 'hidden';
+        
+        playSound('deal');
+        await flyCard(drawPile, newCardEl, newType);
+        newCardEl.style.visibility = 'visible';
+
+        state.isAnimating = false;
+        checkWinner();
+    }
+
+    function flyCard(fromEl, toEl, cardData = null) {
+        return new Promise(resolve => {
+            const fromRect = fromEl.getBoundingClientRect();
+            const toRect = toEl.getBoundingClientRect();
+            const flyer = document.createElement('div');
+            flyer.className = 'card flying-card';
+            flyer.innerHTML = cardData ? `${cardData.svg}` : fromEl.innerHTML;
+            flyer.style.left = fromRect.left + 'px';
+            flyer.style.top = fromRect.top + 'px';
+            document.body.appendChild(flyer);
+            flyer.offsetHeight;
+            flyer.style.left = toRect.left + 'px';
+            flyer.style.top = toRect.top + 'px';
+            setTimeout(() => { flyer.remove(); resolve(); }, 500);
+        });
+    }
+
+    function checkWinner() {
+        const curLegs = state.hand.reduce((s, c) => s + c.legs, 0);
+        if (curLegs === state.target.legs) {
+            state.isGameOver = true;
+            setTimeout(showResult, 600);
+        }
+    }
+
+    function showResult() {
+        const modal = document.getElementById('modal-overlay');
+        const content = document.getElementById('modal-content');
+        modal.style.display = 'flex';
+        
+        if (state.swapsCount === state.prediction) {
+            playSound('correct');
+            content.innerHTML = `<h2>🎉 預測成功！</h2><p>你預測換 <b>${state.prediction}</b> 次，實際也是 <b>${state.swapsCount}</b> 次！<br>現在讓我們來用算式記錄解題邏輯。</p><button class="primary-btn" onclick="startGuidance()">進入算式引導</button>`;
+        } else {
+            playSound('wrong');
+            content.innerHTML = `<h2>❌ 預測不符</h2><p>你預測換 <b>${state.prediction}</b> 次，但實際更換了 <b>${state.swapsCount}</b> 次。<br>請重新挑戰！</p><button class="key submit" style="grid-column: span 4;" onclick="resetGame()">重新挑戰</button>`;
+        }
+    }
+
+    function startGuidance() {
+        state.guideStep = 1;
+        state.currentMathInput = "";
+        state.correctEquations = [];
+        updateGuidanceUI();
+    }
+
+    function addKey(val) {
+        state.currentMathInput += val;
+        document.getElementById('math-display').innerText = state.currentMathInput;
+    }
+
+    function backspaceKey() {
+        state.currentMathInput = state.currentMathInput.slice(0, -1);
+        document.getElementById('math-display').innerText = state.currentMathInput;
+    }
+
+    function updateGuidanceUI() {
+        const content = document.getElementById('modal-content');
+        const isStartChicken = (state.advancedStartType === 'chicken');
+        const sType = isStartChicken ? '雞' : '兔';
+        const sLegs = isStartChicken ? 2 : 4;
+        const tType = isStartChicken ? '兔' : '雞';
+        const tLegs = isStartChicken ? 4 : 2;
+        
+        let hint = "";
+        let stepDesc = "";
+        let validationData = {};
+
+        if (state.guideStep === 1) {
+            hint = `假設全部都是${sType}，${state.target.heads} 隻共有幾隻腳？`;
+            validationData = { op: '×', operands: [sLegs, state.target.heads], result: sLegs * state.target.heads };
+            stepDesc = `假設 ${state.target.heads} 隻全部都是${sType}，會有 ${sLegs * state.target.heads} 隻腳`;
+        } else if (state.guideStep === 2) {
+            const startTotal = sLegs * state.target.heads;
+            const big = Math.max(state.target.legs, startTotal);
+            const small = Math.min(state.target.legs, startTotal);
+            const diff = big - small;
+            hint = `這和目標(${state.target.legs} 隻腳)的總腳數相差多少？`;
+            validationData = { op: '-', operands: [big, small], result: diff };
+            stepDesc = `跟目標腳數相差 ${diff} 隻腳`;
+        } else if (state.guideStep === 3) {
+            const diffTypeWord = isStartChicken ? "多" : "少";
+            hint = `每把一隻${sType}換成一隻${tType}，總腳數會${diffTypeWord}幾隻腳？`;
+            validationData = { op: '-', operands: [Math.max(tLegs, sLegs), Math.min(tLegs, sLegs)], result: 2 };
+            stepDesc = `每把一隻${sType}換成一隻${tType}會${diffTypeWord} 2 隻腳`;
+        } else if (state.guideStep === 4) {
+            const diff = Math.abs(state.target.legs - (sLegs * state.target.heads));
+            const resultSwaps = diff / 2;
+            hint = `算算看總共要把幾隻${sType}換成幾隻${tType}？`;
+            validationData = { op: '÷', operands: [diff, 2], result: resultSwaps };
+            stepDesc = `總共要把 ${resultSwaps} 隻${sType}換成${tType}`;
+        } else if (state.guideStep === 5) {
+            const diff = Math.abs(state.target.legs - (sLegs * state.target.heads));
+            const swappedCount = diff / 2;
+            const remainingCount = state.target.heads - swappedCount;
+            hint = `現在還剩下幾隻${sType}？`;
+            validationData = { op: '-', operands: [state.target.heads, swappedCount], result: remainingCount };
+            stepDesc = `最後剩下 ${remainingCount} 隻${sType}`;
+        }
+
+        let completedHtml = state.correctEquations.map(item => `
+            <div class="equation-row">
+                <div class="equation-item">${item.eq}</div>
+                <div class="equation-desc">「${item.desc}」</div>
+            </div>
+        `).join('');
+
+        content.innerHTML = `
+            <h3>解題紀錄 (${state.guideStep}/5)</h3>
+            <div class="completed-equations">${completedHtml}</div>
+            <div class="guide-hint">${hint}</div>
+            <div class="math-display" id="math-display">${state.currentMathInput}</div>
+            <div class="math-keypad">
+                <div class="key" onclick="addKey('1')">1</div><div class="key" onclick="addKey('2')">2</div><div class="key" onclick="addKey('3')">3</div><div class="key op" onclick="addKey('+')">+</div>
+                <div class="key" onclick="addKey('4')">4</div><div class="key" onclick="addKey('5')">5</div><div class="key" onclick="addKey('6')">6</div><div class="key op" onclick="addKey('-')">-</div>
+                <div class="key" onclick="addKey('7')">7</div><div class="key" onclick="addKey('8')">8</div><div class="key" onclick="addKey('9')">9</div><div class="key op" onclick="addKey('×')">×</div>
+                <div class="key action" onclick="backspaceKey()">⌫</div><div class="key" onclick="addKey('0')">0</div><div class="key op" onclick="addKey('=')">=</div><div class="key op" onclick="addKey('÷')">÷</div>
+                <button class="key submit" id="check-btn">送出檢查</button>
+            </div>
+        `;
+        document.getElementById('check-btn').onclick = () => validateStep(validationData, stepDesc);
+    }
+
+    function validateStep(data, stepDesc) {
+        const input = state.currentMathInput;
+        const parts = input.split(/[=×÷\-+]/);
+        if (parts.length < 3) { failFeedback(); return; }
+        if (!input.includes(data.op) || !input.includes('=')) { failFeedback(); return; }
+
+        const inputResult = parseInt(parts[parts.length - 1]);
+        const inputOperands = parts.slice(0, parts.length - 1).map(p => parseInt(p));
+        if (inputResult !== data.result) { failFeedback(); return; }
+
+        if (data.op === '×' || data.op === '+') {
+            const sortedInput = [...inputOperands].sort((a,b)=>a-b);
+            const sortedTarget = [...data.operands].sort((a,b)=>a-b);
+            if (JSON.stringify(sortedInput) !== JSON.stringify(sortedTarget)) { failFeedback(); return; }
+        } else {
+            if (inputOperands[0] !== data.operands[0] || inputOperands[1] !== data.operands[1]) { failFeedback(); return; }
+        }
+
+        playSound('correct');
+        state.correctEquations.push({ eq: input, desc: stepDesc });
+        state.guideStep++;
+        state.currentMathInput = "";
+        if (state.guideStep > 5) { finishGuidance(); } else { updateGuidanceUI(); }
+    }
+
+    function failFeedback() {
+        playSound('wrong');
+        const display = document.getElementById('math-display');
+        display.style.borderColor = "var(--error)";
+        setTimeout(() => display.style.borderColor = "#ccc", 500);
+    }
+
+    function finishGuidance() {
+        document.getElementById('modal-content').innerHTML = `
+            <h2>🌟 邏輯解密完成！</h2>
+            <div class="completed-equations">
+                ${state.correctEquations.map(item => `
+                    <div class="equation-row">
+                        <div class="equation-item">${item.eq}</div>
+                        <div class="equation-desc">「${item.desc}」</div>
+                    </div>
+                `).join('')}
+            </div>
+            <p>你已經完全掌握如何透過假設法推導答案了！</p>
+            <button class="primary-btn" onclick="resetGame()">再挑戰一題</button>
+        `;
+    }
+
+    function resetGame() {
+        document.getElementById('modal-overlay').style.display = 'none';
+        document.getElementById('table').style.visibility = 'hidden';
+        document.getElementById('start-screen').style.display = 'flex';
+        document.getElementById('predict-input').value = "";
+        initNewProblem();
+    }
+
+    window.onload = initNewProblem;
+</script>
+</body>
+</html>
