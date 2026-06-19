@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>面的大小比較 - 怪獸農場鋪草皮</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        .shape-draggable {
+            cursor: grab;
+            transition: opacity 0.2s;
+        }
+        .shape-draggable:active {
+            cursor: grabbing;
+        }
+        .grid-line {
+            background-image: linear-gradient(to right, rgba(0, 0, 0, 0.15) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(0, 0, 0, 0.15) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+    </style>
+</head>
+<body class="bg-lime-50 min-height-screen font-sans text-stone-800 flex flex-col">
+
+    <!-- HOME_BUTTON_START -->
+    <a href="index.html" style="position: fixed; top: 12px; left: 12px; z-index: 999999; background: rgba(101, 163, 13, 0.9); color: #ffffff; padding: 8px 16px; border-radius: 20px; text-decoration: none; font-family: system-ui, -apple-system, sans-serif; font-size: 14px; font-weight: bold; backdrop-filter: blur(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.1); transition: all 0.2s ease;" onmouseover="this.style.background='rgba(132, 204, 22, 1)'" onmouseout="this.style.background='rgba(101, 163, 13, 0.9)'">🏠 回試作選單</a>
+    <script>(function() { function adjustViewport() { var targetWidth = 1024; var screenWidth = window.innerWidth || document.documentElement.clientWidth || window.screen.width; if (screenWidth > 0 && screenWidth < targetWidth) { var scale = screenWidth / targetWidth; var meta = document.querySelector('meta[name="viewport"]'); if (!meta) { meta = document.createElement('meta'); meta.setAttribute('name', 'viewport'); document.head.appendChild(meta); } meta.setAttribute('content', 'width=' + targetWidth + ', initial-scale=' + scale + ', minimum-scale=' + scale + ', maximum-scale=2.0, user-scalable=yes'); } else { var meta = document.querySelector('meta[name="viewport"]'); if (meta) { meta.setAttribute('content', 'width=device-width, initial-scale=1.0'); } } } adjustViewport(); var timer = null; window.addEventListener('resize', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); window.addEventListener('orientationchange', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); })();</script>
+    <!-- HOME_BUTTON_END -->
+
+    <div class="max-w-4xl w-full mx-auto p-4 md:p-8 flex-1 flex flex-col justify-between mt-12">
+        
+        <!-- Header -->
+        <header class="text-center mb-6">
+            <span class="text-xs font-bold text-lime-700 bg-lime-200 px-3 py-1 rounded-full uppercase tracking-wider">單元十：面的大小比較</span>
+            <h1 class="text-3xl md:text-4xl font-extrabold text-lime-900 mt-2">🦖 怪獸農場鋪草皮</h1>
+            <p class="text-lime-800 text-sm mt-1">拖曳兩片草皮進行「疊合比較」，或開啟「方格紙」點數小格子，比出大小！</p>
+        </header>
+
+        <!-- Mode controls -->
+        <div class="flex justify-center gap-4 mb-4">
+            <button onclick="toggleGrid()" id="btn-grid" class="px-6 py-2 rounded-xl font-bold text-sm bg-white text-lime-700 shadow border-2 border-lime-200 hover:bg-lime-50">
+                <i class="fa-solid fa-table-cells"></i> 顯示方格紙
+            </button>
+            <button onclick="resetShapes()" class="px-6 py-2 rounded-xl font-bold text-sm bg-white text-lime-700 shadow border-2 border-lime-200 hover:bg-lime-50">
+                🔄 重置草皮位置
+            </button>
+        </div>
+
+        <!-- Workspace Arena -->
+        <div class="bg-white rounded-3xl p-6 shadow-xl border-4 border-lime-300 flex-1 flex flex-col justify-between min-h-[480px]">
+            
+            <!-- Grid Arena -->
+            <div class="relative w-full h-[260px] bg-lime-50/20 rounded-2xl border-2 border-lime-100 overflow-hidden" id="arena">
+                <!-- Grid background overlay (30px size) -->
+                <div id="grid-overlay" class="absolute inset-0 grid-line hidden"></div>
+                
+                <!-- Shape A (Blue grass) -->
+                <div id="shape-A" class="shape-draggable absolute bg-sky-500/80 border-2 border-sky-600 rounded flex flex-wrap" style="left: 60px; top: 50px; width: 120px; height: 120px;">
+                    <!-- Visual grids inside shape -->
+                    <div class="absolute inset-0 grid-line pointer-events-none opacity-40"></div>
+                    <span class="absolute top-2 left-2 font-black text-white text-xs select-none">草皮 Ａ</span>
+                </div>
+
+                <!-- Shape B (Green grass) -->
+                <div id="shape-B" class="shape-draggable absolute bg-emerald-500/80 border-2 border-emerald-600 rounded flex flex-wrap" style="left: 280px; top: 50px; width: 90px; height: 150px;">
+                    <div class="absolute inset-0 grid-line pointer-events-none opacity-40"></div>
+                    <span class="absolute top-2 left-2 font-black text-white text-xs select-none">草皮 Ｂ</span>
+                </div>
+            </div>
+
+            <!-- Dialogue & Compare selector -->
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                <!-- Speech bubble -->
+                <div class="bg-lime-50 border border-lime-200 rounded-2xl p-4 min-h-[90px] flex items-center">
+                    <p id="bot-speech" class="text-sm font-semibold text-lime-900">
+                        🦖 小恐龍阿綠說：「這兩塊草皮形狀不一樣呢！你可以拖曳【草皮 A】放到【草皮 B】上面重疊看看，或者按【顯示方格紙】來數數看格子數！」
+                    </p>
+                </div>
+
+                <!-- Selector -->
+                <div class="flex flex-col gap-2">
+                    <span class="text-xs font-black text-lime-800 block">請選出哪一塊草皮的面積比較大：</span>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="checkAnswer('A')" class="bg-white hover:bg-lime-100 text-lime-800 font-bold py-3 px-2 rounded-xl border border-lime-200 text-sm shadow-sm transition-all">草皮 A 較大</button>
+                        <button onclick="checkAnswer('B')" class="bg-white hover:bg-lime-100 text-lime-800 font-bold py-3 px-2 rounded-xl border border-lime-200 text-sm shadow-sm transition-all">草皮 B 較大</button>
+                        <button onclick="checkAnswer('same')" class="bg-white hover:bg-lime-100 text-lime-800 font-bold py-3 px-2 rounded-xl border border-lime-200 text-sm shadow-sm transition-all">一樣大</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Next / Feedback -->
+        <div class="mt-6 flex flex-col md:flex-row items-center justify-between gap-4 bg-lime-100 p-4 rounded-2xl border-2 border-lime-300">
+            <div id="feedback-text" class="text-md font-bold text-lime-900">
+                🦖 試著把兩片草皮拖曳到一塊，能直接比出多出來的部分喔！
+            </div>
+            <button id="btn-next" onclick="nextQuestion()" class="bg-lime-500 hover:bg-lime-600 text-white font-black px-8 py-3 rounded-2xl shadow-md border-b-4 border-lime-700 transition-all flex items-center gap-2">
+                下一題 <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Web Audio Synthesizer -->
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            if (type === 'correct') {
+                osc.frequency.setValueAtTime(523, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'click') {
+                osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            }
+        }
+    </script>
+
+    <!-- Logic -->
+    <script>
+        // Grid cell size is 30px
+        const GRID_CELL_SIZE = 30;
+
+        let widthCellsA = 4;
+        let heightCellsA = 4;
+        let widthCellsB = 3;
+        let heightCellsB = 5;
+
+        let areaA = 16; // Grid units
+        let areaB = 15; // Grid units
+
+        let showGridLines = false;
+
+        window.onload = () => {
+            initGame();
+            setupDragging('shape-A');
+            setupDragging('shape-B');
+        };
+
+        function initGame() {
+            // Randomize shapes sizes between 2 to 6 cells
+            widthCellsA = Math.floor(Math.random() * 3) + 3; // 3 to 5
+            heightCellsA = Math.floor(Math.random() * 3) + 3; // 3 to 5
+            
+            widthCellsB = Math.floor(Math.random() * 3) + 3; // 3 to 5
+            heightCellsB = Math.floor(Math.random() * 3) + 3; // 3 to 5
+
+            // Force L-shapes or rectangular configurations
+            // Let's stick to rectangular shapes for simple visual 2nd grade matching
+            areaA = widthCellsA * heightCellsA;
+            areaB = widthCellsB * heightCellsB;
+
+            // Update shapes CSS dimensions
+            const shapeA = document.getElementById('shape-A');
+            shapeA.style.width = `${widthCellsA * GRID_CELL_SIZE}px`;
+            shapeA.style.height = `${heightCellsA * GRID_CELL_SIZE}px`;
+
+            const shapeB = document.getElementById('shape-B');
+            shapeB.style.width = `${widthCellsB * GRID_CELL_SIZE}px`;
+            shapeB.style.height = `${heightCellsB * GRID_CELL_SIZE}px`;
+
+            resetShapes();
+        }
+
+        function resetShapes() {
+            playSound('click');
+            
+            const shapeA = document.getElementById('shape-A');
+            const shapeB = document.getElementById('shape-B');
+
+            // Place them side by side
+            shapeA.style.left = "60px";
+            shapeA.style.top = "50px";
+
+            shapeB.style.left = "280px";
+            shapeB.style.top = "50px";
+
+            document.getElementById('feedback-text').innerText = "🦖 拖曳綠色或藍色草皮，把一方移到另一方上面重疊！";
+            document.getElementById('feedback-text').className = "text-md font-bold text-lime-900";
+        }
+
+        function toggleGrid() {
+            playSound('click');
+            showGridLines = !showGridLines;
+            
+            const overlay = document.getElementById('grid-overlay');
+            const btn = document.getElementById('btn-grid');
+            
+            if (showGridLines) {
+                overlay.classList.remove('hidden');
+                btn.className = "px-6 py-2 rounded-xl font-bold text-sm bg-lime-600 text-white shadow border-2 border-lime-700";
+                document.getElementById('bot-speech').innerHTML = `🦖 小恐龍阿綠說：「方格紙跑出來囉！每一小格代表一個單位。<br>草皮 A 佔了 <b>${widthCellsA} × ${heightCellsA} = ${areaA}</b> 格，草皮 B 佔了 <b>${widthCellsB} × ${heightCellsB} = ${areaB}</b> 格！」`;
+            } else {
+                overlay.classList.add('hidden');
+                btn.className = "px-6 py-2 rounded-xl font-bold text-sm bg-white text-lime-700 shadow border-2 border-lime-200 hover:bg-lime-50";
+            }
+        }
+
+        function setupDragging(id) {
+            const el = document.getElementById(id);
+            const arena = document.getElementById('arena');
+            let isDragging = false;
+            let startX = 0, startY = 0;
+            let initialLeft = 0, initialTop = 0;
+
+            el.addEventListener('mousedown', dragStart);
+            el.addEventListener('touchstart', dragStart, { passive: true });
+
+            window.addEventListener('mousemove', dragMove);
+            window.addEventListener('touchmove', dragMove, { passive: false });
+
+            window.addEventListener('mouseup', dragEnd);
+            window.addEventListener('touchend', dragEnd);
+
+            function dragStart(e) {
+                isDragging = true;
+                const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+                const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+                
+                startX = clientX;
+                startY = clientY;
+                
+                initialLeft = parseFloat(el.style.left) || 0;
+                initialTop = parseFloat(el.style.top) || 0;
+
+                // Move current dragged element on top
+                el.style.zIndex = 100;
+                const otherId = id === 'shape-A' ? 'shape-B' : 'shape-A';
+                document.getElementById(otherId).style.zIndex = 10;
+            }
+
+            function dragMove(e) {
+                if (!isDragging) return;
+
+                const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+                const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+
+                let dx = clientX - startX;
+                let dy = clientY - startY;
+
+                let newLeft = initialLeft + dx;
+                let newTop = initialTop + dy;
+
+                // Boundaries
+                const maxLeft = arena.clientWidth - el.clientWidth;
+                const maxTop = arena.clientHeight - el.clientHeight;
+
+                if (newLeft < 0) newLeft = 0;
+                if (newLeft > maxLeft) newLeft = maxLeft;
+                if (newTop < 0) newTop = 0;
+                if (newTop > maxTop) newTop = maxTop;
+
+                el.style.left = `${newLeft}px`;
+                el.style.top = `${newTop}px`;
+            }
+
+            function dragEnd() {
+                if (!isDragging) return;
+                isDragging = false;
+                
+                // Snap to 30px grid cells to align nicely
+                let currentLeft = parseFloat(el.style.left);
+                let currentTop = parseFloat(el.style.top);
+
+                let snappedLeft = Math.round(currentLeft / GRID_CELL_SIZE) * GRID_CELL_SIZE;
+                let snappedTop = Math.round(currentTop / GRID_CELL_SIZE) * GRID_CELL_SIZE;
+
+                el.style.left = `${snappedLeft}px`;
+                el.style.top = `${snappedTop}px`;
+            }
+        }
+
+        function checkAnswer(ans) {
+            const feedback = document.getElementById('feedback-text');
+            
+            let correctAns = 'same';
+            if (areaA > areaB) correctAns = 'A';
+            else if (areaB > areaA) correctAns = 'B';
+
+            if (ans === correctAns) {
+                playSound('correct');
+                if (correctAns === 'same') {
+                    feedback.innerHTML = `🎉 🦖 <b>答對了！兩片草皮面積一樣大！</b> 兩者都含有 <b>${areaA}</b> 個小方格！`;
+                } else {
+                    feedback.innerHTML = `🎉 🦖 <b>答對了！草皮 ${correctAns} 比較大！</b><br>因為 A 佔了 <b>${areaA}</b> 格，B 佔了 <b>${areaB}</b> 格！`;
+                }
+                feedback.className = "text-md font-bold text-green-700";
+            } else {
+                playSound('wrong');
+                feedback.innerHTML = `❌ 🦖 <b>答錯囉，再看看！</b> 可以重疊比較多出來的區域，或者數數看各自的格子數！`;
+                feedback.className = "text-md font-bold text-red-600";
+            }
+        }
+
+        function nextQuestion() {
+            playSound('click');
+            // Hide grid when switching questions to reset difficulty
+            showGridLines = true; 
+            toggleGrid(); // Will toggle to false
+
+            initGame();
+        }
+    </script>
+</body>
+</html>
