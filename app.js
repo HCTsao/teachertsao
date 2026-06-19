@@ -208,30 +208,14 @@ const toolsGrid = document.getElementById('tools-grid');
 const toolsCountBadge = document.getElementById('tools-count');
 const currentCategoryTitleText = document.getElementById('current-category-title');
 
-const toolViewer = document.getElementById('tool-viewer');
-const toolIframe = document.getElementById('tool-iframe');
-const closeViewerBtn = document.getElementById('close-viewer-btn');
-const viewerToolCategory = document.getElementById('viewer-tool-category');
-const viewerToolTitle = document.getElementById('viewer-tool-title');
-const newTabBtn = document.getElementById('new-tab-btn');
-
 // 全域狀態
 let currentCategory = 'all';
 let searchQuery = '';
-let activeViewingTool = null;
 
 // 初始化應用程式
 function init() {
     renderTools();
     setupEventListeners();
-    setupHistoryStateListener();
-    
-    // 監聽視窗大小改變，自動調整教具縮放比例
-    window.addEventListener('resize', () => {
-        if (activeViewingTool) {
-            adjustIframeScale();
-        }
-    });
 }
 
 // 渲染教具卡片
@@ -350,92 +334,6 @@ function setupEventListeners() {
         }
 
         renderTools();
-    });
-
-    // 4. 關閉檢視器按鈕
-    closeViewerBtn.addEventListener('click', () => {
-        // 利用瀏覽器 history.back() 返回，這會觸發 popstate 事件進而關閉檢視器
-        if (window.history.state && window.history.state.viewing) {
-            window.history.back();
-        } else {
-            closeTool(false); // 備份防呆
-        }
-    });
-
-    // 5. 在新分頁開啟按鈕
-    newTabBtn.addEventListener('click', () => {
-        if (activeViewingTool) {
-            window.open(activeViewingTool.path, '_blank');
-        }
-    });
-}
-
-// 開啟教具
-function openTool(tool) {
-    window.location.href = tool.path;
-}
-
-// 關閉教具
-// pushState: 是否要執行 history 變更（若是因為 popstate 觸發的，就傳入 false）
-function closeTool(updateHistory = true) {
-    toolViewer.style.display = 'none';
-    toolIframe.src = '';
-    toolIframe.style.transform = '';
-    document.body.style.overflow = ''; // 恢復主頁面捲動
-    activeViewingTool = null;
-}
-
-// 自適應縮放 iframe 以防跑版
-function adjustIframeScale() {
-    if (!activeViewingTool) return;
-
-    const container = document.querySelector('.iframe-container');
-    if (!container) return;
-
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
-
-    // 定義標準設計尺寸 (桌上型電腦寬高)
-    const targetWidth = 1024;
-    const targetHeight = 700;
-
-    let scale = 1;
-
-    // 如果容器寬高小於設計尺寸，則按比例縮小
-    if (containerWidth < targetWidth || containerHeight < targetHeight) {
-        const widthRatio = containerWidth / targetWidth;
-        const heightRatio = containerHeight / targetHeight;
-        scale = Math.min(widthRatio, heightRatio);
-    }
-
-    // 設定 iframe 物理大小與 transform 置中縮放
-    toolIframe.style.width = `${targetWidth}px`;
-    toolIframe.style.height = `${targetHeight}px`;
-    toolIframe.style.position = 'absolute';
-    toolIframe.style.left = '50%';
-    toolIframe.style.top = '50%';
-    toolIframe.style.transform = `translate(-50%, -50%) scale(${scale})`;
-}
-
-// 監聽瀏覽器上一頁/下一頁 (popstate)
-function setupHistoryStateListener() {
-    window.addEventListener('popstate', (event) => {
-        // 如果歷史狀態中沒有 viewing，或者 viewing 為 false，則關閉檢視器
-        if (!event.state || !event.state.viewing) {
-            closeTool(false);
-        } else if (event.state && event.state.viewing) {
-            // 如果使用者從其他地方直接回到 viewing 狀態，則重新開啟該教具
-            const tool = toolsData.find(t => t.name === event.state.toolName);
-            if (tool) {
-                activeViewingTool = tool;
-                viewerToolCategory.textContent = tool.category;
-                viewerToolTitle.textContent = tool.name;
-                toolIframe.src = tool.path;
-                toolViewer.style.display = 'flex';
-                document.body.style.overflow = 'hidden';
-                setTimeout(adjustIframeScale, 50);
-            }
-        }
     });
 }
 
