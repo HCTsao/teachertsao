@@ -232,6 +232,26 @@ let searchQuery = '';
 
 // 初始化應用程式
 function init() {
+    // 嘗試從 sessionStorage 還原先前選擇的分類
+    const savedCategory = sessionStorage.getItem('selectedCategory');
+    if (savedCategory) {
+        currentCategory = savedCategory;
+        // 更新按鈕的 active 樣式
+        document.querySelectorAll('.filter-btn').forEach(b => {
+            if (b.dataset.category === currentCategory) {
+                b.classList.add('active');
+            } else {
+                b.classList.remove('active');
+            }
+        });
+        // 更新標題文字
+        if (currentCategory === 'all') {
+            currentCategoryTitleText.textContent = '所有教具';
+        } else {
+            currentCategoryTitleText.textContent = `${currentCategory} 教具`;
+        }
+    }
+
     renderTools();
     setupEventListeners();
 }
@@ -351,6 +371,9 @@ function setupEventListeners() {
 
         // 更新分類狀態
         currentCategory = btn.dataset.category;
+        
+        // 儲存目前分類至 sessionStorage，以便返回時維持選擇狀態
+        sessionStorage.setItem('selectedCategory', currentCategory);
         
         // 更新標題文字
         if (currentCategory === 'all') {
