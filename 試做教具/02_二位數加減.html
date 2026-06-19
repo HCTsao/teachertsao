@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>二位數的直式加減 - 太空直式救援隊</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        .rocket-container {
+            position: relative;
+            height: 120px;
+            overflow: hidden;
+        }
+        .rocket {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            transition: all 1s ease-in-out;
+        }
+        .rocket-launch {
+            animation: launchRocket 2s forwards ease-in;
+        }
+        @keyframes launchRocket {
+            0% { bottom: 10px; transform: translateX(-50%) scale(1); opacity: 1; }
+            50% { bottom: 60px; transform: translateX(-50%) scale(1.1) rotate(5deg); opacity: 0.8; }
+            100% { bottom: 250px; transform: translateX(-50%) scale(0.5); opacity: 0; }
+        }
+        .digit-box {
+            transition: all 0.3s ease;
+        }
+        .digit-box:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 min-height-screen font-sans text-slate-100 flex flex-col">
+
+    <!-- HOME_BUTTON_START -->
+    <a href="index.html" style="position: fixed; top: 12px; left: 12px; z-index: 999999; background: rgba(51, 65, 85, 0.9); color: #ffffff; padding: 8px 16px; border-radius: 20px; text-decoration: none; font-family: system-ui, -apple-system, sans-serif; font-size: 14px; font-weight: bold; backdrop-filter: blur(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.1); transition: all 0.2s ease;" onmouseover="this.style.background='rgba(71, 85, 105, 1)'" onmouseout="this.style.background='rgba(51, 65, 85, 0.9)'">🏠 回試作選單</a>
+    <script>(function() { function adjustViewport() { var targetWidth = 1024; var screenWidth = window.innerWidth || document.documentElement.clientWidth || window.screen.width; if (screenWidth > 0 && screenWidth < targetWidth) { var scale = screenWidth / targetWidth; var meta = document.querySelector('meta[name="viewport"]'); if (!meta) { meta = document.createElement('meta'); meta.setAttribute('name', 'viewport'); document.head.appendChild(meta); } meta.setAttribute('content', 'width=' + targetWidth + ', initial-scale=' + scale + ', minimum-scale=' + scale + ', maximum-scale=2.0, user-scalable=yes'); } else { var meta = document.querySelector('meta[name="viewport"]'); if (meta) { meta.setAttribute('content', 'width=device-width, initial-scale=1.0'); } } } adjustViewport(); var timer = null; window.addEventListener('resize', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); window.addEventListener('orientationchange', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); })();</script>
+    <!-- HOME_BUTTON_END -->
+
+    <div class="max-w-4xl w-full mx-auto p-4 md:p-8 flex-1 flex flex-col justify-between mt-12">
+        
+        <!-- Header -->
+        <header class="text-center mb-6">
+            <span class="text-xs font-bold text-blue-300 bg-blue-900/50 border border-blue-700 px-3 py-1 rounded-full uppercase tracking-wider">單元二：二位數的直式加減</span>
+            <h1 class="text-3xl md:text-4xl font-extrabold text-blue-400 mt-2">🚀 太空直式救援隊</h1>
+            <p class="text-slate-400 text-sm mt-1">按步就班解開二位數的直式運算，為救援火箭注滿燃料吧！</p>
+        </header>
+
+        <!-- Main Layout Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch flex-1">
+            
+            <!-- Column Display (Left) -->
+            <div class="md:col-span-6 bg-slate-800 rounded-3xl p-6 border-2 border-slate-700 flex flex-col justify-between relative overflow-hidden">
+                <!-- Stars in background -->
+                <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-slate-900/50 to-slate-900/90 pointer-events-none"></div>
+                
+                <div class="relative z-10 flex justify-between items-center border-b border-slate-700 pb-3 mb-6">
+                    <span class="text-sm text-slate-400 font-bold"><i class="fa-solid fa-calculator"></i> 直式計算看板</span>
+                    <span class="text-xs text-blue-400 bg-blue-950 px-2 py-1 rounded font-mono border border-blue-900" id="op-label">加法運算</span>
+                </div>
+
+                <!-- Column Grid -->
+                <div class="relative z-10 flex flex-col items-center justify-center flex-1 py-8">
+                    <div class="grid grid-cols-4 gap-x-2 gap-y-4 text-5xl font-black font-mono w-48 text-center items-center">
+                        
+                        <!-- Header Row (Place value tags) -->
+                        <div></div>
+                        <div class="text-sm text-blue-400 font-bold bg-blue-950/60 rounded py-1">十</div>
+                        <div class="text-sm text-blue-400 font-bold bg-blue-950/60 rounded py-1">個</div>
+                        <div></div>
+
+                        <!-- Carriage / Borrow Row -->
+                        <div></div>
+                        <div class="text-sm text-red-500 font-bold" id="carry-tens"></div>
+                        <div class="text-sm text-red-500 font-bold" id="carry-ones"></div>
+                        <div></div>
+
+                        <!-- Number 1 -->
+                        <div></div>
+                        <div id="num1-tens" class="text-slate-100">3</div>
+                        <div id="num1-ones" class="text-slate-100">8</div>
+                        <div></div>
+
+                        <!-- Number 2 -->
+                        <div id="operator" class="text-blue-500 text-right pr-2">+</div>
+                        <div id="num2-tens" class="text-slate-100">4</div>
+                        <div id="num2-ones" class="text-slate-100">5</div>
+                        <div></div>
+
+                        <!-- Divider line -->
+                        <div class="col-span-4 border-b-4 border-slate-500 my-1"></div>
+
+                        <!-- Answer Row -->
+                        <div></div>
+                        <div id="ans-tens" class="text-slate-500 bg-slate-900/50 rounded-xl h-16 flex items-center justify-center border-2 border-dashed border-slate-700">?</div>
+                        <div id="ans-ones" class="text-slate-500 bg-slate-900/50 rounded-xl h-16 flex items-center justify-center border-2 border-dashed border-slate-700">?</div>
+                        <div></div>
+
+                    </div>
+                </div>
+
+                <!-- Rocket visual -->
+                <div class="rocket-container z-10 border-t border-slate-700/60 mt-4 pt-4">
+                    <div id="rocket" class="rocket text-5xl">🚀</div>
+                    <div class="text-center text-xs text-slate-500 font-bold">燃料狀態: <span id="fuel-text" class="text-blue-400">待命中</span></div>
+                </div>
+            </div>
+
+            <!-- Dialogue & Inputs (Right) -->
+            <div class="md:col-span-6 bg-slate-800 rounded-3xl p-6 border-2 border-slate-700 flex flex-col justify-between">
+                <div class="flex-1 flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-300 mb-3 flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-blue-500 animate-ping"></span> 
+                            太空總署指令
+                        </h3>
+                        
+                        <!-- Bot speech -->
+                        <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4 min-h-[120px] flex items-center mb-6">
+                            <p id="bot-speech" class="text-md leading-relaxed text-blue-100 font-medium">
+                                🚀 太空船燃料不足，請協助啟動救援直式運算！
+                            </p>
+                        </div>
+
+                        <!-- Interaction Box -->
+                        <div class="bg-slate-900/40 border border-slate-800 rounded-2xl p-6" id="input-zone">
+                            <!-- Unit digit input -->
+                            <div id="step-ones-div" class="space-y-3">
+                                <label class="block text-sm font-bold text-slate-400" id="step-label">步驟一：個位數相加</label>
+                                <div class="flex items-center gap-3">
+                                    <input type="number" id="input-ones" class="digit-box bg-slate-800 border-2 border-slate-700 rounded-xl px-4 py-3 text-2xl font-bold w-full text-center text-white" placeholder="請輸入個位計算結果" autofocus>
+                                    <button onclick="submitOnes()" class="bg-blue-600 hover:bg-blue-500 font-black px-6 py-3 rounded-xl border-b-4 border-blue-800 text-white shrink-0">送出</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Skip or Next -->
+                    <div class="mt-6 flex justify-between gap-4">
+                        <button onclick="newProblem()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold py-3 px-4 rounded-xl border border-slate-600">
+                            🔄 換一題
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Web Audio Synthesizer -->
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            if (type === 'correct') {
+                osc.frequency.setValueAtTime(523, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'launch') {
+                // Rocket whoosh sound
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(80, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 1.5);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.8);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 1.8);
+            }
+        }
+    </script>
+
+    <!-- Logic -->
+    <script>
+        let num1, num2, isAddition, step;
+        // steps: 
+        // 0: unit addition/subtraction
+        // 1: carry/borrow check (only if addition has carry, or subtraction has borrow)
+        // 2: tens addition/subtraction
+        // 3: completed, waiting for launch!
+        
+        let carryVal = 0; // for carry: 1, for borrow: -10
+        let tempOnesAnswer = 0;
+
+        window.onload = () => {
+            newProblem();
+            
+            // Add keypress listeners
+            document.getElementById('input-ones').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    if (step === 0 || step === 1) submitOnes();
+                    else if (step === 2) submitTens();
+                }
+            });
+        };
+
+        function newProblem() {
+            // Randomly choose addition or subtraction
+            isAddition = Math.random() > 0.5;
+            
+            // Generate numbers
+            if (isAddition) {
+                // Generates addition with carrying (usually more interactive)
+                num1 = Math.floor(Math.random() * 40) + 25; // 25 - 65
+                num2 = Math.floor(Math.random() * 40) + 15; // 15 - 55
+                // Force a carry with high probability
+                if ((num1 % 10) + (num2 % 10) < 10) {
+                    num1 = Math.floor(num1 / 10) * 10 + 8;
+                    num2 = Math.floor(num2 / 10) * 10 + 7;
+                }
+            } else {
+                // Subtraction with borrowing
+                num1 = Math.floor(Math.random() * 50) + 45; // 45 - 95
+                num2 = Math.floor(Math.random() * 30) + 18; // 18 - 48
+                // Force a borrow
+                if ((num1 % 10) >= (num2 % 10)) {
+                    num1 = Math.floor(num1 / 10) * 10 + 3;
+                    num2 = Math.floor(num2 / 10) * 10 + 8;
+                }
+            }
+
+            carryVal = 0;
+            step = 0;
+            
+            // UI Init
+            document.getElementById('op-label').innerText = isAddition ? '加法運算' : '減法運算';
+            document.getElementById('operator').innerText = isAddition ? '+' : '-';
+            
+            document.getElementById('num1-tens').innerText = Math.floor(num1 / 10);
+            document.getElementById('num1-ones').innerText = num1 % 10;
+            document.getElementById('num2-tens').innerText = Math.floor(num2 / 10);
+            document.getElementById('num2-ones').innerText = num2 % 10;
+
+            document.getElementById('num1-tens').classList.remove('line-through', 'text-red-500');
+            document.getElementById('num1-ones').classList.remove('text-blue-400');
+            
+            document.getElementById('carry-tens').innerText = '';
+            document.getElementById('carry-ones').innerText = '';
+            document.getElementById('ans-tens').innerText = '?';
+            document.getElementById('ans-tens').className = "text-slate-500 bg-slate-900/50 rounded-xl h-16 flex items-center justify-center border-2 border-dashed border-slate-700";
+            document.getElementById('ans-ones').innerText = '?';
+            document.getElementById('ans-ones').className = "text-slate-500 bg-slate-900/50 rounded-xl h-16 flex items-center justify-center border-2 border-dashed border-slate-700";
+            
+            const rkt = document.getElementById('rocket');
+            rkt.className = 'rocket text-5xl';
+            document.getElementById('fuel-text').innerText = '待命注入中';
+            document.getElementById('fuel-text').className = 'text-blue-400';
+
+            setupStepOnes();
+        }
+
+        function setupStepOnes() {
+            const input = document.getElementById('input-ones');
+            input.value = '';
+            input.placeholder = isAddition ? "例如: 8 + 5 = ?" : "例如: 3 - 8 不夠，要借位";
+            input.focus();
+
+            const n1_ones = num1 % 10;
+            const n2_ones = num2 % 10;
+            
+            if (isAddition) {
+                document.getElementById('bot-speech').innerHTML = `👩‍🚀 「太空人報告：請先看【個位數】，<b>${n1_ones} + ${n2_ones}</b> 等於多少呢？」`;
+                document.getElementById('step-label').innerText = '步驟一：計算個位數';
+            } else {
+                document.getElementById('bot-speech').innerHTML = `👩‍🚀 「太空人報告：請看【個位數】，<b>${n1_ones} - ${n2_ones}</b> 不夠減！我們要進行『借位』。請輸入從十位借 1 個十（10個一）後，個位變成多少減 ${n2_ones}？」`;
+                document.getElementById('step-label').innerText = '步驟一：借位後，個位數變成多少？';
+                input.placeholder = `例如：10 + ${n1_ones} = ?`;
+            }
+        }
+
+        function submitOnes() {
+            const input = document.getElementById('input-ones');
+            const val = parseInt(input.value);
+            if (isNaN(val)) return;
+
+            const n1_ones = num1 % 10;
+            const n2_ones = num2 % 10;
+
+            if (isAddition) {
+                const correctOnesSum = n1_ones + n2_ones;
+                if (val === correctOnesSum) {
+                    playSound('correct');
+                    tempOnesAnswer = val % 10;
+                    document.getElementById('ans-ones').innerText = tempOnesAnswer;
+                    document.getElementById('ans-ones').className = "text-green-400 bg-slate-900 rounded-xl h-16 flex items-center justify-center border-2 border-green-500 font-bold";
+                    
+                    if (correctOnesSum >= 10) {
+                        carryVal = 1;
+                        document.getElementById('carry-tens').innerText = '1';
+                        document.getElementById('bot-speech').innerHTML = `🎉 答對了！<b>${n1_ones} + ${n2_ones} = ${correctOnesSum}</b>。<br>個位寫 <b>${tempOnesAnswer}</b>，十位進位 <b>1</b>！十位上方已自動標記進位！`;
+                    } else {
+                        carryVal = 0;
+                        document.getElementById('bot-speech').innerHTML = `🎉 答對了！<b>${n1_ones} + ${n2_ones} = ${correctOnesSum}</b>。<br>個位寫 <b>${tempOnesAnswer}</b>。`;
+                    }
+                    
+                    // Proceed to Tens
+                    step = 2;
+                    setTimeout(setupStepTens, 2000);
+                } else {
+                    playSound('wrong');
+                    document.getElementById('bot-speech').innerHTML = `❌ 不太對喔，再算算看！<b>${n1_ones} + ${n2_ones}</b> 等於多少？`;
+                }
+            } else {
+                // Subtraction (borrowing)
+                const correctBorrowedOnes = 10 + n1_ones;
+                if (step === 0) {
+                    if (val === correctBorrowedOnes) {
+                        playSound('correct');
+                        carryVal = -1;
+                        // Visual cues for borrowing
+                        document.getElementById('num1-tens').classList.add('line-through', 'text-red-500');
+                        document.getElementById('carry-tens').innerText = Math.floor(num1 / 10) - 1;
+                        document.getElementById('carry-ones').innerText = '10';
+                        document.getElementById('bot-speech').innerHTML = `🎉 答對了！向十位借了 10，個位數變成了 <b>${correctBorrowedOnes}</b>！<br>現在請計算個位數的減法：<b>${correctBorrowedOnes} - ${n2_ones}</b> 等於多少？`;
+                        document.getElementById('step-label').innerText = '步驟二：計算個位數減法';
+                        input.value = '';
+                        input.placeholder = `${correctBorrowedOnes} - ${n2_ones} = ?`;
+                        step = 1;
+                    } else {
+                        playSound('wrong');
+                        document.getElementById('bot-speech').innerHTML = `❌ 不夠減喔！要向十位借 1 個十，與個位的 <b>${n1_ones}</b> 合起來，會是多少呢？`;
+                    }
+                } else if (step === 1) {
+                    const finalOnes = correctBorrowedOnes - n2_ones;
+                    if (val === finalOnes) {
+                        playSound('correct');
+                        document.getElementById('ans-ones').innerText = finalOnes;
+                        document.getElementById('ans-ones').className = "text-green-400 bg-slate-900 rounded-xl h-16 flex items-center justify-center border-2 border-green-500 font-bold";
+                        document.getElementById('bot-speech').innerHTML = `🎉 答對了！<b>${correctBorrowedOnes} - ${n2_ones} = ${finalOnes}</b>。個位數填上 <b>${finalOnes}</b>。`;
+                        step = 2;
+                        setTimeout(setupStepTens, 2000);
+                    } else {
+                        playSound('wrong');
+                        document.getElementById('bot-speech').innerHTML = `❌ 不太對喔！<b>${correctBorrowedOnes} - ${n2_ones}</b> 等於多少？`;
+                    }
+                }
+            }
+        }
+
+        function setupStepTens() {
+            const input = document.getElementById('input-ones');
+            input.value = '';
+            
+            const n1_tens = Math.floor(num1 / 10);
+            const n2_tens = Math.floor(num2 / 10);
+
+            if (isAddition) {
+                if (carryVal > 0) {
+                    document.getElementById('bot-speech').innerHTML = `👩‍🚀 「接下來算【十位數】，別忘了加上進位的 1：<br><b>1 + ${n1_tens} + ${n2_tens}</b> 等於多少呢？」`;
+                } else {
+                    document.getElementById('bot-speech').innerHTML = `👩‍🚀 「接下來算【十位數】：<br><b>${n1_tens} + ${n2_tens}</b> 等於多少呢？」`;
+                }
+                document.getElementById('step-label').innerText = '步驟二：計算十位數';
+            } else {
+                const activeTens = n1_tens - 1;
+                document.getElementById('bot-speech').innerHTML = `👩‍🚀 「接下來算【十位數】，因為被借走了一個 1，十位剩下 <b>${activeTens}</b>：<br><b>${activeTens} - ${n2_tens}</b> 等於多少呢？」`;
+                document.getElementById('step-label').innerText = '步驟三：計算十位數';
+            }
+            input.focus();
+        }
+
+        function submitTens() {
+            const input = document.getElementById('input-ones');
+            const val = parseInt(input.value);
+            if (isNaN(val)) return;
+
+            const n1_tens = Math.floor(num1 / 10);
+            const n2_tens = Math.floor(num2 / 10);
+            let correctTens;
+
+            if (isAddition) {
+                correctTens = n1_tens + n2_tens + carryVal;
+            } else {
+                correctTens = (n1_tens - 1) - n2_tens;
+            }
+
+            if (val === correctTens) {
+                playSound('correct');
+                document.getElementById('ans-tens').innerText = correctTens;
+                document.getElementById('ans-tens').className = "text-green-400 bg-slate-900 rounded-xl h-16 flex items-center justify-center border-2 border-green-500 font-bold";
+                
+                // Complete
+                step = 3;
+                document.getElementById('bot-speech').innerHTML = `🎉 太棒了！直式計算完全正確！<br><b>答案是 ${isAddition ? (num1 + num2) : (num1 - num2)}</b>。救援燃料注滿，準備發射！`;
+                document.getElementById('fuel-text').innerText = '燃料 100% 注滿！';
+                document.getElementById('fuel-text').className = 'text-green-400 font-black animate-pulse';
+
+                // Launch animation
+                setTimeout(() => {
+                    playSound('launch');
+                    document.getElementById('rocket').classList.add('rocket-launch');
+                }, 1000);
+
+                setTimeout(newProblem, 4000);
+            } else {
+                playSound('wrong');
+                if (isAddition) {
+                    document.getElementById('bot-speech').innerHTML = `❌ 再檢查看看十位的加法算式喔！`;
+                } else {
+                    document.getElementById('bot-speech').innerHTML = `❌ 再檢查看看十位，被借走 1 個十後還剩下多少減去 ${n2_tens} 喔！`;
+                }
+            }
+        }
+    </script>
+</body>
+</html>

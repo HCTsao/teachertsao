@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>加減關係與應用 - 魔法天平平衡鏡</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* Balance Scale Physics Simulation */
+        .scale-beam {
+            transform-origin: center center;
+            transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        .scale-pan {
+            transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transform-origin: center top;
+        }
+    </style>
+</head>
+<body class="bg-indigo-50 min-height-screen font-sans text-stone-800 flex flex-col">
+
+    <!-- HOME_BUTTON_START -->
+    <a href="index.html" style="position: fixed; top: 12px; left: 12px; z-index: 999999; background: rgba(79, 70, 229, 0.9); color: #ffffff; padding: 8px 16px; border-radius: 20px; text-decoration: none; font-family: system-ui, -apple-system, sans-serif; font-size: 14px; font-weight: bold; backdrop-filter: blur(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.1); transition: all 0.2s ease;" onmouseover="this.style.background='rgba(99, 102, 241, 1)'" onmouseout="this.style.background='rgba(79, 70, 229, 0.9)'">🏠 回試作選單</a>
+    <script>(function() { function adjustViewport() { var targetWidth = 1024; var screenWidth = window.innerWidth || document.documentElement.clientWidth || window.screen.width; if (screenWidth > 0 && screenWidth < targetWidth) { var scale = screenWidth / targetWidth; var meta = document.querySelector('meta[name="viewport"]'); if (!meta) { meta = document.createElement('meta'); meta.setAttribute('name', 'viewport'); document.head.appendChild(meta); } meta.setAttribute('content', 'width=' + targetWidth + ', initial-scale=' + scale + ', minimum-scale=' + scale + ', maximum-scale=2.0, user-scalable=yes'); } else { var meta = document.querySelector('meta[name="viewport"]'); if (meta) { meta.setAttribute('content', 'width=device-width, initial-scale=1.0'); } } } adjustViewport(); var timer = null; window.addEventListener('resize', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); window.addEventListener('orientationchange', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); })();</script>
+    <!-- HOME_BUTTON_END -->
+
+    <div class="max-w-4xl w-full mx-auto p-4 md:p-8 flex-1 flex flex-col justify-between mt-12">
+        
+        <!-- Header -->
+        <header class="text-center mb-6">
+            <span class="text-xs font-bold text-indigo-700 bg-indigo-200 px-3 py-1 rounded-full uppercase tracking-wider">單元四：加減關係與應用</span>
+            <h1 class="text-3xl md:text-4xl font-extrabold text-indigo-900 mt-2">⚖️ 魔法天平平衡鏡</h1>
+            <p class="text-indigo-800 text-sm mt-1">分析文字題目，將數字放入天平，找出消失的神秘問號數！</p>
+        </header>
+
+        <!-- Game Box -->
+        <div class="bg-white rounded-3xl p-6 shadow-xl border-4 border-indigo-300 flex-1 flex flex-col justify-between min-h-[480px]">
+            
+            <!-- Problem Bubble -->
+            <div class="bg-indigo-50 border-2 border-indigo-200 rounded-2xl p-5 mb-6 text-center shadow-inner">
+                <span class="text-xs font-bold text-indigo-600 block mb-1">📖 應用題挑戰</span>
+                <p id="problem-text" class="text-lg font-black text-indigo-950">
+                    小明有 45 顆糖果，送給妹妹一些後剩下 18 顆。請問小明送給妹妹幾顆糖果？
+                </p>
+            </div>
+
+            <!-- Visual Balance Scale (SVG Based for high fidelity) -->
+            <div class="relative w-full h-[220px] bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-center p-4">
+                <svg width="400" height="200" viewBox="0 0 400 200" class="overflow-visible">
+                    <!-- Base Stand -->
+                    <path d="M190 120 L210 120 L210 180 L190 180 Z" fill="#64748b" />
+                    <path d="M150 180 L250 180 L230 195 L170 195 Z" fill="#475569" />
+                    <circle cx="200" cy="120" r="8" fill="#334155" />
+
+                    <!-- Beam (Rotates based on values) -->
+                    <g id="scale-beam" class="scale-beam">
+                        <line x1="80" y1="120" x2="320" y2="120" stroke="#4f46e5" stroke-width="6" stroke-linecap="round" />
+                        <circle cx="80" cy="120" r="5" fill="#312e81" />
+                        <circle cx="320" cy="120" r="5" fill="#312e81" />
+
+                        <!-- Left Pan chains and plate -->
+                        <g id="left-pan" class="scale-pan">
+                            <line x1="80" y1="120" x2="50" y2="170" stroke="#94a3b8" stroke-width="2" />
+                            <line x1="80" y1="120" x2="110" y2="170" stroke="#94a3b8" stroke-width="2" />
+                            <path d="M40 170 L120 170 C120 180, 40 180, 40 170" fill="#a7f3d0" stroke="#059669" stroke-width="2" />
+                            <!-- Left Plate Contents -->
+                            <foreignObject x="40" y="130" width="80" height="38" class="overflow-visible">
+                                <div class="flex justify-center gap-1" id="left-pan-contents">
+                                    <!-- Dynamic Blocks -->
+                                </div>
+                            </foreignObject>
+                        </g>
+
+                        <!-- Right Pan chains and plate -->
+                        <g id="right-pan" class="scale-pan">
+                            <line x1="320" y1="120" x2="290" y2="170" stroke="#94a3b8" stroke-width="2" />
+                            <line x1="320" y1="120" x2="350" y2="170" stroke="#94a3b8" stroke-width="2" />
+                            <path d="M280 170 L360 170 C360 180, 280 180, 280 170" fill="#fbcfe8" stroke="#db2777" stroke-width="2" />
+                            <!-- Right Plate Contents -->
+                            <foreignObject x="280" y="130" width="80" height="38" class="overflow-visible">
+                                <div class="flex justify-center gap-1" id="right-pan-contents">
+                                    <!-- Dynamic Blocks -->
+                                </div>
+                            </foreignObject>
+                        </g>
+                    </g>
+                </svg>
+            </div>
+
+            <!-- Dialogue & Input -->
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 min-h-[90px] flex items-center">
+                    <p id="bot-speech" class="text-sm font-semibold text-indigo-900">
+                        🦉 貓頭鷹波奇說：「天平左邊有問號加18，右邊是45。請算出問號代表多少才能讓天平平衡？」
+                    </p>
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <label class="text-xs font-black text-indigo-800 block">請輸入問號 (?) 的答案：</label>
+                    <div class="flex gap-2">
+                        <input type="number" id="input-ans" class="bg-stone-50 border-2 border-indigo-300 focus:border-indigo-500 rounded-xl px-4 py-3 text-lg font-bold w-full text-center text-stone-800 outline-none" placeholder="? = ?">
+                        <button onclick="checkAnswer()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-black px-6 py-3 rounded-xl border-b-4 border-indigo-800 transition-all shrink-0">確認</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Next / Feedback -->
+        <div class="mt-6 flex flex-col md:flex-row items-center justify-between gap-4 bg-indigo-100 p-4 rounded-2xl border-2 border-indigo-300">
+            <div id="feedback-text" class="text-md font-bold text-indigo-900">
+                🦉 天平歪掉了嗎？算對後天平就會平喔！
+            </div>
+            <button id="btn-next" onclick="nextQuestion()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-black px-8 py-3 rounded-2xl shadow-md border-b-4 border-indigo-700 transition-all flex items-center gap-2">
+                下一題 <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Web Audio Synthesizer -->
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            if (type === 'correct') {
+                osc.frequency.setValueAtTime(523, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'click') {
+                osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            }
+        }
+    </script>
+
+    <!-- Logic -->
+    <script>
+        let problemType = 0; // 0: A - ? = B (Addition/Subtraction relation), 1: ? + A = B
+        let numA = 0;
+        let numB = 0;
+        let correctAnswer = 0;
+
+        const problems = [
+            { template: "小猴子有 {B} 根香蕉，吃掉一些後剩下 {A} 根。吃掉幾根？", eqType: 0 },
+            { template: "公車上原本有 {A} 人，又上車一些人後變成 {B} 人。上車幾人？", eqType: 1 },
+            { template: "圖書館原本有 {A} 本繪本，老師又買了幾本後變成 {B} 本。新買幾本？", eqType: 1 },
+            { template: "小紅包包有 {B} 元，花掉一些買果汁剩下 {A} 元。果汁多少元？", eqType: 0 }
+        ];
+
+        window.onload = () => {
+            initGame();
+            document.getElementById('input-ans').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') checkAnswer();
+            });
+        };
+
+        function initGame() {
+            document.getElementById('input-ans').value = '';
+            
+            // Choose a random problem template
+            const prob = problems[Math.floor(Math.random() * problems.length)];
+            problemType = prob.eqType;
+
+            // Generate numbers
+            if (problemType === 0) {
+                // B - ? = A => ? = B - A
+                numB = Math.floor(Math.random() * 40) + 40; // 40 - 80
+                numA = Math.floor(Math.random() * 20) + 15; // 15 - 35
+                correctAnswer = numB - numA;
+            } else {
+                // A + ? = B => ? = B - A
+                numA = Math.floor(Math.random() * 30) + 15; // 15 - 45
+                numB = Math.floor(Math.random() * 40) + numA + 10; // numA + 10 to numA + 50
+                correctAnswer = numB - numA;
+            }
+
+            // Fill text
+            let text = prob.template.replace('{A}', numA).replace('{B}', numB);
+            document.getElementById('problem-text').innerText = text;
+
+            // Set up balance visuals initial unbalance (tilted before answer)
+            tiltScale(-10); // Start tilted
+
+            // Render plates
+            const leftContent = document.getElementById('left-pan-contents');
+            const rightContent = document.getElementById('right-pan-contents');
+
+            if (problemType === 0) {
+                // B - ? = A  <=>  ? + A = B
+                // Left pan: ? and A
+                leftContent.innerHTML = `
+                    <div class="bg-indigo-600 text-white text-xs font-black w-8 h-8 rounded flex items-center justify-center shadow-md">?</div>
+                    <div class="bg-emerald-600 text-white text-[10px] font-black w-8 h-8 rounded flex items-center justify-center shadow-md">${numA}</div>
+                `;
+                // Right pan: B
+                rightContent.innerHTML = `
+                    <div class="bg-pink-600 text-white text-[10px] font-black w-10 h-8 rounded flex items-center justify-center shadow-md">${numB}</div>
+                `;
+                document.getElementById('bot-speech').innerHTML = `🦉 貓頭鷹波奇說：「題目可以看成 <b>? + ${numA} = ${numB}</b>。<br>天平左邊放了問號和 ${numA}，右邊放了 ${numB}。請問問號是多少呢？」`;
+            } else {
+                // A + ? = B
+                // Left pan: A and ?
+                leftContent.innerHTML = `
+                    <div class="bg-emerald-600 text-white text-[10px] font-black w-8 h-8 rounded flex items-center justify-center shadow-md">${numA}</div>
+                    <div class="bg-indigo-600 text-white text-xs font-black w-8 h-8 rounded flex items-center justify-center shadow-md">?</div>
+                `;
+                // Right pan: B
+                rightContent.innerHTML = `
+                    <div class="bg-pink-600 text-white text-[10px] font-black w-10 h-8 rounded flex items-center justify-center shadow-md">${numB}</div>
+                `;
+                document.getElementById('bot-speech').innerHTML = `🦉 貓頭鷹波奇說：「題目可以記作 <b>${numA} + ? = ${numB}</b>。<br>天平左邊有 ${numA} 和問號，右邊有 ${numB}。快算算看問號是多少！」`;
+            }
+        }
+
+        function tiltScale(deg) {
+            const beam = document.getElementById('scale-beam');
+            const left = document.getElementById('left-pan');
+            const right = document.getElementById('right-pan');
+
+            beam.style.transform = `rotate(${deg}deg)`;
+            
+            // Counter-rotate plates to keep them hanging straight down
+            left.style.transform = `rotate(${-deg}deg)`;
+            right.style.transform = `rotate(${-deg}deg)`;
+        }
+
+        function checkAnswer() {
+            const input = document.getElementById('input-ans');
+            const val = parseInt(input.value);
+            if (isNaN(val)) return;
+
+            const feedback = document.getElementById('feedback-text');
+            if (val === correctAnswer) {
+                playSound('correct');
+                tiltScale(0); // Balanced!
+                feedback.innerHTML = `🎉 🦉 <b>答對了！天平平衡了！</b> 算式：<b>${numA} + ${correctAnswer} = ${numB}</b> 正確！`;
+                feedback.className = "text-md font-bold text-green-700";
+            } else {
+                playSound('wrong');
+                // Calculate scale tilt direction
+                const currentSum = numA + val;
+                if (currentSum > numB) {
+                    tiltScale(12); // Left pan drops down because it's too heavy
+                    feedback.innerHTML = `❌ 🦉 <b>太重了！天平倒向左邊。</b> 你猜問號是 ${val}，左邊總共是 ${currentSum}，大於右邊的 ${numB}。再試試看！`;
+                } else {
+                    tiltScale(-12); // Right pan drops down because Left is too light
+                    feedback.innerHTML = `❌ 🦉 <b>太輕了！天平倒向右邊。</b> 你猜問號是 ${val}，左邊總共是 ${currentSum}，小於右邊的 ${numB}。再試試看！`;
+                }
+                feedback.className = "text-md font-bold text-red-600";
+            }
+        }
+
+        function nextQuestion() {
+            playSound('click');
+            initGame();
+        }
+    </script>
+</body>
+</html>
