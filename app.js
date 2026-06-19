@@ -310,27 +310,35 @@ function createComingSoonCard(category) {
 // 設定事件監聽器
 function setupEventListeners() {
     // 1. 搜尋輸入監聽
-    searchInput.addEventListener('input', (e) => {
-        searchQuery = e.target.value.trim();
-        
-        // 顯示或隱藏清除按鈕
-        if (searchQuery.length > 0) {
-            clearSearchBtn.style.display = 'flex';
-        } else {
-            clearSearchBtn.style.display = 'none';
-        }
-        
-        renderTools();
-    });
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            searchQuery = e.target.value.trim();
+            
+            // 顯示或隱藏清除按鈕
+            if (clearSearchBtn) {
+                if (searchQuery.length > 0) {
+                    clearSearchBtn.style.display = 'flex';
+                } else {
+                    clearSearchBtn.style.display = 'none';
+                }
+            }
+            
+            renderTools();
+        });
+    }
 
     // 2. 清除搜尋按鈕
-    clearSearchBtn.addEventListener('click', () => {
-        searchInput.value = '';
-        searchQuery = '';
-        clearSearchBtn.style.display = 'none';
-        searchInput.focus();
-        renderTools();
-    });
+    if (clearSearchBtn) {
+        clearSearchBtn.addEventListener('click', () => {
+            if (searchInput) {
+                searchInput.value = '';
+                searchQuery = '';
+                clearSearchBtn.style.display = 'none';
+                searchInput.focus();
+            }
+            renderTools();
+        });
+    }
 
     // 3. 分類按鈕點擊監聽 (利用事件代理)
     filterTabsContainer.addEventListener('click', (e) => {
