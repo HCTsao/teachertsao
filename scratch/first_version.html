@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>200以內的數 - 積木與錢幣大挑戰</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        .coin-btn {
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .coin-btn:active {
+            transform: scale(0.9);
+        }
+        .block-animate {
+            animation: popIn 0.3s ease-out;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-amber-50 min-height-screen font-sans text-stone-800 flex flex-col">
+
+    <!-- HOME_BUTTON_START -->
+    <a href="index.html" style="position: fixed; top: 12px; left: 12px; z-index: 999999; background: rgba(217, 119, 6, 0.9); color: #ffffff; padding: 8px 16px; border-radius: 20px; text-decoration: none; font-family: system-ui, -apple-system, sans-serif; font-size: 14px; font-weight: bold; backdrop-filter: blur(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.1); transition: all 0.2s ease;" onmouseover="this.style.background='rgba(245, 158, 11, 1)'" onmouseout="this.style.background='rgba(217, 119, 6, 0.9)'">🏠 回試作選單</a>
+    <script>(function() { function adjustViewport() { var targetWidth = 1024; var screenWidth = window.innerWidth || document.documentElement.clientWidth || window.screen.width; if (screenWidth > 0 && screenWidth < targetWidth) { var scale = screenWidth / targetWidth; var meta = document.querySelector('meta[name="viewport"]'); if (!meta) { meta = document.createElement('meta'); meta.setAttribute('name', 'viewport'); document.head.appendChild(meta); } meta.setAttribute('content', 'width=' + targetWidth + ', initial-scale=' + scale + ', minimum-scale=' + scale + ', maximum-scale=2.0, user-scalable=yes'); } else { var meta = document.querySelector('meta[name="viewport"]'); if (meta) { meta.setAttribute('content', 'width=device-width, initial-scale=1.0'); } } } adjustViewport(); var timer = null; window.addEventListener('resize', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); window.addEventListener('orientationchange', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); })();</script>
+    <!-- HOME_BUTTON_END -->
+
+    <div class="max-w-4xl w-full mx-auto p-4 md:p-8 flex-1 flex flex-col justify-between mt-12">
+        <!-- Title & Subtitle -->
+        <header class="text-center mb-6">
+            <span class="text-xs font-bold text-amber-700 bg-amber-200 px-3 py-1 rounded-full uppercase tracking-wider">單元一：200以內的數</span>
+            <h1 class="text-3xl md:text-4xl font-extrabold text-amber-900 mt-2">🐼 積木與錢幣大挑戰</h1>
+            <p class="text-amber-800 text-sm mt-1">拖曳或點選錢幣與積木，建立數的大小與位值觀念！</p>
+        </header>
+
+        <!-- Mode Selector -->
+        <div class="flex justify-center gap-4 mb-6">
+            <button id="btn-coin-mode" class="px-6 py-3 rounded-2xl font-bold text-lg shadow-md transition-all bg-amber-500 text-white border-2 border-amber-600 scale-105">
+                💰 錢幣付錢挑戰
+            </button>
+            <button id="btn-block-mode" class="px-6 py-3 rounded-2xl font-bold text-lg shadow-md transition-all bg-white text-amber-700 border-2 border-amber-300 hover:bg-amber-100">
+                🧱 積木位值挑戰
+            </button>
+        </div>
+
+        <!-- Main Workspace -->
+        <div class="bg-white rounded-3xl p-6 shadow-xl border-4 border-amber-300 flex-1 flex flex-col justify-between min-h-[500px]">
+            
+            <!-- COIN MODE -->
+            <div id="coin-mode-area" class="flex-1 flex flex-col justify-between">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch flex-1">
+                    <!-- Shop Target Card -->
+                    <div class="md:col-span-5 bg-amber-50 rounded-2xl p-6 border-2 border-amber-200 flex flex-col items-center justify-between text-center">
+                        <div>
+                            <h3 class="text-lg font-bold text-amber-800 mb-2">🛍️ 熊貓商店</h3>
+                            <div id="shop-item-icon" class="text-7xl my-4">🎁</div>
+                            <h4 id="shop-item-name" class="text-xl font-bold text-stone-700">精美禮物盒</h4>
+                        </div>
+                        <div class="w-full mt-4 bg-amber-100 py-3 rounded-xl border border-amber-200">
+                            <span class="text-sm font-semibold text-amber-700 block">商品價格</span>
+                            <span class="text-3xl font-black text-amber-600">$<span id="target-price">147</span></span>
+                        </div>
+                    </div>
+
+                    <!-- Payment Area -->
+                    <div class="md:col-span-7 bg-stone-50 rounded-2xl p-6 border-2 border-dashed border-stone-300 flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-md font-bold text-stone-600">📥 付錢盤子</h3>
+                                <button onclick="clearCoins()" class="text-xs text-red-600 hover:text-red-700 font-bold bg-red-50 hover:bg-red-100 px-3 py-1 rounded-lg border border-red-200">
+                                    <i class="fa-solid fa-trash-can mr-1"></i> 清空
+                                </button>
+                            </div>
+                            
+                            <!-- Visual Coins List -->
+                            <div id="tray-coins" class="flex flex-wrap gap-2 items-center justify-start p-4 bg-white rounded-xl min-h-[220px] border border-stone-200 shadow-inner overflow-y-auto">
+                                <!-- Generated coins go here -->
+                                <p id="coins-placeholder" class="text-stone-400 text-sm mx-auto my-auto text-center">請點選下方錢幣放入盤中...</p>
+                            </div>
+                        </div>
+
+                        <!-- Current Total display -->
+                        <div class="mt-4 flex items-center justify-between bg-amber-100 p-4 rounded-xl border border-amber-200">
+                            <span class="font-bold text-amber-800">你已放入的金額：</span>
+                            <span class="text-2xl font-black text-amber-700">$<span id="current-price">0</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Coin buttons selector -->
+                <div class="mt-6 border-t-2 border-stone-100 pt-6">
+                    <h3 class="text-center font-bold text-amber-900 mb-3">👛 點選錢幣放進付錢盤子：</h3>
+                    <div class="flex justify-center gap-4 md:gap-8">
+                        <button onclick="addCoin(100)" class="coin-btn flex flex-col items-center gap-1 bg-white hover:bg-red-50 border-2 border-red-300 rounded-xl p-3 shadow-md hover:shadow-lg w-24">
+                            <div class="w-16 h-10 bg-red-100 rounded-md border-2 border-red-400 flex items-center justify-center font-bold text-red-700 text-xs shadow-inner">壹佰元</div>
+                            <span class="text-xs font-black text-red-800">+100</span>
+                        </button>
+                        <button onclick="addCoin(10)" class="coin-btn flex flex-col items-center gap-1 bg-white hover:bg-amber-50 border-2 border-amber-400 rounded-xl p-3 shadow-md hover:shadow-lg w-24">
+                            <div class="w-12 h-12 bg-amber-100 rounded-full border-4 border-amber-400 flex items-center justify-center font-black text-amber-700 text-sm shadow-inner">10</div>
+                            <span class="text-xs font-black text-amber-800">+10</span>
+                        </button>
+                        <button onclick="addCoin(1)" class="coin-btn flex flex-col items-center gap-1 bg-white hover:bg-yellow-50 border-2 border-yellow-400 rounded-xl p-3 shadow-md hover:shadow-lg w-24">
+                            <div class="w-10 h-10 bg-yellow-50 rounded-full border-4 border-yellow-300 flex items-center justify-center font-black text-yellow-600 text-xs shadow-inner">1</div>
+                            <span class="text-xs font-black text-yellow-800">+1</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BLOCK MODE -->
+            <div id="block-mode-area" class="flex-1 flex flex-col justify-between hidden">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch flex-1">
+                    <!-- Target and Controls -->
+                    <div class="md:col-span-4 bg-amber-50 rounded-2xl p-6 border-2 border-amber-200 flex flex-col justify-between text-center">
+                        <div>
+                            <h3 class="text-lg font-bold text-amber-800 mb-2">🎯 目標數字</h3>
+                            <div class="bg-amber-100 py-6 rounded-2xl border border-amber-200 my-4">
+                                <span class="text-5xl font-black text-amber-700" id="target-number">125</span>
+                            </div>
+                            <div class="text-xs font-bold text-amber-700 mt-1">請利用積木排出來！</div>
+                        </div>
+
+                        <!-- Mini Scoreboard -->
+                        <div class="bg-white p-3 rounded-xl border border-amber-200 mt-4 text-left">
+                            <div class="text-xs font-bold text-amber-900 border-b border-amber-100 pb-1 mb-2">📋 位值分析表：</div>
+                            <div class="grid grid-cols-3 text-center text-xs font-extrabold text-stone-600 gap-1">
+                                <div class="bg-red-50 p-1 rounded">百位: <span id="num-hundreds">0</span></div>
+                                <div class="bg-amber-50 p-1 rounded">十位: <span id="num-tens">0</span></div>
+                                <div class="bg-yellow-50 p-1 rounded">個位: <span id="num-ones">0</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Canvas Blocks -->
+                    <div class="md:col-span-8 bg-stone-50 rounded-2xl p-6 border-2 border-dashed border-stone-300 flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-md font-bold text-stone-600">🧱 積木放置區</h3>
+                                <button onclick="clearBlocks()" class="text-xs text-red-600 hover:text-red-700 font-bold bg-red-50 hover:bg-red-100 px-3 py-1 rounded-lg border border-red-200">
+                                    <i class="fa-solid fa-trash-can mr-1"></i> 清空
+                                </button>
+                            </div>
+                            
+                            <!-- Visual Blocks List -->
+                            <div id="tray-blocks" class="p-4 bg-white rounded-xl min-h-[220px] border border-stone-200 shadow-inner overflow-y-auto flex flex-col gap-4">
+                                <p id="blocks-placeholder" class="text-stone-400 text-sm mx-auto my-auto text-center">請點選下方積木放入放置區...</p>
+                                
+                                <!-- Hundreds -->
+                                <div id="group-hundreds" class="flex flex-wrap gap-2"></div>
+                                <!-- Tens -->
+                                <div id="group-tens" class="flex flex-wrap gap-2"></div>
+                                <!-- Ones -->
+                                <div id="group-ones" class="flex flex-wrap gap-1"></div>
+                            </div>
+                        </div>
+
+                        <!-- Current Total Blocks Display -->
+                        <div class="mt-4 flex items-center justify-between bg-amber-100 p-4 rounded-xl border border-amber-200">
+                            <span class="font-bold text-amber-800">當前積木代表的數：</span>
+                            <span class="text-2xl font-black text-amber-700" id="current-block-value">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Block buttons selector -->
+                <div class="mt-6 border-t-2 border-stone-100 pt-6">
+                    <h3 class="text-center font-bold text-amber-900 mb-3">🎨 點選積木加到放置區：</h3>
+                    <div class="flex justify-center gap-4">
+                        <button onclick="addBlock('hundred')" class="coin-btn flex flex-col items-center bg-white hover:bg-red-50 border-2 border-red-300 rounded-xl p-3 shadow-md w-24">
+                            <div class="w-12 h-12 bg-red-100 border border-red-400 grid grid-cols-10 grid-rows-10 p-[1px] gap-[1px]">
+                                <!-- 100 little grid lines -->
+                                <script>
+                                    for(let i=0; i<10; i++) {
+                                        document.write('<div class="bg-red-400/50 w-full h-full"></div>');
+                                    }
+                                </script>
+                            </div>
+                            <span class="text-xs font-bold text-red-800 mt-2">百格板</span>
+                            <span class="text-[10px] text-stone-500 font-extrabold">+100</span>
+                        </button>
+                        <button onclick="addBlock('ten')" class="coin-btn flex flex-col items-center bg-white hover:bg-amber-50 border-2 border-amber-300 rounded-xl p-3 shadow-md w-24">
+                            <div class="w-3 h-12 bg-amber-100 border border-amber-400 flex flex-col gap-[1px] p-[1px]">
+                                <div class="bg-amber-400/50 w-full h-2"></div>
+                                <div class="bg-amber-400/50 w-full h-2"></div>
+                                <div class="bg-amber-400/50 w-full h-2"></div>
+                                <div class="bg-amber-400/50 w-full h-2"></div>
+                                <div class="bg-amber-400/50 w-full h-2"></div>
+                            </div>
+                            <span class="text-xs font-bold text-amber-800 mt-2">十條</span>
+                            <span class="text-[10px] text-stone-500 font-extrabold">+10</span>
+                        </button>
+                        <button onclick="addBlock('one')" class="coin-btn flex flex-col items-center bg-white hover:bg-yellow-50 border-2 border-yellow-300 rounded-xl p-3 shadow-md w-24">
+                            <div class="w-4 h-4 bg-yellow-100 border border-yellow-400 shadow-inner"></div>
+                            <span class="text-xs font-bold text-yellow-800 mt-2">個位積木</span>
+                            <span class="text-[10px] text-stone-500 font-extrabold">+1</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Feedback & Next Button -->
+        <div class="mt-6 flex flex-col md:flex-row items-center justify-between gap-4 bg-amber-100 p-4 rounded-2xl border-2 border-amber-300">
+            <div id="feedback-text" class="text-lg font-bold text-amber-900 flex items-center gap-2">
+                🐼 哈囉！我是熊貓老師，來挑戰看看吧！
+            </div>
+            <button id="btn-next" onclick="nextQuestion()" class="bg-amber-500 hover:bg-amber-600 text-white font-black px-8 py-3 rounded-2xl shadow-md border-b-4 border-amber-700 transition-all flex items-center gap-2">
+                下一題 <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Web Audio Synthesized Sounds -->
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            if (type === 'correct') {
+                // Happy ping-pong rising sound
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.3); // A5
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
+            } else if (type === 'wrong') {
+                // Buzz wrong sound
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(120, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'click') {
+                // Soft click sound
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            }
+        }
+    </script>
+
+    <!-- Game Logic -->
+    <script>
+        let mode = 'coin'; // 'coin' or 'block'
+        let targetVal = 0;
+        let currentCoins = { 100: 0, 10: 0, 1: 0 };
+        let currentBlocks = { hundred: 0, ten: 0, one: 0 };
+
+        const items = [
+            { name: "機器人玩具", price: 135, icon: "🤖" },
+            { name: "粉紅小恐龍", price: 168, icon: "🦖" },
+            { name: "太空小飛機", price: 124, icon: "🚀" },
+            { name: "美味巧克力蛋糕", price: 153, icon: "🍰" },
+            { name: "神奇故事書", price: 182, icon: "📚" },
+            { name: "彩色水彩筆", price: 119, icon: "🎨" },
+            { name: "小熊布偶", price: 147, icon: "🧸" }
+        ];
+
+        // Init
+        window.onload = () => {
+            initGame();
+        };
+
+        // Switch modes
+        document.getElementById('btn-coin-mode').addEventListener('click', () => {
+            playSound('click');
+            setMode('coin');
+        });
+        document.getElementById('btn-block-mode').addEventListener('click', () => {
+            playSound('click');
+            setMode('block');
+        });
+
+        function setMode(newMode) {
+            mode = newMode;
+            if (mode === 'coin') {
+                document.getElementById('btn-coin-mode').className = "px-6 py-3 rounded-2xl font-bold text-lg shadow-md transition-all bg-amber-500 text-white border-2 border-amber-600 scale-105";
+                document.getElementById('btn-block-mode').className = "px-6 py-3 rounded-2xl font-bold text-lg shadow-md transition-all bg-white text-amber-700 border-2 border-amber-300 hover:bg-amber-100";
+                document.getElementById('coin-mode-area').classList.remove('hidden');
+                document.getElementById('block-mode-area').classList.add('hidden');
+            } else {
+                document.getElementById('btn-block-mode').className = "px-6 py-3 rounded-2xl font-bold text-lg shadow-md transition-all bg-amber-500 text-white border-2 border-amber-600 scale-105";
+                document.getElementById('btn-coin-mode').className = "px-6 py-3 rounded-2xl font-bold text-lg shadow-md transition-all bg-white text-amber-700 border-2 border-amber-300 hover:bg-amber-100";
+                document.getElementById('block-mode-area').classList.remove('hidden');
+                document.getElementById('coin-mode-area').classList.add('hidden');
+            }
+            initGame();
+        }
+
+        function initGame() {
+            clearCoins();
+            clearBlocks();
+            
+            if (mode === 'coin') {
+                const randomItem = items[Math.floor(Math.random() * items.length)];
+                targetVal = randomItem.price;
+                document.getElementById('shop-item-name').innerText = randomItem.name;
+                document.getElementById('shop-item-icon').innerText = randomItem.icon;
+                document.getElementById('target-price').innerText = targetVal;
+                document.getElementById('feedback-text').innerHTML = `🐼 熊貓收銀員說：「這件 ${randomItem.name} 是 $${targetVal}，請給我剛好的錢喔！」`;
+            } else {
+                targetVal = Math.floor(Math.random() * 100) + 100; // 100 to 199
+                document.getElementById('target-number').innerText = targetVal;
+                document.getElementById('feedback-text').innerHTML = `🐼 請使用下方百格板、十條與個位積木，排出數字 ${targetVal}！`;
+            }
+        }
+
+        // --- COIN MODE ACTIONS ---
+        function addCoin(val) {
+            playSound('click');
+            currentCoins[val]++;
+            renderCoins();
+            checkAnswers();
+        }
+
+        function clearCoins() {
+            currentCoins = { 100: 0, 10: 0, 1: 0 };
+            renderCoins();
+            checkAnswers();
+        }
+
+        function renderCoins() {
+            const tray = document.getElementById('tray-coins');
+            tray.innerHTML = '';
+            
+            const total = (currentCoins[100] * 100) + (currentCoins[10] * 10) + (currentCoins[1] * 1);
+            document.getElementById('current-price').innerText = total;
+
+            if (total === 0) {
+                tray.innerHTML = `<p id="coins-placeholder" class="text-stone-400 text-sm mx-auto my-auto text-center">請點選下方錢幣放入盤中...</p>`;
+                return;
+            }
+
+            // Render 100s
+            for (let i = 0; i < currentCoins[100]; i++) {
+                tray.innerHTML += `<div class="block-animate w-24 h-14 bg-red-100 rounded-md border-2 border-red-400 flex flex-col items-center justify-center font-bold text-red-700 text-xs shadow-md"><div>壹佰元</div><div class="text-[10px] text-red-500">100</div></div>`;
+            }
+            // Render 10s
+            for (let i = 0; i < currentCoins[10]; i++) {
+                tray.innerHTML += `<div class="block-animate w-12 h-12 bg-amber-100 rounded-full border-4 border-amber-400 flex items-center justify-center font-black text-amber-700 text-sm shadow-md">10</div>`;
+            }
+            // Render 1s
+            for (let i = 0; i < currentCoins[1]; i++) {
+                tray.innerHTML += `<div class="block-animate w-10 h-10 bg-yellow-50 rounded-full border-4 border-yellow-300 flex items-center justify-center font-black text-yellow-600 text-xs shadow-md">1</div>`;
+            }
+        }
+
+        // --- BLOCK MODE ACTIONS ---
+        function addBlock(type) {
+            playSound('click');
+            currentBlocks[type]++;
+            renderBlocks();
+            checkAnswers();
+        }
+
+        function clearBlocks() {
+            currentBlocks = { hundred: 0, ten: 0, one: 0 };
+            renderBlocks();
+            checkAnswers();
+        }
+
+        function renderBlocks() {
+            const group100 = document.getElementById('group-hundreds');
+            const group10 = document.getElementById('group-tens');
+            const group1 = document.getElementById('group-ones');
+            
+            group100.innerHTML = '';
+            group10.innerHTML = '';
+            group1.innerHTML = '';
+
+            const total = (currentBlocks.hundred * 100) + (currentBlocks.ten * 10) + (currentBlocks.one * 1);
+            document.getElementById('current-block-value').innerText = total;
+
+            document.getElementById('num-hundreds').innerText = currentBlocks.hundred;
+            document.getElementById('num-tens').innerText = currentBlocks.ten;
+            document.getElementById('num-ones').innerText = currentBlocks.one;
+
+            if (total === 0) {
+                document.getElementById('blocks-placeholder').classList.remove('hidden');
+                return;
+            } else {
+                document.getElementById('blocks-placeholder').classList.add('hidden');
+            }
+
+            // Render hundreds
+            for (let i = 0; i < currentBlocks.hundred; i++) {
+                let gridHTML = '<div class="block-animate w-12 h-12 bg-red-100 border border-red-400 grid grid-cols-10 grid-rows-10 p-[1px] gap-[1px] shadow-sm">';
+                for(let j=0; j<10; j++) gridHTML += '<div class="bg-red-400/40 w-full h-full"></div>';
+                gridHTML += '</div>';
+                group100.innerHTML += gridHTML;
+            }
+
+            // Render tens
+            for (let i = 0; i < currentBlocks.ten; i++) {
+                group10.innerHTML += `
+                    <div class="block-animate w-3 h-12 bg-amber-100 border border-amber-400 flex flex-col gap-[1px] p-[1px] shadow-sm">
+                        <div class="bg-amber-400/40 w-full h-2"></div>
+                        <div class="bg-amber-400/40 w-full h-2"></div>
+                        <div class="bg-amber-400/40 w-full h-2"></div>
+                        <div class="bg-amber-400/40 w-full h-2"></div>
+                        <div class="bg-amber-400/40 w-full h-2"></div>
+                    </div>
+                `;
+            }
+
+            // Render ones
+            for (let i = 0; i < currentBlocks.one; i++) {
+                group1.innerHTML += `<div class="block-animate w-4 h-4 bg-yellow-100 border border-yellow-400 shadow-sm"></div>`;
+            }
+        }
+
+        // --- COMMON CHECK ANSWER ---
+        function checkAnswers() {
+            let total = 0;
+            if (mode === 'coin') {
+                total = (currentCoins[100] * 100) + (currentCoins[10] * 10) + (currentCoins[1] * 1);
+            } else {
+                total = (currentBlocks.hundred * 100) + (currentBlocks.ten * 10) + (currentBlocks.one * 1);
+            }
+
+            const feedback = document.getElementById('feedback-text');
+            if (total === targetVal) {
+                playSound('correct');
+                feedback.innerHTML = `🎉 🐼 <b>答對了！太厲害了！</b> 你放了剛好 <b>$${total}</b>！可以進行下一題囉！`;
+                feedback.className = "text-lg font-bold text-green-700 flex items-center gap-2";
+            } else if (total > targetVal) {
+                feedback.innerHTML = `⚠️ 🐼 <b>太多錢囉！</b> 當前是 <b>$${total}</b>，多出了 <b>$${total - targetVal}</b>。請調整一下。`;
+                feedback.className = "text-lg font-bold text-red-600 flex items-center gap-2";
+            } else {
+                if (total === 0) {
+                    if (mode === 'coin') {
+                        feedback.innerHTML = `🐼 熊貓收銀員說：「請付剛好 <b>$${targetVal}</b> 喔！」`;
+                    } else {
+                        feedback.innerHTML = `🐼 請使用下方積木排出數字 <b>${targetVal}</b> 喔！`;
+                    }
+                    feedback.className = "text-lg font-bold text-amber-900 flex items-center gap-2";
+                } else {
+                    feedback.innerHTML = `🪙 🐼 <b>還不夠喔！</b> 當前是 <b>$${total}</b>，還差 <b>$${targetVal - total}</b>。再加點錢吧！`;
+                    feedback.className = "text-lg font-bold text-amber-800 flex items-center gap-2";
+                }
+            }
+        }
+
+        function nextQuestion() {
+            playSound('click');
+            initGame();
+        }
+    </script>
+</body>
+</html>
