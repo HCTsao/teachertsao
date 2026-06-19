@@ -225,6 +225,13 @@ function init() {
     renderTools();
     setupEventListeners();
     setupHistoryStateListener();
+    
+    // 監聽視窗大小改變，自動調整教具縮放比例
+    window.addEventListener('resize', () => {
+        if (activeViewingTool) {
+            adjustIframeScale();
+        }
+    });
 }
 
 // 渲染教具卡片
@@ -369,9 +376,15 @@ function openTool(tool) {
     activeViewingTool = tool;
     viewerToolCategory.textContent = tool.category;
     viewerToolTitle.textContent = tool.name;
+    
+    // 重設 iframe 樣式，防止載入時閃爍
+    toolIframe.style.transform = 'translate(-50%, -50%) scale(0)';
     toolIframe.src = tool.path;
     toolViewer.style.display = 'flex';
     document.body.style.overflow = 'hidden'; // 防止主頁面捲動
+
+    // 延遲執行縮放以確保容器寬高已正確渲染
+    setTimeout(adjustIframeScale, 50);
 
     // 推送狀態到瀏覽器歷史紀錄，使得「回上一頁」按鈕可關閉 iframe
     window.history.pushState({ viewing: true, toolName: tool.name }, '');
@@ -382,8 +395,41 @@ function openTool(tool) {
 function closeTool(updateHistory = true) {
     toolViewer.style.display = 'none';
     toolIframe.src = '';
+    toolIframe.style.transform = '';
     document.body.style.overflow = ''; // 恢復主頁面捲動
     activeViewingTool = null;
+}
+
+// 自適應縮放 iframe 以防跑版
+function adjustIframeScale() {
+    if (!activeViewingTool) return;
+
+    const container = document.querySelector('.iframe-container');
+    if (!container) return;
+
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+
+    // 定義標準設計尺寸 (桌上型電腦寬高)
+    const targetWidth = 1024;
+    const targetHeight = 700;
+
+    let scale = 1;
+
+    // 如果容器寬高小於設計尺寸，則按比例縮小
+    if (containerWidth < targetWidth || containerHeight < targetHeight) {
+        const widthRatio = containerWidth / targetWidth;
+        const heightRatio = containerHeight / targetHeight;
+        scale = Math.min(widthRatio, heightRatio);
+    }
+
+    // 設定 iframe 物理大小與 transform 置中縮放
+    toolIframe.style.width = `${targetWidth}px`;
+    toolIframe.style.height = `${targetHeight}px`;
+    toolIframe.style.position = 'absolute';
+    toolIframe.style.left = '50%';
+    toolIframe.style.top = '50%';
+    toolIframe.style.transform = `translate(-50%, -50%) scale(${scale})`;
 }
 
 // 監聽瀏覽器上一頁/下一頁 (popstate)
@@ -402,6 +448,7 @@ function setupHistoryStateListener() {
                 toolIframe.src = tool.path;
                 toolViewer.style.display = 'flex';
                 document.body.style.overflow = 'hidden';
+                setTimeout(adjustIframeScale, 50);
             }
         }
     });
