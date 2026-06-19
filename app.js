@@ -373,21 +373,7 @@ function setupEventListeners() {
 
 // 開啟教具
 function openTool(tool) {
-    activeViewingTool = tool;
-    viewerToolCategory.textContent = tool.category;
-    viewerToolTitle.textContent = tool.name;
-    
-    // 重設 iframe 樣式，防止載入時閃爍
-    toolIframe.style.transform = 'translate(-50%, -50%) scale(0)';
-    toolIframe.src = tool.path;
-    toolViewer.style.display = 'flex';
-    document.body.style.overflow = 'hidden'; // 防止主頁面捲動
-
-    // 延遲執行縮放以確保容器寬高已正確渲染
-    setTimeout(adjustIframeScale, 50);
-
-    // 推送狀態到瀏覽器歷史紀錄，使得「回上一頁」按鈕可關閉 iframe
-    window.history.pushState({ viewing: true, toolName: tool.name }, '');
+    window.location.href = tool.path;
 }
 
 // 關閉教具
