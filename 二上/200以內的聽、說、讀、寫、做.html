@@ -870,6 +870,15 @@
         function convertArabicNumbersToChinese(text, alternatives = [], targetNum = null) {
             if (!text) return "";
             
+            // Helper to convert full-width digits (０-９) to half-width digits (0-9)
+            const toHalfWidth = (str) => {
+                if (typeof str !== 'string') return '';
+                return str.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 65248));
+            };
+            
+            text = toHalfWidth(text);
+            const cleanAlternatives = alternatives.map(alt => toHalfWidth(alt));
+            
             // Generate digit spelling for the target number (e.g. 192 -> "一九二")
             let digitSpelling = "";
             if (targetNum !== null) {
@@ -881,7 +890,7 @@
 
             // Check if the user explicitly spoke the digit spelling
             // by checking if the digit spelling is in the raw alternatives.
-            const hasDigitSpellingInSpeech = alternatives.some(alt => alt && alt.includes(digitSpelling));
+            const hasDigitSpellingInSpeech = cleanAlternatives.some(alt => alt && alt.includes(digitSpelling));
 
             return text.replace(/\d+/g, (match) => {
                 const num = parseInt(match, 10);
