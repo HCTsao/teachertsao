@@ -106,7 +106,7 @@
             <!-- Arabic Numeral Input Area -->
             <div id="numeral-input-div" class="mb-6 p-4 bg-amber-50/50 rounded-2xl border border-amber-100 flex flex-col items-center justify-center gap-4 hidden">
                 <span class="font-bold text-amber-800 text-sm">請在下方輸入正確數字：</span>
-                <input type="number" id="numeral-input-field" class="text-center text-3xl font-black text-amber-900 bg-white border-4 border-amber-300 rounded-xl px-4 py-2 w-48 shadow-inner focus:outline-none focus:border-amber-500" placeholder="" min="0" max="999">
+                <input type="text" id="numeral-input-field" class="text-center text-3xl font-black text-amber-900 bg-white border-4 border-amber-300 rounded-xl px-4 py-2 w-48 shadow-inner focus:outline-none focus:border-amber-500" placeholder="請輸入中文數字（例：一百四十七）" pattern="[\u4e00-\u9fa5]+" autocomplete="off">
                 <div class="flex gap-4">
                     <button onclick="clearInput()" class="bg-stone-500 hover:bg-stone-400 text-white font-black px-6 py-2 rounded-xl border-b-2 border-stone-700 transition-all text-sm">清除重輸</button>
                     <button onclick="verifyNumeralInput()" class="bg-amber-600 hover:bg-amber-500 text-white font-black px-6 py-2 rounded-xl border-b-2 border-amber-800 transition-all text-sm">確認送出</button>
@@ -299,6 +299,8 @@
         };
 
         let mode = 'coin';
+        // Global tracker for the current level type (e.g., 'coins_to_number')
+        let currentLevelType = null;
         let questionType = 1; // 1: Shopping, 2: Audio-only, 3: Reverse Count, 4: PV Composition
         
         let targetValue = 0;
@@ -393,7 +395,13 @@
             if (currentLevelType === 'price_to_coins') {
                 // 1. 看商品做數
                 questionType = 1;
-                tag.innerText = "看商品做數";
+                if (mode === 'coin') {
+                    tag.innerText = "看商品做數";
+                    tag.classList.remove('hidden');
+                } else {
+                    tag.innerText = "";
+                    tag.classList.add('hidden');
+                }
                 const item = shoppingItems[Math.floor(Math.random() * shoppingItems.length)];
                 targetValue = item.price;
                 let modeText = mode === 'coin' ? '用錢幣付付看。' : '用積木排排看。';
@@ -645,6 +653,16 @@
         }
 
         function removeItem(type, idx) {
+            // Disallow removal in 看圖輸入 (coins_to_number) mode
+            if (window.currentLevelType === 'coins_to_number') {
+                // Provide feedback that removal is not allowed
+                playSound('wrong');
+                const feedback = document.getElementById('feedback-text');
+                feedback.innerText = '⚠️ 看圖輸入模式下不能刪除圖片！';
+                feedback.className = 'text-md font-bold text-red-600';
+                return;
+            }
+            playSound('click');
             playSound('click');
             if (type === 'hundred') placedHundreds = Math.max(0, placedHundreds - 1);
             else if (type === 'ten') placedTens = Math.max(0, placedTens - 1);
@@ -673,6 +691,8 @@
             // Render hundreds
             const imgHundred = mode === 'coin' ? IMAGES.coin100 : IMAGES.block100;
             const sizeHundred = mode === 'coin' ? 'w-32 h-16 md:w-36 md:h-18' : 'w-28 h-28 md:w-32 md:h-32 object-contain';
+            const sizeTen = mode === 'coin' ? 'w-16 h-16 md:w-20 md:h-20' : 'w-16 h-16 md:w-20 md:h-20 object-contain';
+            const sizeOne = mode === 'coin' ? 'w-12 h-12 md:w-16 md:h-16' : 'w-12 h-12 md:w-16 md:h-16 object-contain';
             for (let i = 0; i < placedHundreds; i++) {
                 colH.innerHTML += `
                     <div class="relative item-animation select-none cursor-pointer" onclick="removeItem('hundred', ${i})">
@@ -684,7 +704,7 @@
 
             // Render tens
             const imgTen = mode === 'coin' ? IMAGES.coin10 : IMAGES.block10;
-            const sizeTen = mode === 'coin' ? 'w-14 h-14 md:w-16 md:h-16' : 'w-20 h-auto md:w-24 md:h-auto scale-110 object-contain';
+            const sizeTen = mode === 'coin' ? 'w-14 h-14 md:w-16 md:h-16' : 'w-14 h-14 md:w-16 md:h-16 object-contain';
             for (let i = 0; i < placedTens; i++) {
                 colT.innerHTML += `
                     <div class="relative item-animation select-none cursor-pointer" onclick="removeItem('ten', ${i})">
@@ -696,7 +716,7 @@
 
             // Render ones
             const imgOne = mode === 'coin' ? IMAGES.coin1 : IMAGES.block1;
-            const sizeOne = mode === 'coin' ? 'w-10 h-10 md:w-12 md:h-12' : 'w-8 h-8 md:w-10 md:h-10 scale-125 object-contain';
+            const sizeOne = mode === 'coin' ? 'w-10 h-10 md:w-12 md:h-12' : 'w-10 h-10 md:w-12 md:h-12 object-contain';
             for (let i = 0; i < placedOnes; i++) {
                 colO.innerHTML += `
                     <div class="relative item-animation select-none cursor-pointer" onclick="removeItem('one', ${i})">
@@ -718,6 +738,30 @@
         }
 
         function verifyNumeralInput() {
+            const feedback = document.getElementById('feedback-text');
+            const field = document.getElementById('numeral-input-field');
+            const valStr = field.value.trim();
+
+            if (valStr === "") {
+                playSound('wrong');
+                feedback.innerText = "🐼 請先輸入中文數字！";
+                feedback.className = "text-md font-bold text-red-600";
+                return;
+            }
+
+            const expected = getChineseStandardReading(targetValue);
+            if (valStr === expected) {
+                playSound('correct');
+                feedback.innerHTML = `🐼 輸入結果：<b>${valStr}</b>。恭喜你，答對了！`;
+                feedback.className = "text-md font-bold text-green-700 font-extrabold animate-bounce";
+                quantityVerified = true;
+                // Skip speech verification; input is final answer
+            } else {
+                playSound('wrong');
+                feedback.innerHTML = `🐼 輸入結果：<b>${valStr}</b>。答案不對喔，請清除重輸一次！`;
+                feedback.className = "text-md font-bold text-red-600";
+            }
+        }
             const feedback = document.getElementById('feedback-text');
             const field = document.getElementById('numeral-input-field');
             const valStr = field.value.trim();
