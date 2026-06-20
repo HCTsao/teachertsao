@@ -306,6 +306,7 @@
 
         let isRecording = false;
         let recognition = null;
+        let speechSessionTranscripts = [];
 
         let quantityVerified = false;
         let speechVerified = false;
@@ -399,7 +400,7 @@
                 // 2. 聽音做數
                 questionType = 2;
                 tag.innerText = "聽音做數";
-                targetValue = Math.floor(Math.random() * 100) + 100;
+                targetValue = Math.floor(Math.random() * 101) + 100;
                 document.getElementById('problem-text').innerHTML = `🐼 聽聲音挑戰！「請仔細聽播放的聲音，並在定位版排出對應的數量！」`;
                 document.getElementById('target-display-card').classList.add('hidden');
                 playAudioQuestion(targetValue);
@@ -408,7 +409,7 @@
                 // 3. 看圖輸入
                 questionType = 3;
                 tag.innerText = "看圖輸入";
-                targetValue = Math.floor(Math.random() * 100) + 100;
+                targetValue = Math.floor(Math.random() * 101) + 100;
                 placedHundreds = Math.floor(targetValue / 100);
                 placedTens = Math.floor((targetValue % 100) / 10);
                 placedOnes = targetValue % 10;
@@ -427,7 +428,7 @@
                 // NEW: 聽音輸入
                 questionType = 5;
                 tag.innerText = "聽音輸入";
-                targetValue = Math.floor(Math.random() * 100) + 100;
+                targetValue = Math.floor(Math.random() * 101) + 100;
                 document.getElementById('problem-text').innerHTML = `🐼 聽音輸入挑戰！「請仔細聽播放的聲音，並在下方欄位輸入對應的數字！」`;
                 document.getElementById('target-display-card').classList.add('hidden');
                 
@@ -442,7 +443,7 @@
                 // 4. 位值合成(不進位)
                 questionType = 4;
                 tag.innerText = "位值合成(不進位)";
-                targetValue = Math.floor(Math.random() * 100) + 100;
+                targetValue = Math.floor(Math.random() * 101) + 100;
                 const h = Math.floor(targetValue / 100);
                 const t = Math.floor((targetValue % 100) / 10);
                 const o = targetValue % 10;
@@ -465,7 +466,7 @@
                 // 5. 位值合成(有進位)
                 questionType = 6;
                 tag.innerText = "位值合成(有進位)";
-                targetValue = Math.floor(Math.random() * 80) + 110; // e.g. 110 ~ 189
+                targetValue = Math.floor(Math.random() * 101) + 100; // 100 ~ 200
                 // Distribute into carry format randomly
                 const trueH = Math.floor(targetValue / 100);
                 const trueT = Math.floor((targetValue % 100) / 10);
@@ -475,13 +476,13 @@
                 let t = trueT;
                 let o = trueO;
                 
-                if (Math.random() > 0.5) {
+                if (trueT >= 1 && Math.random() > 0.5) {
                     // Carry ones
-                    t = Math.max(0, trueT - 1);
+                    t = trueT - 1;
                     o = trueO + 10;
                 } else {
                     // Carry tens
-                    h = Math.max(0, trueH - 1);
+                    h = trueH - 1;
                     t = trueT + 10;
                 }
                 
@@ -792,7 +793,7 @@
             if (!SpeechRecognition) {
                 // Fallback if not supported
                 const typed = prompt("此瀏覽器不支援語音辨識。請手動輸入中文讀音（例如：一百四十七）：");
-                if (typed) verifySpeech(typed);
+                if (typed) verifySpeech([typed]);
                 return;
             }
 
@@ -805,8 +806,9 @@
             recognition = new SpeechRecognition();
             recognition.lang = 'zh-TW';
             recognition.continuous = true;
-            recognition.interimResults = false;
+            recognition.interimResults = true;
             recognition.maxAlternatives = 10;
+            speechSessionTranscripts = [];
 
             recognition.onstart = () => {
                 isRecording = true;
@@ -817,15 +819,19 @@
             };
 
             recognition.onresult = (event) => {
-                const alternatives = [];
-                const result = event.results[event.results.length - 1];
-                for (let i = 0; i < result.length; i++) {
-                    const text = result[i].transcript.trim().replace(/[。？，！\s]/g, '');
-                    if (text && !alternatives.includes(text)) {
-                        alternatives.push(text);
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const result = event.results[i];
+                    for (let j = 0; j < result.length; j++) {
+                        const text = result[j].transcript.trim().replace(/[。？，！\s]/g, '');
+                        if (text && !speechSessionTranscripts.includes(text)) {
+                            speechSessionTranscripts.push(text);
+                        }
                     }
                 }
-                verifySpeech(alternatives);
+                
+                // Show the latest interim or final text as preview
+                const latestText = event.results[event.results.length - 1][0].transcript.trim();
+                document.getElementById('speech-status').innerText = "正在辨識：" + latestText;
             };
 
             recognition.onerror = (e) => {
@@ -838,6 +844,13 @@
                 isRecording = false;
                 const recBtn = document.getElementById('btn-record');
                 recBtn.classList.remove('mic-active');
+                
+                if (speechSessionTranscripts.length > 0) {
+                    verifySpeech(speechSessionTranscripts);
+                } else {
+                    document.getElementById('speech-status').innerText = "未偵測到語音，請重試！";
+                    document.getElementById('speech-status').className = "text-sm font-bold text-red-500";
+                }
             };
 
             recognition.start();
