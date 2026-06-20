@@ -843,11 +843,27 @@
             recognition.start();
         }
 
-        function convertArabicNumbersToChinese(text) {
+        function convertArabicNumbersToChinese(text, alternatives = [], targetNum = null) {
             if (!text) return "";
+            
+            // Check if any raw alternative contains '百' or '十'
+            const hasPlaceValueInSpeech = alternatives.some(alt => alt && (alt.includes('百') || alt.includes('十')));
+
             return text.replace(/\d+/g, (match) => {
                 const num = parseInt(match, 10);
-                return getChineseStandardReading(num);
+                if (targetNum !== null && num === targetNum) {
+                    if (hasPlaceValueInSpeech) {
+                        return getChineseStandardReading(num);
+                    } else {
+                        // Return digit-by-digit spelling
+                        return num.toString().split('').map(d => {
+                            const map = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+                            return map[parseInt(d)];
+                        }).join('');
+                    }
+                } else {
+                    return getChineseStandardReading(num);
+                }
             });
         }
 
@@ -873,19 +889,20 @@
                 return map[parseInt(d)];
             }).join(''); // e.g. "一四七"
 
+            // Convert raw alternatives using our smart converter
+            const convertedAlternatives = alternatives.map(alt => 
+                convertArabicNumbersToChinese(alt, alternatives, targetValue)
+            );
+
             let detectedText = "";
             let isCorrect = false;
             let isDigitOnly = false;
 
-            // 1. Check if any alternative matches acceptable readings literally
-            let matchingAcceptable = alternatives.find(alt => acceptable.includes(alt));
+            // 1. Check if any converted alternative is exactly the standard reading or acceptable reading
+            let matchingAcceptable = convertedAlternatives.find(alt => acceptable.includes(alt));
 
-            // 2. Check if any alternative matches the digit spelling literally (e.g. "一二三")
-            let matchingDigit = alternatives.find(alt => alt === digitSpelling);
-
-            // 3. Check if any alternative contains the target digits (e.g. "123", "1百23", "1 2 3")
-            let targetDigitsStr = targetValue.toString();
-            let matchingDigits = alternatives.find(alt => alt.replace(/\D/g, '') === targetDigitsStr);
+            // 2. Check if any converted alternative is exactly the digit spelling (e.g. "一二三")
+            let matchingDigit = convertedAlternatives.find(alt => alt === digitSpelling);
 
             if (matchingAcceptable) {
                 detectedText = matchingAcceptable;
@@ -893,16 +910,9 @@
             } else if (matchingDigit) {
                 detectedText = matchingDigit;
                 isDigitOnly = true;
-            } else if (matchingDigits) {
-                // If Chrome returned target digits (like "123") but we did NOT find a literal digit spelling,
-                // we treat it as correct (standard place value reading).
-                detectedText = standard;
-                isCorrect = true;
             } else {
-                // Completely incorrect answer
-                // Use the first alternative, but if it contains digits, convert them to Chinese characters
-                let rawText = alternatives[0];
-                detectedText = convertArabicNumbersToChinese(rawText);
+                // If neither matched, just use the converted version of the first alternative
+                detectedText = convertedAlternatives[0];
             }
 
             document.getElementById('speech-result-div').classList.remove('hidden');
