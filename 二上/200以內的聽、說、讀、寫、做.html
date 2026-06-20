@@ -888,20 +888,27 @@
                 }).join('');
             }
 
-            // Check if the user explicitly spoke the digit spelling
-            // by checking if the digit spelling is in the raw alternatives.
-            const hasDigitSpellingInSpeech = cleanAlternatives.some(alt => alt && alt.includes(digitSpelling));
+            // A number is considered standard reading if any raw alternative contains '百' or '十'
+            const hasStandardSpellingInSpeech = cleanAlternatives.some(alt => alt && (alt.includes('百') || alt.includes('十')));
 
             return text.replace(/\d+/g, (match) => {
                 const num = parseInt(match, 10);
                 if (targetNum !== null && num === targetNum) {
-                    if (hasDigitSpellingInSpeech) {
-                        return digitSpelling;
-                    } else {
+                    if (hasStandardSpellingInSpeech) {
                         return getChineseStandardReading(num);
+                    } else {
+                        return digitSpelling;
                     }
                 } else {
-                    return getChineseStandardReading(num);
+                    if (hasStandardSpellingInSpeech) {
+                        return getChineseStandardReading(num);
+                    } else {
+                        // Return digit spelling of the number
+                        return num.toString().split('').map(d => {
+                            const map = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+                            return map[parseInt(d)];
+                        }).join('');
+                    }
                 }
             });
         }
