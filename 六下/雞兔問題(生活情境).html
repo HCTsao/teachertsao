@@ -1,0 +1,1812 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5-3 假設法邏輯挑戰（精準引導版）</title>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            --panel-bg: rgba(255, 255, 255, 0.85);
+            --card-bg: rgba(241, 245, 249, 0.9);
+            --border-glow: rgba(99, 102, 241, 0.15);
+            --border-active: rgba(99, 102, 241, 0.5);
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --primary: #4f46e5;
+            --primary-hover: #3730a3;
+            --success: #059669;
+            --warning: #d97706;
+            --danger: #dc2626;
+            --glass-blur: blur(12px);
+        }
+
+        body {
+            font-family: 'Inter', "Microsoft JhengHei", -apple-system, sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        /* 頂部固定按鈕區 */
+        .fixed-nav {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.9);
+            color: var(--text-primary);
+            padding: 8px 18px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: bold;
+            backdrop-filter: var(--glass-blur);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+            cursor: pointer;
+            outline: none;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+        
+        .nav-btn:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        /* 啟動設定畫面 */
+        #setup-screen {
+            background: var(--panel-bg);
+            backdrop-filter: var(--glass-blur);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            padding: 40px;
+            border-radius: 24px;
+            width: 95%;
+            max-width: 650px;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.06);
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        h1 {
+            color: var(--text-primary);
+            font-size: 2.2rem;
+            margin-bottom: 8px;
+            text-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            text-align: left;
+            font-weight: bold;
+            margin: 15px 0 10px 5px;
+            color: var(--text-primary);
+            font-size: 1.05rem;
+        }
+
+        /* 情境選擇卡片 */
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+
+        @media (max-width: 550px) {
+            .scenario-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .scenario-card {
+            background: var(--card-bg);
+            border: 2px solid var(--border-glow);
+            border-radius: 16px;
+            padding: 14px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 12px;
+            text-align: left;
+        }
+
+        .scenario-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--primary);
+            box-shadow: 0 6px 15px rgba(99, 102, 241, 0.08);
+        }
+
+        .scenario-card.active {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.08);
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.1);
+        }
+
+        .scenario-icon {
+            font-size: 2.2rem;
+            flex-shrink: 0;
+        }
+
+        .scenario-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .scenario-name {
+            font-weight: bold;
+            font-size: 1rem;
+        }
+
+        .scenario-desc {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        /* 滑桿控制 */
+        .slider-wrapper {
+            background: var(--card-bg);
+            padding: 16px 20px;
+            border-radius: 16px;
+            border: 1px solid var(--border-glow);
+            margin-bottom: 25px;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .slider-val {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            outline: none;
+            background: #475569;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        /* 按鈕樣式 */
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 12px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn:hover {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        /* 遊戲核心挑戰畫面 */
+        #game-screen {
+            display: none;
+            width: 98%;
+            max-width: 1600px;
+            margin: 60px auto 20px auto;
+            grid-template-columns: 1fr 1.25fr;
+            gap: 20px;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @media (max-width: 900px) {
+            #game-screen {
+                grid-template-columns: 1fr;
+            }
+            .question-box {
+                grid-column: span 1 !important;
+            }
+        }
+
+        /* 題目區 */
+        .question-box {
+            grid-column: span 2; /* 兩倍寬度，橫跨兩欄 */
+            background: var(--panel-bg);
+            border: 1px solid var(--border-glow);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            backdrop-filter: var(--glass-blur);
+        }
+
+        .question-header {
+            font-size: 0.9rem;
+            color: var(--primary);
+            font-weight: bold;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .question-text {
+            font-size: 1.25rem;
+            line-height: 1.6;
+            font-weight: bold;
+        }
+
+        /* 步驟清單 */
+        .steps-ledger {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-glow);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            backdrop-filter: var(--glass-blur);
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .ledger-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+        }
+
+        .ledger-step {
+            background: rgba(0, 0, 0, 0.02);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            border-radius: 12px;
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: all 0.3s;
+        }
+
+        .ledger-step.active {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.08);
+        }
+
+        .ledger-step.completed {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.08);
+        }
+
+        .step-num-tag {
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: var(--text-secondary);
+        }
+        .completed .step-num-tag {
+            color: var(--success);
+        }
+        .active .step-num-tag {
+            color: var(--primary);
+        }
+
+        .step-eq-disp {
+            font-size: 1.2rem;
+            font-weight: bold;
+            font-family: monospace;
+        }
+
+        .step-meaning-disp {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+        }
+        .completed .step-meaning-disp {
+            color: var(--text-primary);
+        }
+
+        /* 右側：作答控制台 */
+        .right-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-glow);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            backdrop-filter: var(--glass-blur);
+            display: flex;
+            flex-direction: column;
+            gap: 12px; /* 降低間距，使其高度對齊步驟紀錄 */
+            box-sizing: border-box;
+        }
+
+        @media (min-width: 901px) {
+            .right-panel {
+                display: grid;
+                grid-template-columns: 1.2fr 1fr;
+                grid-template-areas:
+                    "header keypad"
+                    "instruction keypad"
+                    "eq-group keypad"
+                    "meaning-group keypad"
+                    "feedback keypad"
+                    "submit keypad"
+                    "chips chips";
+                gap: 10px 16px;
+                align-items: start;
+            }
+            .active-step-header {
+                grid-area: header;
+            }
+            .active-step-instruction {
+                grid-area: instruction;
+            }
+            .eq-group {
+                grid-area: eq-group;
+            }
+            .meaning-group {
+                grid-area: meaning-group;
+                margin-top: 0 !important;
+            }
+            .virtual-keypad {
+                grid-area: keypad;
+                align-self: center;
+            }
+            .feedback-box {
+                grid-area: feedback;
+            }
+            .submit-row {
+                grid-area: submit;
+            }
+            .word-chips-container {
+                grid-area: chips;
+            }
+        }
+
+        .active-step-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .step-badge {
+            background: var(--primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        .active-step-instruction {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--warning);
+            display: none; /* 初始隱藏，答錯時顯示 */
+        }
+
+        /* 輸入框組合 */
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .input-label {
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: var(--text-secondary);
+        }
+
+        .text-input {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid var(--border-glow);
+            border-radius: 12px;
+            padding: 15px 12px; /* Increased padding for larger input area */
+            font-size: 1.2rem; /* Slightly larger font */
+            color: var(--text-primary);
+            outline: none;
+            transition: border-color 0.2s;
+            width: 100%;
+            box-sizing: border-box;
+            min-height: 80px; /* Ensure sufficient height */
+        }
+
+        .text-input:focus {
+            border-color: var(--primary);
+        }
+
+        /* 算式輸入框專用 */
+        #equation-input {
+            font-family: monospace;
+            font-size: 1.4rem;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+
+        /* 虛擬鍵盤 */
+        .virtual-keypad {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px; /* 降低間距 */
+            background: rgba(0, 0, 0, 0.03);
+            padding: 8px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .key-btn {
+            background: #f1f5f9;
+            color: #1e293b;
+            border: none;
+            padding: 10px 0; /* 降低 padding 以節省垂直高度 */
+            border-radius: 8px;
+            font-size: 1.15rem; /* 稍微縮小字體 */
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.1s, transform 0.05s;
+            user-select: none;
+        }
+
+        .key-btn:hover {
+            background: #cbd5e1;
+        }
+
+        .key-btn:active {
+            transform: scale(0.95);
+        }
+
+        .key-btn.operator {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .key-btn.operator:hover {
+            background: #bfdbfe;
+        }
+
+        .key-btn.action {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .key-btn.action:hover {
+            background: #fecaca;
+        }
+
+        /* 詞字卡拼圖區 */
+        .word-chips-container {
+            background: rgba(251, 191, 36, 0.08);
+            border: 1px dashed var(--warning);
+            border-radius: 16px;
+            padding: 16px;
+            margin-top: 10px;
+            display: none; /* 初始隱藏，答錯時顯示 */
+            flex-direction: column;
+            gap: 10px;
+            animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .word-chips-title {
+            font-size: 0.9rem;
+            color: var(--warning);
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .chips-pool {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .word-chip {
+            background: #f1f5f9;
+            color: var(--text-primary);
+            border: 1px solid rgba(0,0,0,0.06);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 0.92rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .word-chip:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            transform: scale(1.05);
+        }
+
+        .word-chip:active {
+            transform: scale(0.95);
+        }
+
+        /* 反饋區域 */
+        .feedback-box {
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+
+        .feedback-box.error {
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid var(--danger);
+            color: #dc2626;
+        }
+
+        .feedback-box.success {
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid var(--success);
+            color: #059669;
+        }
+
+        .submit-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 2fr;
+            gap: 12px;
+        }
+
+        @media (max-width: 480px) {
+            .submit-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .submit-row button {
+            padding: 12px 0 !important;
+            font-size: 1.05rem !important;
+            height: 46px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+
+        .clear-btn {
+            background: #334155;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .clear-btn:hover {
+            background: #475569;
+        }
+
+        .hint-btn {
+            background: rgba(245, 158, 11, 0.15);
+            color: #000000;
+            border: 1px solid var(--warning);
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .hint-btn:hover {
+            background: rgba(245, 158, 11, 0.3);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+        }
+        .hint-btn:active {
+            transform: translateY(1px);
+        }
+
+        /* 關卡結算畫面 */
+        #ending-screen {
+            display: none;
+            background: var(--panel-bg);
+            backdrop-filter: var(--glass-blur);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            padding: 40px;
+            border-radius: 24px;
+            width: 90%;
+            max-width: 750px;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.06);
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .ending-badge {
+            font-size: 5rem;
+            margin-bottom: 10px;
+            animation: float 2s ease-in-out infinite;
+        }
+
+        .ending-table {
+            width: 100%;
+            margin: 20px 0;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        .ending-table th, .ending-table td {
+            padding: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .ending-table th {
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .ending-table td.eq-cell {
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        /* 動畫效果 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        /* 紙花慶祝碎片 */
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #ffd700;
+            opacity: 0.8;
+            top: -10px;
+            z-index: 9999;
+            animation: fall 3s linear infinite;
+        }
+
+        @keyframes fall {
+            to {
+                transform: translateY(105vh) rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- 頂部固定按鈕區 -->
+<div class="fixed-nav">
+    <a href="../index.html" class="nav-btn">&#127969; 回首頁</a>
+    <button id="nav-menu-btn" onclick="restartSetup()" class="nav-btn" style="display: none;">📋 回主選單</button>
+</div>
+
+<!-- 1. 啟動設定畫面 -->
+<div id="setup-screen">
+    <h1>🍱 假設法邏輯挑戰</h1>
+    <div class="subtitle">康軒版六年級下學期 5-3 怎樣解題</div>
+    
+    <div class="section-title">選擇日常情境：</div>
+    <div class="scenario-grid">
+        <div class="scenario-card active" onclick="selectScenario('bento')">
+            <span class="scenario-icon">🍱</span>
+            <div class="scenario-info">
+                <span class="scenario-name">1. 便當情境</span>
+                <span class="scenario-desc">鮭魚便當(100元) / 排骨便當(80元)</span>
+            </div>
+        </div>
+        <div class="scenario-card" onclick="selectScenario('cable')">
+            <span class="scenario-icon">🚠</span>
+            <div class="scenario-info">
+                <span class="scenario-name">2. 日月潭纜車</span>
+                <span class="scenario-desc">全票(380元) / 優待票(300元)</span>
+            </div>
+        </div>
+        <div class="scenario-card" onclick="selectScenario('stationery')">
+            <span class="scenario-icon">✏️</span>
+            <div class="scenario-info">
+                <span class="scenario-name">3. 文具購買</span>
+                <span class="scenario-desc">原子筆(12元) / 鉛筆(9元)</span>
+            </div>
+        </div>
+        <div class="scenario-card" onclick="selectScenario('tea')">
+            <span class="scenario-icon">🍵</span>
+            <div class="scenario-info">
+                <span class="scenario-name">4. 茶葉買賣</span>
+                <span class="scenario-desc">烏龍茶(每斤700元) / 綠茶(每斤600元)</span>
+            </div>
+        </div>
+        <div class="scenario-card" onclick="selectScenario('coins')">
+            <span class="scenario-icon">🪙</span>
+            <div class="scenario-info">
+                <span class="scenario-name">5. 存錢筒整理</span>
+                <span class="scenario-desc">50元硬幣 / 10元硬幣</span>
+            </div>
+        </div>
+        <div class="scenario-card" onclick="selectScenario('vehicles')">
+            <span class="scenario-icon">🚗</span>
+            <div class="scenario-info">
+                <span class="scenario-name">6. 車輛統計</span>
+                <span class="scenario-desc">六輪貨車 / 四輪汽車</span>
+            </div>
+        </div>
+        <div class="scenario-card" onclick="selectScenario('random')" style="grid-column: span 2;">
+            <span class="scenario-icon">🎲</span>
+            <div class="scenario-info">
+                <span class="scenario-name">7. 隨機情境（含經典雞兔及門票等其他情境）</span>
+                <span class="scenario-desc">隨機生成各種不同主題題目進行邏輯挑戰！</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="slider-wrapper">
+        <div class="slider-header">
+            <span class="input-label" style="font-size: 1rem;">設定購買/統計總數量：</span>
+            <span id="slider-val-display" class="slider-val">10</span>
+        </div>
+        <input type="range" id="total-count-slider" min="6" max="30" value="10" oninput="updateSliderVal(this.value)">
+    </div>
+
+    <button class="btn" onclick="startGame()">開始出題練習</button>
+</div>
+
+<!-- 2. 遊戲核心挑戰畫面 -->
+<div id="game-screen">
+    <!-- 頂部：挑戰題目 (橫跨兩欄) -->
+    <div class="question-box">
+        <div class="question-header">
+            <span>📌</span> 挑戰題目
+        </div>
+        <div id="question-text-el" class="question-text">
+            正在生成問題...
+        </div>
+    </div>
+
+    <!-- 左下側：解題步驟紀錄 -->
+    <div class="steps-ledger">
+        <div class="ledger-title">📝 假設法解題步驟紀錄</div>
+        <div id="ledger-step-1" class="ledger-step active">
+            <div class="step-num-tag">步驟 1 / 5</div>
+            <div class="step-eq-disp" id="ledger-eq-1">--</div>
+            <div class="step-meaning-disp" id="ledger-meaning-1">等待回答中...</div>
+        </div>
+        <div id="ledger-step-2" class="ledger-step">
+            <div class="step-num-tag">步驟 2 / 5</div>
+            <div class="step-eq-disp" id="ledger-eq-2">--</div>
+            <div class="step-meaning-disp" id="ledger-meaning-2">尚未解鎖</div>
+        </div>
+        <div id="ledger-step-3" class="ledger-step">
+            <div class="step-num-tag">步驟 3 / 5</div>
+            <div class="step-eq-disp" id="ledger-eq-3">--</div>
+            <div class="step-meaning-disp" id="ledger-meaning-3">尚未解鎖</div>
+        </div>
+        <div id="ledger-step-4" class="ledger-step">
+            <div class="step-num-tag">步驟 4 / 5</div>
+            <div class="step-eq-disp" id="ledger-eq-4">--</div>
+            <div class="step-meaning-disp" id="ledger-meaning-4">尚未解鎖</div>
+        </div>
+        <div id="ledger-step-5" class="ledger-step">
+            <div class="step-num-tag">步驟 5 / 5</div>
+            <div class="step-eq-disp" id="ledger-eq-5">--</div>
+            <div class="step-meaning-disp" id="ledger-meaning-5">尚未解鎖</div>
+        </div>
+    </div>
+
+    <!-- 右側：作答控制台 -->
+    <div class="right-panel">
+        <div class="active-step-header">
+            <div class="step-badge" id="console-step-badge">步驟 1</div>
+            <div class="input-label" style="font-weight: bold; color: var(--success);">雙路徑自動引導作答系統</div>
+        </div>
+        
+        <div id="console-instruction" class="active-step-instruction">
+            假設全部都是便宜的商品，要花多少錢？
+        </div>
+
+        <!-- 算式輸入 -->
+        <div class="input-group eq-group">
+            <label class="input-label" for="equation-input">👉 寫下此步驟的算式：</label>
+            <input type="text" id="equation-input" class="text-input" placeholder="請輸入完整的算式" readonly>
+        </div>
+
+        <!-- 虛擬鍵盤 -->
+        <div class="virtual-keypad">
+            <button class="key-btn" onclick="pressKey('1')">1</button>
+            <button class="key-btn" onclick="pressKey('2')">2</button>
+            <button class="key-btn" onclick="pressKey('3')">3</button>
+            <button class="key-btn operator" onclick="pressKey('+')">+</button>
+
+            <button class="key-btn" onclick="pressKey('4')">4</button>
+            <button class="key-btn" onclick="pressKey('5')">5</button>
+            <button class="key-btn" onclick="pressKey('6')">6</button>
+            <button class="key-btn operator" onclick="pressKey('-')">-</button>
+
+            <button class="key-btn" onclick="pressKey('7')">7</button>
+            <button class="key-btn" onclick="pressKey('8')">8</button>
+            <button class="key-btn" onclick="pressKey('9')">9</button>
+            <button class="key-btn operator" onclick="pressKey('×')">×</button>
+
+            <button class="key-btn action" onclick="pressKey('clear')">C</button>
+            <button class="key-btn" onclick="pressKey('0')">0</button>
+            <button class="key-btn operator" onclick="pressKey('=')">=</button>
+            <button class="key-btn operator" onclick="pressKey('÷')">÷</button>
+            
+            <button class="key-btn action" onclick="pressKey('backspace')" style="grid-column: span 4; font-size: 1.1rem; padding: 8px 0;">⌫ 刪除最後一個字</button>
+        </div>
+
+        <!-- 涵義輸入 -->
+        <div class="input-group meaning-group" style="margin-top: 5px;">
+            <label class="input-label" for="meaning-input">👉 用中文解釋這個算式的涵義：</label>
+            <textarea id="meaning-input" class="text-input" placeholder="" rows="3"></textarea>
+        </div>
+
+        <!-- 詞字卡重組輔助區 -->
+        <div id="word-chips" class="word-chips-container">
+            <div class="word-chips-title">
+                💡 字詞拼圖提示（請點擊下方字詞卡，將它們按順序拼成一句完整的話：）
+            </div>
+            <div id="chips-pool-el" class="chips-pool">
+                <!-- 動態載入字詞卡 -->
+            </div>
+        </div>
+
+        <!-- 回饋訊息 -->
+        <div id="feedback-el" class="feedback-box"></div>
+
+        <!-- 動作按鈕 -->
+        <div class="submit-row">
+            <button class="clear-btn" onclick="clearActiveInputs()">清除重填</button>
+            <button class="hint-btn" onclick="showHint()">查看提示</button>
+            <button class="btn" onclick="submitStepAnswer()">送出檢查</button>
+        </div>
+    </div>
+</div>
+
+<!-- 3. 關卡結算畫面 -->
+<div id="ending-screen">
+    <div class="ending-badge">🏆</div>
+    <h1 style="color: var(--success);">邏輯挑戰成功！</h1>
+    <p class="subtitle" style="margin-bottom: 20px;">你已經成功用假設法解開了這道生活情境問題！</p>
+    
+    <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 25px;">
+        <h3 style="margin-top:0; text-align:left; color: var(--warning);">🎓 你的解題心法 ledger 彙整：</h3>
+        <table class="ending-table">
+            <thead>
+                <tr>
+                    <th style="width: 15%;">步驟</th>
+                    <th style="width: 35%;">列式</th>
+                    <th style="width: 50%;">解釋涵義</th>
+                </tr>
+            </thead>
+            <tbody id="ending-ledger-body">
+                <!-- 動態填入 -->
+            </tbody>
+        </table>
+    </div>
+
+    <button class="btn" onclick="restartSetup()">再挑戰一題</button>
+</div>
+
+<script>
+    // --- 音效管理 (Web Audio API Synthesizer) ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    function playTone(freq, type, duration, delay = 0) {
+        setTimeout(() => {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.frequency.value = freq;
+            osc.type = type;
+            
+            const now = audioCtx.currentTime;
+            gain.gain.setValueAtTime(0.08, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+            
+            osc.start(now);
+            osc.stop(now + duration);
+        }, delay * 1000);
+    }
+
+    function playSound(type) {
+        try {
+            if (type === 'correct') {
+                playTone(523.25, 'triangle', 0.15, 0); // C5
+                playTone(659.25, 'triangle', 0.15, 0.08); // E5
+                playTone(783.99, 'triangle', 0.3, 0.16); // G5
+            } else if (type === 'wrong') {
+                playTone(293.66, 'sawtooth', 0.25, 0); // D4
+                playTone(220.00, 'sawtooth', 0.3, 0.08); // A3
+            } else if (type === 'pop') {
+                playTone(880, 'sine', 0.05, 0);
+            } else if (type === 'win') {
+                const notes = [523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50];
+                notes.forEach((freq, idx) => {
+                    playTone(freq, 'sine', 0.2, idx * 0.1);
+                });
+            }
+        } catch (e) {
+            console.log('Audio Context error:', e);
+        }
+    }
+
+    document.body.addEventListener('click', () => {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+    });
+
+    // --- 資料結構 & 情境設定 ---
+    const SCENARIOS = {
+        bento: {
+            title: "便當情境",
+            icon: "🍱",
+            item1: { name: "排骨便當", price: 80 },
+            item2: { name: "鮭魚便當", price: 100 },
+            unit: "個",
+            buyer: "阿宏",
+            action: "買",
+            valUnit: "元",
+            costName: "花費"
+        },
+        cable: {
+            title: "日月潭纜車",
+            icon: "🚠",
+            item1: { name: "優待票", price: 300 },
+            item2: { name: "全票", price: 380 },
+            unit: "張",
+            buyer: "遊客們",
+            action: "買",
+            valUnit: "元",
+            costName: "車票費用"
+        },
+        stationery: {
+            title: "文具購買",
+            icon: "✏️",
+            item1: { name: "鉛筆", price: 9 },
+            item2: { name: "原子筆", price: 12 },
+            unit: "枝",
+            buyer: "爸爸",
+            action: "買",
+            valUnit: "元",
+            costName: "花費"
+        },
+        tea: {
+            title: "茶葉買賣",
+            icon: "🍵",
+            item1: { name: "綠茶", price: 600 },
+            item2: { name: "烏龍茶", price: 700 },
+            unit: "斤",
+            buyer: "茶行老闆",
+            action: "買進",
+            valUnit: "元",
+            costName: "花費"
+        },
+        coins: {
+            title: "存錢筒整理",
+            icon: "🪙",
+            item1: { name: "10元硬幣", price: 10 },
+            item2: { name: "50元硬幣", price: 50 },
+            unit: "個",
+            buyer: "小明",
+            action: "存有",
+            valUnit: "元",
+            costName: "總金額"
+        },
+        vehicles: {
+            title: "停車場統計",
+            icon: "🚗",
+            item1: { name: "四輪汽車", price: 4 },
+            item2: { name: "六輪貨車", price: 6 },
+            unit: "輛",
+            buyer: "管理員",
+            action: "統計",
+            valUnit: "個輪子",
+            costName: "輪子總數"
+        }
+    };
+
+    const EXTRA_SCENARIOS = [
+        {
+            title: "農場點點名",
+            icon: "🐔",
+            item1: { name: "雞", price: 2 },
+            item2: { name: "兔", price: 4 },
+            unit: "隻",
+            buyer: "農夫阿土",
+            action: "養",
+            valUnit: "隻腳",
+            costName: "腳的總數"
+        },
+        {
+            title: "球類採購",
+            icon: "🏀",
+            item1: { name: "排球", price: 200 },
+            item2: { name: "籃球", price: 350 },
+            unit: "個",
+            buyer: "體育組長",
+            action: "買",
+            valUnit: "元",
+            costName: "花費"
+        },
+        {
+            title: "校園單車統計",
+            icon: "🚲",
+            item1: { name: "腳踏車", price: 2 },
+            item2: { name: "三輪車", price: 3 },
+            unit: "輛",
+            buyer: "糾察隊",
+            action: "統計",
+            valUnit: "個輪子",
+            costName: "輪子總數"
+        }
+    ];
+
+    let activeScenarioKey = 'bento';
+    let gameState = {
+        currentStep: 1, 
+        scenario: {},
+        totalCount: 10,
+        count1: 0, 
+        count2: 0, 
+        totalCost: 0,
+        solvedPath: null, 
+        stepAnswers: {
+            1: { eq: "", meaning: "" },
+            2: { eq: "", meaning: "" },
+            3: { eq: "", meaning: "" },
+            4: { eq: "", meaning: "" },
+            5: { eq: "", meaning: "" }
+        },
+        failedAttempts: 0
+    };
+
+    function updateSliderVal(val) {
+        document.getElementById('slider-val-display').innerText = val;
+        gameState.totalCount = parseInt(val);
+    }
+
+    function selectScenario(key) {
+        activeScenarioKey = key;
+        document.querySelectorAll('.scenario-card').forEach(card => card.classList.remove('active'));
+        
+        let card = document.querySelector(`.scenario-card[onclick="selectScenario('${key}')"]`);
+        if (card) card.classList.add('active');
+        playSound('pop');
+    }
+
+    // --- 題目生成器 ---
+    function generateProblem() {
+        let scData;
+        if (activeScenarioKey === 'random') {
+            const allScenarios = [...Object.values(SCENARIOS), ...EXTRA_SCENARIOS];
+            scData = allScenarios[Math.floor(Math.random() * allScenarios.length)];
+        } else {
+            scData = SCENARIOS[activeScenarioKey];
+        }
+        
+        const N = gameState.totalCount;
+        const count2 = Math.floor(Math.random() * (N - 3)) + 2; 
+        const count1 = N - count2;
+        
+        const P1 = scData.item1.price;
+        const P2 = scData.item2.price;
+        const totalCost = count1 * P1 + count2 * P2;
+
+        gameState.scenario = scData;
+        gameState.count1 = count1;
+        gameState.count2 = count2;
+        gameState.totalCost = totalCost;
+        gameState.solvedPath = null; 
+        gameState.currentStep = 1;
+        gameState.failedAttempts = 0;
+        
+        gameState.stepAnswers = {
+            1: { eq: "", meaning: "" },
+            2: { eq: "", meaning: "" },
+            3: { eq: "", meaning: "" },
+            4: { eq: "", meaning: "" },
+            5: { eq: "", meaning: "" }
+        };
+
+        let qText = "";
+        if (scData.title === "停車場統計" || scData.title === "校園單車統計") {
+            qText = `${scData.buyer}統計有<b>${scData.item1.name}</b>和<b>${scData.item2.name}</b>共 <b>${N}</b> ${scData.unit}，共有 <b>${totalCost}</b> ${scData.valUnit}。請問${scData.item1.name}和${scData.item2.name}各有多少${scData.unit}？`;
+        } else if (scData.title === "存錢筒整理") {
+            qText = `${scData.buyer}的存錢筒裡有<b>${scData.item1.name}</b>和<b>${scData.item2.name}</b>共 <b>${N}</b> ${scData.unit}，總金額是 <b>${totalCost}</b> 元。請問${scData.item1.name}和${scData.item2.name}各有多少${scData.unit}？`;
+        } else if (scData.title === "農場點點名") {
+            qText = `${scData.buyer}的農場裡養了<b>${scData.item1.name}</b>（每隻 ${P1} 隻腳）和<b>${scData.item2.name}</b>（每隻 ${P2} 隻腳）共 <b>${N}</b> ${scData.unit}，共有 <b>${totalCost}</b> ${scData.valUnit}。請問${scData.item1.name}和${scData.item2.name}各有幾${scData.unit}？`;
+        } else if (scData.title === "茶葉買賣") {
+            qText = `${scData.buyer}${scData.action}了<b>${scData.item1.name}</b>（每斤 ${P1} 元）和<b>${scData.item2.name}</b>（每斤 ${P2} 元）共 <b>${N}</b> ${scData.unit}，一共${scData.costName} <b>${totalCost}</b> 元。請問${scData.item1.name}和${scData.item2.name}各${scData.action}了幾斤？`;
+        } else {
+            qText = `${scData.buyer}${scData.action}了<b>${scData.item1.name}</b>（每${scData.unit} ${P1} 元）和<b>${scData.item2.name}</b>（每${scData.unit} ${P2} 元）共 <b>${N}</b> ${scData.unit}，一共${scData.costName} <b>${totalCost}</b> 元。請問${scData.item1.name}和${scData.item2.name}各${scData.action}了幾${scData.unit}？`;
+        }
+        
+        document.getElementById('question-text-el').innerHTML = qText;
+    }
+
+    // --- 啟動與重設流程 ---
+    function startGame() {
+        generateProblem();
+        document.getElementById('setup-screen').style.display = 'none';
+        document.getElementById('game-screen').style.display = 'grid';
+        document.getElementById('ending-screen').style.display = 'none';
+        
+        // 顯示頂部的「回主選單」按鈕
+        document.getElementById('nav-menu-btn').style.display = 'flex';
+        
+        for (let s = 1; s <= 5; s++) {
+            const ledgerEl = document.getElementById(`ledger-step-${s}`);
+            ledgerEl.className = `ledger-step ${s === 1 ? 'active' : ''}`;
+            document.getElementById(`ledger-eq-${s}`).innerText = '--';
+            document.getElementById(`ledger-meaning-${s}`).innerText = s === 1 ? '等待回答中...' : '尚未解鎖';
+        }
+        
+        updateStepConsole();
+        playSound('pop');
+    }
+
+    function restartSetup() {
+        document.getElementById('setup-screen').style.display = 'block';
+        document.getElementById('game-screen').style.display = 'none';
+        document.getElementById('ending-screen').style.display = 'none';
+        
+        // 隱藏頂部的「回主選單」按鈕
+        document.getElementById('nav-menu-btn').style.display = 'none';
+        
+        document.querySelectorAll('.confetti').forEach(el => el.remove());
+        playSound('pop');
+    }
+
+    // --- 控制台更新與狀態管理 ---
+    function updateStepConsole() {
+        const step = gameState.currentStep;
+        document.getElementById('console-step-badge').innerText = `步驟 ${step}`;
+        
+        const sc = gameState.scenario;
+        const P1 = sc.item1.price;
+        const P2 = sc.item2.price;
+        const N = gameState.totalCount;
+        const T = gameState.totalCost;
+
+        let instruction = "";
+        
+        // 配合修正 1：步驟 1 引導語修改
+        if (step === 1) {
+            const payWord = sc.title === "存錢筒整理" ? "要有多少元？" : (sc.title === "停車場統計" || sc.title === "校園單車統計" ? "要有多少個輪子？" : (sc.title === "農場點點名" ? "要有多少隻腳？" : "要花多少錢？"));
+            instruction = `假設全部都是「${sc.item1.name}」或「${sc.item2.name}」，${payWord}`;
+        } else {
+            const path = gameState.solvedPath;
+            const startTotal = path === 'A' ? P1 * N : P2 * N;
+            const costDiff = Math.abs(T - startTotal);
+            const unitDiff = P2 - P1;
+            const expectedCount = costDiff / unitDiff;
+            
+            if (path === 'A') { // 假設全部都是便宜的品項 1
+                const targetName = sc.item2.name; 
+                
+                // 配合修正 2：步驟 2 引導語修改
+                if (step === 2) {
+                    const isLess = T > startTotal; 
+                    const dirWord = isLess ? "多" : "少";
+                    instruction = `「實際${sc.costName}」比「假設${sc.costName}」${dirWord}幾${sc.valUnit}？`;
+                } 
+                // 配合修正 3：步驟 3 引導語修改
+                else if (step === 3) {
+                    instruction = `每把一個「${sc.item1.name}」換成「${sc.item2.name}」會多幾${sc.valUnit}？`;
+                } 
+                // 配合修正 4：步驟 4 引導語修改
+                else if (step === 4) {
+                    const diffWord = "少";
+                    const changeWord = "多";
+                    instruction = `目前${diffWord}了 ${costDiff} ${sc.valUnit}，每換一次會${changeWord} ${unitDiff} ${sc.valUnit}，要換幾次？`;
+                } 
+                // 配合修正 5：步驟 5 引導語修改
+                else if (step === 5) {
+                    instruction = `還剩下幾個${sc.item1.name}？`;
+                }
+            } else { // 假設全部都是貴的品項 2
+                const targetName = sc.item1.name; 
+                
+                // 配合修正 2：步驟 2 引導語修改
+                if (step === 2) {
+                    const isLess = T > startTotal; 
+                    const dirWord = isLess ? "多" : "少";
+                    instruction = `「實際${sc.costName}」比「假設${sc.costName}」${dirWord}幾${sc.valUnit}？`;
+                } 
+                // 配合修正 3：步驟 3 引導語修改
+                else if (step === 3) {
+                    instruction = `每把一個「${sc.item2.name}」換成「${sc.item1.name}」會少幾${sc.valUnit}？`;
+                } 
+                // 配合修正 4：步驟 4 引導語修改
+                else if (step === 4) {
+                    const diffWord = "多";
+                    const changeWord = "少";
+                    instruction = `目前${diffWord}了 ${costDiff} ${sc.valUnit}，每換一次會${changeWord} ${unitDiff} ${sc.valUnit}，要換幾次？`;
+                } 
+                // 配合修正 5：步驟 5 引導語修改
+                else if (step === 5) {
+                    instruction = `還剩下幾個${sc.item2.name}？`;
+                }
+            }
+        }
+        
+        document.getElementById('console-instruction').innerText = instruction;
+        // 1. 上面橘色的引導語先不要出現，等學生沒有辦法列出正確算式（即答錯）時才作為提示顯示
+        document.getElementById('console-instruction').style.display = gameState.failedAttempts >= 1 ? 'block' : 'none';
+        
+        clearActiveInputs();
+        hideFeedback();
+        
+        if (gameState.failedAttempts >= 1) {
+            showWordChips();
+        } else {
+            hideWordChips();
+        }
+    }
+
+    function clearActiveInputs() {
+        document.getElementById('equation-input').value = "";
+        document.getElementById('meaning-input').value = "";
+    }
+
+    function showHint() {
+        playSound('pop');
+        document.getElementById('console-instruction').style.display = 'block';
+        showWordChips();
+    }
+
+    function hideFeedback() {
+        const fb = document.getElementById('feedback-el');
+        fb.style.display = 'none';
+        fb.className = 'feedback-box';
+    }
+
+    function showFeedback(type, text) {
+        const fb = document.getElementById('feedback-el');
+        fb.style.display = 'block';
+        fb.className = `feedback-box ${type}`;
+        fb.innerText = text;
+    }
+
+    // --- 虛擬鍵盤輸入處理 ---
+    function pressKey(key) {
+        const eqInput = document.getElementById('equation-input');
+        let current = eqInput.value;
+
+        if (key === 'clear') {
+            eqInput.value = "";
+        } else if (key === 'backspace') {
+            eqInput.value = current.slice(0, -1);
+        } else {
+            eqInput.value = current + key;
+        }
+        playSound('pop');
+    }
+
+    // --- 算式安全解析與計算器 ---
+    function safeEval(str) {
+        const cleanStr = str.replace(/×/g, '*').replace(/÷/g, '/');
+        if (!/^[0-9+\-*/().\s]+$/.test(cleanStr)) return NaN;
+        try {
+            return Function(`"use strict"; return (${cleanStr})`)();
+        } catch (e) {
+            return NaN;
+        }
+    }
+
+    function parseEquation(eqStr) {
+        const cleanEq = eqStr.replace(/\s+/g, '');
+        const parts = cleanEq.split('=');
+        if (parts.length !== 2) return null;
+        
+        const lhs = parts[0];
+        const rhsVal = parseInt(parts[1]);
+        if (isNaN(rhsVal)) return null;
+        
+        const lhsVal = safeEval(lhs);
+        if (isNaN(lhsVal) || lhsVal !== rhsVal) return null;
+        
+        const numbers = lhs.match(/\d+/g).map(Number);
+        return { lhs, rhs: rhsVal, numbers };
+    }
+
+    // 輔助將文字純化以進行比對
+    function normalizeText(txt) {
+        return txt.replace(/[\s，。、；：：「」,.;:()（）]/g, '').trim();
+    }
+
+    // --- 詞字卡拼圖提示生成 ---
+    function showWordChips() {
+        const container = document.getElementById('word-chips');
+        const pool = document.getElementById('chips-pool-el');
+        pool.innerHTML = "";
+        
+        const sc = gameState.scenario;
+        const N = gameState.totalCount;
+        const T = gameState.totalCost;
+        const P1 = sc.item1.price;
+        const P2 = sc.item2.price;
+        const step = gameState.currentStep;
+        const path = gameState.solvedPath;
+        const valUnit = sc.valUnit;
+
+        // 生成精準的字詞拼圖陣列，拼圖拼完就可以完美拼成那句話，不要有用不到的額外字詞
+        let chips = [];
+        
+        if (step === 1) {
+            const isPathA = (path !== 'B'); // 預設或確定走 A
+            const targetName = isPathA ? sc.item1.name : sc.item2.name;
+            const sumVal = isPathA ? P1 * N : P2 * N;
+            let actionWord = "，一共要花";
+            if (sc.title === "停車場統計" || sc.title === "校園單車統計" || sc.title === "農場點點名" || sc.valUnit.includes("輪子") || sc.valUnit.includes("腳")) {
+                actionWord = "，一共有";
+            } else if (sc.title === "存錢筒整理") {
+                actionWord = "，一共是";
+            }
+            
+            chips = ["假設", N + sc.unit, "都是", targetName, actionWord, sumVal + valUnit];
+        } else if (step === 2) {
+            const startTotal = path === 'A' ? P1 * N : P2 * N;
+            const diff = Math.abs(T - startTotal);
+            const isLess = T > startTotal; // 實際大於假設，即假設比實際少
+            const dirWord = isLess ? "少" : "多";
+            
+            chips = ["比實際的", sc.costName, dirWord + "了", diff + valUnit];
+        } else if (step === 3) {
+            const diff = P2 - P1;
+            const isPathA = (path === 'A');
+            const dirWord = isPathA ? "多" : "少";
+            const fromName = isPathA ? sc.item1.name : sc.item2.name;
+            const toName = isPathA ? sc.item2.name : sc.item1.name;
+            
+            chips = ["每把一" + sc.unit, fromName, "換成一" + sc.unit, toName, "，會" + dirWord, diff + valUnit];
+        } else if (step === 4) {
+            const costDiff = Math.abs(T - (path === 'A' ? P1 * N : P2 * N));
+            const unitDiff = P2 - P1;
+            const expectedCount = costDiff / unitDiff;
+            const targetName = path === 'A' ? sc.item2.name : sc.item1.name;
+            
+            const diffWord = path === 'A' ? "少" : "多";
+            const changeWord = path === 'A' ? "多" : "少";
+            
+            // 配合修正 4：拼圖｢少了100元｣改成｢目前少了100元｣；｢得到5個｣改成｢代表有 5 個｣
+            chips = [
+                "目前" + diffWord + "了" + costDiff + valUnit, 
+                "，每換一次會" + changeWord + unitDiff + valUnit, 
+                "，所以要換", 
+                expectedCount + "次", 
+                "，代表有 " + expectedCount + " " + sc.unit, 
+                targetName
+            ];
+        } else if (step === 5) {
+            const targetCount2 = path === 'A' ? gameState.count2 : gameState.count1;
+            const targetName2 = path === 'A' ? sc.item2.name : sc.item1.name;
+            const targetCount1 = path === 'A' ? gameState.count1 : gameState.count2;
+            const targetName1 = path === 'A' ? sc.item1.name : sc.item2.name;
+            
+            chips = [
+                "原本有" + N + sc.unit, 
+                "，拿走" + targetCount2 + sc.unit, 
+                "換成" + targetName2, 
+                "，還剩下" + targetCount1 + sc.unit, 
+                targetName1
+            ];
+        }
+
+        // 打亂拼圖順序以提供挑戰性，但保證裡面全部單字合起來就是完美的一句話
+        const shuffledChips = [...chips].sort(() => Math.random() - 0.5);
+
+        shuffledChips.forEach(text => {
+            const chip = document.createElement('div');
+            chip.className = 'word-chip';
+            chip.innerText = text;
+            chip.onclick = () => {
+                const input = document.getElementById('meaning-input');
+                input.value = input.value + text;
+                playSound('pop');
+            };
+            pool.appendChild(chip);
+        });
+
+        container.style.display = 'flex';
+    }
+
+    function hideWordChips() {
+        document.getElementById('word-chips').style.display = 'none';
+    }
+
+    // --- 語意與算式驗證器 ---
+    function validateStepAnswer(eqInput, meaningInput) {
+        const parsed = parseEquation(eqInput);
+        if (!parsed) {
+            return { valid: false, reason: "算式格式有誤（例如必須包含 '='，且等號兩邊的值要相等，乘法用 ×，除法用 ÷ 喔！）" };
+        }
+
+        const sc = gameState.scenario;
+        const N = gameState.totalCount;
+        const T = gameState.totalCost;
+        const P1 = sc.item1.price;
+        const P2 = sc.item2.price;
+        const step = gameState.currentStep;
+        const valUnit = sc.valUnit;
+        
+        let path = gameState.solvedPath;
+        const text = meaningInput.trim();
+
+        // 步驟 1: 假設全部都是一種項目
+        if (step === 1) {
+            const sumA = P1 * N;
+            const sumB = P2 * N;
+            let detectedPath = null;
+            
+            if (parsed.rhs === sumA && parsed.numbers.includes(P1) && parsed.numbers.includes(N)) {
+                detectedPath = 'A'; // 假設都是便宜的 (item1)
+            } else if (parsed.rhs === sumB && parsed.numbers.includes(P2) && parsed.numbers.includes(N)) {
+                detectedPath = 'B'; // 假設都是貴的 (item2)
+            }
+
+            if (!detectedPath) {
+                return { valid: false, reason: `算式中的數字不符。這步需要計算：假設全部都是「${sc.item1.name}」時的值為 ${P1}×${N}=${sumA}，或者假設全部都是「${sc.item2.name}」時的值為 ${P2}×${N}=${sumB}。` };
+            }
+
+            const isPathA = (detectedPath === 'A');
+            const targetName = isPathA ? sc.item1.name : sc.item2.name;
+            const bannedName = isPathA ? sc.item2.name : sc.item1.name;
+            const expectedSum = isPathA ? sumA : sumB;
+
+            // 完美的標準答案 (用於字詞拼圖直通)
+            let actionWord = "一共要花";
+            if (sc.title === "停車場統計" || sc.title === "校園單車統計" || sc.title === "農場點點名" || sc.valUnit.includes("輪子") || sc.valUnit.includes("腳")) {
+                actionWord = "一共有";
+            } else if (sc.title === "存錢筒整理") {
+                actionWord = "一共是";
+            }
+            const targetSentence = `假設${N}${sc.unit}都是${targetName}，${actionWord}${expectedSum}${valUnit}`;
+
+            if (normalizeText(text) === normalizeText(targetSentence)) {
+                return { valid: true, path: detectedPath, normalizedEq: `${isPathA ? P1 : P2} × ${N} = ${parsed.rhs}`, meaningDesc: `假設 ${N} ${sc.unit}全部都是${targetName}，${actionWord} ${expectedSum} ${valUnit}` };
+            }
+
+            // 語義 fallback 檢查
+            const hasAssume = /假設|如果|全|都|假如|設為/.test(text);
+            const hasTarget = new RegExp(targetName).test(text);
+            const hasSumVal = new RegExp(expectedSum.toString()).test(text);
+            const hasBanned = new RegExp(bannedName).test(text);
+
+            if (!hasAssume) {
+                return { valid: false, reason: "引導：請在解釋中加入假設前提（例如「假設...」或「如果...」）。", path: detectedPath };
+            }
+            if (!hasTarget) {
+                return { valid: false, reason: `引導：算式中使用了「${targetName}」的數值，請在解釋中明確指出假設全部都是「${targetName}」喔！`, path: detectedPath };
+            }
+            if (hasBanned) {
+                return { valid: false, reason: `引導：你目前假設全部都是「${targetName}」，在解釋中請不要提到「${bannedName}」以免概念混淆。`, path: detectedPath };
+            }
+            if (!hasSumVal) {
+                return { valid: false, reason: `引導：請在解釋中明確寫出假設全部為「${targetName}」時的數值總金額/數量：${expectedSum}${valUnit}。`, path: detectedPath };
+            }
+
+            return { valid: true, path: detectedPath, normalizedEq: `${isPathA ? P1 : P2} × ${N} = ${parsed.rhs}`, meaningDesc: `假設 ${N} ${sc.unit}全部都是${targetName}，${actionWord} ${expectedSum} ${valUnit}` };
+        }
+
+        // 步驟 2: 比實際多多少、少多少？
+        if (step === 2) {
+            const startTotal = path === 'A' ? P1 * N : P2 * N;
+            const expectedDiff = Math.abs(T - startTotal);
+            
+            if (parsed.rhs !== expectedDiff || !parsed.numbers.includes(T) || !parsed.numbers.includes(startTotal)) {
+                const big = Math.max(T, startTotal);
+                const small = Math.min(T, startTotal);
+                return { valid: false, reason: `算式數字有誤。此步需要用減法求出實際總額與假設總額的差額：${big} - ${small} = ${expectedDiff}` };
+            }
+
+            const isLess = T > startTotal; 
+            const requiredDirection = isLess ? "少" : "多";
+            
+            // 完美的標準答案 (用於字詞拼圖直通)
+            const targetSentence = `比實際的${sc.costName}${requiredDirection}了${expectedDiff}${valUnit}`;
+
+            if (normalizeText(text) === normalizeText(targetSentence)) {
+                return { valid: true, normalizedEq: `${Math.max(T, startTotal)} - ${Math.min(T, startTotal)} = ${expectedDiff}`, meaningDesc: `比實際的${sc.costName}${requiredDirection}了 ${expectedDiff} ${valUnit}` };
+            }
+
+            // 語義 fallback 檢查
+            const hasDirection = new RegExp(requiredDirection).test(text);
+            const hasWrongDirection = new RegExp(isLess ? "多" : "少").test(text);
+            const hasDiffVal = new RegExp(expectedDiff.toString()).test(text);
+
+            if (!hasDiffVal) {
+                return { valid: false, reason: `引導：請在解釋中寫出差額的數值 ${expectedDiff}${valUnit}。` };
+            }
+            if (!hasDirection && /相差|差/.test(text)) {
+                return { valid: false, reason: `引導：請具體寫出是比實際的${sc.costName}「${requiredDirection}」了多少，不要只寫相差或差喔！` };
+            }
+            if (hasWrongDirection && !text.includes(`比實際${requiredDirection}了`)) {
+                return { valid: false, reason: `引導：請仔細想想，你的假設是 ${startTotal}${valUnit}，實際是 ${T}${valUnit}，所以假設是比實際「${requiredDirection}」了才對喔！` };
+            }
+            if (!hasDirection) {
+                return { valid: false, reason: `引導：請完整表達出這一步是「比實際的${sc.costName}${requiredDirection}了 ${expectedDiff}${valUnit}」。` };
+            }
+
+            return { valid: true, normalizedEq: `${Math.max(T, startTotal)} - ${Math.min(T, startTotal)} = ${expectedDiff}`, meaningDesc: `比實際的${sc.costName}${requiredDirection}了 ${expectedDiff} ${valUnit}` };
+        }
+
+        // 步驟 3: 單個差額概念
+        if (step === 3) {
+            const expectedDiff = P2 - P1;
+            
+            if (parsed.rhs !== expectedDiff || !parsed.numbers.includes(P1) || !parsed.numbers.includes(P2)) {
+                return { valid: false, reason: `算式數字有誤。此步需要計算單個物品的價錢/輪子差：${P2} - ${P1} = ${expectedDiff}` };
+            }
+
+            const isPathA = (path === 'A');
+            const direction = isPathA ? "多" : "少"; 
+            const fromName = isPathA ? sc.item1.name : sc.item2.name;
+            const toName = isPathA ? sc.item2.name : sc.item1.name;
+            
+            // 完美的標準答案 (用於字詞拼圖直通)
+            const targetSentence = `每把一${sc.unit}${fromName}換成一${sc.unit}${toName}，會${direction}${expectedDiff}${valUnit}`;
+
+            if (normalizeText(text) === normalizeText(targetSentence)) {
+                return { valid: true, normalizedEq: `${P2} - ${P1} = ${expectedDiff}`, meaningDesc: `每把一${sc.unit}${fromName}換成一${sc.unit}${toName}，會${direction} ${expectedDiff} ${valUnit}` };
+            }
+
+            // 語義 fallback 檢查
+            const hasEach = /每|一次/.test(text);
+            const hasDirection = new RegExp(direction).test(text);
+            const hasDiffVal = new RegExp(expectedDiff.toString()).test(text);
+            const hasSwap = /換|替/.test(text);
+
+            if (!hasEach) {
+                return { valid: false, reason: "引導：請在解釋中加入表示單次替換的詞彙，如「每」或「每換一次」。" };
+            }
+            if (!hasSwap) {
+                return { valid: false, reason: "引導：請在解釋中加入代表替換的詞，如「換成」或「對調」。" };
+            }
+            if (!hasDiffVal) {
+                return { valid: false, reason: `引導：請在解釋中包含單個差值的數值 ${expectedDiff}${valUnit}。` };
+            }
+            if (!hasDirection) {
+                return { valid: false, reason: `引導：因為你每把一${sc.unit}「${fromName}」換成「${toName}」，總額會變「${direction}」，請明確寫出「${direction}」。` };
+            }
+
+            return { valid: true, normalizedEq: `${P2} - ${P1} = ${expectedDiff}`, meaningDesc: `每把一${sc.unit}${fromName}換成一${sc.unit}${toName}，會${direction} ${expectedDiff} ${valUnit}` };
+        }
+
+        // 步驟 4: 算出要換幾次 (包含除的概念)
+        if (step === 4) {
+            const startTotal = path === 'A' ? P1 * N : P2 * N;
+            const costDiff = Math.abs(T - startTotal);
+            const unitDiff = P2 - P1;
+            const expectedCount = costDiff / unitDiff;
+            
+            if (parsed.rhs !== expectedCount || !parsed.numbers.includes(costDiff) || !parsed.numbers.includes(unitDiff)) {
+                return { valid: false, reason: `算式數字有誤。需用總差值除以單個差值：${costDiff} ÷ ${unitDiff} = ${expectedCount}` };
+            }
+
+            const targetName = path === 'A' ? sc.item2.name : sc.item1.name;
+            const diffWord = path === 'A' ? "少" : "多";
+            const changeWord = path === 'A' ? "多" : "少";
+            
+            // 完美的標準答案 (用於字詞拼圖直通)
+            const targetSentence = `目前${diffWord}了${costDiff}${valUnit}，每換一次會${changeWord}${unitDiff}${valUnit}，所以要換${expectedCount}次，代表有${expectedCount}${sc.unit}${targetName}`;
+
+            if (normalizeText(text) === normalizeText(targetSentence)) {
+                return { valid: true, normalizedEq: `${costDiff} ÷ ${unitDiff} = ${expectedCount}`, meaningDesc: `目前${diffWord}了 ${costDiff} ${valUnit}，每換一次會${changeWord} ${unitDiff} ${valUnit}，所以共需換 ${expectedCount} 次，代表有 ${expectedCount} ${sc.unit}${targetName}` };
+            }
+
+            // 語義 fallback 檢查
+            const hasEach = /每|一個/.test(text);
+            const hasTargetName = new RegExp(targetName).test(text);
+            const hasSwapCount = new RegExp(expectedCount.toString()).test(text);
+            const hasSwapWord = /換/.test(text);
+
+            if (!hasEach) {
+                return { valid: false, reason: `引導：請在解釋中加入關鍵字「每」以說明除法包含的關係（例如：因為目前${diffWord}了${costDiff}${valUnit}，每換一次會${changeWord}${unitDiff}${valUnit}，所以要換...次）。` };
+            }
+            if (!hasSwapWord) {
+                return { valid: false, reason: "引導：請說明這是要進行「更換」的次數。" };
+            }
+            if (!hasTargetName) {
+                return { valid: false, reason: `引導：替換出來得到的即是換入商品「${targetName}」的數量，請在解釋中指明代表「${targetName}」有 ${expectedCount} ${sc.unit}。` };
+            }
+            if (!hasSwapCount) {
+                return { valid: false, reason: `引導：請在解釋中寫出計算出的更換數量：${expectedCount}。` };
+            }
+
+            return { valid: true, normalizedEq: `${costDiff} ÷ ${unitDiff} = ${expectedCount}`, meaningDesc: `目前${diffWord}了 ${costDiff} ${valUnit}，每換一次會${changeWord} ${unitDiff} ${valUnit}，所以共需換 ${expectedCount} 次，代表有 ${expectedCount} ${sc.unit}${targetName}` };
+        }
+
+        // 步驟 5: 算出剩下的數量
+        if (step === 5) {
+            const pathCount = path === 'A' ? gameState.count2 : gameState.count1;
+            const expectedRemaining = N - pathCount;
+            
+            if (parsed.rhs !== expectedRemaining || !parsed.numbers.includes(N) || !parsed.numbers.includes(pathCount)) {
+                return { valid: false, reason: `算式數字有誤。需用總數量減去已算出的品項數量：${N} - ${pathCount} = ${expectedRemaining}` };
+            }
+
+            const targetName2 = path === 'A' ? sc.item2.name : sc.item1.name; 
+            const targetName1 = path === 'A' ? sc.item1.name : sc.item2.name; 
+            
+            // 完美的標準答案 (用於字詞拼圖直通)
+            const targetSentence = `原本有${N}${sc.unit}，拿走${pathCount}${sc.unit}換成${targetName2}，還剩下${expectedRemaining}${sc.unit}${targetName1}`;
+
+            if (normalizeText(text) === normalizeText(targetSentence)) {
+                return { valid: true, normalizedEq: `${N} - ${pathCount} = ${expectedRemaining}`, meaningDesc: `原本的 ${N} ${sc.unit}中，拿走 ${pathCount} ${sc.unit}換成${targetName2}，還剩下 ${expectedRemaining} ${sc.unit}${targetName1}` };
+            }
+
+            // 語義 fallback 檢查
+            const hasName1 = new RegExp(sc.item1.name).test(text);
+            const hasName2 = new RegExp(sc.item2.name).test(text);
+            const hasRemainingVal = new RegExp(expectedRemaining.toString()).test(text);
+            const hasSwapVal = new RegExp(pathCount.toString()).test(text);
+            const hasRemainingWord = /剩|拿走/.test(text);
+
+            if (!hasRemainingWord) {
+                return { valid: false, reason: "引導：請在解釋中加入代表剩餘的詞，如「剩下」或「拿走換成後還剩」。" };
+            }
+            if (!hasName1 || !hasName2) {
+                return { valid: false, reason: `引導：請在解釋中同時寫出這兩種項目的名稱：「${sc.item1.name}」與「${sc.item2.name}」，以便對照說明。` };
+            }
+            if (!hasSwapVal || !hasRemainingVal) {
+                return { valid: false, reason: `引導：請在解釋中對應寫出這兩個數量（拿走 ${pathCount} ${sc.unit}換成${targetName2}，還剩下 ${expectedRemaining} ${sc.unit}${targetName1}）。` };
+            }
+
+            return { valid: true, normalizedEq: `${N} - ${pathCount} = ${expectedRemaining}`, meaningDesc: `原本的 ${N} ${sc.unit}中，拿走 ${pathCount} ${sc.unit}換成${targetName2}，還剩下 ${expectedRemaining} ${sc.unit}${targetName1}` };
+        }
+
+        return { valid: false, reason: "未知錯誤，請重新確認。" };
+    }
+
+    // --- 提交作答與跳轉控制 ---
+    function submitStepAnswer() {
+        const eqInput = document.getElementById('equation-input').value;
+        const meaningInput = document.getElementById('meaning-input').value;
+
+        if (!eqInput || !meaningInput) {
+            playSound('wrong');
+            showFeedback('error', "請輸入完整的「算式」與「解釋涵義」喔！");
+            return;
+        }
+
+        const res = validateStepAnswer(eqInput, meaningInput);
+
+        if (!res.valid) {
+            playSound('wrong');
+            gameState.failedAttempts++;
+            showFeedback('error', res.reason);
+            
+            // 答錯時，顯示橘色引導語和字詞拼圖提示
+            document.getElementById('console-instruction').style.display = 'block';
+            showWordChips();
+            return;
+        }
+
+        // 答對了
+        playSound('correct');
+        const step = gameState.currentStep;
+        
+        if (step === 1 && res.path) {
+            gameState.solvedPath = res.path;
+        }
+
+        gameState.stepAnswers[step] = {
+            eq: res.normalizedEq,
+            meaning: res.meaningDesc
+        };
+
+        const ledgerEl = document.getElementById(`ledger-step-${step}`);
+        ledgerEl.className = "ledger-step completed";
+        document.getElementById(`ledger-eq-${step}`).innerText = res.normalizedEq;
+        document.getElementById(`ledger-meaning-${step}`).innerText = `「${res.meaningDesc}」`;
+
+        if (step < 5) {
+            gameState.currentStep++;
+            gameState.failedAttempts = 0;
+            
+            const nextLedgerEl = document.getElementById(`ledger-step-${gameState.currentStep}`);
+            nextLedgerEl.className = "ledger-step active";
+            document.getElementById(`ledger-meaning-${gameState.currentStep}`).innerText = "等待回答中...";
+            
+            updateStepConsole();
+        } else {
+            showEndingScreen();
+        }
+    }
+
+    // --- 關卡結算畫面 ---
+    function showEndingScreen() {
+        document.getElementById('game-screen').style.display = 'none';
+        document.getElementById('ending-screen').style.display = 'block';
+        playSound('win');
+
+        const body = document.getElementById('ending-ledger-body');
+        body.innerHTML = "";
+
+        for (let s = 1; s <= 5; s++) {
+            const ans = gameState.stepAnswers[s];
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>第 ${s} 步</td>
+                <td class="eq-cell">${ans.eq}</td>
+                <td>${ans.meaning}</td>
+            `;
+            body.appendChild(row);
+        }
+
+        createConfetti();
+    }
+
+    function createConfetti() {
+        const container = document.body;
+        const colors = ['#f59e0b', '#10b981', '#6366f1', '#ec4899', '#3b82f6', '#ffd700'];
+        
+        for (let i = 0; i < 80; i++) {
+            const confetti = document.createElement('div');
+            confetti.className = 'confetti';
+            confetti.style.left = Math.random() * 100 + 'vw';
+            confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+            confetti.style.animationDelay = Math.random() * 2 + 's';
+            confetti.style.animationDuration = Math.random() * 2 + 2 + 's';
+            confetti.style.width = Math.random() * 8 + 6 + 'px';
+            confetti.style.height = Math.random() * 8 + 6 + 'px';
+            confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+            container.appendChild(confetti);
+        }
+    }
+</script>
+</body>
+</html>
