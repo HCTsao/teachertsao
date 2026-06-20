@@ -806,6 +806,7 @@
             recognition.lang = 'zh-TW';
             recognition.continuous = true;
             recognition.interimResults = false;
+            recognition.maxAlternatives = 10;
 
             recognition.onstart = () => {
                 isRecording = true;
@@ -816,8 +817,15 @@
             };
 
             recognition.onresult = (event) => {
-                const text = event.results[0][0].transcript.trim().replace(/[。？，！\s]/g, '');
-                verifySpeech(text);
+                const alternatives = [];
+                const result = event.results[event.results.length - 1];
+                for (let i = 0; i < result.length; i++) {
+                    const text = result[i].transcript.trim().replace(/[。？，！\s]/g, '');
+                    if (text && !alternatives.includes(text)) {
+                        alternatives.push(text);
+                    }
+                }
+                verifySpeech(alternatives);
             };
 
             recognition.onerror = (e) => {
@@ -843,40 +851,85 @@
             });
         }
 
-        function verifySpeech(transcript) {
-            transcript = convertArabicNumbersToChinese(transcript);
-            document.getElementById('speech-result-div').classList.remove('hidden');
-            document.getElementById('speech-result-text').innerText = transcript;
+        function verifySpeech(transcriptInput) {
+            let alternatives = Array.isArray(transcriptInput) ? transcriptInput : [transcriptInput];
+            
+            // Clean alternatives
+            alternatives = alternatives.map(alt => {
+                if (typeof alt !== 'string') return '';
+                return alt.trim().replace(/[。？，！\s]/g, '');
+            }).filter(alt => alt !== '');
+
+            if (alternatives.length === 0) {
+                alternatives = [""];
+            }
 
             const acceptable = getAcceptableReadings(targetValue);
-            const feedback = document.getElementById('feedback-text');
-
+            const standard = getChineseStandardReading(targetValue);
+            
             // Format bad digit pronunciation warnings, e.g. "一四七" instead of "一百四十七"
             const digitSpelling = targetValue.toString().split('').map(d => {
                 const map = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
                 return map[parseInt(d)];
             }).join(''); // e.g. "一四七"
 
-            if (acceptable.includes(transcript)) {
+            let detectedText = "";
+            let isCorrect = false;
+            let isDigitOnly = false;
+
+            // 1. Check if any alternative matches acceptable readings literally
+            let matchingAcceptable = alternatives.find(alt => acceptable.includes(alt));
+
+            // 2. Check if any alternative matches the digit spelling literally (e.g. "一二三")
+            let matchingDigit = alternatives.find(alt => alt === digitSpelling);
+
+            // 3. Check if any alternative contains the target digits (e.g. "123", "1百23", "1 2 3")
+            let targetDigitsStr = targetValue.toString();
+            let matchingDigits = alternatives.find(alt => alt.replace(/\D/g, '') === targetDigitsStr);
+
+            if (matchingAcceptable) {
+                detectedText = matchingAcceptable;
+                isCorrect = true;
+            } else if (matchingDigit) {
+                detectedText = matchingDigit;
+                isDigitOnly = true;
+            } else if (matchingDigits) {
+                // If Chrome returned target digits (like "123") but we did NOT find a literal digit spelling,
+                // we treat it as correct (standard place value reading).
+                detectedText = standard;
+                isCorrect = true;
+            } else {
+                // Completely incorrect answer
+                // Use the first alternative, but if it contains digits, convert them to Chinese characters
+                let rawText = alternatives[0];
+                detectedText = convertArabicNumbersToChinese(rawText);
+            }
+
+            document.getElementById('speech-result-div').classList.remove('hidden');
+            document.getElementById('speech-result-text').innerText = detectedText;
+
+            const feedback = document.getElementById('feedback-text');
+
+            if (isCorrect) {
                 playSound('correct');
                 speechVerified = true;
                 document.getElementById('btn-next').classList.remove('hidden');
                 
-                feedback.innerHTML = `🏆 <b>口說辨識成功！完全正確！</b> 你念了 <b>「${transcript}」</b>。完成了所有挑戰！`;
+                feedback.innerHTML = `🏆 <b>口說辨識成功！完全正確！</b> 你念了 <b>「${detectedText}」</b>。完成了所有挑戰！`;
                 feedback.className = "text-md font-bold text-green-700 font-extrabold animate-bounce";
                 
                 document.getElementById('speech-status').innerText = "辨識成功！";
                 document.getElementById('speech-status').className = "text-sm font-black text-green-600";
-            } else if (transcript.includes(digitSpelling) || transcript === digitSpelling) {
+            } else if (isDigitOnly || detectedText.includes(digitSpelling) || detectedText === digitSpelling) {
                 playSound('wrong');
-                feedback.innerHTML = `❌ <b>讀法不正確喔！</b> 你念成了『${transcript}』。請說出完整的位值讀法：<b>「${getChineseStandardReading(targetValue)}」</b>，不能只念數字喔！`;
+                feedback.innerHTML = `❌ <b>讀法不正確喔！</b> 你念成了『${detectedText}』。請說出完整的位值讀法：<b>「${standard}」</b>，不能只念數字喔！`;
                 feedback.className = "text-md font-bold text-red-600";
                 
                 document.getElementById('speech-status').innerText = "讀法錯誤，請重試！";
                 document.getElementById('speech-status').className = "text-sm font-bold text-red-500";
             } else {
                 playSound('wrong');
-                feedback.innerHTML = `❌ <b>辨識不符合！</b> 你念的是『${transcript}』，這不是 <b>${targetValue}</b> 的正確中文讀法。請看清數字再念一次！`;
+                feedback.innerHTML = `❌ <b>辨識不符合！</b> 你念的是『${detectedText}』，這不是 <b>${targetValue}</b> 的正確中文讀法。請看清數字再念一次！`;
                 feedback.className = "text-md font-bold text-red-600";
 
                 document.getElementById('speech-status').innerText = "讀音不相符，請重試";
