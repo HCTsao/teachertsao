@@ -1554,6 +1554,100 @@
         document.getElementById('word-chips').style.display = 'none';
     }
 
+    // --- 輔助檢核工具（降低審核嚴謹性，支援中文數字與簡稱） ---
+    function getChineseNumberRepresentations(num) {
+        const units = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+        if (num === 0) return ["零"];
+        if (num === 2) return ["二", "兩", "两"];
+        
+        if (num < 10) {
+            return [units[num]];
+        }
+        if (num === 10) {
+            return ["十", "一十"];
+        }
+        if (num < 20) {
+            const digit = num % 10;
+            return ["十" + units[digit], "一十" + units[digit]];
+        }
+        if (num < 100) {
+            const tens = Math.floor(num / 10);
+            const digit = num % 10;
+            if (digit === 0) {
+                return [units[tens] + "十"];
+            }
+            return [units[tens] + "十" + units[digit]];
+        }
+        
+        if (num < 1000) {
+            const hundreds = Math.floor(num / 100);
+            const rem = num % 100;
+            const representation = [];
+            if (rem === 0) {
+                representation.push(units[hundreds] + "百");
+            } else {
+                const tens = Math.floor(rem / 10);
+                const digit = rem % 10;
+                const tensStr = tens === 0 ? "零" : (tens === 1 ? "一十" : units[tens] + "十");
+                const digitStr = digit === 0 ? "" : units[digit];
+                
+                if (digit === 0) {
+                    representation.push(units[hundreds] + "百" + units[tens] + "十");
+                    representation.push(units[hundreds] + "百" + units[tens]);
+                } else {
+                    representation.push(units[hundreds] + "百" + tensStr + digitStr);
+                }
+            }
+            return representation;
+        }
+        return [];
+    }
+
+    function containsNumber(text, num) {
+        if (text.includes(num.toString())) return true;
+        const reps = getChineseNumberRepresentations(num);
+        for (const r of reps) {
+            if (r && text.includes(r)) return true;
+        }
+        return false;
+    }
+
+    function matchItemName(text, itemName) {
+        if (text.includes(itemName)) return true;
+        
+        if (itemName === "六輪貨車") {
+            return text.includes("六輪貨車") || text.includes("六輪車") || text.includes("貨車") || text.includes("六輪");
+        }
+        if (itemName === "四輪汽車") {
+            return text.includes("四輪汽車") || text.includes("四輪車") || text.includes("汽車") || text.includes("四輪");
+        }
+        if (itemName === "50元硬幣") {
+            return text.includes("50元硬幣") || text.includes("50元") || text.includes("五十元硬幣") || text.includes("五十元") || text.includes("50") || text.includes("五十");
+        }
+        if (itemName === "10元硬幣") {
+            return text.includes("10元硬幣") || text.includes("10元") || text.includes("十元硬幣") || text.includes("十元") || text.includes("10") || text.includes("十");
+        }
+        if (itemName === "排骨便當") {
+            return text.includes("排骨便當") || text.includes("排骨") || text.includes("排骨飯");
+        }
+        if (itemName === "鮭魚便當") {
+            return text.includes("鮭魚便當") || text.includes("鮭魚") || text.includes("鮭魚飯");
+        }
+        if (itemName === "優待票") {
+            return text.includes("優待票") || text.includes("優待") || text.includes("半票");
+        }
+        if (itemName === "全票") {
+            return text.includes("全票") || text.includes("全");
+        }
+        if (itemName === "腳踏車") {
+            return text.includes("腳踏車") || text.includes("單車") || text.includes("雙輪車") || text.includes("二輪車");
+        }
+        if (itemName === "三輪車") {
+            return text.includes("三輪車") || text.includes("三輪");
+        }
+        return false;
+    }
+
     // --- 語意與算式驗證器 ---
     function validateStepAnswer(eqInput, meaningInput) {
         const parsed = parseEquation(eqInput);
@@ -1606,11 +1700,11 @@
                 return { valid: true, path: detectedPath, normalizedEq: `${isPathA ? P1 : P2} × ${N} = ${parsed.rhs}`, meaningDesc: `假設 ${N} ${sc.unit}全部都是${targetName}，${actionWord} ${expectedSum} ${valUnit}` };
             }
 
-            // 語義 fallback 檢查
+            // 語義 fallback 檢查 - 降低嚴謹性
             const hasAssume = /假設|如果|全|都|假如|設為/.test(text);
-            const hasTarget = new RegExp(targetName).test(text);
-            const hasSumVal = new RegExp(expectedSum.toString()).test(text);
-            const hasBanned = new RegExp(bannedName).test(text);
+            const hasTarget = matchItemName(text, targetName);
+            const hasSumVal = containsNumber(text, expectedSum);
+            const hasBanned = matchItemName(text, bannedName);
 
             if (!hasAssume) {
                 return { valid: false, reason: "引導：請在解釋中加入假設前提（例如「假設...」或「如果...」）。", path: detectedPath };
@@ -1640,7 +1734,6 @@
             }
 
             const isMore = startTotal > T; 
-            const requiredDirection = isMore ? "多" : "off"; // 如果 isMore 為 false 就是少
             const finalDirection = isMore ? "多" : "少";
             
             // 完美的標準答案 (用於字詞拼圖直通)
@@ -1650,10 +1743,10 @@
                 return { valid: true, normalizedEq: `${Math.max(T, startTotal)} - ${Math.min(T, startTotal)} = ${expectedDiff}`, meaningDesc: `假設${sc.costName}比實際${sc.costName}${finalDirection}了 ${expectedDiff} ${valUnit}` };
             }
 
-            // 語義 fallback 檢查
+            // 語義 fallback 檢查 - 降低嚴謹性
             const hasDirection = new RegExp(finalDirection).test(text);
             const hasWrongDirection = new RegExp(isMore ? "少" : "多").test(text);
-            const hasDiffVal = new RegExp(expectedDiff.toString()).test(text);
+            const hasDiffVal = containsNumber(text, expectedDiff);
 
             if (!hasDiffVal) {
                 return { valid: false, reason: `引導：請在解釋中寫出差額的數值 ${expectedDiff}${valUnit}。` };
@@ -1691,11 +1784,11 @@
                 return { valid: true, normalizedEq: `${P2} - ${P1} = ${expectedDiff}`, meaningDesc: `每把一${sc.unit}${fromName}換成一${sc.unit}${toName}，會${direction} ${expectedDiff} ${valUnit}` };
             }
 
-            // 語義 fallback 檢查
-            const hasEach = /每|一次/.test(text);
+            // 語義 fallback 檢查 - 降低嚴謹性
+            const hasEach = /每|一次|一/.test(text);
             const hasDirection = new RegExp(direction).test(text);
-            const hasDiffVal = new RegExp(expectedDiff.toString()).test(text);
-            const hasSwap = /換|替/.test(text);
+            const hasDiffVal = containsNumber(text, expectedDiff);
+            const hasSwap = /換|替|配/.test(text);
 
             if (!hasEach) {
                 return { valid: false, reason: "引導：請在解釋中加入表示單次替換的詞彙，如「每」或「每換一次」。" };
@@ -1735,11 +1828,11 @@
                 return { valid: true, normalizedEq: `${costDiff} ÷ ${unitDiff} = ${expectedCount}`, meaningDesc: `目前${diffWord}了 ${costDiff} ${valUnit}，每換一次會${changeWord} ${unitDiff} ${valUnit}，所以共需換 ${expectedCount} 次，代表有 ${expectedCount} ${sc.unit}${targetName}` };
             }
 
-            // 語義 fallback 檢查
+            // 語義 fallback 檢查 - 降低嚴謹性
             const hasEach = new RegExp(`每|一次|一${sc.unit}`).test(text);
-            const hasTargetName = new RegExp(targetName).test(text);
-            const hasSwapCount = new RegExp(expectedCount.toString()).test(text);
-            const hasSwapWord = /換/.test(text);
+            const hasTargetName = matchItemName(text, targetName);
+            const hasSwapCount = containsNumber(text, expectedCount);
+            const hasSwapWord = /換|除/.test(text);
 
             if (!hasEach) {
                 return { valid: false, reason: `引導：請在解釋中加入關鍵字「每」以說明除法包含的關係（例如：因為目前${diffWord}了${costDiff}${valUnit}，每換一次會${changeWord}${unitDiff}${valUnit}，所以要換...次）。` };
@@ -1776,21 +1869,15 @@
                 return { valid: true, normalizedEq: `${N} - ${pathCount} = ${expectedRemaining}`, meaningDesc: `原本的 ${N} ${sc.unit}中，拿走 ${pathCount} ${sc.unit}換成${targetName2}，還剩下 ${expectedRemaining} ${sc.unit}${targetName1}` };
             }
 
-            // 語義 fallback 檢查
-            const hasName1 = new RegExp(sc.item1.name).test(text);
-            const hasName2 = new RegExp(sc.item2.name).test(text);
-            const hasRemainingVal = new RegExp(expectedRemaining.toString()).test(text);
-            const hasSwapVal = new RegExp(pathCount.toString()).test(text);
-            const hasRemainingWord = /剩|拿走/.test(text);
+            // 語義 fallback 檢查 - 降低嚴謹性 (步驟五僅需提到算出來的剩餘數量與其品項簡稱/全稱即可)
+            const hasTargetName1 = matchItemName(text, targetName1);
+            const hasRemainingVal = containsNumber(text, expectedRemaining);
 
-            if (!hasRemainingWord) {
-                return { valid: false, reason: "引導：請在解釋中加入代表剩餘的詞，如「剩下」或「拿走換成後還剩」。" };
+            if (!hasRemainingVal) {
+                return { valid: false, reason: `引導：請在解釋中明確寫出最後算出來的數量「${expectedRemaining}」喔！` };
             }
-            if (!hasName1 || !hasName2) {
-                return { valid: false, reason: `引導：請在解釋中同時寫出這兩種項目的名稱：「${sc.item1.name}」與「${sc.item2.name}」，以便對照說明。` };
-            }
-            if (!hasSwapVal || !hasRemainingVal) {
-                return { valid: false, reason: `引導：請在解釋中對應寫出這兩個數量（拿走 ${pathCount} ${sc.unit}換成${targetName2}，還剩下 ${expectedRemaining} ${sc.unit}${targetName1}）。` };
+            if (!hasTargetName1) {
+                return { valid: false, reason: `引導：算式算出來的數量 ${expectedRemaining} 是代表哪個項目？請在解釋中加入「${targetName1}」喔！` };
             }
 
             return { valid: true, normalizedEq: `${N} - ${pathCount} = ${expectedRemaining}`, meaningDesc: `原本的 ${N} ${sc.unit}中，拿走 ${pathCount} ${sc.unit}換成${targetName2}，還剩下 ${expectedRemaining} ${sc.unit}${targetName1}` };
