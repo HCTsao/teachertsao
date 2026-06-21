@@ -793,6 +793,13 @@
         <input type="range" id="total-count-slider" min="6" max="30" value="10" oninput="updateSliderVal(this.value)">
     </div>
 
+    <div class="slider-wrapper" style="margin-top: 15px; margin-bottom: 20px;">
+        <div class="slider-header" style="margin-bottom: 8px;">
+            <span class="input-label" style="font-size: 1rem; font-weight: bold;">輸入學生姓名或座號 (必填)：</span>
+        </div>
+        <input type="text" id="student-name-input" placeholder="例如：5號林小明" style="width: 100%; padding: 12px; border-radius: 12px; border: 2px solid var(--border-glow); background: rgba(255, 255, 255, 0.7); color: var(--text-primary); font-size: 1rem; box-sizing: border-box; outline: none; transition: border-color 0.3s;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border-glow)'">
+    </div>
+
     <button class="btn" onclick="startGame()">開始出題練習</button>
 </div>
 
@@ -934,6 +941,31 @@
 </div>
 
 <script>
+    // ==========================================
+    // 💡 老師請在此填入您的 Firebase 設定 (Config)
+    // ==========================================
+    const firebaseConfig = {
+        apiKey: "請在此填入您的ApiKey",
+        authDomain: "請在此填入您的AuthDomain",
+        databaseURL: "請在此填入您的DatabaseURL",
+        projectId: "請在此填入您的ProjectId",
+        storageBucket: "請在此填入您的StorageBucket",
+        messagingSenderId: "請在此填入您的MessagingSenderId",
+        appId: "請在此填入您的AppId"
+    };
+
+    // 初始化 Firebase (僅在有填寫且載入成功時初始化，保持容錯)
+    let isFirebaseActive = false;
+    if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "請在此填入您的ApiKey") {
+        try {
+            firebase.initializeApp(firebaseConfig);
+            isFirebaseActive = true;
+            console.log("Firebase 初始化成功！");
+        } catch (e) {
+            console.error("Firebase 初始化失敗：", e);
+        }
+    }
+
     // --- 音效管理 (Web Audio API Synthesizer) ---
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     
@@ -1108,7 +1140,9 @@
             4: { eq: "", meaning: "" },
             5: { eq: "", meaning: "" }
         },
-        failedAttempts: 0
+        failedAttempts: 0,
+        studentName: "",
+        startTime: null
     };
 
     function updateSliderVal(val) {
@@ -1179,6 +1213,16 @@
 
     // --- 啟動與重設流程 ---
     function startGame() {
+        const studentName = document.getElementById('student-name-input').value.trim();
+        if (!studentName) {
+            playSound('wrong');
+            alert("請先輸入您的『學生姓名或座號』喔！");
+            document.getElementById('student-name-input').focus();
+            return;
+        }
+        gameState.studentName = studentName;
+        gameState.startTime = Date.now();
+
         generateProblem();
         document.getElementById('setup-screen').style.display = 'none';
         document.getElementById('game-screen').style.display = 'grid';
@@ -1829,6 +1873,47 @@
         }
 
         createConfetti();
+        uploadRecordToFirebase();
+    }
+
+    function uploadRecordToFirebase() {
+        if (!isFirebaseActive) {
+            console.log("Firebase 尚未啟用，跳過數據上傳。");
+            return;
+        }
+
+        const durationSec = gameState.startTime ? Math.round((Date.now() - gameState.startTime) / 1000) : 0;
+        
+        // 建立上傳紀錄物件
+        const record = {
+            student: gameState.studentName || "未知學生",
+            timestamp: new Date().toISOString(),
+            scenario: gameState.scenario.title,
+            totalCount: gameState.totalCount,
+            totalCost: gameState.totalCost,
+            solvedPath: gameState.solvedPath || "未完成",
+            durationSeconds: durationSec,
+            stepAnswers: {
+                1: gameState.stepAnswers[1] || { eq: "", meaning: "" },
+                2: gameState.stepAnswers[2] || { eq: "", meaning: "" },
+                3: gameState.stepAnswers[3] || { eq: "", meaning: "" },
+                4: gameState.stepAnswers[4] || { eq: "", meaning: "" },
+                5: gameState.stepAnswers[5] || { eq: "", meaning: "" }
+            }
+        };
+
+        // 推送到 Firebase
+        try {
+            firebase.database().ref('records').push(record)
+                .then(() => {
+                    console.log("學生答題數據已成功上傳 Firebase！");
+                })
+                .catch((err) => {
+                    console.error("Firebase 寫入錯誤：", err);
+                });
+        } catch (e) {
+            console.error("Firebase 上傳過程中發生異常：", e);
+        }
     }
 
     function createConfetti() {

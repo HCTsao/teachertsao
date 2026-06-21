@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Firebase Web SDK (v8.10.1 Namespace version) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <title>雞兔問題(生活情境) - 教師管理後台</title>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            --panel-bg: rgba(255, 255, 255, 0.85);
+            --card-bg: rgba(241, 245, 249, 0.9);
+            --border-glow: rgba(99, 102, 241, 0.15);
+            --border-active: rgba(99, 102, 241, 0.5);
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --error: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft JhengHei", sans-serif;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            background: var(--panel-bg);
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            padding: 30px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            color: var(--text-primary);
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            margin-bottom: 25px;
+        }
+
+        /* Firebase 未設定警示 */
+        .config-warning {
+            background: rgba(245, 158, 11, 0.1);
+            border: 2px dashed var(--warning);
+            color: #b45309;
+            padding: 15px;
+            border-radius: 16px;
+            margin-bottom: 25px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            text-align: left;
+        }
+
+        .config-warning code {
+            background: rgba(0, 0, 0, 0.05);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: Consolas, monospace;
+            font-weight: bold;
+        }
+
+        /* 功能控制列 */
+        .controls-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 15px;
+            border-radius: 12px;
+            border: 2px solid var(--border-glow);
+            background: #fff;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .search-box input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.1);
+        }
+
+        .filter-select {
+            padding: 12px 15px;
+            border-radius: 12px;
+            border: 2px solid var(--border-glow);
+            background: #fff;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            outline: none;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .filter-select:focus {
+            border-color: var(--primary);
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+            border: 2px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .btn-danger:hover {
+            background: var(--error);
+            color: #fff;
+            border-color: var(--error);
+        }
+
+        /* 數據列表表格 */
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            border-radius: 16px;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            background: #fff;
+            margin-bottom: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.95rem;
+        }
+
+        th, td {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        th {
+            background: #f1f5f9;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: rgba(99, 102, 241, 0.02);
+        }
+
+        .path-badge {
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .path-badge.A {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .path-badge.B {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+        }
+
+        .attempts-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 24px;
+            height: 24px;
+            padding: 0 6px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        .attempts-badge.clean {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .attempts-badge.dirty {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+        }
+
+        .btn-view {
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--primary);
+            background: transparent;
+            color: var(--primary);
+            font-size: 0.85rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-view:hover {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .loading-placeholder {
+            padding: 50px;
+            color: var(--text-secondary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border-glow);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 詳細歷程彈出視窗 (Modal) */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(4px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal-box {
+            background: #fff;
+            width: 100%;
+            max-width: 800px;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            max-height: 90vh;
+        }
+
+        .modal-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+
+        .modal-close {
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            border: none;
+            background: transparent;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+
+        .modal-close:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .modal-body {
+            padding: 25px;
+            overflow-y: auto;
+            text-align: left;
+        }
+
+        .student-summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .summary-card {
+            background: var(--card-bg);
+            padding: 12px 15px;
+            border-radius: 16px;
+            border: 1px solid rgba(0,0,0,0.02);
+        }
+
+        .summary-card .label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .summary-card .value {
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+
+        .step-record-card {
+            background: #fff;
+            border: 1px solid rgba(99, 102, 241, 0.12);
+            border-left: 6px solid var(--primary);
+            border-radius: 16px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .step-record-card.step-1 { border-left-color: #6366f1; }
+        .step-record-card.step-2 { border-left-color: #f59e0b; }
+        .step-record-card.step-3 { border-left-color: #10b981; }
+        .step-record-card.step-4 { border-left-color: #ec4899; }
+        .step-record-card.step-5 { border-left-color: #3b82f6; }
+
+        .step-header {
+            font-weight: bold;
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .step-eq {
+            font-family: "Courier New", Courier, monospace;
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: var(--primary);
+            margin-bottom: 6px;
+            background: rgba(99, 102, 241, 0.05);
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 6px;
+        }
+
+        .step-meaning {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎓 雞兔問題(生活情境) - 教師管理後台</h1>
+        <div class="subtitle">即時監控全班學生的解題進度與數學思維歷程</div>
+
+        <!-- 💡 Firebase 設定提示 (如尚未設定時顯示) -->
+        <div id="config-banner" class="config-warning">
+            ⚠️ <b>尚未設定 Firebase 資料庫！</b><br>
+            請使用文字編輯器打開此檔案（`教師後台.html`），在第 394 行左右尋找 <code>firebaseConfig</code>，並填入您在 Firebase Console 取得的 Web SDK Config 物件，以啟用即時學生數據監控。
+        </div>
+
+        <!-- 控制列 -->
+        <div class="controls-row">
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="🔍 輸入學生座號或姓名搜尋...">
+            </div>
+            <select id="scenario-filter" class="filter-select">
+                <option value="all">所有日常情境</option>
+                <option value="便當情境">🍱 便當情境</option>
+                <option value="日月潭纜車">🚠 日月潭纜車</option>
+                <option value="文具購買">✏️ 文具購買</option>
+                <option value="茶葉買賣">🍵 茶葉買賣</option>
+                <option value="存錢筒整理">🪙 存錢筒整理</option>
+                <option value="車輛統計">🚗 車輛統計</option>
+                <option value="農場點點名">🐔 農場點點名</option>
+                <option value="球類採購">🏀 球類採購</option>
+                <option value="校園單車統計">🚲 校園單車統計</option>
+            </select>
+            <button class="btn btn-primary" onclick="loadData()">🔄 重新整理</button>
+            <button class="btn btn-danger" onclick="clearAllData()">🗑️ 清空所有數據</button>
+        </div>
+
+        <!-- 表格 -->
+        <div class="table-responsive">
+            <table id="records-table">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">時間</th>
+                        <th style="width: 18%;">學生座號/姓名</th>
+                        <th style="width: 15%;">挑戰情境</th>
+                        <th style="width: 12%;">題目設定</th>
+                        <th style="width: 10%;">解題路徑</th>
+                        <th style="width: 10%;">答錯次數</th>
+                        <th style="width: 10%;">答題耗時</th>
+                        <th style="width: 10%;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <!-- 動態填入 -->
+                </tbody>
+            </table>
+            
+            <div id="loading-el" class="loading-placeholder">
+                <div class="spinner"></div>
+                <p>正在載入 Firebase 資料庫的學生作答紀錄...</p>
+            </div>
+        </div>
+        
+        <div id="total-count-label" style="text-align: right; color: var(--text-secondary); font-size: 0.85rem; padding-right: 10px;">
+            共計 0 筆作答歷程
+        </div>
+    </div>
+
+    <!-- 詳細歷程彈出視窗 (Modal) -->
+    <div id="detail-modal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <span class="modal-title">📋 學生詳細答題歷程</span>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body" id="modal-body-content">
+                <!-- 動態注入 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 💡 老師請在此填入您的 Firebase 設定 (Config)
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "請在此填入您的ApiKey",
+            authDomain: "請在此填入您的AuthDomain",
+            databaseURL: "請在此填入您的DatabaseURL",
+            projectId: "請在此填入您的ProjectId",
+            storageBucket: "請在此填入您的StorageBucket",
+            messagingSenderId: "請在此填入您的MessagingSenderId",
+            appId: "請在此填入您的AppId"
+        };
+
+        // 初始化 Firebase (僅在有填寫時初始化)
+        let isFirebaseActive = false;
+        let db = null;
+        let allRecords = {}; // 快取所有紀錄
+
+        if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "請在此填入您的ApiKey") {
+            try {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.database();
+                isFirebaseActive = true;
+                document.getElementById('config-banner').style.display = 'none';
+                console.log("Firebase 連結成功！");
+            } catch (e) {
+                console.error("Firebase 初始化失敗：", e);
+            }
+        }
+
+        // 頁面載入後自動開始監聽
+        window.onload = function() {
+            if (isFirebaseActive) {
+                listenToRecords();
+            } else {
+                document.getElementById('loading-el').innerHTML = `
+                    <p style="color: var(--error); font-weight: bold;">⚠️ 尚未配置 Firebase 連線</p>
+                    <p style="font-size: 0.85rem; margin-top: 10px;">請參照上方虛線區塊說明填入資料庫 Config，即可取得學生作答。</p>
+                `;
+            }
+
+            // 監聽搜尋與過濾事件
+            document.getElementById('search-input').addEventListener('input', renderTable);
+            document.getElementById('scenario-filter').addEventListener('change', renderTable);
+        };
+
+        // 監聽 Realtime Database 變化
+        function listenToRecords() {
+            document.getElementById('loading-el').style.display = 'flex';
+            
+            db.ref('records').on('value', (snapshot) => {
+                allRecords = snapshot.val() || {};
+                document.getElementById('loading-el').style.display = 'none';
+                renderTable();
+            }, (error) => {
+                console.error("讀取資料失敗", error);
+                document.getElementById('loading-el').innerHTML = `
+                    <p style="color: var(--error);">讀取資料失敗：${error.message}</p>
+                `;
+            });
+        }
+
+        // 手動整理
+        function loadData() {
+            if (!isFirebaseActive) return;
+            listenToRecords();
+        }
+
+        // 渲染表格
+        function renderTable() {
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = "";
+
+            const searchQuery = document.getElementById('search-input').value.trim().toLowerCase();
+            const scenarioFilter = document.getElementById('scenario-filter').value;
+
+            // 將記錄物件轉成陣列並依時間排序 (新 -> 舊)
+            const recordsArray = Object.keys(allRecords).map(key => {
+                return { id: key, ...allRecords[key] };
+            }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            let visibleCount = 0;
+
+            recordsArray.forEach(rec => {
+                // 搜尋與篩選過濾
+                const studentName = (rec.student || "").toLowerCase();
+                const matchesSearch = studentName.includes(searchQuery);
+                const matchesScenario = scenarioFilter === 'all' || rec.scenario === scenarioFilter;
+
+                if (!matchesSearch || !matchesScenario) return;
+
+                visibleCount++;
+                const tr = document.createElement('tr');
+                
+                // 時間格式化 (例如: 10:45:30)
+                const dateObj = new Date(rec.timestamp);
+                const timeStr = dateObj.toLocaleDateString() + ' ' + dateObj.toTimeString().split(' ')[0];
+                
+                // 解題耗時
+                const minutes = Math.floor((rec.durationSeconds || 0) / 60);
+                const seconds = (rec.durationSeconds || 0) % 60;
+                const timeTakenStr = minutes > 0 ? `${minutes}分${seconds}秒` : `${seconds}秒`;
+
+                // 解題路徑樣式
+                const pathText = rec.solvedPath === 'A' ? 'A (便宜)' : (rec.solvedPath === 'B' ? 'B (貴重)' : rec.solvedPath);
+                const pathClass = rec.solvedPath === 'A' || rec.solvedPath === 'B' ? rec.solvedPath : '';
+
+                // 答錯次數樣式
+                const attempts = rec.failedAttempts || 0;
+                const attemptsClass = attempts === 0 ? 'clean' : 'dirty';
+
+                tr.innerHTML = `
+                    <td>${timeStr}</td>
+                    <td style="font-weight: bold; color: var(--primary);">${escapeHtml(rec.student)}</td>
+                    <td>${rec.scenario}</td>
+                    <td>共 ${rec.totalCount} 個 / ${rec.totalCost} 元</td>
+                    <td><span class="path-badge ${pathClass}">${pathText}</span></td>
+                    <td><span class="attempts-badge ${attemptsClass}">${attempts} 次</span></td>
+                    <td>${timeTakenStr}</td>
+                    <td><button class="btn-view" onclick="viewDetails('${rec.id}')">查看詳細</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('total-count-label').innerText = `共計 ${visibleCount} 筆作答歷程`;
+            
+            if (visibleCount === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 30px;">
+                            📭 目前尚無符合條件的學生作答紀錄。
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // HTML 轉義防護
+        function escapeHtml(string) {
+            return String(string).replace(/[&<>"']/g, function (s) {
+                return {
+                    "&": "&amp;",
+                    "<": "&lt;",
+                    ">": "&gt;",
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[s];
+            });
+        }
+
+        // 查看詳細作答 (Modal)
+        function viewDetails(id) {
+            const rec = allRecords[id];
+            if (!rec) return;
+
+            const modal = document.getElementById('detail-modal');
+            const content = document.getElementById('modal-body-content');
+            
+            const dateObj = new Date(rec.timestamp);
+            const timeStr = dateObj.toLocaleDateString() + ' ' + dateObj.toTimeString().split(' ')[0];
+
+            const minutes = Math.floor((rec.durationSeconds || 0) / 60);
+            const seconds = (rec.durationSeconds || 0) % 60;
+            const timeTakenStr = minutes > 0 ? `${minutes}分${seconds}秒` : `${seconds}秒`;
+
+            const pathText = rec.solvedPath === 'A' ? 'A (假設全部便宜)' : (rec.solvedPath === 'B' ? 'B (假設全部貴重)' : rec.solvedPath);
+
+            let stepsHtml = "";
+            for (let s = 1; s <= 5; s++) {
+                const stepAns = rec.stepAnswers && rec.stepAnswers[s] ? rec.stepAnswers[s] : { eq: "無數據", meaning: "無數據" };
+                stepsHtml += `
+                    <div class="step-record-card step-${s}">
+                        <div class="step-header">
+                            <span>步驟 ${s}</span>
+                        </div>
+                        <div class="step-eq">${escapeHtml(stepAns.eq)}</div>
+                        <div class="step-meaning">👉 <b>解釋：</b>${escapeHtml(stepAns.meaning)}</div>
+                    </div>
+                `;
+            }
+
+            content.innerHTML = `
+                <div class="student-summary-cards">
+                    <div class="summary-card">
+                        <div class="label">學生名字/座號</div>
+                        <div class="value" style="color: var(--primary);">${escapeHtml(rec.student)}</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="label">答題耗時 / 錯題</div>
+                        <div class="value">${timeTakenStr} / <span style="color: ${rec.failedAttempts > 0 ? 'var(--error)' : 'var(--success)'}">${rec.failedAttempts || 0}次錯</span></div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="label">挑戰情境</div>
+                        <div class="value">${rec.scenario} (共 ${rec.totalCount} 個)</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="label">採用路徑</div>
+                        <div class="value">${pathText}</div>
+                    </div>
+                </div>
+                
+                <h3 style="font-size: 1.05rem; font-weight: bold; margin-bottom: 12px; border-bottom: 2px solid var(--border-glow); padding-bottom: 8px;">👣 解題步驟記錄</h3>
+                ${stepsHtml}
+            `;
+
+            modal.style.display = "flex";
+        }
+
+        function closeModal() {
+            document.getElementById('detail-modal').style.display = "none";
+        }
+
+        // 清空所有作答數據
+        function clearAllData() {
+            if (!isFirebaseActive) return;
+
+            const pw = prompt("⚠️ 警告：這將會永久清空資料庫中「所有學生」的解題紀錄！\n請輸入密碼以確認清空（預設密碼：admin888）：");
+            if (pw === null) return; // 點擊取消
+
+            if (pw === "admin888") {
+                db.ref('records').set(null)
+                    .then(() => {
+                        alert("✨ 已成功清空所有學生作答數據！");
+                    })
+                    .catch((err) => {
+                        alert("清空失敗：" + err.message);
+                    });
+            } else {
+                alert("❌ 密碼錯誤，拒絕清空數據！");
+            }
+        }
+    </script>
+</body>
+</html>
