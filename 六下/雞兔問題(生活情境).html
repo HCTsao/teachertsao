@@ -1239,9 +1239,9 @@
                 
                 // 配合修正 2：步驟 2 引導語修改
                 if (step === 2) {
-                    const isLess = T > startTotal; 
-                    const dirWord = isLess ? "多" : "少";
-                    instruction = `「實際${sc.costName}」比「假設${sc.costName}」${dirWord}幾${sc.valUnit}？`;
+                    const isMore = startTotal > T; 
+                    const dirWord = isMore ? "多" : "少";
+                    instruction = `「假設${sc.costName}」比「實際${sc.costName}」${dirWord}幾${sc.valUnit}？`;
                 } 
                 // 配合修正 3：步驟 3 引導語修改
                 else if (step === 3) {
@@ -1262,9 +1262,9 @@
                 
                 // 配合修正 2：步驟 2 引導語修改
                 if (step === 2) {
-                    const isLess = T > startTotal; 
-                    const dirWord = isLess ? "多" : "少";
-                    instruction = `「實際${sc.costName}」比「假設${sc.costName}」${dirWord}幾${sc.valUnit}？`;
+                    const isMore = startTotal > T; 
+                    const dirWord = isMore ? "多" : "少";
+                    instruction = `「假設${sc.costName}」比「實際${sc.costName}」${dirWord}幾${sc.valUnit}？`;
                 } 
                 // 配合修正 3：步驟 3 引導語修改
                 else if (step === 3) {
@@ -1440,10 +1440,10 @@
         } else if (step === 2) {
             const startTotal = path === 'A' ? P1 * N : P2 * N;
             const diff = Math.abs(T - startTotal);
-            const isLess = T > startTotal; // 實際大於假設，即假設比實際少
-            const dirWord = isLess ? "少" : "多";
+            const isMore = startTotal > T; // 假設大於實際，即假設比實際多
+            const dirWord = isMore ? "多" : "少";
             
-            chips = ["比實際的", sc.costName, dirWord + "了", diff + valUnit];
+            chips = ["假設" + sc.costName, "比實際" + sc.costName, dirWord + "了", diff + valUnit];
         } else if (step === 3) {
             const diff = P2 - P1;
             const isPathA = (path === 'A');
@@ -1592,35 +1592,36 @@
                 return { valid: false, reason: `算式數字有誤。此步需要用減法求出實際總額與假設總額的差額：${big} - ${small} = ${expectedDiff}` };
             }
 
-            const isLess = T > startTotal; 
-            const requiredDirection = isLess ? "少" : "多";
+            const isMore = startTotal > T; 
+            const requiredDirection = isMore ? "多" : "off"; // 如果 isMore 為 false 就是少
+            const finalDirection = isMore ? "多" : "少";
             
             // 完美的標準答案 (用於字詞拼圖直通)
-            const targetSentence = `比實際的${sc.costName}${requiredDirection}了${expectedDiff}${valUnit}`;
+            const targetSentence = `假設${sc.costName}比實際${sc.costName}${finalDirection}了${expectedDiff}${valUnit}`;
 
             if (normalizeText(text) === normalizeText(targetSentence)) {
-                return { valid: true, normalizedEq: `${Math.max(T, startTotal)} - ${Math.min(T, startTotal)} = ${expectedDiff}`, meaningDesc: `比實際的${sc.costName}${requiredDirection}了 ${expectedDiff} ${valUnit}` };
+                return { valid: true, normalizedEq: `${Math.max(T, startTotal)} - ${Math.min(T, startTotal)} = ${expectedDiff}`, meaningDesc: `假設${sc.costName}比實際${sc.costName}${finalDirection}了 ${expectedDiff} ${valUnit}` };
             }
 
             // 語義 fallback 檢查
-            const hasDirection = new RegExp(requiredDirection).test(text);
-            const hasWrongDirection = new RegExp(isLess ? "多" : "少").test(text);
+            const hasDirection = new RegExp(finalDirection).test(text);
+            const hasWrongDirection = new RegExp(isMore ? "少" : "多").test(text);
             const hasDiffVal = new RegExp(expectedDiff.toString()).test(text);
 
             if (!hasDiffVal) {
                 return { valid: false, reason: `引導：請在解釋中寫出差額的數值 ${expectedDiff}${valUnit}。` };
             }
             if (!hasDirection && /相差|差/.test(text)) {
-                return { valid: false, reason: `引導：請具體寫出是比實際的${sc.costName}「${requiredDirection}」了多少，不要只寫相差或差喔！` };
+                return { valid: false, reason: `引導：請具體寫出是比實際的${sc.costName}「${finalDirection}」了多少，不要只寫相差或差喔！` };
             }
-            if (hasWrongDirection && !text.includes(`比實際${requiredDirection}了`)) {
-                return { valid: false, reason: `引導：請仔細想想，你的假設是 ${startTotal}${valUnit}，實際是 ${T}${valUnit}，所以假設是比實際「${requiredDirection}」了才對喔！` };
+            if (hasWrongDirection && !text.includes(`比實際${sc.costName}${finalDirection}了`) && !text.includes(`比實際${finalDirection}了`)) {
+                return { valid: false, reason: `引導：請仔細想想，你的假設是 ${startTotal}${valUnit}，實際是 ${T}${valUnit}，所以假設是比實際「${finalDirection}」了才對喔！` };
             }
             if (!hasDirection) {
-                return { valid: false, reason: `引導：請完整表達出這一步是「比實際的${sc.costName}${requiredDirection}了 ${expectedDiff}${valUnit}」。` };
+                return { valid: false, reason: `引導：請完整表達出這一步是「假設${sc.costName}比實際${sc.costName}${finalDirection}了 ${expectedDiff}${valUnit}」。` };
             }
 
-            return { valid: true, normalizedEq: `${Math.max(T, startTotal)} - ${Math.min(T, startTotal)} = ${expectedDiff}`, meaningDesc: `比實際的${sc.costName}${requiredDirection}了 ${expectedDiff} ${valUnit}` };
+            return { valid: true, normalizedEq: `${Math.max(T, startTotal)} - ${Math.min(T, startTotal)} = ${expectedDiff}`, meaningDesc: `假設${sc.costName}比實際${sc.costName}${finalDirection}了 ${expectedDiff} ${valUnit}` };
         }
 
         // 步驟 3: 單個差額概念
