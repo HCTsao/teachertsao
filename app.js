@@ -227,6 +227,13 @@ const toolsData = [
         category: "六下",
         path: "六下/雞兔問題(生活情境).html",
         desc: ""
+    },
+    // 七上
+    {
+        name: "數學神兵-正負大對決",
+        category: "七上",
+        path: "七上/數學神兵-正負大對決/index.html",
+        desc: "國中七年級整數四則運算對戰遊戲，心算答題召喚飛彈雷射對決！"
     }
 ];
 

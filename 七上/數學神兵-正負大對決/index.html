@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>數學神兵：正負大對決 | 國中數學整數四則運算對戰遊戲</title>
+  <meta name="description" content="專為國中七年級學生設計的整數四則運算學習對戰遊戲。透過心算答題、累積攻擊能量，在明亮清晰的對戰畫面上召喚魔法雷射擊敗機械獸！">
+  <meta name="keywords" content="國中數學,整數四則運算,正負數,絕對值,中括號,相反數,算式挑戰,明亮主題,RPG戰鬥">
+  <meta name="author" content="Antigravity Math Games">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- 明亮主題背景光影 -->
+    <div class="bg-glow bg-glow-blue"></div>
+    <div class="bg-glow bg-glow-pink"></div>
+
+    <!-- 首頁與關卡選擇畫面 -->
+    <section id="start-screen" class="screen active">
+      <header class="hero-header">
+        <div class="badge">114課綱數學RPG</div>
+        <h1 class="main-title">數學神兵<span class="sub-gradient">正負大對決</span></h1>
+      </header>
+
+      <main class="setup-container">
+        <!-- 模式選擇 -->
+        <div class="setup-card" id="mode-setup">
+          <h2>1. 選擇遊戲模式</h2>
+          <div class="btn-group-row">
+            <button type="button" id="btn-mode-campaign" class="mode-btn active" data-mode="campaign">
+              <span class="btn-icon">🤖</span>
+              <span class="btn-text">戰役模式 (挑戰機械獸)</span>
+            </button>
+            <button type="button" id="btn-mode-pvp" class="mode-btn" data-mode="pvp">
+              <span class="btn-icon">⚔️</span>
+              <span class="btn-text">雙人算陣決鬥 (1vs1)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 關卡選擇 -->
+        <div class="setup-card" id="level-setup">
+          <h2>2. 選擇戰役關卡</h2>
+          <div class="level-grid">
+            <button type="button" class="level-btn active" data-level="1">
+              <span class="level-num">Level 1</span>
+              <h3>加減算術挑戰</h3>
+            </button>
+            <button type="button" class="level-btn" data-level="2">
+              <span class="level-num">Level 2</span>
+              <h3>乘除運算挑戰</h3>
+            </button>
+            <button type="button" class="level-btn" data-level="3">
+              <span class="level-num">Level 3</span>
+              <h3>進階四則混合</h3>
+            </button>
+            <button type="button" class="level-btn" data-level="4">
+              <span class="level-num">Level 4</span>
+              <h3>進階絕對值大考驗</h3>
+            </button>
+          </div>
+        </div>
+
+        <button type="button" id="btn-start-game" class="start-play-btn">
+          <span>啟動對決</span>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </main>
+    </section>
+
+    <!-- 遊戲進行畫面 -->
+    <section id="game-screen" class="screen">
+      <!-- 戰役模式佈局 -->
+      <div id="campaign-layout" class="game-layout">
+        <!-- 頂部資訊與重設按鈕 -->
+        <header class="battle-header">
+          <button type="button" id="btn-home" class="icon-btn" title="回首頁">🏠</button>
+          <div class="level-indicator">
+            <span id="current-level-badge" class="badge">Level 1</span>
+            <span id="current-level-title" class="current-level-title">加減算術挑戰</span>
+          </div>
+          <div class="round-counter">回合 <span id="round-num">1</span></div>
+          <button type="button" id="btn-reset" class="icon-btn" title="重啟戰鬥">🔄</button>
+        </header>
+
+        <!-- 戰鬥決鬥場 (Avatars & Battle animation arena) -->
+        <div class="battle-arena">
+          <!-- 玩家角色 (左側) -->
+          <div class="combatant player-combatant" id="player-combatant">
+            <div class="avatar-card" id="player-avatar-card">
+              <span class="avatar-emoji" id="player-avatar-emoji">🧙‍♂️</span>
+              <div class="combatant-shield-val hidden" id="player-shield-badge">🛡️ 0</div>
+            </div>
+            <div class="combatant-info">
+              <span class="combatant-name" id="player-name-label">勇者 玩家 1</span>
+              <div class="hp-bar-wrapper">
+                <div class="hp-bar fill-green" id="player-hp-fill" style="width: 100%;"></div>
+                <div class="shield-bar" id="player-shield-fill" style="width: 0%;"></div>
+              </div>
+              <span class="hp-text"><span id="player-hp">30</span>/30 HP</span>
+            </div>
+          </div>
+
+          <div class="vs-effect">VS</div>
+
+          <!-- 機械獸 / 玩家2 (右側) -->
+          <div class="combatant boss-combatant" id="boss-combatant">
+            <div class="avatar-card" id="boss-avatar-card">
+              <span class="avatar-emoji" id="boss-avatar-emoji">🐉</span>
+              <div class="combatant-shield-val hidden" id="boss-shield-badge">🛡️ 0</div>
+            </div>
+            <div class="combatant-info">
+              <span class="combatant-name" id="boss-name-label">負極機械獸</span>
+              <div class="hp-bar-wrapper">
+                <div class="hp-bar fill-pink" id="boss-hp-fill" style="width: 100%;"></div>
+                <div class="shield-bar" id="boss-shield-fill" style="width: 0%;"></div>
+              </div>
+              <span class="hp-text"><span id="boss-hp">20</span>/<span id="boss-max-hp">20</span> HP</span>
+            </div>
+          </div>
+
+          <!-- 動態飄浮傷害文字 -->
+          <div class="damage-popup-overlay" id="damage-popup-overlay">
+            <!-- JS 動態生成傷害彈窗數值 -->
+          </div>
+        </div>
+
+        <!-- 戰報日誌顯示 -->
+        <div class="combat-log-wrapper">
+          <div class="combat-log" id="combat-log">戰鬥開始！</div>
+        </div>
+
+        <!-- 中下題目卡與答案按鈕 -->
+        <main class="interaction-area">
+          <!-- 當前答題者與計時條 -->
+          <div class="action-bar">
+            <div class="turn-announcer" id="turn-announcer">
+              輪到 <span id="active-player-name" class="text-blue">玩家 1</span> 的回合
+            </div>
+            <div class="turn-timer">
+              剩餘時間: <span id="timer-text">30</span> 秒
+            </div>
+          </div>
+
+          <!-- 題目容器 -->
+          <div class="question-container">
+            <div class="timer-bar-wrapper">
+              <div class="timer-bar" id="timer-bar"></div>
+            </div>
+            <div class="question-box">
+              <h2 class="question-formula" id="question-formula">(-9) + (-7) = ?</h2>
+            </div>
+          </div>
+
+          <!-- 4選1答案卡 -->
+          <div class="card-options-grid" id="options-container">
+            <button type="button" class="answer-card" data-index="0">
+              <div class="card-inner">
+                <span class="card-value">-16</span>
+              </div>
+            </button>
+            <button type="button" class="answer-card" data-index="1">
+              <div class="card-inner">
+                <span class="card-value">16</span>
+              </div>
+            </button>
+            <button type="button" class="answer-card" data-index="2">
+              <div class="card-inner">
+                <span class="card-value">-2</span>
+              </div>
+            </button>
+            <button type="button" class="answer-card" data-index="3">
+              <div class="card-inner">
+                <span class="card-value">2</span>
+              </div>
+            </button>
+          </div>
+        </main>
+      </div>
+
+      <!-- 雙人對抗佈局 (同時做答、左右分立、旋轉視角) -->
+      <div id="pvp-layout" class="game-layout hidden">
+        <!-- 左側玩家 1 (旋轉 90deg) -->
+        <div class="pvp-half pvp-left">
+          <div class="pvp-rotated-container">
+            <div class="pvp-header">
+              <div class="pvp-player-info">
+                <span class="pvp-avatar">🧙‍♂️</span>
+                <span class="pvp-name">玩家 1</span>
+              </div>
+              <div class="pvp-hp-box">
+                <div class="pvp-hp-bar-wrapper">
+                  <div class="pvp-hp-bar fill-green" id="pvp-p1-my-hp-fill" style="width: 100%;"></div>
+                </div>
+                <div class="pvp-hp-text">
+                  <span>我方 HP</span>
+                  <span><span id="pvp-p1-my-hp">30</span>/30</span>
+                </div>
+              </div>
+              <div class="pvp-hp-box">
+                <div class="pvp-hp-bar-wrapper">
+                  <div class="pvp-hp-bar fill-pink" id="pvp-p1-op-hp-fill" style="width: 100%;"></div>
+                </div>
+                <div class="pvp-hp-text">
+                  <span>對手 HP</span>
+                  <span><span id="pvp-p1-op-hp">30</span>/30</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="pvp-middle">
+              <div class="pvp-question-card">
+                <div class="pvp-timer-bar-wrapper">
+                  <div class="pvp-timer-bar" id="pvp-p1-timer-bar"></div>
+                </div>
+                <div class="pvp-question-formula" id="pvp-p1-formula">載入中...</div>
+              </div>
+            </div>
+            
+            <div class="pvp-bottom">
+              <div class="pvp-options-grid" id="pvp-p1-options">
+                <!-- 動態按鈕 -->
+              </div>
+            </div>
+            
+            <div class="pvp-action-overlay" id="pvp-p1-overlay"></div>
+          </div>
+        </div>
+
+        <!-- 右側玩家 2 (旋轉 -90deg) -->
+        <div class="pvp-half pvp-right">
+          <div class="pvp-rotated-container">
+            <div class="pvp-header">
+              <div class="pvp-player-info">
+                <span class="pvp-avatar">🥷</span>
+                <span class="pvp-name">玩家 2</span>
+              </div>
+              <div class="pvp-hp-box">
+                <div class="pvp-hp-bar-wrapper">
+                  <div class="pvp-hp-bar fill-pink" id="pvp-p2-my-hp-fill" style="width: 100%;"></div>
+                </div>
+                <div class="pvp-hp-text">
+                  <span>我方 HP</span>
+                  <span><span id="pvp-p2-my-hp">30</span>/30</span>
+                </div>
+              </div>
+              <div class="pvp-hp-box">
+                <div class="pvp-hp-bar-wrapper">
+                  <div class="pvp-hp-bar fill-green" id="pvp-p2-op-hp-fill" style="width: 100%;"></div>
+                </div>
+                <div class="pvp-hp-text">
+                  <span>對手 HP</span>
+                  <span><span id="pvp-p2-op-hp">30</span>/30</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="pvp-middle">
+              <div class="pvp-question-card">
+                <div class="pvp-timer-bar-wrapper">
+                  <div class="pvp-timer-bar" id="pvp-p2-timer-bar"></div>
+                </div>
+                <div class="pvp-question-formula" id="pvp-p2-formula">載入中...</div>
+              </div>
+            </div>
+            
+            <div class="pvp-bottom">
+              <div class="pvp-options-grid" id="pvp-p2-options">
+                <!-- 動態按鈕 -->
+              </div>
+            </div>
+            
+            <div class="pvp-action-overlay" id="pvp-p2-overlay"></div>
+          </div>
+        </div>
+
+        <!-- 頂部中央回主選單與計時器 (橫式全觀看得到) -->
+        <div class="pvp-center-bar">
+          <button type="button" id="btn-pvp-home" class="pvp-home-btn" title="回主選單">🏠</button>
+          <div class="pvp-match-timer">⏱️ <span id="pvp-match-time-text">90</span>s</div>
+          <button type="button" id="btn-pvp-reset" class="pvp-home-btn" title="重新開始">🔄</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 結算畫面 -->
+    <section id="result-screen" class="screen">
+      <div class="result-card">
+        <div class="trophy-icon" id="result-icon">🏆</div>
+        <h1 id="winner-title" class="winner-title">戰役勝利！</h1>
+        <p id="winner-reason" class="winner-reason">成功摧毀負極機械獸核心！</p>
+        
+        <div class="stats-box">
+          <div class="stat-row">
+            <span>戰鬥回合數</span>
+            <span id="stat-rounds" class="stat-val">5 回合</span>
+          </div>
+          <div class="stat-row">
+            <span>答對題數</span>
+            <span id="stat-correct-count" class="stat-val text-blue">8 題</span>
+          </div>
+          <div class="stat-row">
+            <span>答題正確率</span>
+            <span id="stat-accuracy" class="stat-val text-pink">88%</span>
+          </div>
+        </div>
+
+        <div class="result-actions">
+          <button type="button" id="btn-rematch" class="start-play-btn">
+            <span>再玩一次</span>
+          </button>
+          <button type="button" id="btn-result-home" class="mode-btn">
+            <span>回主選單</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 隨機情境事件彈窗 (水庫、溫度計、中點寶箱) -->
+    <div class="modal-overlay hidden" id="modal-overlay">
+      <div class="modal-card" id="modal-card">
+        <div class="modal-badge" id="modal-badge">隨機事件</div>
+        <h2 id="modal-title">🎁 中點寶箱降臨！</h2>
+        <div class="modal-content">
+          <p id="modal-desc">算出中點坐標即可發動「中點衝擊波」對機械獸造成雙倍重創！</p>
+          <div class="modal-math-box" id="modal-formula">
+            A(-5) 與 B(7) 的中點是？
+          </div>
+        </div>
+        <div class="modal-options" id="modal-options">
+          <!-- JS 動態生成選項 -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Application -->
+  <script src="app.js"></script>
+</body>
+</html>
