@@ -274,6 +274,16 @@ const GAME_STATE = {
     p2IsProcessing: false,
     matchTimer: null,
     matchTimeLeft: 90
+  },
+
+  // 線上連線狀態
+  online: {
+    peer: null,
+    conn: null,
+    isHost: false,
+    role: '',       // 'p1' (Host/Left) or 'p2' (Guest/Right)
+    roomId: '',
+    connected: false
   }
 };
 
@@ -377,7 +387,14 @@ const DOM = {
   get pvpP2Formula() { return document.getElementById('pvp-p2-formula'); },
   get pvpP2Options() { return document.getElementById('pvp-p2-options'); },
   get pvpP2Overlay() { return document.getElementById('pvp-p2-overlay'); },
-  get battleArena() { return document.querySelector('.battle-arena'); }
+  get battleArena() { return document.querySelector('.battle-arena'); },
+  
+  // 線上連線 UI 元素
+  get onlineSetup() { return document.getElementById('online-setup'); },
+  get btnCreateRoom() { return document.getElementById('btn-create-room'); },
+  get btnJoinRoom() { return document.getElementById('btn-join-room'); },
+  get inputRoomId() { return document.getElementById('input-room-id'); },
+  get onlineStatusMessage() { return document.getElementById('online-status-message'); }
 };
 
 // ==========================================================================
@@ -385,6 +402,7 @@ const DOM = {
 // ==========================================================================
 function initApp() {
   setupEventListeners();
+  initOnlineSetupUI();
 }
 
 function setupEventListeners() {
@@ -395,6 +413,20 @@ function setupEventListeners() {
       DOM.modeBtns.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       GAME_STATE.mode = btn.dataset.mode;
+      
+      // 線上模式與大廳 UI 連動
+      const onlineSetupCard = document.getElementById('online-setup');
+      const levelSetupCard = document.getElementById('level-setup');
+      if (GAME_STATE.mode === 'online') {
+        onlineSetupCard.classList.remove('hidden');
+        levelSetupCard.classList.remove('hidden');
+        DOM.btnStartGame.classList.add('hidden');
+        updateOnlineStatus('請選擇「創建連線房間」或輸入房號後「連線加入」對手。');
+      } else {
+        onlineSetupCard.classList.add('hidden');
+        levelSetupCard.classList.remove('hidden');
+        DOM.btnStartGame.classList.remove('hidden');
+      }
     });
   });
 
@@ -421,6 +453,11 @@ function setupEventListeners() {
 
   DOM.btnReset.addEventListener('click', startBattle);
   DOM.btnRematch.addEventListener('click', () => {
+    if (GAME_STATE.mode === 'online' || GAME_STATE.mode === 'pvp') {
+      closeOnlineConnection();
+      showScreen(DOM.startScreen);
+      return;
+    }
     if (GAME_STATE.mode === 'campaign') {
       if (GAME_STATE.bossHp <= 0) {
         // Player won
@@ -484,6 +521,7 @@ function startBattle() {
     // 顯示雙人對戰 Layout，隱藏單人 Layout
     DOM.campaignLayout.classList.add('hidden');
     DOM.pvpLayout.classList.remove('hidden');
+    DOM.pvpLayout.classList.remove('online-pvp-mode');
     
     // 設定答題時間
     if (GAME_STATE.level === 1) {
@@ -1115,6 +1153,10 @@ function resizePvPLayout() {
 function startPvpTurn(playerId) {
   if (checkPvpGameOver()) return;
   
+  const isLocal = (GAME_STATE.mode !== 'online') || 
+                  (playerId === 1 && GAME_STATE.online.role === 'p1') || 
+                  (playerId === 2 && GAME_STATE.online.role === 'p2');
+  
   if (playerId === 1) {
     if (GAME_STATE.p1Skill2Cd > 0) {
       GAME_STATE.p1Skill2Cd--;
@@ -1123,9 +1165,19 @@ function startPvpTurn(playerId) {
       GAME_STATE.p1Skill3Cd--;
     }
     GAME_STATE.pvp.p1IsProcessing = false;
-    GAME_STATE.pvp.p1Question = generateQuestion(GAME_STATE.level, getRandomInteger(1, 3));
-    displayPvpQuestion(1, GAME_STATE.pvp.p1Question);
-    startPvpTimer(1);
+    
+    if (isLocal) {
+      GAME_STATE.pvp.p1Question = generateQuestion(GAME_STATE.level, getRandomInteger(1, 3));
+      if (GAME_STATE.mode === 'online') {
+        sendOnlineMessage({
+          type: 'sync_question',
+          playerId: 1,
+          question: GAME_STATE.pvp.p1Question
+        });
+      }
+      displayPvpQuestion(1, GAME_STATE.pvp.p1Question);
+      startPvpTimer(1);
+    }
   } else {
     if (GAME_STATE.p2Skill2Cd > 0) {
       GAME_STATE.p2Skill2Cd--;
@@ -1134,9 +1186,19 @@ function startPvpTurn(playerId) {
       GAME_STATE.p2Skill3Cd--;
     }
     GAME_STATE.pvp.p2IsProcessing = false;
-    GAME_STATE.pvp.p2Question = generateQuestion(GAME_STATE.level, getRandomInteger(1, 3));
-    displayPvpQuestion(2, GAME_STATE.pvp.p2Question);
-    startPvpTimer(2);
+    
+    if (isLocal) {
+      GAME_STATE.pvp.p2Question = generateQuestion(GAME_STATE.level, getRandomInteger(1, 3));
+      if (GAME_STATE.mode === 'online') {
+        sendOnlineMessage({
+          type: 'sync_question',
+          playerId: 2,
+          question: GAME_STATE.pvp.p2Question
+        });
+      }
+      displayPvpQuestion(2, GAME_STATE.pvp.p2Question);
+      startPvpTimer(2);
+    }
   }
 }
 
@@ -1209,6 +1271,13 @@ function handlePvpTimeout(playerId) {
     const container = DOM.pvpLayout.querySelector('.pvp-left .pvp-rotated-container');
     spawnProjectile(container, '☄️', 'pvp-boss-projectile');
     
+    if (GAME_STATE.mode === 'online') {
+      sendOnlineMessage({
+        type: 'timeout',
+        playerId: 1
+      });
+    }
+    
     setTimeout(() => {
       startPvpTurn(1);
     }, 800);
@@ -1224,6 +1293,13 @@ function handlePvpTimeout(playerId) {
     const container = DOM.pvpLayout.querySelector('.pvp-right .pvp-rotated-container');
     spawnProjectile(container, '☄️', 'pvp-boss-projectile');
     
+    if (GAME_STATE.mode === 'online') {
+      sendOnlineMessage({
+        type: 'timeout',
+        playerId: 2
+      });
+    }
+    
     setTimeout(() => {
       startPvpTurn(2);
     }, 800);
@@ -1238,13 +1314,23 @@ function displayPvpQuestion(playerId, q) {
   
   formulaEl.innerText = q.formula;
   optionsEl.innerHTML = '';
+  optionsEl.classList.remove('skills-view');
+  
+  const isLocal = (GAME_STATE.mode !== 'online') || 
+                  (playerId === 1 && GAME_STATE.online.role === 'p1') || 
+                  (playerId === 2 && GAME_STATE.online.role === 'p2');
   
   q.options.forEach((val, idx) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'pvp-btn';
     btn.innerText = val >= 0 ? `+${val}` : val;
-    btn.addEventListener('click', () => checkPvpAnswer(playerId, idx));
+    if (isLocal) {
+      btn.addEventListener('click', () => checkPvpAnswer(playerId, idx));
+    } else {
+      btn.classList.add('disabled');
+      btn.disabled = true;
+    }
     optionsEl.appendChild(btn);
   });
 }
@@ -1421,6 +1507,15 @@ function showPvpSkillSelection(playerId) {
   const optionsEl = playerId === 1 ? DOM.pvpP1Options : DOM.pvpP2Options;
   if (!optionsEl) return;
   
+  const isLocal = (GAME_STATE.mode !== 'online') || 
+                  (playerId === 1 && GAME_STATE.online.role === 'p1') || 
+                  (playerId === 2 && GAME_STATE.online.role === 'p2');
+                  
+  if (!isLocal) {
+    optionsEl.innerHTML = '<div style="font-size:0.9rem; color:var(--text-light-gray); font-weight:700; text-align:center; width:100%; padding:15px;">對手正在選擇招式...</div>';
+    return;
+  }
+  
   optionsEl.innerHTML = '';
   optionsEl.classList.add('skills-view');
   
@@ -1476,6 +1571,16 @@ function showPvpSkillSelection(playerId) {
         
         playPvpSkillEffects(playerId, defenderId, idx + 1, dmg, skill.name);
         
+        if (GAME_STATE.mode === 'online') {
+          sendOnlineMessage({
+            type: 'use_skill',
+            attackerId: playerId,
+            skillNum: idx + 1,
+            dmg: dmg,
+            skillName: skill.name
+          });
+        }
+        
         setTimeout(() => {
           startPvpTurn(playerId);
         }, 1200);
@@ -1502,6 +1607,13 @@ function checkPvpAnswer(playerId, selectedIdx) {
     
     if (isCorrect) {
       synth.playLaser();
+      if (GAME_STATE.mode === 'online') {
+        sendOnlineMessage({
+          type: 'state_change',
+          playerId: 1,
+          state: 'selecting_skill'
+        });
+      }
       setTimeout(() => {
         showPvpSkillSelection(1);
       }, 600);
@@ -1512,6 +1624,12 @@ function checkPvpAnswer(playerId, selectedIdx) {
       const container = DOM.pvpLayout.querySelector('.pvp-left .pvp-rotated-container');
       spawnProjectile(container, '☄️', 'pvp-boss-projectile');
       updatePvpHPUI();
+      if (GAME_STATE.mode === 'online') {
+        sendOnlineMessage({
+          type: 'wrong_answer',
+          playerId: 1
+        });
+      }
       setTimeout(() => {
         startPvpTurn(1);
       }, 1000);
@@ -1532,6 +1650,13 @@ function checkPvpAnswer(playerId, selectedIdx) {
     
     if (isCorrect) {
       synth.playLaser();
+      if (GAME_STATE.mode === 'online') {
+        sendOnlineMessage({
+          type: 'state_change',
+          playerId: 2,
+          state: 'selecting_skill'
+        });
+      }
       setTimeout(() => {
         showPvpSkillSelection(2);
       }, 600);
@@ -1542,6 +1667,12 @@ function checkPvpAnswer(playerId, selectedIdx) {
       const container = DOM.pvpLayout.querySelector('.pvp-right .pvp-rotated-container');
       spawnProjectile(container, '☄️', 'pvp-boss-projectile');
       updatePvpHPUI();
+      if (GAME_STATE.mode === 'online') {
+        sendOnlineMessage({
+          type: 'wrong_answer',
+          playerId: 2
+        });
+      }
       setTimeout(() => {
         startPvpTurn(2);
       }, 1000);
@@ -1581,9 +1712,21 @@ function startPvpMatchTimer() {
   GAME_STATE.pvp.matchTimeLeft = 90;
   if (DOM.pvpMatchTimeText) DOM.pvpMatchTimeText.innerText = GAME_STATE.pvp.matchTimeLeft;
   
+  // 線上模式：訪客端由房主同步時間，不在此處計時
+  if (GAME_STATE.mode === 'online' && !GAME_STATE.online.isHost) {
+    return;
+  }
+  
   GAME_STATE.pvp.matchTimer = setInterval(() => {
     GAME_STATE.pvp.matchTimeLeft--;
     if (DOM.pvpMatchTimeText) DOM.pvpMatchTimeText.innerText = GAME_STATE.pvp.matchTimeLeft;
+    
+    if (GAME_STATE.mode === 'online') {
+      sendOnlineMessage({
+        type: 'match_time',
+        time: GAME_STATE.pvp.matchTimeLeft
+      });
+    }
     
     if (GAME_STATE.pvp.matchTimeLeft <= 0) {
       clearInterval(GAME_STATE.pvp.matchTimer);
@@ -2026,6 +2169,334 @@ function generateUniqueOptions(correctVal, offsets) {
 function writeLog(text, className = '') {
   DOM.combatLog.innerText = text;
   DOM.combatLog.className = `combat-log ${className}`;
+}
+
+// ==========================================================================
+// 線上對決 P2P 連線模組 (PeerJS P2P Connection Module)
+// ==========================================================================
+function initOnlineSetupUI() {
+  const onlineSetupCard = document.getElementById('online-setup');
+  const levelSetupCard = document.getElementById('level-setup');
+
+  // 監聽模式選擇 (在 setupEventListeners 的 click 事件之後額外做 UI 切換)
+  DOM.modeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.mode === 'online') {
+        onlineSetupCard.classList.remove('hidden');
+        levelSetupCard.classList.remove('hidden');
+        DOM.btnStartGame.classList.add('hidden');
+        updateOnlineStatus('請選擇「創建連線房間」或輸入房號後「連線加入」對手。');
+      } else {
+        onlineSetupCard.classList.add('hidden');
+        levelSetupCard.classList.remove('hidden');
+        DOM.btnStartGame.classList.remove('hidden');
+      }
+    });
+  });
+
+  // 創建房間按鈕
+  document.getElementById('btn-create-room').addEventListener('click', () => {
+    synth.playClick();
+    setupPeerAsHost();
+  });
+
+  // 加入房間按鈕
+  document.getElementById('btn-join-room').addEventListener('click', () => {
+    synth.playClick();
+    const roomId = document.getElementById('input-room-id').value.trim();
+    if (!roomId || roomId.length !== 4 || isNaN(roomId)) {
+      updateOnlineStatus('請輸入正確的 4 位數房號！', 'error');
+      return;
+    }
+    setupPeerAsGuest(roomId);
+  });
+}
+
+function updateOnlineStatus(text, type = '') {
+  const el = DOM.onlineStatusMessage;
+  if (!el) return;
+  el.innerText = text;
+  el.className = 'online-status';
+  if (type === 'success') el.classList.add('success');
+  if (type === 'error') el.classList.add('error');
+}
+
+function setupPeerAsHost() {
+  updateOnlineStatus('正在連線至 Peer 伺服器並建立房間...');
+  closeOnlineConnection();
+
+  // 產生 4 位隨機房號
+  const code = Math.floor(1000 + Math.random() * 9000).toString();
+  GAME_STATE.online.roomId = code;
+  GAME_STATE.online.isHost = true;
+  GAME_STATE.online.role = 'p1'; // 房主固定為 P1 (左半屏)
+
+  try {
+    GAME_STATE.online.peer = new Peer('math-hero-' + code, {
+      debug: 1
+    });
+
+    GAME_STATE.online.peer.on('open', (id) => {
+      updateOnlineStatus(`房間建立成功！房號：【${code}】\n請將房號告知對手，等待對手連線加入...`, 'success');
+    });
+
+    GAME_STATE.online.peer.on('connection', (connection) => {
+      GAME_STATE.online.conn = connection;
+      setupConnectionEvents(connection);
+    });
+
+    GAME_STATE.online.peer.on('error', (err) => {
+      console.error(err);
+      if (err.type === 'unavailable-id') {
+        setupPeerAsHost();
+      } else {
+        updateOnlineStatus('連線伺服器失敗，請再試一次！', 'error');
+      }
+    });
+  } catch (e) {
+    console.error(e);
+    updateOnlineStatus('建立房間發生異常，請重試！', 'error');
+  }
+}
+
+function setupPeerAsGuest(roomId) {
+  updateOnlineStatus(`正在連線加入房間 ${roomId}...`);
+  closeOnlineConnection();
+
+  GAME_STATE.online.roomId = roomId;
+  GAME_STATE.online.isHost = false;
+  GAME_STATE.online.role = 'p2'; // 訪客固定為 P2 (右半屏)
+
+  try {
+    GAME_STATE.online.peer = new Peer(null, {
+      debug: 1
+    });
+
+    GAME_STATE.online.peer.on('open', (id) => {
+      const connection = GAME_STATE.online.peer.connect('math-hero-' + roomId);
+      GAME_STATE.online.conn = connection;
+      setupConnectionEvents(connection);
+    });
+
+    GAME_STATE.online.peer.on('error', (err) => {
+      console.error(err);
+      updateOnlineStatus('連線伺服器失敗，請確認房號是否正確！', 'error');
+    });
+  } catch (e) {
+    console.error(e);
+    updateOnlineStatus('加入房間發生異常，請重試！', 'error');
+  }
+}
+
+function setupConnectionEvents(connection) {
+  connection.on('open', () => {
+    GAME_STATE.online.connected = true;
+    updateOnlineStatus('對手已連線！即將進入遊戲...', 'success');
+
+    setTimeout(() => {
+      if (GAME_STATE.online.isHost) {
+        sendOnlineMessage({
+          type: 'init_game',
+          level: GAME_STATE.level
+        });
+        startOnlineBattle();
+      }
+    }, 1000);
+  });
+
+  connection.on('data', (data) => {
+    handleOnlineMessage(data);
+  });
+
+  connection.on('close', () => {
+    handleOnlineDisconnect();
+  });
+
+  connection.on('error', (err) => {
+    console.error(err);
+    handleOnlineDisconnect();
+  });
+}
+
+function sendOnlineMessage(msg) {
+  if (GAME_STATE.online.conn && GAME_STATE.online.connected) {
+    GAME_STATE.online.conn.send(msg);
+  }
+}
+
+function closeOnlineConnection() {
+  GAME_STATE.online.connected = false;
+  if (GAME_STATE.online.conn) {
+    GAME_STATE.online.conn.close();
+    GAME_STATE.online.conn = null;
+  }
+  if (GAME_STATE.online.peer) {
+    GAME_STATE.online.peer.destroy();
+    GAME_STATE.online.peer = null;
+  }
+}
+
+function startOnlineBattle() {
+  GAME_STATE.mode = 'online';
+  
+  DOM.campaignLayout.classList.add('hidden');
+  DOM.pvpLayout.classList.remove('hidden');
+  DOM.pvpLayout.classList.add('online-pvp-mode');
+
+  GAME_STATE.playerHp = 30;
+  GAME_STATE.bossHp = 30;
+  GAME_STATE.stats.correct = 0;
+  GAME_STATE.stats.total = 0;
+
+  if (GAME_STATE.level === 1 || GAME_STATE.level === 2) {
+    GAME_STATE.pvp.p1TimeLimit = 25;
+    GAME_STATE.pvp.p2TimeLimit = 25;
+  } else {
+    GAME_STATE.pvp.p1TimeLimit = 35;
+    GAME_STATE.pvp.p2TimeLimit = 35;
+  }
+
+  updatePvpHPUI();
+  setupRoleLabels();
+  showScreen(DOM.gameScreen);
+
+  setTimeout(() => {
+    if (GAME_STATE.online.role === 'p1') {
+      startPvpTurn(1);
+    } else {
+      startPvpTurn(2);
+    }
+
+    if (GAME_STATE.online.isHost) {
+      startPvpMatchTimer();
+    }
+  }, 500);
+}
+
+function handleOnlineMessage(data) {
+  if (!data || !data.type) return;
+
+  switch (data.type) {
+    case 'init_game':
+      GAME_STATE.level = data.level;
+      startOnlineBattle();
+      break;
+
+    case 'sync_question':
+      if (data.playerId === 1) {
+        GAME_STATE.pvp.p1Question = data.question;
+        renderSpectatorQuestion(1, data.question);
+      } else {
+        GAME_STATE.pvp.p2Question = data.question;
+        renderSpectatorQuestion(2, data.question);
+      }
+      break;
+
+    case 'state_change':
+      if (data.state === 'selecting_skill') {
+        showPvpSkillSelection(data.playerId);
+      }
+      break;
+
+    case 'use_skill':
+      const attackerId = data.attackerId;
+      const defenderId = attackerId === 1 ? 2 : 1;
+      playPvpSkillEffects(attackerId, defenderId, data.skillNum, data.dmg, data.skillName);
+      
+      setTimeout(() => {
+        if (GAME_STATE.online.role === 'p1') {
+          // P1 is local, P2 is remote. Guest continues.
+        } else {
+          // P2 is local, P1 is remote. Host continues.
+        }
+      }, 1200);
+      break;
+
+    case 'wrong_answer':
+      if (data.playerId === 1) {
+        GAME_STATE.playerHp = Math.max(0, GAME_STATE.playerHp - 6);
+        flashPvpOverlay(1, 'wrong');
+        const container = DOM.pvpLayout.querySelector('.pvp-left .pvp-rotated-container');
+        spawnProjectile(container, '☄️', 'pvp-boss-projectile');
+      } else {
+        GAME_STATE.bossHp = Math.max(0, GAME_STATE.bossHp - 6);
+        flashPvpOverlay(2, 'wrong');
+        const container = DOM.pvpLayout.querySelector('.pvp-right .pvp-rotated-container');
+        spawnProjectile(container, '☄️', 'pvp-boss-projectile');
+      }
+      updatePvpHPUI();
+      synth.playWrong();
+      break;
+
+    case 'timeout':
+      if (data.playerId === 1) {
+        GAME_STATE.playerHp = Math.max(0, GAME_STATE.playerHp - 6);
+        flashPvpOverlay(1, 'wrong');
+        const container = DOM.pvpLayout.querySelector('.pvp-left .pvp-rotated-container');
+        spawnProjectile(container, '☄️', 'pvp-boss-projectile');
+      } else {
+        GAME_STATE.bossHp = Math.max(0, GAME_STATE.bossHp - 6);
+        flashPvpOverlay(2, 'wrong');
+        const container = DOM.pvpLayout.querySelector('.pvp-right .pvp-rotated-container');
+        spawnProjectile(container, '☄️', 'pvp-boss-projectile');
+      }
+      updatePvpHPUI();
+      synth.playWrong();
+      break;
+
+    case 'match_time':
+      GAME_STATE.pvp.matchTimeLeft = data.time;
+      if (DOM.pvpMatchTimeText) DOM.pvpMatchTimeText.innerText = data.time;
+      if (data.time <= 0) {
+        endPvpGame('timeUp');
+      }
+      break;
+  }
+}
+
+function renderSpectatorQuestion(playerId, q) {
+  const formulaEl = playerId === 1 ? DOM.pvpP1Formula : DOM.pvpP2Formula;
+  const optionsEl = playerId === 1 ? DOM.pvpP1Options : DOM.pvpP2Options;
+  if (!formulaEl || !optionsEl) return;
+
+  formulaEl.innerText = q.formula;
+  optionsEl.innerHTML = '';
+  optionsEl.classList.remove('skills-view');
+
+  q.options.forEach((val) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'pvp-btn disabled';
+    btn.disabled = true;
+    btn.innerText = val >= 0 ? `+${val}` : val;
+    optionsEl.appendChild(btn);
+  });
+}
+
+function handleOnlineDisconnect() {
+  if (!GAME_STATE.online.connected) return;
+  GAME_STATE.online.connected = false;
+
+  clearInterval(GAME_STATE.pvp.p1Timer);
+  clearInterval(GAME_STATE.pvp.p2Timer);
+  clearInterval(GAME_STATE.pvp.matchTimer);
+
+  synth.playWrong();
+  
+  DOM.winnerTitle.innerText = '對手已斷線離線！';
+  DOM.winnerTitle.className = 'winner-title text-pink';
+  DOM.winnerReason.innerText = '連線意外中斷，我方獲得本次對決勝利 🏆';
+  DOM.resultIcon.innerText = '🔌';
+  
+  DOM.statRounds.innerText = '線上連線';
+  DOM.statCorrectCount.innerText = '對方斷線';
+  DOM.statAccuracy.innerText = '自動獲勝';
+
+  const rematchText = DOM.btnRematch.querySelector('span');
+  if (rematchText) rematchText.innerText = '返回大廳';
+  
+  showScreen(DOM.resultScreen);
+  closeOnlineConnection();
 }
 
 if (document.readyState === 'loading') {
