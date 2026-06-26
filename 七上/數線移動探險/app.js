@@ -139,6 +139,11 @@ const DOM = {
   inputSteps: document.getElementById('input-steps'),
   stepMoveStatus: document.getElementById('step-move-status'),
 
+  stepAnswerCard: document.getElementById('step-answer-card'),
+  inputFinalAnswer: document.getElementById('input-final-answer'),
+  finalAnswerFormulaHint: document.getElementById('final-answer-formula-hint'),
+  stepAnswerStatus: document.getElementById('step-answer-status'),
+
   btnSubmit: document.getElementById('btn-submit'),
   btnNext: document.getElementById('btn-next'),
 
@@ -169,7 +174,8 @@ const GAME_STATE = {
   userAnswer: {
     start: null,
     dir: null, // left | right
-    steps: null
+    steps: null,
+    finalAnswer: null
   },
   
   challengeTimer: null,
@@ -252,13 +258,11 @@ function handleTickClick(val) {
 
   // 移動棋子到點選起點位置
   movePawnToValue(val, false);
-  
-  // 顯示送出按鈕
-  DOM.btnSubmit.style.display = 'block';
-  
-  // 清空步驟二的先前狀態
+
+  // 清空步驟二的先前狀態，並重置步驟三
   DOM.stepMoveCard.classList.remove('success', 'error');
   DOM.stepMoveStatus.innerHTML = '';
+  resetStep3();
 }
 
 // 動態搬移棋子 (棋子定位)
@@ -341,7 +345,7 @@ function setupEventListeners() {
   // 啟動遊戲
   DOM.btnStartGame.addEventListener('click', startGame);
 
-  // 步驟二方向按鈕
+  // 步驟二方向按鈕 — 選方向後開啟步驟三
   const dirBtns = DOM.stepMoveCard.querySelectorAll('.dir-btn');
   dirBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -349,7 +353,24 @@ function setupEventListeners() {
       dirBtns.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       GAME_STATE.userAnswer.dir = btn.dataset.dir;
+      unlockStep3();
     });
+  });
+
+  // 輸入格數後也要確保步驟三開啟
+  DOM.inputSteps.addEventListener('input', () => {
+    if (GAME_STATE.userAnswer.dir && DOM.inputSteps.value) {
+      unlockStep3();
+    }
+  });
+
+  // 最終答案欄位輸入後顯示送出按鈕
+  DOM.inputFinalAnswer.addEventListener('input', () => {
+    if (DOM.inputFinalAnswer.value !== '') {
+      DOM.btnSubmit.style.display = 'block';
+    } else {
+      DOM.btnSubmit.style.display = 'none';
+    }
   });
 
   // 送出答案
@@ -364,6 +385,28 @@ function setupEventListeners() {
     synth.playClick();
     showScreen(DOM.startScreen);
   });
+}
+
+// 重置步驟三到 disabled 狀態
+function resetStep3() {
+  DOM.stepAnswerCard.className = 'step-card disabled';
+  DOM.stepAnswerStatus.innerHTML = '';
+  DOM.inputFinalAnswer.value = '';
+  DOM.inputFinalAnswer.disabled = true;
+  DOM.btnSubmit.style.display = 'none';
+  GAME_STATE.userAnswer.finalAnswer = null;
+}
+
+// 解鎖步驟三
+function unlockStep3() {
+  const q = GAME_STATE.currentQuestion;
+  DOM.stepAnswerCard.classList.remove('disabled');
+  DOM.stepAnswerCard.classList.add('active');
+  DOM.stepAnswerCard.classList.remove('success', 'error');
+  DOM.stepAnswerStatus.innerHTML = '';
+  DOM.inputFinalAnswer.disabled = false;
+  // 顯示公式提示
+  if (q) DOM.finalAnswerFormulaHint.innerText = q.formula;
 }
 
 // 畫面顯示切換
@@ -462,7 +505,7 @@ function loadQuestion() {
   DOM.inputSteps.disabled = true;
   DOM.stepMoveStatus.innerHTML = '';
 
-  DOM.btnSubmit.style.display = 'none';
+  resetStep3();
   DOM.btnNext.style.display = 'none';
   DOM.feedbackPanel.classList.add('hidden');
 
@@ -562,7 +605,9 @@ function verifyAnswer() {
   if (GAME_STATE.isProcessingAnswer) return;
 
   const stepsVal = parseInt(DOM.inputSteps.value);
-  if (!GAME_STATE.userAnswer.start === null) {
+  const finalAnswerVal = parseInt(DOM.inputFinalAnswer.value);
+
+  if (GAME_STATE.userAnswer.start === null) {
     alert('請在數線上點選出發起點！');
     return;
   }
@@ -571,27 +616,34 @@ function verifyAnswer() {
     return;
   }
   if (isNaN(stepsVal) || stepsVal <= 0) {
-    alert('請在輸入框填寫正確的移動格數！');
+    alert('請填寫移動的格數！');
+    return;
+  }
+  if (isNaN(finalAnswerVal)) {
+    alert('請在步驟三填寫算式的最終答案！');
     return;
   }
 
   GAME_STATE.userAnswer.steps = stepsVal;
+  GAME_STATE.userAnswer.finalAnswer = finalAnswerVal;
   GAME_STATE.isProcessingAnswer = true;
   DOM.btnSubmit.style.display = 'none';
 
-  // 停用所有輸入框與方向按鈕避免干擾
+  // 停用所有輸入，避免干擾
   const dirBtns = DOM.stepMoveCard.querySelectorAll('.dir-btn');
   dirBtns.forEach(btn => btn.disabled = true);
   DOM.inputSteps.disabled = true;
+  DOM.inputFinalAnswer.disabled = true;
 
   const q = GAME_STATE.currentQuestion;
-  const isStartCorrect = (GAME_STATE.userAnswer.start === q.start);
-  const isDirCorrect = (GAME_STATE.userAnswer.dir === q.dir);
-  const isStepsCorrect = (GAME_STATE.userAnswer.steps === q.steps);
+  const isStartCorrect   = (GAME_STATE.userAnswer.start === q.start);
+  const isDirCorrect     = (GAME_STATE.userAnswer.dir   === q.dir);
+  const isStepsCorrect   = (GAME_STATE.userAnswer.steps === q.steps);
+  const isFinalCorrect   = (GAME_STATE.userAnswer.finalAnswer === q.dest);
 
-  const isAllCorrect = isStartCorrect && isDirCorrect && isStepsCorrect;
+  const isAllCorrect = isStartCorrect && isDirCorrect && isStepsCorrect && isFinalCorrect;
 
-  // 驗證回饋細項
+  // ── 步驟一 回饋 ──
   if (isStartCorrect) {
     DOM.stepStartCard.className = 'step-card success';
     DOM.stepStartStatus.innerHTML = '✅';
@@ -600,6 +652,7 @@ function verifyAnswer() {
     DOM.stepStartStatus.innerHTML = '❌';
   }
 
+  // ── 步驟二 回饋 ──
   if (isDirCorrect && isStepsCorrect) {
     DOM.stepMoveCard.className = 'step-card success';
     DOM.stepMoveStatus.innerHTML = '✅';
@@ -608,40 +661,43 @@ function verifyAnswer() {
     DOM.stepMoveStatus.innerHTML = '❌';
   }
 
-  // 執行跳躍動畫流程
+  // ── 步驟三 回饋 ──
+  if (isFinalCorrect) {
+    DOM.stepAnswerCard.className = 'step-card success';
+    DOM.stepAnswerStatus.innerHTML = '✅';
+  } else {
+    DOM.stepAnswerCard.className = 'step-card error';
+    DOM.stepAnswerStatus.innerHTML = '❌';
+  }
+
+  // ── 執行動畫與整體回饋 ──
   if (isAllCorrect) {
-    // 答對加分
     GAME_STATE.correctCount++;
-    if (GAME_STATE.mode === 'challenge') {
-      GAME_STATE.score += 10;
-    }
-    
+    if (GAME_STATE.mode === 'challenge') GAME_STATE.score += 10;
+
     playPawnMovePathAnimation(q.start, q.dest, q.steps, () => {
-      // 成功結束後動作
       synth.playSuccess();
       DOM.feedbackPanel.className = 'feedback-panel';
       DOM.feedbackIcon.innerText = '🎉';
-      DOM.feedbackTitle.innerText = '回答正確！';
-      DOM.feedbackText.innerText = `棋子起點正確，且順利向${q.dir === 'left' ? '左' : '右'}移動 ${q.steps} 格抵達座標 ${q.dest}。`;
-      
-      // 更新算式為正確答案
+      DOM.feedbackTitle.innerText = '三步驟全對！太棒了！';
+      DOM.feedbackText.innerText = `起點 ${q.start}，向${q.dir === 'left' ? '左' : '右'}移動 ${q.steps} 格，抵達座標 ${q.dest}，算式 ${q.formula} = ${q.dest} ✓`;
       DOM.questionEquation.innerText = `${q.formula} = ${q.dest}`;
       drawDisplacementCurve(q.start, q.dest, true);
       DOM.btnNext.style.display = 'block';
     });
   } else {
-    // 答錯，播放錯誤音效，並強制演示正確軌跡給學生看
     synth.playError();
     DOM.feedbackPanel.className = 'feedback-panel wrong';
     DOM.feedbackIcon.innerText = '💡';
-    DOM.feedbackTitle.innerText = '回答錯誤！正確演示如下：';
-    
+    DOM.feedbackTitle.innerText = '有答錯的地方，正確解答如下：';
+
     let errorMsg = '';
     if (!isStartCorrect) errorMsg += `起點應為 ${q.start}；`;
-    if (!isDirCorrect || !isStepsCorrect) errorMsg += `移動方向與格數應為「往${q.dir === 'left' ? '左' : '右'}移動 ${q.steps} 格」。`;
+    if (!isDirCorrect || !isStepsCorrect) errorMsg += `移動應為「往${q.dir === 'left' ? '左' : '右'}移動 ${q.steps} 格」；`;
+    if (!isFinalCorrect) errorMsg += `算式結果應為 ${q.dest}。`;
     DOM.feedbackText.innerText = errorMsg;
 
-    // 清理非正確狀態高亮
+    // 清理刻度高亮，顯示正確起點
     const tickNodes = DOM.numberLineTicks.querySelectorAll('.tick-node');
     tickNodes.forEach(node => {
       const v = parseInt(node.dataset.val);
@@ -649,7 +705,7 @@ function verifyAnswer() {
       else node.classList.remove('selected-start');
     });
 
-    // 棋子退回正確起點並依序演示正確路徑
+    // 棋子退回正確起點並演示正確路徑
     movePawnToValue(q.start, true);
     setTimeout(() => {
       playPawnMovePathAnimation(q.start, q.dest, q.steps, () => {
