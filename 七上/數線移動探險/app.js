@@ -113,9 +113,6 @@ const DOM = {
   
   btnModePractice: document.getElementById('btn-mode-practice'),
   btnModeChallenge: document.getElementById('btn-mode-challenge'),
-  practiceTypesCard: document.getElementById('practice-types-card'),
-  btnSelectAll: document.getElementById('btn-select-all'),
-  btnSelectNone: document.getElementById('btn-select-none'),
   btnStartGame: document.getElementById('btn-start-game'),
 
   infoModeText: document.getElementById('info-mode-text'),
@@ -179,7 +176,7 @@ const GAME_STATE = {
   challengeStartTime: 0,
   challengeTotalTime: 0,
   
-  practiceSelectedTypes: new Set([1, 2, 3, 4, 5, 6, 7]),
+  roundTypes: [],
   isProcessingAnswer: false
 };
 
@@ -331,7 +328,6 @@ function setupEventListeners() {
     synth.playClick();
     DOM.btnModePractice.classList.add('active');
     DOM.btnModeChallenge.classList.remove('active');
-    DOM.practiceTypesCard.style.display = 'block';
     GAME_STATE.mode = 'practice';
   });
 
@@ -339,39 +335,7 @@ function setupEventListeners() {
     synth.playClick();
     DOM.btnModeChallenge.classList.add('active');
     DOM.btnModePractice.classList.remove('active');
-    DOM.practiceTypesCard.style.display = 'none';
     GAME_STATE.mode = 'challenge';
-  });
-
-  // 練習題型多選全選與清除
-  DOM.btnSelectAll.addEventListener('click', () => {
-    synth.playClick();
-    const boxes = document.querySelectorAll('.type-checkbox');
-    boxes.forEach(box => {
-      box.checked = true;
-      GAME_STATE.practiceSelectedTypes.add(parseInt(box.dataset.type));
-    });
-  });
-
-  DOM.btnSelectNone.addEventListener('click', () => {
-    synth.playClick();
-    const boxes = document.querySelectorAll('.type-checkbox');
-    boxes.forEach(box => {
-      box.checked = false;
-      GAME_STATE.practiceSelectedTypes.delete(parseInt(box.dataset.type));
-    });
-  });
-
-  // 核取方塊點選事件
-  document.querySelectorAll('.type-checkbox').forEach(box => {
-    box.addEventListener('change', () => {
-      const typeNum = parseInt(box.dataset.type);
-      if (box.checked) {
-        GAME_STATE.practiceSelectedTypes.add(typeNum);
-      } else {
-        GAME_STATE.practiceSelectedTypes.delete(typeNum);
-      }
-    });
   });
 
   // 啟動遊戲
@@ -413,22 +377,33 @@ function showScreen(targetScreen) {
 // ==========================================================================
 // 遊戲核心流程
 // ==========================================================================
+function generateRoundTypes() {
+  const base = [1, 2, 3, 4, 5, 6, 7];
+  const extras = [];
+  for (let i = 0; i < 3; i++) {
+    extras.push(Math.floor(Math.random() * 7) + 1);
+  }
+  const combined = base.concat(extras);
+  // Shuffle combined
+  for (let i = combined.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [combined[i], combined[j]] = [combined[j], combined[i]];
+  }
+  return combined;
+}
+
 function startGame() {
   synth.playClick();
-  
-  if (GAME_STATE.mode === 'practice' && GAME_STATE.practiceSelectedTypes.size === 0) {
-    alert('請至少勾選一種練習題型！');
-    return;
-  }
 
   // 重置狀態
   GAME_STATE.questionIndex = 0;
   GAME_STATE.score = 0;
   GAME_STATE.correctCount = 0;
   GAME_STATE.isProcessingAnswer = false;
+  GAME_STATE.roundTypes = generateRoundTypes();
   
+  GAME_STATE.challengeStartTime = Date.now();
   if (GAME_STATE.mode === 'challenge') {
-    GAME_STATE.challengeStartTime = Date.now();
     DOM.infoScoreBox.style.display = 'block';
     DOM.infoTimerBox.style.display = 'block';
     DOM.infoModeText.innerText = '🏆 冒險挑戰模式';
@@ -437,7 +412,6 @@ function startGame() {
     DOM.infoScoreBox.style.display = 'none';
     DOM.infoTimerBox.style.display = 'none';
     DOM.infoModeText.innerText = '💡 自由練習模式';
-    clearInterval(GAME_STATE.challengeTimer);
   }
 
   showScreen(DOM.gameScreen);
@@ -493,24 +467,16 @@ function loadQuestion() {
   DOM.feedbackPanel.classList.add('hidden');
 
   // 更新進度條
+  DOM.infoProgressText.innerText = `第 ${GAME_STATE.questionIndex + 1} / 10 題`;
+  DOM.progressBarFill.style.width = `${((GAME_STATE.questionIndex + 1) / 10) * 100}%`;
   if (GAME_STATE.mode === 'challenge') {
-    DOM.infoProgressText.innerText = `第 ${GAME_STATE.questionIndex + 1} / 10 題`;
-    DOM.progressBarFill.style.width = `${((GAME_STATE.questionIndex + 1) / 10) * 100}%`;
     DOM.infoScoreVal.innerText = GAME_STATE.score;
-  } else {
-    DOM.infoProgressText.innerText = `已練習：${GAME_STATE.questionIndex + 1} 題`;
-    DOM.progressBarFill.style.width = '100%';
   }
 }
 
 // 題型隨機生成器
 function generateQuestion() {
-  let types = [1, 2, 3, 4, 5, 6, 7];
-  if (GAME_STATE.mode === 'practice') {
-    types = Array.from(GAME_STATE.practiceSelectedTypes);
-  }
-  
-  const chosenType = types[Math.floor(Math.random() * types.length)];
+  const chosenType = GAME_STATE.roundTypes[GAME_STATE.questionIndex % 10];
   let a, b, start, dir, steps, dest;
   
   // 邊界控制：出發點與降落點都必須限制在 [-10, 10] 區間內
@@ -719,8 +685,8 @@ function nextQuestion() {
   synth.playClick();
   GAME_STATE.questionIndex++;
   
-  if (GAME_STATE.mode === 'challenge' && GAME_STATE.questionIndex >= 10) {
-    // 挑戰結束，結算
+  if (GAME_STATE.questionIndex >= 10) {
+    // 一關結束，結算
     clearInterval(GAME_STATE.challengeTimer);
     GAME_STATE.challengeTotalTime = ((Date.now() - GAME_STATE.challengeStartTime) / 1000).toFixed(1);
     showResultScreen();
