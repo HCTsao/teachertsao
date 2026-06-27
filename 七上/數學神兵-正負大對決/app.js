@@ -2245,6 +2245,13 @@ function setupPeerAsHost() {
 
   try {
     GAME_STATE.online.peer = new Peer('math-hero-' + code, {
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' }
+        ]
+      },
       debug: 1
     });
 
@@ -2262,7 +2269,7 @@ function setupPeerAsHost() {
       if (err.type === 'unavailable-id') {
         setupPeerAsHost();
       } else {
-        updateOnlineStatus('連線伺服器失敗，請再試一次！', 'error');
+        updateOnlineStatus('連線伺服器失敗，請重試！ (錯誤類型: ' + err.type + ')', 'error');
       }
     });
   } catch (e) {
@@ -2281,6 +2288,13 @@ function setupPeerAsGuest(roomId) {
 
   try {
     GAME_STATE.online.peer = new Peer(null, {
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' }
+        ]
+      },
       debug: 1
     });
 
@@ -2292,7 +2306,11 @@ function setupPeerAsGuest(roomId) {
 
     GAME_STATE.online.peer.on('error', (err) => {
       console.error(err);
-      updateOnlineStatus('連線伺服器失敗，請確認房號是否正確！', 'error');
+      if (err.type === 'peer-not-found') {
+        updateOnlineStatus('找不到該房間！請確認房號是否正確，或房主是否已建立房間。', 'error');
+      } else {
+        updateOnlineStatus('連線伺服器失敗，請確認房號或網路狀態！ (錯誤: ' + err.type + ')', 'error');
+      }
     });
   } catch (e) {
     console.error(e);
@@ -2301,7 +2319,8 @@ function setupPeerAsGuest(roomId) {
 }
 
 function setupConnectionEvents(connection) {
-  connection.on('open', () => {
+  const onOpen = () => {
+    if (GAME_STATE.online.connected) return;
     GAME_STATE.online.connected = true;
     updateOnlineStatus('對手已連線！即將進入遊戲...', 'success');
 
@@ -2314,7 +2333,13 @@ function setupConnectionEvents(connection) {
         startOnlineBattle();
       }
     }, 1000);
-  });
+  };
+
+  if (connection.open) {
+    onOpen();
+  } else {
+    connection.on('open', onOpen);
+  }
 
   connection.on('data', (data) => {
     handleOnlineMessage(data);
