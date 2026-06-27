@@ -229,44 +229,60 @@ function generateNumberLineTicks() {
 }
 
 // 處理數線刻度點選
+// 起點對則立即解鎖步驟二；錢 則立即顯示提示並鎖住步驟二
 function handleTickClick(val) {
   if (GAME_STATE.isProcessingAnswer) return;
   synth.playClick();
-  
-  // 紀錄選擇的起點
+
   GAME_STATE.userAnswer.start = val;
-  
-  // 更新刻度高亮樣式
+
+  // 更新刻度高亮
   const tickNodes = DOM.numberLineTicks.querySelectorAll('.tick-node');
   tickNodes.forEach(node => {
-    if (parseInt(node.dataset.val) === val) {
-      node.classList.add('selected-start');
-    } else {
-      node.classList.remove('selected-start');
-    }
+    parseInt(node.dataset.val) === val
+      ? node.classList.add('selected-start')
+      : node.classList.remove('selected-start');
   });
 
-  // 更新步驟一顯示文字與樣式
   DOM.selectedStartVal.innerText = val >= 0 ? `+${val}` : val;
   DOM.selectedStartVal.className = 'chosen';
-  DOM.stepStartCard.classList.add('success');
-  DOM.stepStartStatus.innerHTML = '✅';
-
-  // 開啟步驟二輸入限制
-  DOM.stepMoveCard.classList.remove('disabled');
-  DOM.stepMoveCard.classList.add('active');
-  
-  const dirBtns = DOM.stepMoveCard.querySelectorAll('.dir-btn');
-  dirBtns.forEach(btn => btn.disabled = false);
-  DOM.inputSteps.disabled = false;
-
-  // 移動棋子到點選起點位置
   movePawnToValue(val, false);
 
-  // 清空步驟二的先前狀態，並重置步驟三
-  DOM.stepMoveCard.classList.remove('success', 'error');
-  DOM.stepMoveStatus.innerHTML = '';
-  resetStep3();
+  const q = GAME_STATE.currentQuestion;
+  if (val === q.start) {
+    // ✅ 起點正確
+    DOM.stepStartCard.className = 'step-card success';
+    DOM.stepStartStatus.innerHTML = '✅';
+    DOM.stepStartGuidance.classList.add('hidden');
+    DOM.stepStartGuidance.innerText = '';
+
+    // 解鎖步驟二
+    DOM.stepMoveCard.classList.remove('disabled');
+    DOM.stepMoveCard.classList.add('active');
+    const dirBtns = DOM.stepMoveCard.querySelectorAll('.dir-btn');
+    dirBtns.forEach(btn => btn.disabled = false);
+    DOM.inputSteps.disabled = false;
+    DOM.stepMoveCard.classList.remove('success', 'error');
+    DOM.stepMoveStatus.innerHTML = '';
+    DOM.stepMoveGuidance.classList.add('hidden');
+    resetStep3();
+  } else {
+    // ❌ 起點錢——立即顯示提示並鎖住步驟二
+    DOM.stepStartCard.className = 'step-card error';
+    DOM.stepStartStatus.innerHTML = '❌';
+    DOM.stepStartGuidance.innerText = getGuidance(q.type, 'start', q);
+    DOM.stepStartGuidance.classList.remove('hidden');
+
+    // 重新鎖住步驟二
+    DOM.stepMoveCard.className = 'step-card disabled';
+    const dirBtns = DOM.stepMoveCard.querySelectorAll('.dir-btn');
+    dirBtns.forEach(btn => { btn.disabled = true; btn.classList.remove('active'); });
+    DOM.inputSteps.value = '';
+    DOM.inputSteps.disabled = true;
+    GAME_STATE.userAnswer.dir = null;
+    DOM.stepMoveGuidance.classList.add('hidden');
+    resetStep3();
+  }
 }
 
 // 動態搬移棋子 (棋子定位)
@@ -334,43 +350,69 @@ function setupEventListeners() {
   // 模式切換按鈕
   DOM.btnModePractice.addEventListener('click', () => {
     synth.playClick();
-    DOM.btnModePractice.classList.add('active');
-    DOM.btnModeChallenge.classList.remove('active');
-    GAME_STATE.mode = 'practice';
-  });
-
-  DOM.btnModeChallenge.addEventListener('click', () => {
-    synth.playClick();
-    DOM.btnModeChallenge.classList.add('active');
-    DOM.btnModePractice.classList.remove('active');
-    GAME_STATE.mode = 'challenge';
-  });
-
-  // 啟動遊戲
+    DOM.btnMo  // 啟動遇戲
   DOM.btnStartGame.addEventListener('click', startGame);
 
-  // 步驟二方向按鈕 — 選方向後開啟步驟三
+  // 步驟二方向按鈕 — 選方向後立即實時驗證
   const dirBtns = DOM.stepMoveCard.querySelectorAll('.dir-btn');
   dirBtns.forEach(btn => {
     btn.addEventListener('click', () => {
+      if (GAME_STATE.isProcessingAnswer) return;
       synth.playClick();
       dirBtns.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       GAME_STATE.userAnswer.dir = btn.dataset.dir;
-      unlockStep3();
+      checkStep2Status();
     });
   });
 
-  // 輸入格數後也要確保步驟三開啟
+  // 輸入格數後立即實時驗證
   DOM.inputSteps.addEventListener('input', () => {
-    if (GAME_STATE.userAnswer.dir && DOM.inputSteps.value) {
-      unlockStep3();
+    checkStep2Status();
+  });
+
+  // 最終答案欄位——立即實時驗證並顯示對應提示
+  DOM.inputFinalAnswer.addEventListener('input', () => {
+    const q = GAME_STATE.currentQuestion;
+    if (!q || GAME_STATE.isProcessingAnswer) return;
+    const raw = DOM.inputFinalAnswer.value;
+    const val = parseInt(raw);
+
+    if (raw === '') {
+      DOM.stepAnswerCard.className = 'step-card active';
+      DOM.stepAnswerStatus.innerHTML = '';
+      DOM.stepAnswerGuidance.classList.add('hidden');
+      DOM.btnSubmit.style.display = 'none';
+    } else if (!isNaN(val)) {
+      if (val === q.dest) {
+        DOM.stepAnswerCard.className = 'step-card success';
+        DOM.stepAnswerStatus.innerHTML = '✅';
+        DOM.stepAnswerGuidance.classList.add('hidden');
+        DOM.stepAnswerGuidance.innerText = '';
+        DOM.btnSubmit.style.display = 'block';
+      } else {
+        DOM.stepAnswerCard.className = 'step-card error';
+        DOM.stepAnswerStatus.innerHTML = '❌';
+        DOM.stepAnswerGuidance.innerText = getGuidance(q.type, 'final', q);
+        DOM.stepAnswerGuidance.classList.remove('hidden');
+        DOM.btnSubmit.style.display = 'none';
+      }
     }
   });
 
-  // 最終答案欄位輸入後顯示送出按鈕
-  DOM.inputFinalAnswer.addEventListener('input', () => {
-    if (DOM.inputFinalAnswer.value !== '') {
+  // 送出答案
+  DOM.btnSubmit.addEventListener('click', verifyAnswer);
+
+  // 下一題
+  DOM.btnNext.addEventListener('click', nextQuestion);
+
+  // 結算畫面按鈕
+  DOM.btnRematch.addEventListener('click', startGame);
+  DOM.btnHome.addEventListener('click', () => {
+    synth.playClick();
+    showScreen(DOM.startScreen);
+  });
+}FinalAnswer.value !== '') {
       DOM.btnSubmit.style.display = 'block';
     } else {
       DOM.btnSubmit.style.display = 'none';
@@ -403,6 +445,45 @@ function resetStep3() {
   GAME_STATE.userAnswer.finalAnswer = null;
 }
 
+// 步驟二實時驗證：方向與格數
+function checkStep2Status() {
+  const q = GAME_STATE.currentQuestion;
+  if (!q || GAME_STATE.isProcessingAnswer) return;
+
+  const stepsVal  = parseInt(DOM.inputSteps.value);
+  const hasDir    = !!GAME_STATE.userAnswer.dir;
+  const hasSteps  = !isNaN(stepsVal) && stepsVal > 0;
+  const isDirCorrect   = hasDir   && (GAME_STATE.userAnswer.dir === q.dir);
+  const isStepsCorrect = hasSteps && (stepsVal === q.steps);
+
+  // 方向錯誤優先顯示；方向對再檢查格數
+  if (hasDir && !isDirCorrect) {
+    DOM.stepMoveGuidance.innerText = getGuidance(q.type, 'dir', q);
+    DOM.stepMoveGuidance.classList.remove('hidden');
+  } else if (hasSteps && !isStepsCorrect) {
+    DOM.stepMoveGuidance.innerText = getGuidance(q.type, 'steps', q);
+    DOM.stepMoveGuidance.classList.remove('hidden');
+  } else {
+    DOM.stepMoveGuidance.classList.add('hidden');
+    DOM.stepMoveGuidance.innerText = '';
+  }
+
+  // 更新步驟二卡片狀態
+  if (isDirCorrect && isStepsCorrect) {
+    DOM.stepMoveCard.className = 'step-card success';
+    DOM.stepMoveStatus.innerHTML = '✅';
+    unlockStep3();
+  } else if ((hasDir && !isDirCorrect) || (hasSteps && !isStepsCorrect)) {
+    DOM.stepMoveCard.className = 'step-card error';
+    DOM.stepMoveStatus.innerHTML = '❌';
+    // 方向或格數錯就鎖住步驟三
+    resetStep3();
+  } else {
+    DOM.stepMoveCard.className = 'step-card active';
+    DOM.stepMoveStatus.innerHTML = '';
+  }
+}
+
 // 解鎖步驟三
 function unlockStep3() {
   const q = GAME_STATE.currentQuestion;
@@ -411,7 +492,6 @@ function unlockStep3() {
   DOM.stepAnswerCard.classList.remove('success', 'error');
   DOM.stepAnswerStatus.innerHTML = '';
   DOM.inputFinalAnswer.disabled = false;
-  // 顯示公式提示
   if (q) DOM.finalAnswerFormulaHint.innerText = q.formula;
 }
 
