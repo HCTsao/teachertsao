@@ -611,69 +611,51 @@ function generateQuestion() {
 }
 
 // ==========================================================================
-// 每驟這个错誤的引導語 (21 組)
+// 每步驟答錯的引導語
+// 步驟一 / 步驟三：依加減號統一引導
+// 步驟二（方向/格數）：依題型給予專屬引導
 // ==========================================================================
 function getGuidance(type, errorType, q) {
-  const { a, b, start, steps, formula } = q;
-  const aAbs = Math.abs(a);
-  const bAbs = Math.abs(b);
+  const { start, dir, dest, formula } = q;
+  const bAbs = Math.abs(q.b);
+  const dirStr = dir === 'left' ? '左' : '右';
 
-  // errorType: 'start' | 'dir' | 'steps' | 'final'
-  const guides = {
-    // 題型 1：a + (-b)
-    1: {
-      start:  `起點看加號「前面」的數字。「${formula}」的起點是 ${aAbs}，請指向正數軸上的「${aAbs}」！`,
-      dir:    `「+(-${bAbs})」是「加負數」——加負數就是往左走！`,
-      steps:  `移動格數看括號裡的數字：「(-${bAbs})」忽略負號就是 ${bAbs} 格！`,
-      final:  `算式結果 = 起點 ${start} 向左走 ${bAbs} 格 = ${q.dest}。`
-    },
-    // 題型 2：(-a) + b
-    2: {
-      start:  `起點看第一個括號裡的數字加上負號。「${formula}」的起點是 -${aAbs}，請找負數軸上的「-${aAbs}」！`,
-      dir:    `「+${bAbs}」是「加正數」——加正數就是往右走！`,
-      steps:  `移動格數看加號後面的數字：「+${bAbs}」就是 ${bAbs} 格！`,
-      final:  `算式結果 = 起點 ${start} 向右走 ${bAbs} 格 = ${q.dest}。`
-    },
-    // 題型 3：(-a) + (-b)
-    3: {
-      start:  `起點看第一個括號裡的數字。「${formula}」的起點是 -${aAbs}，請找負數軸上的「-${aAbs}」！`,
-      dir:    `「+(-${bAbs})」是「加負數」——加負數就是往左走！`,
-      steps:  `移動格數看第二個括號裡的數字：「(-${bAbs})」忽略負號就是 ${bAbs} 格！`,
-      final:  `算式結果 = 起點 ${start} 向左走 ${bAbs} 格 = ${q.dest}。`
-    },
-    // 題型 4：a - b
-    4: {
-      start:  `起點看減號「前面」的數字。「${formula}」的起點是 ${aAbs}，請點正數軸上的「${aAbs}」！`,
-      dir:    `「-${bAbs}」是「減正數」——減正數就是往左走！`,
-      steps:  `移動格數看減號後面的數字：「-${bAbs}」就是 ${bAbs} 格！`,
-      final:  `算式結果 = 起點 ${start} 向左走 ${bAbs} 格 = ${q.dest}。`
-    },
-    // 題型 5：a - (-b)
-    5: {
-      start:  `起點看最前面的數字。「${formula}」的起點是 ${aAbs}，請點正數軸上的「${aAbs}」！`,
-      dir:    `「-(-${bAbs})」是「減負數」，負負得正，方向要反過來——往右走！`,
-      steps:  `移動格數看括號裡的數字：「-(-${bAbs})」忽略所有符號就是 ${bAbs} 格！`,
-      final:  `算式結果 = 起點 ${start} 向右走 ${bAbs} 格 = ${q.dest}。`
-    },
-    // 題型 6：(-a) - b
-    6: {
-      start:  `起點看第一個括號裡的數字。「${formula}」的起點是 -${aAbs}，請找負數軸上的「-${aAbs}」！`,
-      dir:    `「-${bAbs}」是「減正數」——減正數就是往左走！`,
-      steps:  `移動格數看減號後面的數字：「-${bAbs}」就是 ${bAbs} 格！`,
-      final:  `算式結果 = 起點 ${start} 向左走 ${bAbs} 格 = ${q.dest}。`
-    },
-    // 題型 7：(-a) - (-b)
-    7: {
-      start:  `起點看第一個括號裡的數字。「${formula}」的起點是 -${aAbs}，請找負數軸上的「-${aAbs}」！`,
-      dir:    `「-(-${bAbs})」是「減負數」，負負得正，方向要反過來——往右走！`,
-      steps:  `移動格數看第二個括號裡的數字：「-(-${bAbs})」忽略所有符號就是 ${bAbs} 格！`,
-      final:  `算式結果 = 起點 ${start} 向右走 ${bAbs} 格 = ${q.dest}。`
-    }
+  // 題型 1~3 為加法（加號），4~7 為減法（減號）
+  const opChar = (type <= 3) ? '加' : '減';
+
+  // ── 步驟一：起點在加/減號前面 ──
+  if (errorType === 'start') {
+    return `💡 起點就是「${opChar}號前面」的數字。\n「${formula}」中，${opChar}號前面是 ${start}，請點選 ${start} 這個刻度出發！`;
+  }
+
+  // ── 步驟三：最終答案，看加/減號後面的數字 ──
+  if (errorType === 'final') {
+    return `💡 看「${opChar}號後面」的數字（忽略括號和正負號），就是要走的格數。\n「${formula}」後面的數是 ${bAbs}，從 ${start} 往${dirStr}走 ${bAbs} 格，答案是 ${dest}！`;
+  }
+
+  // ── 步驟二：方向與格數（依題型） ──
+  const dirGuides = {
+    1: `「+(-${bAbs})」是「加負數」——加負數就是往左走！`,
+    2: `「+${bAbs}」是「加正數」——加正數就是往右走！`,
+    3: `「+(-${bAbs})」是「加負數」——加負數就是往左走！`,
+    4: `「-${bAbs}」是「減正數」——減正數就是往左走！`,
+    5: `「-(-${bAbs})」是「減負數」，負負得正，方向要反過來——往右走！`,
+    6: `「-${bAbs}」是「減正數」——減正數就是往左走！`,
+    7: `「-(-${bAbs})」是「減負數」，負負得正，方向要反過來——往右走！`
+  };
+  const stepsGuides = {
+    1: `移動格數看括號裡的數字：「(-${bAbs})」忽略負號就是 ${bAbs} 格！`,
+    2: `移動格數看加號後面的數字：「+${bAbs}」就是 ${bAbs} 格！`,
+    3: `移動格數看第二個括號裡的數字：「(-${bAbs})」忽略負號就是 ${bAbs} 格！`,
+    4: `移動格數看減號後面的數字：「-${bAbs}」就是 ${bAbs} 格！`,
+    5: `移動格數看括號裡的數字：「-(-${bAbs})」忽略所有符號就是 ${bAbs} 格！`,
+    6: `移動格數看減號後面的數字：「-${bAbs}」就是 ${bAbs} 格！`,
+    7: `移動格數看第二個括號裡的數字：「-(-${bAbs})」忽略所有符號就是 ${bAbs} 格！`
   };
 
-  const typeGuides = guides[type];
-  if (!typeGuides) return '';
-  return '💡 ' + (typeGuides[errorType] || '');
+  if (errorType === 'dir')   return '💡 ' + (dirGuides[type]   || '');
+  if (errorType === 'steps') return '💡 ' + (stepsGuides[type] || '');
+  return '';
 }
 
 // 驗證答案
