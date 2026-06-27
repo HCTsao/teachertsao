@@ -143,6 +143,10 @@ const DOM = {
   inputFinalAnswer: document.getElementById('input-final-answer'),
   finalAnswerFormulaHint: document.getElementById('final-answer-formula-hint'),
   stepAnswerStatus: document.getElementById('step-answer-status'),
+  stepAnswerGuidance: document.getElementById('step-answer-guidance'),
+
+  stepStartGuidance: document.getElementById('step-start-guidance'),
+  stepMoveGuidance: document.getElementById('step-move-guidance'),
 
   btnSubmit: document.getElementById('btn-submit'),
   btnNext: document.getElementById('btn-next'),
@@ -391,6 +395,8 @@ function setupEventListeners() {
 function resetStep3() {
   DOM.stepAnswerCard.className = 'step-card disabled';
   DOM.stepAnswerStatus.innerHTML = '';
+  DOM.stepAnswerGuidance.classList.add('hidden');
+  DOM.stepAnswerGuidance.innerText = '';
   DOM.inputFinalAnswer.value = '';
   DOM.inputFinalAnswer.disabled = true;
   DOM.btnSubmit.style.display = 'none';
@@ -494,6 +500,8 @@ function loadQuestion() {
   DOM.selectedStartVal.className = 'placeholder-val';
   DOM.stepStartCard.className = 'step-card active';
   DOM.stepStartStatus.innerHTML = '';
+  DOM.stepStartGuidance.classList.add('hidden');
+  DOM.stepStartGuidance.innerText = '';
 
   DOM.stepMoveCard.className = 'step-card disabled';
   const dirBtns = DOM.stepMoveCard.querySelectorAll('.dir-btn');
@@ -504,6 +512,8 @@ function loadQuestion() {
   DOM.inputSteps.value = '';
   DOM.inputSteps.disabled = true;
   DOM.stepMoveStatus.innerHTML = '';
+  DOM.stepMoveGuidance.classList.add('hidden');
+  DOM.stepMoveGuidance.innerText = '';
 
   resetStep3();
   DOM.btnNext.style.display = 'none';
@@ -600,6 +610,72 @@ function generateQuestion() {
   };
 }
 
+// ==========================================================================
+// 每驟這个错誤的引導語 (21 組)
+// ==========================================================================
+function getGuidance(type, errorType, q) {
+  const { a, b, start, steps, formula } = q;
+  const aAbs = Math.abs(a);
+  const bAbs = Math.abs(b);
+
+  // errorType: 'start' | 'dir' | 'steps' | 'final'
+  const guides = {
+    // 題型 1：a + (-b)
+    1: {
+      start:  `起點看加號「前面」的數字。「${formula}」的起點是 ${aAbs}，請指向正數軸上的「${aAbs}」！`,
+      dir:    `「+(-${bAbs})」是「加負數」——加負數就是往左走！`,
+      steps:  `移動格數看括號裡的數字：「(-${bAbs})」忽略負號就是 ${bAbs} 格！`,
+      final:  `算式結果 = 起點 ${start} 向左走 ${bAbs} 格 = ${q.dest}。`
+    },
+    // 題型 2：(-a) + b
+    2: {
+      start:  `起點看第一個括號裡的數字加上負號。「${formula}」的起點是 -${aAbs}，請找負數軸上的「-${aAbs}」！`,
+      dir:    `「+${bAbs}」是「加正數」——加正數就是往右走！`,
+      steps:  `移動格數看加號後面的數字：「+${bAbs}」就是 ${bAbs} 格！`,
+      final:  `算式結果 = 起點 ${start} 向右走 ${bAbs} 格 = ${q.dest}。`
+    },
+    // 題型 3：(-a) + (-b)
+    3: {
+      start:  `起點看第一個括號裡的數字。「${formula}」的起點是 -${aAbs}，請找負數軸上的「-${aAbs}」！`,
+      dir:    `「+(-${bAbs})」是「加負數」——加負數就是往左走！`,
+      steps:  `移動格數看第二個括號裡的數字：「(-${bAbs})」忽略負號就是 ${bAbs} 格！`,
+      final:  `算式結果 = 起點 ${start} 向左走 ${bAbs} 格 = ${q.dest}。`
+    },
+    // 題型 4：a - b
+    4: {
+      start:  `起點看減號「前面」的數字。「${formula}」的起點是 ${aAbs}，請點正數軸上的「${aAbs}」！`,
+      dir:    `「-${bAbs}」是「減正數」——減正數就是往左走！`,
+      steps:  `移動格數看減號後面的數字：「-${bAbs}」就是 ${bAbs} 格！`,
+      final:  `算式結果 = 起點 ${start} 向左走 ${bAbs} 格 = ${q.dest}。`
+    },
+    // 題型 5：a - (-b)
+    5: {
+      start:  `起點看最前面的數字。「${formula}」的起點是 ${aAbs}，請點正數軸上的「${aAbs}」！`,
+      dir:    `「-(-${bAbs})」是「減負數」，負負得正，方向要反過來——往右走！`,
+      steps:  `移動格數看括號裡的數字：「-(-${bAbs})」忽略所有符號就是 ${bAbs} 格！`,
+      final:  `算式結果 = 起點 ${start} 向右走 ${bAbs} 格 = ${q.dest}。`
+    },
+    // 題型 6：(-a) - b
+    6: {
+      start:  `起點看第一個括號裡的數字。「${formula}」的起點是 -${aAbs}，請找負數軸上的「-${aAbs}」！`,
+      dir:    `「-${bAbs}」是「減正數」——減正數就是往左走！`,
+      steps:  `移動格數看減號後面的數字：「-${bAbs}」就是 ${bAbs} 格！`,
+      final:  `算式結果 = 起點 ${start} 向左走 ${bAbs} 格 = ${q.dest}。`
+    },
+    // 題型 7：(-a) - (-b)
+    7: {
+      start:  `起點看第一個括號裡的數字。「${formula}」的起點是 -${aAbs}，請找負數軸上的「-${aAbs}」！`,
+      dir:    `「-(-${bAbs})」是「減負數」，負負得正，方向要反過來——往右走！`,
+      steps:  `移動格數看第二個括號裡的數字：「-(-${bAbs})」忽略所有符號就是 ${bAbs} 格！`,
+      final:  `算式結果 = 起點 ${start} 向右走 ${bAbs} 格 = ${q.dest}。`
+    }
+  };
+
+  const typeGuides = guides[type];
+  if (!typeGuides) return '';
+  return '💡 ' + (typeGuides[errorType] || '');
+}
+
 // 驗證答案
 function verifyAnswer() {
   if (GAME_STATE.isProcessingAnswer) return;
@@ -643,31 +719,48 @@ function verifyAnswer() {
 
   const isAllCorrect = isStartCorrect && isDirCorrect && isStepsCorrect && isFinalCorrect;
 
-  // ── 步驟一 回饋 ──
+  // ── 步驟一 回饋 + 引導 ──
   if (isStartCorrect) {
     DOM.stepStartCard.className = 'step-card success';
     DOM.stepStartStatus.innerHTML = '✅';
+    DOM.stepStartGuidance.classList.add('hidden');
   } else {
     DOM.stepStartCard.className = 'step-card error';
     DOM.stepStartStatus.innerHTML = '❌';
+    DOM.stepStartGuidance.innerText = getGuidance(q.type, 'start', q);
+    DOM.stepStartGuidance.classList.remove('hidden');
   }
 
-  // ── 步驟二 回饋 ──
+  // ── 步驟二 回饋 + 引導（方向和格數分開判斷） ──
   if (isDirCorrect && isStepsCorrect) {
     DOM.stepMoveCard.className = 'step-card success';
     DOM.stepMoveStatus.innerHTML = '✅';
+    DOM.stepMoveGuidance.classList.add('hidden');
   } else {
     DOM.stepMoveCard.className = 'step-card error';
     DOM.stepMoveStatus.innerHTML = '❌';
+    // 優先顯示方向錯誤的引導，若方向對但格數錯則顯示格數引導
+    const moveHint = !isDirCorrect
+      ? getGuidance(q.type, 'dir', q)
+      : getGuidance(q.type, 'steps', q);
+    // 若兩者都錯，合併顯示
+    const moveHintFull = (!isDirCorrect && !isStepsCorrect)
+      ? getGuidance(q.type, 'dir', q) + '\n' + getGuidance(q.type, 'steps', q)
+      : moveHint;
+    DOM.stepMoveGuidance.innerText = moveHintFull;
+    DOM.stepMoveGuidance.classList.remove('hidden');
   }
 
-  // ── 步驟三 回饋 ──
+  // ── 步驟三 回饋 + 引導 ──
   if (isFinalCorrect) {
     DOM.stepAnswerCard.className = 'step-card success';
     DOM.stepAnswerStatus.innerHTML = '✅';
+    DOM.stepAnswerGuidance.classList.add('hidden');
   } else {
     DOM.stepAnswerCard.className = 'step-card error';
     DOM.stepAnswerStatus.innerHTML = '❌';
+    DOM.stepAnswerGuidance.innerText = getGuidance(q.type, 'final', q);
+    DOM.stepAnswerGuidance.classList.remove('hidden');
   }
 
   // ── 執行動畫與整體回饋 ──
@@ -688,14 +781,9 @@ function verifyAnswer() {
   } else {
     synth.playError();
     DOM.feedbackPanel.className = 'feedback-panel wrong';
-    DOM.feedbackIcon.innerText = '💡';
-    DOM.feedbackTitle.innerText = '有答錯的地方，正確解答如下：';
-
-    let errorMsg = '';
-    if (!isStartCorrect) errorMsg += `起點應為 ${q.start}；`;
-    if (!isDirCorrect || !isStepsCorrect) errorMsg += `移動應為「往${q.dir === 'left' ? '左' : '右'}移動 ${q.steps} 格」；`;
-    if (!isFinalCorrect) errorMsg += `算式結果應為 ${q.dest}。`;
-    DOM.feedbackText.innerText = errorMsg;
+    DOM.feedbackIcon.innerText = '📖';
+    DOM.feedbackTitle.innerText = '有步驟答錯了！請看各步驟的提示：';
+    DOM.feedbackText.innerText = '棋子即將演示正確路徑，請仔細觀察…';
 
     // 清理刻度高亮，顯示正確起點
     const tickNodes = DOM.numberLineTicks.querySelectorAll('.tick-node');
