@@ -350,7 +350,19 @@ function setupEventListeners() {
   // 模式切換按鈕
   DOM.btnModePractice.addEventListener('click', () => {
     synth.playClick();
-    DOM.btnMo  // 啟動遇戲
+    DOM.btnModePractice.classList.add('active');
+    DOM.btnModeChallenge.classList.remove('active');
+    GAME_STATE.mode = 'practice';
+  });
+
+  DOM.btnModeChallenge.addEventListener('click', () => {
+    synth.playClick();
+    DOM.btnModeChallenge.classList.add('active');
+    DOM.btnModePractice.classList.remove('active');
+    GAME_STATE.mode = 'challenge';
+  });
+
+  // 啟動遊戲
   DOM.btnStartGame.addEventListener('click', startGame);
 
   // 步驟二方向按鈕 — 選方向後立即實時驗證
@@ -397,25 +409,6 @@ function setupEventListeners() {
         DOM.stepAnswerGuidance.classList.remove('hidden');
         DOM.btnSubmit.style.display = 'none';
       }
-    }
-  });
-
-  // 送出答案
-  DOM.btnSubmit.addEventListener('click', verifyAnswer);
-
-  // 下一題
-  DOM.btnNext.addEventListener('click', nextQuestion);
-
-  // 結算畫面按鈕
-  DOM.btnRematch.addEventListener('click', startGame);
-  DOM.btnHome.addEventListener('click', () => {
-    synth.playClick();
-    showScreen(DOM.startScreen);
-  });
-}FinalAnswer.value !== '') {
-      DOM.btnSubmit.style.display = 'block';
-    } else {
-      DOM.btnSubmit.style.display = 'none';
     }
   });
 
