@@ -441,6 +441,11 @@ function setupEventListeners() {
   });
 
   DOM.btnStartGame.addEventListener('click', () => {
+    // 線上模式禁止用此按鈕啟動，必須透過 PeerJS 連線後自動啟動
+    if (GAME_STATE.mode === 'online') {
+      updateOnlineStatus('請先完成連線：創建房間或輸入房號加入！', 'error');
+      return;
+    }
     GAME_STATE.stage = 1;
     startBattle();
   });
@@ -2203,12 +2208,19 @@ function initOnlineSetupUI() {
   // 加入房間按鈕
   document.getElementById('btn-join-room').addEventListener('click', () => {
     synth.playClick();
-    const roomId = document.getElementById('input-room-id').value.trim();
-    if (!roomId || roomId.length !== 4 || isNaN(roomId)) {
-      updateOnlineStatus('請輸入正確的 4 位數房號！', 'error');
+    const roomId = document.getElementById('input-room-id').value.trim().toUpperCase();
+    if (!roomId || roomId.length < 1 || roomId.length > 6) {
+      updateOnlineStatus('請輸入房號（1~6 位英數字）！', 'error');
       return;
     }
     setupPeerAsGuest(roomId);
+  });
+
+  // Enter 鍵直接加入
+  document.getElementById('input-room-id').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      document.getElementById('btn-join-room').click();
+    }
   });
 }
 
