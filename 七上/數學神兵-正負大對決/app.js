@@ -283,7 +283,8 @@ const GAME_STATE = {
     isHost: false,
     role: '',       // 'p1' (Host/Left) or 'p2' (Guest/Right)
     roomId: '',
-    connected: false
+    connected: false,
+    opponentName: ''
   }
 };
 
@@ -555,8 +556,8 @@ function startBattle() {
       GAME_STATE.pvp.p2TimeLimit = 35;
     }
 
-    GAME_STATE.playerHp = 200;
-    GAME_STATE.bossHp = 200; // PvP 中 bossHp 作為 Player 2 的 HP
+    GAME_STATE.playerHp = 100;
+    GAME_STATE.bossHp = 100; // PvP 中 bossHp 作為 Player 2 的 HP
     GAME_STATE.stats.correct = 0;
     GAME_STATE.stats.total = 0;
 
@@ -659,14 +660,16 @@ function updatePvpRoleLabels() {
   const studentInfoInput = document.getElementById('input-student-info');
   const studentInfo = studentInfoInput ? studentInfoInput.value.trim() : '你';
 
+  const opName = GAME_STATE.online.opponentName || '對手';
+
   if (GAME_STATE.mode === 'online') {
     if (GAME_STATE.online.role === 'p1') {
       p1NameEl.innerText = studentInfo;
-      if (p1OpNameEl) p1OpNameEl.innerText = '對手';
+      if (p1OpNameEl) p1OpNameEl.innerText = opName;
       DOM.pvpLayout.classList.add('pvp-role-p1');
     } else {
       p2NameEl.innerText = studentInfo;
-      if (p2OpNameEl) p2OpNameEl.innerText = '對手';
+      if (p2OpNameEl) p2OpNameEl.innerText = opName;
       DOM.pvpLayout.classList.add('pvp-role-p2');
     }
   } else {
@@ -723,6 +726,14 @@ function recordStudentAnswer(questionText, selectedOption, isCorrect, customStud
     const records = JSON.parse(localStorage.getItem('math_hero_records') || '[]');
     records.unshift(newRecord); // 最新在最前
     localStorage.setItem('math_hero_records', JSON.stringify(records));
+
+    // 如果是線上對決，將作答數據即時同步給對方，使雙方後台都能收集到所有數據
+    if (GAME_STATE.mode === 'online' && GAME_STATE.online.connected) {
+      sendOnlineMessage({
+        type: 'sync_record',
+        record: newRecord
+      });
+    }
   } catch (e) {
     console.error("寫入學生數據發生異常：", e);
   }
@@ -1847,49 +1858,20 @@ function updatePvpHPUI() {
   
   // P1 視角面板 (我方 P1, 對手 P2)
   if (DOM.pvpP1MyHp) DOM.pvpP1MyHp.innerText = p1Hp;
-  if (DOM.pvpP1MyHpFill) DOM.pvpP1MyHpFill.style.width = `${(p1Hp / 200) * 100}%`;
+  if (DOM.pvpP1MyHpFill) DOM.pvpP1MyHpFill.style.width = `${(p1Hp / 100) * 100}%`;
   if (DOM.pvpP1OpHp) DOM.pvpP1OpHp.innerText = p2Hp;
-  if (DOM.pvpP1OpHpFill) DOM.pvpP1OpHpFill.style.width = `${(p2Hp / 200) * 100}%`;
+  if (DOM.pvpP1OpHpFill) DOM.pvpP1OpHpFill.style.width = `${(p2Hp / 100) * 100}%`;
   
   // P2 視角面板 (我方 P2, 對手 P1)
   if (DOM.pvpP2MyHp) DOM.pvpP2MyHp.innerText = p2Hp;
-  if (DOM.pvpP2MyHpFill) DOM.pvpP2MyHpFill.style.width = `${(p2Hp / 200) * 100}%`;
+  if (DOM.pvpP2MyHpFill) DOM.pvpP2MyHpFill.style.width = `${(p2Hp / 100) * 100}%`;
   if (DOM.pvpP2OpHp) DOM.pvpP2OpHp.innerText = p1Hp;
-  if (DOM.pvpP2OpHpFill) DOM.pvpP2OpHpFill.style.width = `${(p1Hp / 200) * 100}%`;
+  if (DOM.pvpP2OpHpFill) DOM.pvpP2OpHpFill.style.width = `${(p1Hp / 100) * 100}%`;
 }
 
 function startPvpMatchTimer() {
-  clearInterval(GAME_STATE.pvp.matchTimer);
-  GAME_STATE.pvp.matchTimeLeft = 90;
-  if (DOM.pvpMatchTimeText) DOM.pvpMatchTimeText.innerText = GAME_STATE.pvp.matchTimeLeft;
-  
-  // 線上模式：訪客端由房主同步時間，不在此處計時
-  if (GAME_STATE.mode === 'online' && !GAME_STATE.online.isHost) {
-    return;
-  }
-  
-  GAME_STATE.pvp.matchTimer = setInterval(() => {
-    GAME_STATE.pvp.matchTimeLeft--;
-    if (DOM.pvpMatchTimeText) DOM.pvpMatchTimeText.innerText = GAME_STATE.pvp.matchTimeLeft;
-    
-    if (GAME_STATE.mode === 'online') {
-      sendOnlineMessage({
-        type: 'match_time',
-        time: GAME_STATE.pvp.matchTimeLeft
-      });
-    }
-    
-    if (GAME_STATE.pvp.matchTimeLeft <= 0) {
-      clearInterval(GAME_STATE.pvp.matchTimer);
-      clearInterval(GAME_STATE.pvp.p1Timer);
-      clearInterval(GAME_STATE.pvp.p2Timer);
-      endPvpGame('timeUp');
-    }
-    
-    if (checkPvpGameOver()) {
-      clearInterval(GAME_STATE.pvp.matchTimer);
-    }
-  }, 1000);
+  // 依據需求，已取消對戰總時間限制，打到對方血量歸零為止
+  return;
 }
 
 function checkPvpGameOver() {
@@ -2606,10 +2588,19 @@ function startOnlineBattle() {
   DOM.pvpLayout.classList.remove('hidden');
   DOM.pvpLayout.classList.add('online-pvp-mode');
 
-  GAME_STATE.playerHp = 200;
-  GAME_STATE.bossHp = 200;
+  GAME_STATE.playerHp = 100;
+  GAME_STATE.bossHp = 100;
   GAME_STATE.stats.correct = 0;
   GAME_STATE.stats.total = 0;
+  GAME_STATE.online.opponentName = '';
+
+  // 同步交換名字
+  const studentInfoInput = document.getElementById('input-student-info');
+  const studentInfo = studentInfoInput ? studentInfoInput.value.trim() : '對手';
+  sendOnlineMessage({
+    type: 'sync_name',
+    name: studentInfo
+  });
 
   if (GAME_STATE.level === 1 || GAME_STATE.level === 2) {
     GAME_STATE.pvp.p1TimeLimit = 25;
@@ -2712,6 +2703,21 @@ function handleOnlineMessage(data) {
       if (DOM.pvpMatchTimeText) DOM.pvpMatchTimeText.innerText = data.time;
       if (data.time <= 0) {
         endPvpGame('timeUp');
+      }
+      break;
+
+    case 'sync_name':
+      GAME_STATE.online.opponentName = data.name;
+      updatePvpRoleLabels();
+      break;
+
+    case 'sync_record':
+      try {
+        const records = JSON.parse(localStorage.getItem('math_hero_records') || '[]');
+        records.unshift(data.record);
+        localStorage.setItem('math_hero_records', JSON.stringify(records));
+      } catch (e) {
+        console.error("同步收到的學生資料失敗：", e);
       }
       break;
   }
