@@ -231,14 +231,14 @@ const GAME_STATE = {
   maxRounds: 12,
   
   // 玩家 1 屬性 (勇者)
-  playerHp: 30,
-  playerMaxHp: 30,
+  playerHp: 200,
+  playerMaxHp: 200,
   playerShield: 0,
   playerDmgDealt: 0, // 單場總傷害
   
   // 玩家 2 / Boss 屬性
-  bossHp: 30,
-  bossMaxHp: 30,
+  bossHp: 200,
+  bossMaxHp: 200,
   bossShield: 0,
   bossDmgDealt: 0,
   
@@ -487,6 +487,9 @@ function setupEventListeners() {
   
   DOM.btnResultHome.addEventListener('click', () => {
     synth.playClick();
+    if (GAME_STATE.mode === 'online') {
+      closeOnlineConnection();
+    }
     showScreen(DOM.startScreen);
   });
 
@@ -497,6 +500,9 @@ function setupEventListeners() {
     clearInterval(GAME_STATE.pvp.p2Timer);
     clearInterval(GAME_STATE.pvp.matchTimer);
     window.removeEventListener('resize', resizePvPLayout);
+    if (GAME_STATE.mode === 'online') {
+      closeOnlineConnection();
+    }
     showScreen(DOM.startScreen);
   });
 
@@ -540,12 +546,13 @@ function startBattle() {
       GAME_STATE.pvp.p2TimeLimit = 35;
     }
 
-    GAME_STATE.playerHp = 30;
-    GAME_STATE.bossHp = 30; // PvP 中 bossHp 作為 Player 2 的 HP
+    GAME_STATE.playerHp = 200;
+    GAME_STATE.bossHp = 200; // PvP 中 bossHp 作為 Player 2 的 HP
     GAME_STATE.stats.correct = 0;
     GAME_STATE.stats.total = 0;
 
     updatePvpHPUI();
+    updatePvpRoleLabels();
     showScreen(DOM.gameScreen);
     
     // 綁定 resize 監聽並延遲初始化以取得正確的 clientWidth
@@ -563,8 +570,8 @@ function startBattle() {
     DOM.pvpLayout.classList.add('hidden');
     
     // 重設血量
-    GAME_STATE.playerHp = 30;
-    GAME_STATE.playerMaxHp = 30;
+    GAME_STATE.playerHp = 200;
+    GAME_STATE.playerMaxHp = 200;
     GAME_STATE.playerShield = 0;
     GAME_STATE.playerDmgDealt = 0;
     
@@ -626,6 +633,43 @@ function setupRoleLabels() {
     };
     DOM.bossNameLabel.innerText = stageNames[GAME_STATE.stage] || '負極機械獸';
     DOM.bossAvatarEmoji.innerText = GAME_STATE.stage === 3 ? '🐉' : (GAME_STATE.stage === 2 ? '🤖' : '👾');
+  }
+}
+
+// 實時線上對決：動態更新「你」與「對手」標籤，套用紅框與左右視角對調
+function updatePvpRoleLabels() {
+  const p1NameEl = document.getElementById('pvp-p1-name');
+  const p2NameEl = document.getElementById('pvp-p2-name');
+  if (!p1NameEl || !p2NameEl) return;
+
+  if (GAME_STATE.mode === 'online') {
+    if (GAME_STATE.online.role === 'p1') {
+      p1NameEl.innerText = '你';
+      p2NameEl.innerText = '對手';
+    } else {
+      p2NameEl.innerText = '你';
+      p1NameEl.innerText = '對手';
+    }
+  } else {
+    p1NameEl.innerText = '玩家 1';
+    p2NameEl.innerText = '玩家 2';
+  }
+  
+  // 清除本地高亮與對調
+  DOM.pvpLayout.classList.remove('pvp-swapped');
+  const leftContainer = DOM.pvpLayout.querySelector('.pvp-left .pvp-rotated-container');
+  const rightContainer = DOM.pvpLayout.querySelector('.pvp-right .pvp-rotated-container');
+  if (leftContainer) leftContainer.classList.remove('pvp-local-highlight');
+  if (rightContainer) rightContainer.classList.remove('pvp-local-highlight');
+
+  // 如果是線上對決，套用外框與位置對調
+  if (GAME_STATE.mode === 'online') {
+    if (GAME_STATE.online.role === 'p1') {
+      if (leftContainer) leftContainer.classList.add('pvp-local-highlight');
+    } else {
+      DOM.pvpLayout.classList.add('pvp-swapped');
+      if (rightContainer) rightContainer.classList.add('pvp-local-highlight');
+    }
   }
 }
 
@@ -971,19 +1015,36 @@ function checkBattleOver() {
 function showBattleResult(winner, reason) {
   synth.playWin();
 
-  if (winner === 1) {
-    DOM.winnerTitle.innerText = GAME_STATE.mode === 'pvp' ? '玩家 1 獲得勝利！' : '戰役突破成功！';
-    DOM.winnerTitle.className = 'winner-title text-blue';
-    DOM.resultIcon.innerText = '🏆';
-  } else if (winner === 2) {
-    const name = GAME_STATE.mode === 'pvp' ? '玩家 2' : '機械獸';
-    DOM.winnerTitle.innerText = `${name} 獲得勝利！`;
-    DOM.winnerTitle.className = 'winner-title text-pink';
-    DOM.resultIcon.innerText = GAME_STATE.mode === 'pvp' ? '🏆' : '💥';
+  if (GAME_STATE.mode === 'online') {
+    const isMyWin = (winner === 1 && GAME_STATE.online.role === 'p1') || (winner === 2 && GAME_STATE.online.role === 'p2');
+    if (winner === 0) {
+      DOM.winnerTitle.innerText = '勢均力敵，平局！';
+      DOM.winnerTitle.className = 'winner-title';
+      DOM.resultIcon.innerText = '🤝';
+    } else if (isMyWin) {
+      DOM.winnerTitle.innerText = '你 獲得勝利！';
+      DOM.winnerTitle.className = 'winner-title text-blue';
+      DOM.resultIcon.innerText = '🏆';
+    } else {
+      DOM.winnerTitle.innerText = '對手 獲得勝利！';
+      DOM.winnerTitle.className = 'winner-title text-pink';
+      DOM.resultIcon.innerText = '💥';
+    }
   } else {
-    DOM.winnerTitle.innerText = '勢均力敵，平局！';
-    DOM.winnerTitle.className = 'winner-title';
-    DOM.resultIcon.innerText = '🤝';
+    if (winner === 1) {
+      DOM.winnerTitle.innerText = GAME_STATE.mode === 'pvp' ? '玩家 1 獲得勝利！' : '戰役突破成功！';
+      DOM.winnerTitle.className = 'winner-title text-blue';
+      DOM.resultIcon.innerText = '🏆';
+    } else if (winner === 2) {
+      const name = GAME_STATE.mode === 'pvp' ? '玩家 2' : '機械獸';
+      DOM.winnerTitle.innerText = `${name} 獲得勝利！`;
+      DOM.winnerTitle.className = 'winner-title text-pink';
+      DOM.resultIcon.innerText = GAME_STATE.mode === 'pvp' ? '🏆' : '💥';
+    } else {
+      DOM.winnerTitle.innerText = '勢均力敵，平局！';
+      DOM.winnerTitle.className = 'winner-title';
+      DOM.resultIcon.innerText = '🤝';
+    }
   }
 
   DOM.winnerReason.innerText = reason;
@@ -1701,15 +1762,15 @@ function updatePvpHPUI() {
   
   // P1 視角面板 (我方 P1, 對手 P2)
   if (DOM.pvpP1MyHp) DOM.pvpP1MyHp.innerText = p1Hp;
-  if (DOM.pvpP1MyHpFill) DOM.pvpP1MyHpFill.style.width = `${(p1Hp / 30) * 100}%`;
+  if (DOM.pvpP1MyHpFill) DOM.pvpP1MyHpFill.style.width = `${(p1Hp / 200) * 100}%`;
   if (DOM.pvpP1OpHp) DOM.pvpP1OpHp.innerText = p2Hp;
-  if (DOM.pvpP1OpHpFill) DOM.pvpP1OpHpFill.style.width = `${(p2Hp / 30) * 100}%`;
+  if (DOM.pvpP1OpHpFill) DOM.pvpP1OpHpFill.style.width = `${(p2Hp / 200) * 100}%`;
   
   // P2 視角面板 (我方 P2, 對手 P1)
   if (DOM.pvpP2MyHp) DOM.pvpP2MyHp.innerText = p2Hp;
-  if (DOM.pvpP2MyHpFill) DOM.pvpP2MyHpFill.style.width = `${(p2Hp / 30) * 100}%`;
+  if (DOM.pvpP2MyHpFill) DOM.pvpP2MyHpFill.style.width = `${(p2Hp / 200) * 100}%`;
   if (DOM.pvpP2OpHp) DOM.pvpP2OpHp.innerText = p1Hp;
-  if (DOM.pvpP2OpHpFill) DOM.pvpP2OpHpFill.style.width = `${(p1Hp / 30) * 100}%`;
+  if (DOM.pvpP2OpHpFill) DOM.pvpP2OpHpFill.style.width = `${(p1Hp / 200) * 100}%`;
 }
 
 function startPvpMatchTimer() {
@@ -1764,27 +1825,54 @@ function endPvpGame(reasonType) {
   const p1Hp = GAME_STATE.playerHp;
   const p2Hp = GAME_STATE.bossHp;
   
-  if (reasonType === 'hpZero') {
-    if (p1Hp <= 0 && p2Hp <= 0) {
-      winner = 0;
-      reason = '雙方同時倒下，平手！';
-    } else if (p1Hp <= 0) {
-      winner = 2;
-      reason = '🔴 玩家 2 擊敗玩家 1！';
+  if (GAME_STATE.mode === 'online') {
+    const isP1 = (GAME_STATE.online.role === 'p1');
+    if (reasonType === 'hpZero') {
+      if (p1Hp <= 0 && p2Hp <= 0) {
+        winner = 0;
+        reason = '雙方同時倒下，平手！';
+      } else if (p1Hp <= 0) {
+        winner = 2;
+        reason = isP1 ? '🔴 對手擊敗了你！' : '🟢 你擊敗了對手！';
+      } else {
+        winner = 1;
+        reason = isP1 ? '🟢 你擊敗了對手！' : '🔴 對手擊敗了你！';
+      }
     } else {
-      winner = 1;
-      reason = '🔵 玩家 1 擊敗玩家 2！';
+      if (p1Hp > p2Hp) {
+        winner = 1;
+        reason = isP1 ? `⏰ 時間到！你的血量較高 (${p1Hp} vs ${p2Hp})` : `⏰ 時間到！對手血量較高 (${p1Hp} vs ${p2Hp})`;
+      } else if (p2Hp > p1Hp) {
+        winner = 2;
+        reason = isP1 ? `⏰ 時間到！對手血量較高 (${p2Hp} vs ${p1Hp})` : `⏰ 時間到！你的血量較高 (${p2Hp} vs ${p1Hp})`;
+      } else {
+        winner = 0;
+        reason = `⏰ 時間到！雙方血量相同 (${p1Hp} vs ${p2Hp})，平手！`;
+      }
     }
   } else {
-    if (p1Hp > p2Hp) {
-      winner = 1;
-      reason = `⏰ 時間到！玩家 1 血量較高 (${p1Hp} vs ${p2Hp})`;
-    } else if (p2Hp > p1Hp) {
-      winner = 2;
-      reason = `⏰ 時間到！玩家 2 血量較高 (${p2Hp} vs ${p1Hp})`;
+    if (reasonType === 'hpZero') {
+      if (p1Hp <= 0 && p2Hp <= 0) {
+        winner = 0;
+        reason = '雙方同時倒下，平手！';
+      } else if (p1Hp <= 0) {
+        winner = 2;
+        reason = '🔴 玩家 2 擊敗玩家 1！';
+      } else {
+        winner = 1;
+        reason = '🔵 玩家 1 擊敗玩家 2！';
+      }
     } else {
-      winner = 0;
-      reason = `⏰ 時間到！雙方血量相同 (${p1Hp} vs ${p2Hp})，平手！`;
+      if (p1Hp > p2Hp) {
+        winner = 1;
+        reason = `⏰ 時間到！玩家 1 血量較高 (${p1Hp} vs ${p2Hp})`;
+      } else if (p2Hp > p1Hp) {
+        winner = 2;
+        reason = `⏰ 時間到！玩家 2 血量較高 (${p2Hp} vs ${p1Hp})`;
+      } else {
+        winner = 0;
+        reason = `⏰ 時間到！雙方血量相同 (${p1Hp} vs ${p2Hp})，平手！`;
+      }
     }
   }
   
@@ -2386,8 +2474,8 @@ function startOnlineBattle() {
   DOM.pvpLayout.classList.remove('hidden');
   DOM.pvpLayout.classList.add('online-pvp-mode');
 
-  GAME_STATE.playerHp = 30;
-  GAME_STATE.bossHp = 30;
+  GAME_STATE.playerHp = 200;
+  GAME_STATE.bossHp = 200;
   GAME_STATE.stats.correct = 0;
   GAME_STATE.stats.total = 0;
 
@@ -2400,7 +2488,7 @@ function startOnlineBattle() {
   }
 
   updatePvpHPUI();
-  setupRoleLabels();
+  updatePvpRoleLabels();
   showScreen(DOM.gameScreen);
 
   setTimeout(() => {
@@ -2519,6 +2607,13 @@ function renderSpectatorQuestion(playerId, q) {
 function handleOnlineDisconnect() {
   if (!GAME_STATE.online.connected) return;
   GAME_STATE.online.connected = false;
+
+  // 如果遊戲已經正常結束分出勝負，不執行斷線覆寫
+  const isGameOver = (GAME_STATE.playerHp <= 0 || GAME_STATE.bossHp <= 0 || GAME_STATE.pvp.matchTimeLeft <= 0);
+  if (isGameOver) {
+    closeOnlineConnection();
+    return;
+  }
 
   clearInterval(GAME_STATE.pvp.p1Timer);
   clearInterval(GAME_STATE.pvp.p2Timer);
