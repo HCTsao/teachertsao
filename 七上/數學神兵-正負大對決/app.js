@@ -642,13 +642,18 @@ function updatePvpRoleLabels() {
   const p2NameEl = document.getElementById('pvp-p2-name');
   if (!p1NameEl || !p2NameEl) return;
 
+  // 清除先前的角色模式類別
+  DOM.pvpLayout.classList.remove('pvp-role-p1', 'pvp-role-p2');
+
   if (GAME_STATE.mode === 'online') {
     if (GAME_STATE.online.role === 'p1') {
       p1NameEl.innerText = '你';
       p2NameEl.innerText = '對手';
+      DOM.pvpLayout.classList.add('pvp-role-p1');
     } else {
       p2NameEl.innerText = '你';
       p1NameEl.innerText = '對手';
+      DOM.pvpLayout.classList.add('pvp-role-p2');
     }
   } else {
     p1NameEl.innerText = '玩家 1';
