@@ -2245,6 +2245,9 @@ function setupPeerAsHost() {
 
   try {
     GAME_STATE.online.peer = new Peer('math-hero-' + code, {
+      host: '0.peerjs.com',
+      port: 443,
+      secure: true,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
@@ -2288,6 +2291,9 @@ function setupPeerAsGuest(roomId) {
 
   try {
     GAME_STATE.online.peer = new Peer(null, {
+      host: '0.peerjs.com',
+      port: 443,
+      secure: true,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
