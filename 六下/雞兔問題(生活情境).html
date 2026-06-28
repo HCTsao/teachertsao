@@ -727,6 +727,14 @@
                 transform: translateY(105vh) rotate(360deg);
             }
         }
+        @keyframes bounce {
+            0%, 100% { transform: scaleY(1); }
+            50% { transform: scaleY(2.2); }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
     </style>
 </head>
 <body>
@@ -898,7 +906,20 @@
         <!-- 涵義輸入 -->
         <div class="input-group meaning-group" style="margin-top: 5px;">
             <label class="input-label" for="meaning-input">👉 用中文解釋這個算式的涵義：</label>
-            <textarea id="meaning-input" class="text-input" placeholder="" rows="3"></textarea>
+            <div style="position: relative; display: flex; gap: 8px;">
+                <textarea id="meaning-input" class="text-input" placeholder="可以鍵入或點擊右邊麥克風進行語音錄音解釋" rows="3" style="flex: 1; padding-right: 50px;"></textarea>
+                <button id="record-btn" onclick="toggleRecording()" style="position: absolute; right: 10px; top: 10px; width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--primary); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.15); transition: background 0.2s;" title="語音錄音解釋">
+                    <i class="fa-solid fa-microphone" id="mic-icon" style="font-size: 1.1rem;"></i>
+                </button>
+            </div>
+            <!-- 錄音中波形動畫 -->
+            <div id="recording-wave" style="display: none; align-items: center; gap: 4px; margin-top: 8px; justify-content: center;">
+                <span style="font-size: 0.85rem; color: #dc2626; font-weight: bold; margin-right: 8px; animation: pulse 1s infinite;">🔴 錄音中，請說話...</span>
+                <span class="wave-bar" style="display: inline-block; width: 3px; height: 12px; background: #dc2626; animation: bounce 0.8s infinite 0.1s; transform-origin: bottom;"></span>
+                <span class="wave-bar" style="display: inline-block; width: 3px; height: 20px; background: #dc2626; animation: bounce 0.8s infinite 0.2s; transform-origin: bottom;"></span>
+                <span class="wave-bar" style="display: inline-block; width: 3px; height: 14px; background: #dc2626; animation: bounce 0.8s infinite 0.3s; transform-origin: bottom;"></span>
+                <span class="wave-bar" style="display: inline-block; width: 3px; height: 8px; background: #dc2626; animation: bounce 0.8s infinite 0.4s; transform-origin: bottom;"></span>
+            </div>
         </div>
 
         <!-- 詞字卡重組輔助區 -->
@@ -1419,17 +1440,27 @@
     function parseEquation(eqStr) {
         const cleanEq = eqStr.replace(/\s+/g, '');
         const parts = cleanEq.split('=');
-        if (parts.length !== 2) return null;
+        if (parts.length !== 2) {
+            return { errorType: 'format', msg: "算式格式有誤，必須包含一個等號 '=' 喔！" };
+        }
         
         const lhs = parts[0];
         const rhsVal = parseInt(parts[1]);
-        if (isNaN(rhsVal)) return null;
+        if (isNaN(rhsVal)) {
+            return { errorType: 'format', msg: "等號右邊必須是計算出來的數字喔！" };
+        }
         
         const lhsVal = safeEval(lhs);
-        if (isNaN(lhsVal) || lhsVal !== rhsVal) return null;
+        if (isNaN(lhsVal)) {
+            return { errorType: 'format', msg: "算式左邊格式有誤，乘法請用 ×，除法請用 ÷ 喔！" };
+        }
+        
+        if (lhsVal !== rhsVal) {
+            return { errorType: 'calculation', msg: "算式中的計算有誤，請再仔細檢查看看計算是否正確喔！" };
+        }
         
         const numbers = lhs.match(/\d+/g).map(Number);
-        return { lhs, rhs: rhsVal, numbers };
+        return { valid: true, lhs, rhs: rhsVal, numbers };
     }
 
     // 容錯處理：將語音輸入的 $50硬幣/$10硬幣 轉換為 50元硬幣/10元硬幣
@@ -1672,10 +1703,11 @@
 
     // --- 語意與算式驗證器 ---
     function validateStepAnswer(eqInput, meaningInput) {
-        const parsed = parseEquation(eqInput);
-        if (!parsed) {
-            return { valid: false, reason: "算式格式有誤（例如必須包含 '='，且等號兩邊的值要相等，乘法用 ×，除法用 ÷ 喔！）" };
+        const parsedResult = parseEquation(eqInput);
+        if (parsedResult.errorType) {
+            return { valid: false, reason: parsedResult.msg };
         }
+        const parsed = parsedResult;
 
         const sc = gameState.scenario;
         const N = gameState.totalCount;
@@ -1943,9 +1975,8 @@
             gameState.totalFailedAttempts = (gameState.totalFailedAttempts || 0) + 1;
             showFeedback('error', res.reason);
             
-            // 答錯時，顯示橘色引導語和字詞拼圖提示
+            // 答錯時，顯示橘色引導語，但不要自動顯示字詞拼圖提示
             document.getElementById('console-instruction').style.display = 'block';
-            showWordChips();
             return;
         }
 
@@ -2058,6 +2089,328 @@
             confetti.style.height = Math.random() * 8 + 6 + 'px';
             confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
             container.appendChild(confetti);
+        }
+    }
+
+    // --- 🎙️ 語音辨識與 AI 語意分析模擬模組 (Speech Recognition & AI Semantic Analysis Demo) ---
+    let recognition = null;
+    let isRecording = false;
+
+    function initSpeechRecognition() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            console.error("此瀏覽器不支援 Web Speech API 語音識別功能。");
+            return;
+        }
+        recognition = new SpeechRecognition();
+        recognition.lang = 'zh-TW';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = () => {
+            isRecording = true;
+            document.getElementById('mic-icon').className = 'fa-solid fa-square';
+            document.getElementById('record-btn').style.background = '#dc2626';
+            document.getElementById('recording-wave').style.display = 'flex';
+        };
+
+        recognition.onresult = (event) => {
+            const speechToText = event.results[0][0].transcript;
+            console.log("語音辨識結果：", speechToText);
+            document.getElementById('meaning-input').value = speechToText;
+            
+            // 觸發 AI 語意分析
+            triggerAiAnalysis(speechToText);
+        };
+
+        recognition.onerror = (event) => {
+            console.error("語音辨識錯誤：", event.error);
+            stopRecordingState();
+            alert("錄音辨識失敗，請再試一次或檢查麥克風權限。");
+        };
+
+        recognition.onend = () => {
+            stopRecordingState();
+        };
+    }
+
+    function toggleRecording() {
+        if (!recognition) {
+            initSpeechRecognition();
+        }
+        if (!recognition) {
+            alert("您的瀏覽器不支援語音錄製，請使用 Chrome 或 Edge 瀏覽器！");
+            return;
+        }
+
+        if (isRecording) {
+            recognition.stop();
+        } else {
+            playSound('pop');
+            recognition.start();
+        }
+    }
+
+    function stopRecordingState() {
+        isRecording = false;
+        document.getElementById('mic-icon').className = 'fa-solid fa-microphone';
+        document.getElementById('record-btn').style.background = 'var(--primary)';
+        document.getElementById('recording-wave').style.display = 'none';
+    }
+
+    function triggerAiAnalysis(text) {
+        const fb = document.getElementById('feedback-el');
+        fb.style.display = 'block';
+        fb.className = 'feedback-box';
+        fb.style.background = 'rgba(99, 102, 241, 0.08)';
+        fb.style.border = '1px dashed var(--primary)';
+        fb.style.color = 'var(--primary)';
+        fb.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">
+                <i class="fa-solid fa-robot fa-spin"></i> 
+                <span><b>AI 語音語意診斷中...</b>（正在分析口述算式涵義是否合乎邏輯）</span>
+            </div>
+        `;
+
+        setTimeout(() => {
+            const eqInput = document.getElementById('equation-input').value;
+            if (!eqInput) {
+                showFeedback('error', "🎙️ AI 診斷提示：辨識到了您的口述解釋，但請先在上方輸入本步驟的「算式」喔！");
+                return;
+            }
+            
+            // 進行適應性語意合理性檢核
+            const res = getDynamicAiFeedback(gameState.currentStep, text, eqInput);
+            
+            if (res.valid) {
+                playSound('correct');
+                showFeedback('success', `✨ AI 診斷正確！您口述的是：「${text}」`);
+                
+                // 自動將其送出，寫入 ledger 紀錄
+                setTimeout(() => {
+                    submitStepAnswer();
+                }, 1200);
+            } else {
+                playSound('wrong');
+                // 記錄答錯嘗試
+                const step = gameState.currentStep;
+                if (!gameState.stepAnswers[step].attempts) {
+                    gameState.stepAnswers[step].attempts = [];
+                }
+                gameState.stepAnswers[step].attempts.push({
+                    eq: eqInput,
+                    meaning: text,
+                    valid: false,
+                    reason: res.reason,
+                    timestamp: new Date().toISOString()
+                });
+                gameState.failedAttempts++;
+                gameState.totalFailedAttempts = (gameState.totalFailedAttempts || 0) + 1;
+
+                const tagText = res.isSlight ? "💡 稍微說錯，以你的句子為基礎進行引導" : "⚠️ 概念相差較多，以基礎問句引導";
+                showFeedback('error', `❌ AI 診斷不完整（${tagText}）：\n您口述的是：「${text}」\n\n👉 引導建議：${res.reason}`);
+                document.getElementById('console-instruction').style.display = 'block';
+            }
+        }, 1500);
+    }
+
+    // 智能適應性 AI 引導回饋生成器 (Adaptive AI Feedback Generator)
+    function getDynamicAiFeedback(step, text, eqInput) {
+        const parsedResult = parseEquation(eqInput);
+        if (parsedResult.errorType) {
+            return { valid: false, reason: parsedResult.msg, isSlight: false };
+        }
+        const parsed = parsedResult;
+
+        const sc = gameState.scenario;
+        const N = gameState.totalCount;
+        const T = gameState.totalCost;
+        const P1 = sc.item1.price;
+        const P2 = sc.item2.price;
+        const valUnit = sc.valUnit;
+        const path = gameState.solvedPath;
+
+        // 執行基礎規則驗證
+        const res = validateStepAnswer(eqInput, text);
+        if (res.valid) return res;
+
+        // 分析學生輸入，判斷是否為「稍微說錯」並給予適應性句子引導
+        let isSlight = false;
+        let adaptiveReason = "";
+        const cleanText = cleanInputText(text.trim());
+
+        if (step === 1) {
+            const sumA = P1 * N;
+            const sumB = P2 * N;
+            let detectedPath = null;
+            if (parsed.rhs === sumA && parsed.numbers.includes(P1) && parsed.numbers.includes(N)) {
+                detectedPath = 'A';
+            } else if (parsed.rhs === sumB && parsed.numbers.includes(P2) && parsed.numbers.includes(N)) {
+                detectedPath = 'B';
+            }
+
+            const hasAssume = /假設|如果|全|都|假如|設為/.test(cleanText);
+            const hasItem1 = matchItemName(cleanText, sc.item1.name);
+            const hasItem2 = matchItemName(cleanText, sc.item2.name);
+            
+            const payWord = sc.title === "存錢筒整理" ? "要有多少元呢？" : (sc.title === "停車場統計" || sc.title === "校園單車統計" ? "要有多少個輪子呢？" : (sc.title === "農場點點名" ? "要有多少隻腳呢？" : "要花幾元呢？"));
+            const unitName = (sc.title === "便當情境") ? "個便當" : (sc.title === "日月潭纜車" ? "張票" : (sc.title === "文具購買" ? "枝文具" : (sc.title === "茶葉買賣" ? "斤茶葉" : (sc.title === "存錢筒整理" ? "個硬幣" : (sc.title === "停車場統計" ? "輛車" : sc.unit)))));
+
+            // 針對大偏差的引導語客製化（如果口述提到了特定品項，就以該品項為主題引導）
+            let fallbackReason = res.reason;
+            if (hasItem1 && !hasItem2) {
+                fallbackReason = `總共要${sc.action} ${N} ${unitName}，全部都${sc.action}「${sc.item1.name}」的話${payWord}`;
+            } else if (hasItem2 && !hasItem1) {
+                fallbackReason = `總共要${sc.action} ${N} ${unitName}，全部都${sc.action}「${sc.item2.name}」的話${payWord}`;
+            }
+
+            if (!detectedPath) {
+                return { valid: false, reason: fallbackReason, isSlight: false }; // 算式錯誤或大偏差
+            }
+
+            const isPathA = (detectedPath === 'A');
+            const targetName = isPathA ? sc.item1.name : sc.item2.name;
+            const bannedName = isPathA ? sc.item2.name : sc.item1.name;
+            const expectedSum = isPathA ? sumA : sumB;
+            const hasTarget = isPathA ? hasItem1 : hasItem2;
+            const hasBanned = isPathA ? hasItem2 : hasItem1;
+            const hasSumVal = containsNumber(cleanText, expectedSum);
+
+            if (hasBanned) {
+                const currentTarget = isPathA ? sc.item1.name : sc.item2.name;
+                return { valid: false, reason: `總共要${sc.action} ${N} ${unitName}，全部都${sc.action}「${currentTarget}」的話${payWord}`, isSlight: false };
+            }
+
+            const satisfiedCount = (hasAssume ? 1 : 0) + (hasTarget ? 1 : 0) + (hasSumVal ? 1 : 0);
+
+            if (satisfiedCount === 2) {
+                isSlight = true;
+                if (!hasAssume) {
+                    adaptiveReason = `概念非常接近了！以您的口語「<b>${text}</b>」為基礎，請在最前面加上假設前提，例如改為：「<b>假設</b> ${text}」會更完整喔！`;
+                } else if (!hasSumVal) {
+                    let actionWord = sc.title === "存錢筒整理" ? "一共是" : (sc.title === "停車場統計" || sc.title === "校園單車統計" || sc.title === "農場點點名" ? "一共有" : "一共要花");
+                    adaptiveReason = `您說得很好，有提到假設和正確品項！以您的口語「<b>${text}</b>」為基礎，請在句子後面補上算出來的值，例如加上「<b>，${actionWord} ${expectedSum}${valUnit}</b>」會更完整喔！`;
+                } else if (!hasTarget) {
+                    adaptiveReason = `有提到假設前提與計算數值！以您的口語「<b>${text}</b>」為基礎，請明確指出全部是什麼項目，例如在「都是」後面加上「<b>${targetName}</b>」會更完整喔！`;
+                }
+            } else {
+                return { valid: false, reason: fallbackReason, isSlight: false };
+            }
+        } 
+        else if (step === 2) {
+            const startTotal = path === 'A' ? P1 * N : P2 * N;
+            const expectedDiff = Math.abs(T - startTotal);
+            if (parsed.rhs !== expectedDiff) return { valid: false, reason: res.reason, isSlight: false };
+
+            const isMore = startTotal > T;
+            const finalDirection = isMore ? "多" : "少";
+            const wrongDirection = isMore ? "少" : "多";
+
+            const hasDirection = new RegExp(finalDirection).test(cleanText);
+            const hasWrongDirection = new RegExp(wrongDirection).test(cleanText);
+            const hasDiffVal = containsNumber(cleanText, expectedDiff);
+
+            const satisfiedCount = (hasDirection ? 1 : 0) + (hasDiffVal ? 1 : 0);
+
+            if (satisfiedCount === 1) {
+                isSlight = true;
+                if (!hasDirection && !hasWrongDirection) {
+                    adaptiveReason = `數值算對了！以您的口語「<b>${text}</b>」為基礎，請明確講出是比實際的${sc.costName}「<b>${finalDirection}</b>」了多少，避免只說相差或差喔！`;
+                } else if (!hasDiffVal) {
+                    adaptiveReason = `方向判斷正確！以您的口語「<b>${text}</b>」為基礎，請把算出的差額放進句子中，例如改為：「${text} <b>${expectedDiff}${valUnit}</b>」會更完整喔！`;
+                } else if (hasWrongDirection) {
+                    adaptiveReason = `數值對了，但增減方向反囉。您的假設是 ${startTotal}，實際是 ${T}，所以假設是比實際「<b>${finalDirection}</b>」了才對。請以您的句子為基礎，把「${wrongDirection}」改為「<b>${finalDirection}</b>」再試試！`;
+                }
+            }
+        } 
+        else if (step === 3) {
+            const expectedDiff = P2 - P1;
+            if (parsed.rhs !== expectedDiff) return { valid: false, reason: res.reason, isSlight: false };
+
+            const isPathA = (path === 'A');
+            const direction = isPathA ? "多" : "少";
+            const fromName = isPathA ? sc.item1.name : sc.item2.name;
+            const toName = isPathA ? sc.item2.name : sc.item1.name;
+
+            const hasEach = /每|一次|一/.test(cleanText);
+            const hasDirection = new RegExp(direction).test(cleanText);
+            const hasDiffVal = containsNumber(cleanText, expectedDiff);
+            const hasSwap = /換|替|配/.test(cleanText);
+
+            const satisfiedCount = (hasEach ? 1 : 0) + (hasDirection ? 1 : 0) + (hasDiffVal ? 1 : 0) + (hasSwap ? 1 : 0);
+
+            if (satisfiedCount === 3) {
+                isSlight = true;
+                if (!hasEach) {
+                    adaptiveReason = `邏輯很好！以您的口語「<b>${text}</b>」為基礎，請加上代表單次替換的詞彙，例如在句首加上「<b>每</b>」字（如：「<b>每</b>${text}」）會更完整喔！`;
+                } else if (!hasSwap) {
+                    adaptiveReason = `數字與方向正確！以您的口語「<b>${text}</b>」為基礎，請說明進行了「<b>替換</b>」動作，例如補上「...<b>換成</b>...」會更完整喔！`;
+                } else if (!hasDiffVal) {
+                    adaptiveReason = `思路正確！以您的口語「<b>${text}</b>」為基礎，請把單個差值「<b>${expectedDiff}${valUnit}</b>」寫進句子中會更完整喔！`;
+                } else if (!hasDirection) {
+                    adaptiveReason = `很棒的描述！以您的口語「<b>${text}</b>」為基礎，請明確口述總數會變「<b>${direction}</b>」，例如在結尾加上「<b>，會${direction}${expectedDiff}${valUnit}</b>」會更完整喔！`;
+                }
+            }
+        } 
+        else if (step === 4) {
+            const startTotal = path === 'A' ? P1 * N : P2 * N;
+            const costDiff = Math.abs(T - startTotal);
+            const unitDiff = P2 - P1;
+            const expectedCount = costDiff / unitDiff;
+            if (parsed.rhs !== expectedCount) return { valid: false, reason: res.reason, isSlight: false };
+
+            const targetName = path === 'A' ? sc.item2.name : sc.item1.name;
+            const diffWord = path === 'A' ? "少" : "多";
+            const changeWord = path === 'A' ? "多" : "少";
+
+            const hasEach = new RegExp(`每|一次|一${sc.unit}`).test(cleanText);
+            const hasTargetName = matchItemName(cleanText, targetName);
+            const hasSwapCount = containsNumber(cleanText, expectedCount);
+            const hasSwapWord = /換|除/.test(cleanText);
+
+            const satisfiedCount = (hasEach ? 1 : 0) + (hasTargetName ? 1 : 0) + (hasSwapCount ? 1 : 0) + (hasSwapWord ? 1 : 0);
+
+            if (satisfiedCount === 3) {
+                isSlight = true;
+                if (!hasEach) {
+                    adaptiveReason = `算式概念很清楚！以您的口語「<b>${text}</b>」為基礎，請加上說明除法關係的詞，例如加上「<b>每換一次會...</b>」會更完整喔！`;
+                } else if (!hasSwapWord) {
+                    adaptiveReason = `計算都對！以您的口語「<b>${text}</b>」為基礎，請指出這是「<b>更換</b>」次數會更完整喔！`;
+                } else if (!hasTargetName) {
+                    adaptiveReason = `算出更換的次數了！以您的口語「<b>${text}</b>」為基礎，請明確補上這代表換到了「<b>${expectedCount} ${sc.unit} 的 ${targetName}</b>」會更完整喔！`;
+                } else if (!hasSwapCount) {
+                    adaptiveReason = `邏輯正確！以您的口語「<b>${text}</b>」為基礎，請把算出的次數「<b>${expectedCount}次</b>」加入句子中會更完整喔！`;
+                }
+            }
+        } 
+        else if (step === 5) {
+            const pathCount = path === 'A' ? gameState.count2 : gameState.count1;
+            const expectedRemaining = N - pathCount;
+            if (parsed.rhs !== expectedRemaining) return { valid: false, reason: res.reason, isSlight: false };
+
+            const targetName2 = path === 'A' ? sc.item2.name : sc.item1.name;
+            const targetName1 = path === 'A' ? sc.item1.name : sc.item2.name;
+
+            const hasTargetName1 = matchItemName(cleanText, targetName1);
+            const hasRemainingVal = containsNumber(cleanText, expectedRemaining);
+
+            const satisfiedCount = (hasTargetName1 ? 1 : 0) + (hasRemainingVal ? 1 : 0);
+
+            if (satisfiedCount === 1) {
+                isSlight = true;
+                if (!hasTargetName1) {
+                    adaptiveReason = `算對了剩下的數量！以您的口語「<b>${text}</b>」為基礎，請明确指出是剩下哪個品項，例如加上「<b>${targetName1}</b>」會更完整喔！`;
+                } else if (!hasRemainingVal) {
+                    adaptiveReason = `找出品項了！以您的口語「<b>${text}</b>」為基礎，請把剩餘數量「<b>${expectedRemaining}</b>」加進句子裡會更完整喔！`;
+                }
+            }
+        }
+
+        if (isSlight) {
+            return { valid: false, reason: adaptiveReason, isSlight: true };
+        } else {
+            // 大偏差，使用原本設定好的引導語
+            return { valid: false, reason: res.reason, isSlight: false };
         }
     }
 </script>
