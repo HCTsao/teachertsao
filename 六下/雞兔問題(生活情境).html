@@ -1142,13 +1142,14 @@
         totalCost: 0,
         solvedPath: null, 
         stepAnswers: {
-            1: { eq: "", meaning: "" },
-            2: { eq: "", meaning: "" },
-            3: { eq: "", meaning: "" },
-            4: { eq: "", meaning: "" },
-            5: { eq: "", meaning: "" }
+            1: { eq: "", meaning: "", attempts: [] },
+            2: { eq: "", meaning: "", attempts: [] },
+            3: { eq: "", meaning: "", attempts: [] },
+            4: { eq: "", meaning: "", attempts: [] },
+            5: { eq: "", meaning: "", attempts: [] }
         },
         failedAttempts: 0,
+        totalFailedAttempts: 0,
         studentName: "",
         startTime: null
     };
@@ -1192,13 +1193,14 @@
         gameState.solvedPath = null; 
         gameState.currentStep = 1;
         gameState.failedAttempts = 0;
+        gameState.totalFailedAttempts = 0;
         
         gameState.stepAnswers = {
-            1: { eq: "", meaning: "" },
-            2: { eq: "", meaning: "" },
-            3: { eq: "", meaning: "" },
-            4: { eq: "", meaning: "" },
-            5: { eq: "", meaning: "" }
+            1: { eq: "", meaning: "", attempts: [] },
+            2: { eq: "", meaning: "", attempts: [] },
+            3: { eq: "", meaning: "", attempts: [] },
+            4: { eq: "", meaning: "", attempts: [] },
+            5: { eq: "", meaning: "", attempts: [] }
         };
 
         let qText = "";
@@ -1903,10 +1905,27 @@
         }
 
         const res = validateStepAnswer(eqInput, meaningInput);
+        const step = gameState.currentStep;
+        if (!gameState.stepAnswers[step]) {
+            gameState.stepAnswers[step] = { eq: "", meaning: "", attempts: [] };
+        }
+        if (!gameState.stepAnswers[step].attempts) {
+            gameState.stepAnswers[step].attempts = [];
+        }
+
+        // 紀錄本次嘗試
+        gameState.stepAnswers[step].attempts.push({
+            eq: eqInput,
+            meaning: meaningInput.trim(),
+            valid: res.valid,
+            reason: res.valid ? "" : res.reason,
+            timestamp: new Date().toISOString()
+        });
 
         if (!res.valid) {
             playSound('wrong');
             gameState.failedAttempts++;
+            gameState.totalFailedAttempts = (gameState.totalFailedAttempts || 0) + 1;
             showFeedback('error', res.reason);
             
             // 答錯時，顯示橘色引導語和字詞拼圖提示
@@ -1917,16 +1936,13 @@
 
         // 答對了
         playSound('correct');
-        const step = gameState.currentStep;
         
         if (step === 1 && res.path) {
             gameState.solvedPath = res.path;
         }
 
-        gameState.stepAnswers[step] = {
-            eq: res.normalizedEq,
-            meaning: meaningInput.trim()
-        };
+        gameState.stepAnswers[step].eq = res.normalizedEq;
+        gameState.stepAnswers[step].meaning = meaningInput.trim();
 
         const ledgerEl = document.getElementById(`ledger-step-${step}`);
         ledgerEl.className = "ledger-step completed";
@@ -1988,12 +2004,13 @@
             totalCost: gameState.totalCost,
             solvedPath: gameState.solvedPath || "未完成",
             durationSeconds: durationSec,
+            failedAttempts: gameState.totalFailedAttempts || 0,
             stepAnswers: {
-                1: gameState.stepAnswers[1] || { eq: "", meaning: "" },
-                2: gameState.stepAnswers[2] || { eq: "", meaning: "" },
-                3: gameState.stepAnswers[3] || { eq: "", meaning: "" },
-                4: gameState.stepAnswers[4] || { eq: "", meaning: "" },
-                5: gameState.stepAnswers[5] || { eq: "", meaning: "" }
+                1: gameState.stepAnswers[1] || { eq: "", meaning: "", attempts: [] },
+                2: gameState.stepAnswers[2] || { eq: "", meaning: "", attempts: [] },
+                3: gameState.stepAnswers[3] || { eq: "", meaning: "", attempts: [] },
+                4: gameState.stepAnswers[4] || { eq: "", meaning: "", attempts: [] },
+                5: gameState.stepAnswers[5] || { eq: "", meaning: "", attempts: [] }
             }
         };
 

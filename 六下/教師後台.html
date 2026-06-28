@@ -664,14 +664,35 @@
 
             let stepsHtml = "";
             for (let s = 1; s <= 5; s++) {
-                const stepAns = rec.stepAnswers && rec.stepAnswers[s] ? rec.stepAnswers[s] : { eq: "無數據", meaning: "無數據" };
+                const stepAns = rec.stepAnswers && rec.stepAnswers[s] ? rec.stepAnswers[s] : { eq: "無數據", meaning: "無數據", attempts: [] };
+                
+                let attemptsListHtml = "";
+                if (stepAns.attempts && stepAns.attempts.length > 0) {
+                    attemptsListHtml = `<div style="margin-top: 10px; font-size: 0.85rem; border-top: 1px dotted #ccc; padding-top: 8px;">`;
+                    attemptsListHtml += `<b>💡 所有嘗試歷程：</b><ol style="padding-left: 20px; margin-top: 5px;">`;
+                    stepAns.attempts.forEach((att, idx) => {
+                        const statusColor = att.valid ? 'var(--success)' : 'var(--error)';
+                        const statusTag = att.valid ? '【答對】' : '【答錯/不完整】';
+                        attemptsListHtml += `
+                            <li style="margin-bottom: 6px;">
+                                <span style="font-family: monospace; font-weight: bold; color: var(--primary);">${escapeHtml(att.eq)}</span>
+                                <span style="color: var(--text-secondary); margin-left: 10px;">解釋：</span><span>${escapeHtml(att.meaning)}</span>
+                                <span style="color: ${statusColor}; font-weight: bold; margin-left: 8px;">${statusTag}</span>
+                                ${att.reason ? `<div style="color: #b45309; font-size: 0.8rem; margin-top: 2px; padding-left: 10px; border-left: 2px solid var(--warning);">系統提示：${escapeHtml(att.reason)}</div>` : ''}
+                            </li>
+                        `;
+                    });
+                    attemptsListHtml += `</ol></div>`;
+                }
+
                 stepsHtml += `
                     <div class="step-record-card step-${s}">
                         <div class="step-header">
                             <span>步驟 ${s}</span>
                         </div>
                         <div class="step-eq">${escapeHtml(stepAns.eq)}</div>
-                        <div class="step-meaning">👉 <b>解釋：</b>${escapeHtml(stepAns.meaning)}</div>
+                        <div class="step-meaning">👉 <b>過關解釋：</b>${escapeHtml(stepAns.meaning)}</div>
+                        ${attemptsListHtml}
                     </div>
                 `;
             }
