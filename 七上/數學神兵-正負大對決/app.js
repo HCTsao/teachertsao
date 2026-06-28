@@ -441,6 +441,15 @@ function setupEventListeners() {
   });
 
   DOM.btnStartGame.addEventListener('click', () => {
+    // 驗證學生資料
+    const studentInfoInput = document.getElementById('input-student-info');
+    const studentInfo = studentInfoInput ? studentInfoInput.value.trim() : '';
+    if (!studentInfo) {
+      alert("請先輸入您的「班級/座號/姓名」喔！");
+      if (studentInfoInput) studentInfoInput.focus();
+      return;
+    }
+
     // 線上模式禁止用此按鈕啟動，必須透過 PeerJS 連線後自動啟動
     if (GAME_STATE.mode === 'online') {
       updateOnlineStatus('請先完成連線：創建房間或輸入房號加入！', 'error');
@@ -639,25 +648,32 @@ function setupRoleLabels() {
 // 實時線上對決：動態更新「你」與「對手」標籤，套用紅框與左右視角對調
 function updatePvpRoleLabels() {
   const p1NameEl = document.getElementById('pvp-p1-name');
+  const p1OpNameEl = document.getElementById('pvp-p1-op-name');
   const p2NameEl = document.getElementById('pvp-p2-name');
+  const p2OpNameEl = document.getElementById('pvp-p2-op-name');
   if (!p1NameEl || !p2NameEl) return;
 
   // 清除先前的角色模式類別
   DOM.pvpLayout.classList.remove('pvp-role-p1', 'pvp-role-p2');
 
+  const studentInfoInput = document.getElementById('input-student-info');
+  const studentInfo = studentInfoInput ? studentInfoInput.value.trim() : '你';
+
   if (GAME_STATE.mode === 'online') {
     if (GAME_STATE.online.role === 'p1') {
-      p1NameEl.innerText = '你';
-      p2NameEl.innerText = '對手';
+      p1NameEl.innerText = studentInfo;
+      if (p1OpNameEl) p1OpNameEl.innerText = '對手';
       DOM.pvpLayout.classList.add('pvp-role-p1');
     } else {
-      p2NameEl.innerText = '你';
-      p1NameEl.innerText = '對手';
+      p2NameEl.innerText = studentInfo;
+      if (p2OpNameEl) p2OpNameEl.innerText = '對手';
       DOM.pvpLayout.classList.add('pvp-role-p2');
     }
   } else {
     p1NameEl.innerText = '玩家 1';
+    if (p1OpNameEl) p1OpNameEl.innerText = '玩家 2';
     p2NameEl.innerText = '玩家 2';
+    if (p2OpNameEl) p2OpNameEl.innerText = '玩家 1';
   }
   
   // 清除本地高亮與對調
@@ -675,6 +691,40 @@ function updatePvpRoleLabels() {
       DOM.pvpLayout.classList.add('pvp-swapped');
       if (rightContainer) rightContainer.classList.add('pvp-local-highlight');
     }
+  }
+}
+
+// 紀錄學生作答數據並上傳至本地教師後台
+function recordStudentAnswer(questionText, selectedOption, isCorrect, customStudentInfo = null) {
+  const studentInfoInput = document.getElementById('input-student-info');
+  const defaultInfo = studentInfoInput ? studentInfoInput.value.trim() : '未命名學生';
+  const studentInfo = customStudentInfo || defaultInfo;
+
+  let modeName = '戰役模式';
+  if (GAME_STATE.mode === 'pvp') {
+    modeName = '雙人同屏';
+  } else if (GAME_STATE.mode === 'online') {
+    modeName = '線上對決';
+  }
+
+  const now = new Date();
+  const timeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+
+  const newRecord = {
+    time: timeStr,
+    studentInfo: studentInfo,
+    mode: modeName,
+    question: questionText,
+    selectedOption: selectedOption,
+    isCorrect: isCorrect
+  };
+
+  try {
+    const records = JSON.parse(localStorage.getItem('math_hero_records') || '[]');
+    records.unshift(newRecord); // 最新在最前
+    localStorage.setItem('math_hero_records', JSON.stringify(records));
+  } catch (e) {
+    console.error("寫入學生數據發生異常：", e);
   }
 }
 
@@ -834,6 +884,11 @@ function checkAnswer(selectedIdx) {
   const q = GAME_STATE.currentQuestion;
   const isCorrect = (selectedIdx === q.correctIdx);
   const cards = DOM.optionsContainer.querySelectorAll('.answer-card');
+  
+  // 記錄作答數據
+  const selectedOptionVal = q.options[selectedIdx];
+  const selectedOptionText = selectedOptionVal >= 0 ? `+${selectedOptionVal}` : `${selectedOptionVal}`;
+  recordStudentAnswer(q.formula, selectedOptionText, isCorrect);
   
   GAME_STATE.stats.total++;
   
@@ -1662,13 +1717,38 @@ function showPvpSkillSelection(playerId) {
 }
 
 function checkPvpAnswer(playerId, selectedIdx) {
+  const q = playerId === 1 ? GAME_STATE.pvp.p1Question : GAME_STATE.pvp.p2Question;
+  if (!q) return;
+  const isCorrect = (selectedIdx === q.correctIdx);
+
+  // 記錄作答數據
+  const studentInfoInput = document.getElementById('input-student-info');
+  const studentInfo = studentInfoInput ? studentInfoInput.value.trim() : '未命名學生';
+  const selectedOptionVal = q.options[selectedIdx];
+  const selectedOptionText = selectedOptionVal >= 0 ? `+${selectedOptionVal}` : `${selectedOptionVal}`;
+
+  let shouldRecord = false;
+  let customStudentInfo = studentInfo;
+
+  if (GAME_STATE.mode === 'pvp') {
+    shouldRecord = true;
+    customStudentInfo = `[玩家${playerId}] ${studentInfo}`;
+  } else if (GAME_STATE.mode === 'online') {
+    const localPlayerId = GAME_STATE.online.role === 'p1' ? 1 : 2;
+    if (playerId === localPlayerId) {
+      shouldRecord = true;
+    }
+  }
+
+  if (shouldRecord) {
+    recordStudentAnswer(q.formula, selectedOptionText, isCorrect, customStudentInfo);
+  }
+
   if (playerId === 1) {
     if (GAME_STATE.pvp.p1IsProcessing) return;
     GAME_STATE.pvp.p1IsProcessing = true;
     clearInterval(GAME_STATE.pvp.p1Timer);
     
-    const q = GAME_STATE.pvp.p1Question;
-    const isCorrect = (selectedIdx === q.correctIdx);
     const buttons = DOM.pvpP1Options.querySelectorAll('.pvp-btn');
     
     buttons[selectedIdx].classList.add(isCorrect ? 'correct' : 'wrong');
@@ -2295,12 +2375,29 @@ function initOnlineSetupUI() {
   // 創建房間按鈕
   document.getElementById('btn-create-room').addEventListener('click', () => {
     synth.playClick();
+    // 驗證學生資料
+    const studentInfoInput = document.getElementById('input-student-info');
+    const studentInfo = studentInfoInput ? studentInfoInput.value.trim() : '';
+    if (!studentInfo) {
+      alert("請先輸入您的「班級/座號/姓名」喔！");
+      if (studentInfoInput) studentInfoInput.focus();
+      return;
+    }
     setupPeerAsHost();
   });
 
   // 加入房間按鈕
   document.getElementById('btn-join-room').addEventListener('click', () => {
     synth.playClick();
+    // 驗證學生資料
+    const studentInfoInput = document.getElementById('input-student-info');
+    const studentInfo = studentInfoInput ? studentInfoInput.value.trim() : '';
+    if (!studentInfo) {
+      alert("請先輸入您的「班級/座號/姓名」喔！");
+      if (studentInfoInput) studentInfoInput.focus();
+      return;
+    }
+
     const roomId = document.getElementById('input-room-id').value.trim().toUpperCase();
     if (!roomId || roomId.length < 1 || roomId.length > 6) {
       updateOnlineStatus('請輸入房號（1~6 位英數字）！', 'error');
