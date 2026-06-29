@@ -888,7 +888,7 @@ function displayQuestion(q) {
 
     btn.innerHTML = `
       <div class="card-inner">
-        <span class="card-value">${val >= 0 ? '+' + val : val}</span>
+        <span class="card-value">${typeof val === 'number' ? (val >= 0 ? '+' + val : val) : val}</span>
       </div>
     `;
 
@@ -909,7 +909,7 @@ function checkAnswer(selectedIdx) {
   
   // 記錄作答數據
   const selectedOptionVal = q.options[selectedIdx];
-  const selectedOptionText = selectedOptionVal >= 0 ? `+${selectedOptionVal}` : `${selectedOptionVal}`;
+  const selectedOptionText = typeof selectedOptionVal === 'number' ? (selectedOptionVal >= 0 ? `+${selectedOptionVal}` : `${selectedOptionVal}`) : selectedOptionVal;
   recordStudentAnswer(q.formula, selectedOptionText, isCorrect);
   
   GAME_STATE.stats.total++;
@@ -1248,7 +1248,7 @@ function renderModalButtons(options, correctVal, onChoose) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'modal-btn';
-    btn.innerText = val >= 0 ? `+${val}` : val;
+    btn.innerText = typeof val === 'number' ? (val >= 0 ? `+${val}` : val) : val;
     btn.addEventListener('click', () => {
       onChoose(btn, val);
     });
@@ -1489,7 +1489,7 @@ function displayPvpQuestion(playerId, q) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'pvp-btn';
-    btn.innerText = val >= 0 ? `+${val}` : val;
+    btn.innerText = typeof val === 'number' ? (val >= 0 ? `+${val}` : val) : val;
     if (isLocal) {
       btn.addEventListener('click', () => checkPvpAnswer(playerId, idx));
     } else {
@@ -1782,7 +1782,7 @@ function checkPvpAnswer(playerId, selectedIdx) {
   const studentInfoInput = document.getElementById('input-student-info');
   const studentInfo = studentInfoInput ? studentInfoInput.value.trim() : '未命名學生';
   const selectedOptionVal = q.options[selectedIdx];
-  const selectedOptionText = selectedOptionVal >= 0 ? `+${selectedOptionVal}` : `${selectedOptionVal}`;
+  const selectedOptionText = typeof selectedOptionVal === 'number' ? (selectedOptionVal >= 0 ? `+${selectedOptionVal}` : `${selectedOptionVal}`) : selectedOptionVal;
 
   let shouldRecord = false;
   let customStudentInfo = studentInfo;
@@ -2017,7 +2017,8 @@ function endPvpGame(reasonType) {
 // 題庫輔助與格式化工具
 // ==========================================================================
 function isAllPositive(numbers, answer) {
-  return numbers.every(n => n >= 0) && answer >= 0;
+  if (typeof answer === 'string') return false;
+  return numbers.every(n => typeof n === 'number' && n >= 0) && answer >= 0;
 }
 
 function formatBracketGroup(a, b, op) {
@@ -2332,42 +2333,57 @@ function generateQuestion(level, stage = 1) {
         }
         break;
       }
-      case 5: { // 兩點間的距離
-        if (stage === 1) {
-          // Stage 1: 一正一負，座標在 [-20, 20] 區間
-          const a = getRandomInteger(2, 20);
-          const b = getRandomInteger(-20, -2);
-          const isAFirst = Math.random() < 0.5;
-          const p1 = isAFirst ? a : b;
-          const p2 = isAFirst ? b : a;
-          formula = `數線上兩點 A(${p1}) 與 B(${p2}) 的距離 = ?`;
-          answer = Math.abs(p1 - p2);
-          operands = [p1, p2];
-        } else if (stage === 2) {
-          // Stage 2: 兩個負數，座標在 [-20, -2] 區間
-          const a = getRandomInteger(-20, -2);
-          const b = getRandomInteger(-20, -2, [a]);
-          formula = `數線上兩點 A(${a}) 與 B(${b}) 的距離 = ?`;
-          answer = Math.abs(a - b);
-          operands = [a, b];
+      case 5: { // 兩點間的距離 或 絕對值方程式
+        const isEquation = Math.floor(Math.random() * 3) === 0; // 每三題出現一次 (1/3 比例)
+        if (isEquation) {
+          // 絕對值方程式: |a ± k| = d，求 a
+          const k = getRandomInteger(1, 15);
+          const d = getRandomInteger(1, 15);
+          const isPlus = Math.random() < 0.5;
+          formula = `若 | a ${isPlus ? '+' : '-'} ${k} | = ${d}，則 a = ?`;
+          
+          const a1 = isPlus ? (d - k) : (d + k);
+          const a2 = isPlus ? (-d - k) : (-d + k);
+          const ansSorted = [a1, a2].sort((x, y) => x - y);
+          answer = `${ansSorted[0]} 或 ${ansSorted[1]}`;
+          operands = [k, d, isPlus ? 1 : 0, 'equation'];
         } else {
-          // Stage 3: 混合出題，擴大座標區間 [-35, 35]，且避免雙正數
-          const isBothNegative = Math.random() < 0.5;
-          if (isBothNegative) {
-            const a = getRandomInteger(-35, -2);
-            const b = getRandomInteger(-35, -2, [a]);
-            formula = `數線上兩點 A(${a}) 與 B(${b}) 的距離 = ?`;
-            answer = Math.abs(a - b);
-            operands = [a, b];
-          } else {
-            const a = getRandomInteger(5, 35);
-            const b = getRandomInteger(-35, -5);
+          if (stage === 1) {
+            // Stage 1: 一正一負，座標在 [-20, 20] 區間
+            const a = getRandomInteger(2, 20);
+            const b = getRandomInteger(-20, -2);
             const isAFirst = Math.random() < 0.5;
             const p1 = isAFirst ? a : b;
             const p2 = isAFirst ? b : a;
             formula = `數線上兩點 A(${p1}) 與 B(${p2}) 的距離 = ?`;
             answer = Math.abs(p1 - p2);
             operands = [p1, p2];
+          } else if (stage === 2) {
+            // Stage 2: 兩個負數，座標在 [-20, -2] 區間
+            const a = getRandomInteger(-20, -2);
+            const b = getRandomInteger(-20, -2, [a]);
+            formula = `數線上兩點 A(${a}) 與 B(${b}) 的距離 = ?`;
+            answer = Math.abs(a - b);
+            operands = [a, b];
+          } else {
+            // Stage 3: 混合出題，擴大座標區間 [-35, 35]，且避免雙正數
+            const isBothNegative = Math.random() < 0.5;
+            if (isBothNegative) {
+              const a = getRandomInteger(-35, -2);
+              const b = getRandomInteger(-35, -2, [a]);
+              formula = `數線上兩點 A(${a}) 與 B(${b}) 的距離 = ?`;
+              answer = Math.abs(a - b);
+              operands = [a, b];
+            } else {
+              const a = getRandomInteger(5, 35);
+              const b = getRandomInteger(-35, -5);
+              const isAFirst = Math.random() < 0.5;
+              const p1 = isAFirst ? a : b;
+              const p2 = isAFirst ? b : a;
+              formula = `數線上兩點 A(${p1}) 與 B(${p2}) 的距離 = ?`;
+              answer = Math.abs(p1 - p2);
+              operands = [p1, p2];
+            }
           }
         }
         break;
@@ -2381,35 +2397,64 @@ function generateQuestion(level, stage = 1) {
 
   let options;
   if (level === 5) {
-    const correctVal = answer;
     const optionsSet = new Set();
-    optionsSet.add(correctVal);
+    optionsSet.add(answer);
 
-    const a = operands[0];
-    const b = operands[1];
+    if (operands[3] === 'equation') {
+      const k = operands[0];
+      const d = operands[1];
+      const isPlus = operands[2] === 1;
+      const ansSorted = [parseInt(answer.split(' 或 ')[0]), parseInt(answer.split(' 或 ')[1])];
 
-    // 迷思 1: 直接減去絕對值 | |a| - |b| |
-    const d1 = Math.abs(Math.abs(a) - Math.abs(b));
-    // 迷思 2: 絕對值直接相加 |a| + |b|（同號時會錯，例如 -8 與 -3 算成 11）
-    const d2 = Math.abs(a) + Math.abs(b);
-    // 迷思 3: 直接相加 |a + b|
-    const d3 = Math.abs(a + b);
-    // 迷思 4: 運算符號混淆迷思（將 a - (-b) 誤算為 a - b，反之亦然）
-    const d4 = Math.abs(correctVal - 2 * Math.min(Math.abs(a), Math.abs(b)));
+      // 迷思 1: 反向方程式的解 (符號錯誤)
+      const w1_1 = isPlus ? (d + k) : (d - k);
+      const w1_2 = isPlus ? (-d + k) : (-d - k);
+      const wrongPair1 = [w1_1, w1_2].sort((x, y) => x - y);
+      optionsSet.add(`${wrongPair1[0]} 或 ${wrongPair1[1]}`);
 
-    [d1, d2, d3, d4].forEach(d => {
-      if (d > 0 && d !== correctVal) {
-        optionsSet.add(d);
+      // 迷思 2: 雙解變為相反數
+      const wrongPair2 = [-ansSorted[0], -ansSorted[1]].sort((x, y) => x - y);
+      optionsSet.add(`${wrongPair2[0]} 或 ${wrongPair2[1]}`);
+
+      // 迷思 3: 只有一根的對稱解 (例如 -1 或 1)
+      const absRoot = Math.abs(ansSorted[0] !== 0 ? ansSorted[0] : ansSorted[1]);
+      optionsSet.add(`-${absRoot} 或 ${absRoot}`);
+
+      // 若選項不足，補以偏差選項
+      const offsets = [1, 2, 3, 5, 10];
+      for (let offset of offsets) {
+        if (optionsSet.size >= 4) break;
+        const w_p = [ansSorted[0] - offset, ansSorted[1] + offset].sort((x, y) => x - y);
+        optionsSet.add(`${w_p[0]} 或 ${w_p[1]}`);
       }
-    });
+    } else {
+      const a = operands[0];
+      const b = operands[1];
+      const correctVal = answer;
 
-    // 若選項不足 4 個，用相近的數字填補
-    const offsets = [1, 2, 3, 5, 10];
-    for (let offset of offsets) {
-      if (optionsSet.size >= 4) break;
-      if (correctVal + offset > 0) optionsSet.add(correctVal + offset);
-      if (optionsSet.size >= 4) break;
-      if (correctVal - offset > 0) optionsSet.add(correctVal - offset);
+      // 迷思 1: 直接減去絕對值 | |a| - |b| |
+      const d1 = Math.abs(Math.abs(a) - Math.abs(b));
+      // 迷思 2: 絕對值直接相加 |a| + |b|（同號時會錯，例如 -8 與 -3 算成 11）
+      const d2 = Math.abs(a) + Math.abs(b);
+      // 迷思 3: 直接相加 |a + b|
+      const d3 = Math.abs(a + b);
+      // 迷思 4: 運算符號混淆迷思（將 a - (-b) 誤算為 a - b，反之亦然）
+      const d4 = Math.abs(correctVal - 2 * Math.min(Math.abs(a), Math.abs(b)));
+
+      [d1, d2, d3, d4].forEach(d => {
+        if (d > 0 && d !== correctVal) {
+          optionsSet.add(d);
+        }
+      });
+
+      // 若選項不足 4 個，用相近的數字填補
+      const offsets = [1, 2, 3, 5, 10];
+      for (let offset of offsets) {
+        if (optionsSet.size >= 4) break;
+        if (correctVal + offset > 0) optionsSet.add(correctVal + offset);
+        if (optionsSet.size >= 4) break;
+        if (correctVal - offset > 0) optionsSet.add(correctVal - offset);
+      }
     }
 
     options = Array.from(optionsSet).slice(0, 4);
@@ -2944,7 +2989,7 @@ function renderSpectatorQuestion(playerId, q) {
     btn.type = 'button';
     btn.className = 'pvp-btn disabled';
     btn.disabled = true;
-    btn.innerText = val >= 0 ? `+${val}` : val;
+    btn.innerText = typeof val === 'number' ? (val >= 0 ? `+${val}` : val) : val;
     optionsEl.appendChild(btn);
   });
 }
