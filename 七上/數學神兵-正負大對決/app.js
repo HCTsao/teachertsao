@@ -2295,7 +2295,7 @@ function generateQuestion(level, stage = 1) {
             const a = getRandomInteger(-6, 6, [0]);
             const b = getRandomInteger(-6, 6, [0]);
             const c = getRandomInteger(-15, 15, [0]);
-            formula = `| ${a} × ${b} | - ${formatNumber(c)} = ?`;
+            formula = `| ${formatNumber(a)} × ${formatNumber(b)} | - ${formatNumber(c)} = ?`;
             answer = Math.abs(a * b) - c;
             operands = [a, b, c];
           } else {
@@ -2303,7 +2303,7 @@ function generateQuestion(level, stage = 1) {
             const a = getRandomInteger(-15, 15, [0]);
             const b = getRandomInteger(-12, 12, [0]);
             const c = getRandomInteger(-12, 12, [0]);
-            formula = `${formatNumber(a)} + | ${b} + ${c} | = ?`;
+            formula = `${formatNumber(a)} + | ${formatNumber(b)} + ${formatNumber(c)} | = ?`;
             answer = a + Math.abs(b + c);
             operands = [a, b, c];
           }
@@ -2316,7 +2316,7 @@ function generateQuestion(level, stage = 1) {
             const b = getRandomInteger(-4, 4, [0]);
             const c = getRandomInteger(-10, 10, [0]);
             const d = getRandomInteger(-10, 10, [0, -c]);
-            formula = `| ${a} × ${b} | - | ${c} + ${d} | = ?`;
+            formula = `| ${formatNumber(a)} × ${formatNumber(b)} | - | ${formatNumber(c)} + ${formatNumber(d)} | = ?`;
             answer = Math.abs(a * b) - Math.abs(c + d);
             operands = [a, b, c, d];
           } else {
