@@ -272,6 +272,11 @@ const GAME_STATE = {
     p2TimeLimit: 30,
     p1IsProcessing: false,
     p2IsProcessing: false,
+    p1Total: 0,
+    p1Correct: 0,
+    p2Total: 0,
+    p2Correct: 0,
+    isGameEnded: false,
     matchTimer: null,
     matchTimeLeft: 90
   },
@@ -546,20 +551,25 @@ function startBattle() {
     
     // 設定答題時間
     if (GAME_STATE.level === 1) {
-      GAME_STATE.pvp.p1TimeLimit = 25;
-      GAME_STATE.pvp.p2TimeLimit = 25;
-    } else if (GAME_STATE.level === 2) {
-      GAME_STATE.pvp.p1TimeLimit = 25;
-      GAME_STATE.pvp.p2TimeLimit = 25;
-    } else {
       GAME_STATE.pvp.p1TimeLimit = 35;
       GAME_STATE.pvp.p2TimeLimit = 35;
+    } else if (GAME_STATE.level === 2) {
+      GAME_STATE.pvp.p1TimeLimit = 35;
+      GAME_STATE.pvp.p2TimeLimit = 35;
+    } else {
+      GAME_STATE.pvp.p1TimeLimit = 45;
+      GAME_STATE.pvp.p2TimeLimit = 45;
     }
 
     GAME_STATE.playerHp = 100;
     GAME_STATE.bossHp = 100; // PvP 中 bossHp 作為 Player 2 的 HP
     GAME_STATE.stats.correct = 0;
     GAME_STATE.stats.total = 0;
+    GAME_STATE.pvp.p1Total = 0;
+    GAME_STATE.pvp.p1Correct = 0;
+    GAME_STATE.pvp.p2Total = 0;
+    GAME_STATE.pvp.p2Correct = 0;
+    GAME_STATE.pvp.isGameEnded = false;
 
     updatePvpHPUI();
     updatePvpRoleLabels();
@@ -1119,12 +1129,29 @@ function showBattleResult(winner, reason) {
   }
 
   DOM.winnerReason.innerText = reason;
-  DOM.statRounds.innerText = GAME_STATE.mode === 'pvp' ? '實時對決' : `${Math.min(GAME_STATE.round, GAME_STATE.maxRounds)} 回合`;
-  
   if (GAME_STATE.mode === 'pvp') {
-    DOM.statCorrectCount.innerText = '即時對戰';
-    DOM.statAccuracy.innerText = '100% 鬥志';
+    const p1Total = GAME_STATE.pvp.p1Total;
+    const p1Correct = GAME_STATE.pvp.p1Correct;
+    const p1Acc = p1Total > 0 ? Math.round((p1Correct / p1Total) * 100) : 0;
+
+    const p2Total = GAME_STATE.pvp.p2Total;
+    const p2Correct = GAME_STATE.pvp.p2Correct;
+    const p2Acc = p2Total > 0 ? Math.round((p2Correct / p2Total) * 100) : 0;
+
+    DOM.statRounds.innerText = `${Math.max(p1Total, p2Total)} 回合`;
+    DOM.statCorrectCount.innerText = `P1: ${p1Correct} 題 / P2: ${p2Correct} 題`;
+    DOM.statAccuracy.innerText = `P1: ${p1Acc}% / P2: ${p2Acc}%`;
+  } else if (GAME_STATE.mode === 'online') {
+    const isP1 = (GAME_STATE.online.role === 'p1');
+    const total = isP1 ? GAME_STATE.pvp.p1Total : GAME_STATE.pvp.p2Total;
+    const correct = isP1 ? GAME_STATE.pvp.p1Correct : GAME_STATE.pvp.p2Correct;
+    const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
+
+    DOM.statRounds.innerText = `${total} 回合`;
+    DOM.statCorrectCount.innerText = `${correct} 題`;
+    DOM.statAccuracy.innerText = `${accuracy}%`;
   } else {
+    DOM.statRounds.innerText = `${Math.min(GAME_STATE.round, GAME_STATE.maxRounds)} 回合`;
     DOM.statCorrectCount.innerText = `${GAME_STATE.stats.correct} 題`;
     const total = GAME_STATE.stats.total || 1;
     const accuracy = Math.round((GAME_STATE.stats.correct / total) * 100);
@@ -1732,6 +1759,24 @@ function checkPvpAnswer(playerId, selectedIdx) {
   if (!q) return;
   const isCorrect = (selectedIdx === q.correctIdx);
 
+  // 累加對戰答題統計
+  if (playerId === 1) {
+    GAME_STATE.pvp.p1Total++;
+    if (isCorrect) GAME_STATE.pvp.p1Correct++;
+  } else {
+    GAME_STATE.pvp.p2Total++;
+    if (isCorrect) GAME_STATE.pvp.p2Correct++;
+  }
+
+  // 同步更新通用統計做為防呆備份 (針對本機操作的玩家)
+  const isLocal = (GAME_STATE.mode !== 'online') || 
+                  (playerId === 1 && GAME_STATE.online.role === 'p1') || 
+                  (playerId === 2 && GAME_STATE.online.role === 'p2');
+  if (isLocal) {
+    GAME_STATE.stats.total++;
+    if (isCorrect) GAME_STATE.stats.correct++;
+  }
+
   // 記錄作答數據
   const studentInfoInput = document.getElementById('input-student-info');
   const studentInfo = studentInfoInput ? studentInfoInput.value.trim() : '未命名學生';
@@ -1867,6 +1912,9 @@ function updatePvpHPUI() {
   if (DOM.pvpP2MyHpFill) DOM.pvpP2MyHpFill.style.width = `${(p2Hp / 100) * 100}%`;
   if (DOM.pvpP2OpHp) DOM.pvpP2OpHp.innerText = p1Hp;
   if (DOM.pvpP2OpHpFill) DOM.pvpP2OpHpFill.style.width = `${(p1Hp / 100) * 100}%`;
+
+  // 即時判定勝負
+  checkPvpGameOver();
 }
 
 function startPvpMatchTimer() {
@@ -1886,6 +1934,19 @@ function checkPvpGameOver() {
 }
 
 function endPvpGame(reasonType) {
+  if (GAME_STATE.pvp.isGameEnded) return;
+  GAME_STATE.pvp.isGameEnded = true;
+
+  // 線上對決通知對手遊戲結束，同步最終血量與狀態
+  if (GAME_STATE.mode === 'online' && GAME_STATE.online.connected) {
+    sendOnlineMessage({
+      type: 'game_over',
+      reasonType: reasonType,
+      playerHp: GAME_STATE.playerHp,
+      bossHp: GAME_STATE.bossHp
+    });
+  }
+
   let winner = 0;
   let reason = '';
   
@@ -2425,6 +2486,10 @@ function setupPeerAsHost() {
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478' },
+          { urls: 'stun:stun.nextcloud.com:443' },
           {
             urls: 'turn:openrelay.metered.ca:80',
             username: 'openrelayproject',
@@ -2437,6 +2502,21 @@ function setupPeerAsHost() {
           },
           {
             urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:relay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:relay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:relay.metered.ca:443?transport=tcp',
             username: 'openrelayproject',
             credential: 'openrelayproject'
           }
@@ -2486,6 +2566,10 @@ function setupPeerAsGuest(roomId) {
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478' },
+          { urls: 'stun:stun.nextcloud.com:443' },
           {
             urls: 'turn:openrelay.metered.ca:80',
             username: 'openrelayproject',
@@ -2498,6 +2582,21 @@ function setupPeerAsGuest(roomId) {
           },
           {
             urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:relay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:relay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:relay.metered.ca:443?transport=tcp',
             username: 'openrelayproject',
             credential: 'openrelayproject'
           }
@@ -2593,6 +2692,11 @@ function startOnlineBattle() {
   GAME_STATE.stats.correct = 0;
   GAME_STATE.stats.total = 0;
   GAME_STATE.online.opponentName = '';
+  GAME_STATE.pvp.p1Total = 0;
+  GAME_STATE.pvp.p1Correct = 0;
+  GAME_STATE.pvp.p2Total = 0;
+  GAME_STATE.pvp.p2Correct = 0;
+  GAME_STATE.pvp.isGameEnded = false;
 
   // 同步交換名字
   const studentInfoInput = document.getElementById('input-student-info');
@@ -2657,6 +2761,15 @@ function handleOnlineMessage(data) {
       const defenderId = attackerId === 1 ? 2 : 1;
       playPvpSkillEffects(attackerId, defenderId, data.skillNum, data.dmg, data.skillName);
       
+      // 累加對手答題統計 (答對並使用招式)
+      if (attackerId === 1) {
+        GAME_STATE.pvp.p1Total++;
+        GAME_STATE.pvp.p1Correct++;
+      } else {
+        GAME_STATE.pvp.p2Total++;
+        GAME_STATE.pvp.p2Correct++;
+      }
+
       setTimeout(() => {
         if (GAME_STATE.online.role === 'p1') {
           // P1 is local, P2 is remote. Guest continues.
@@ -2668,11 +2781,13 @@ function handleOnlineMessage(data) {
 
     case 'wrong_answer':
       if (data.playerId === 1) {
+        GAME_STATE.pvp.p1Total++; // 累加對手答題數 (答錯)
         GAME_STATE.playerHp = Math.max(0, GAME_STATE.playerHp - 6);
         flashPvpOverlay(1, 'wrong');
         const container = DOM.pvpLayout.querySelector('.pvp-left .pvp-rotated-container');
         spawnProjectile(container, '☄️', 'pvp-boss-projectile');
       } else {
+        GAME_STATE.pvp.p2Total++; // 累加對手答題數 (答錯)
         GAME_STATE.bossHp = Math.max(0, GAME_STATE.bossHp - 6);
         flashPvpOverlay(2, 'wrong');
         const container = DOM.pvpLayout.querySelector('.pvp-right .pvp-rotated-container');
@@ -2684,11 +2799,13 @@ function handleOnlineMessage(data) {
 
     case 'timeout':
       if (data.playerId === 1) {
+        GAME_STATE.pvp.p1Total++; // 累加對手答題數 (超時)
         GAME_STATE.playerHp = Math.max(0, GAME_STATE.playerHp - 6);
         flashPvpOverlay(1, 'wrong');
         const container = DOM.pvpLayout.querySelector('.pvp-left .pvp-rotated-container');
         spawnProjectile(container, '☄️', 'pvp-boss-projectile');
       } else {
+        GAME_STATE.pvp.p2Total++; // 累加對手答題數 (超時)
         GAME_STATE.bossHp = Math.max(0, GAME_STATE.bossHp - 6);
         flashPvpOverlay(2, 'wrong');
         const container = DOM.pvpLayout.querySelector('.pvp-right .pvp-rotated-container');
@@ -2696,6 +2813,18 @@ function handleOnlineMessage(data) {
       }
       updatePvpHPUI();
       synth.playWrong();
+      break;
+
+    case 'game_over':
+      GAME_STATE.playerHp = data.playerHp;
+      GAME_STATE.bossHp = data.bossHp;
+      updatePvpHPUI();
+      if (!GAME_STATE.pvp.isGameEnded) {
+        clearInterval(GAME_STATE.pvp.p1Timer);
+        clearInterval(GAME_STATE.pvp.p2Timer);
+        clearInterval(GAME_STATE.pvp.matchTimer);
+        endPvpGame(data.reasonType);
+      }
       break;
 
     case 'match_time':
