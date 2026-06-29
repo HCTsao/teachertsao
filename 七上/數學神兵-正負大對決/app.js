@@ -485,11 +485,11 @@ function setupEventListeners() {
           GAME_STATE.stage++;
         } else {
           // Beat stage 3 (the boss)
-          if (GAME_STATE.level < 4) {
+          if (GAME_STATE.level < 5) {
             GAME_STATE.level++;
             GAME_STATE.stage = 1;
           } else {
-            // Already cleared level 4 stage 3
+            // Already cleared level 5 stage 3
             GAME_STATE.stage = 1;
           }
         }
@@ -630,9 +630,10 @@ function setupRoleLabels() {
     1: '加減算術挑戰',
     2: '乘除運算挑戰',
     3: '進階四則混合',
-    4: '進階絕對值大考驗'
+    4: '進階絕對值大考驗',
+    5: '兩點間的距離'
   };
-  DOM.currentLevelBadge.innerText = `Level ${GAME_STATE.level}`;
+  DOM.currentLevelBadge.innerText = `關卡 ${GAME_STATE.level}`;
   DOM.currentLevelTitle.innerText = titles[GAME_STATE.level];
 
   if (GAME_STATE.mode === 'pvp') {
@@ -1167,10 +1168,10 @@ function showBattleResult(winner, reason) {
           const nextStage = GAME_STATE.stage + 1;
           rematchText.innerText = `挑戰關卡升級 (關卡 ${nextStage} - HP: ${STAGE_HP_CONFIG[nextStage]})`;
         } else {
-          if (GAME_STATE.level < 4) {
-            rematchText.innerText = `進入 Level ${GAME_STATE.level + 1}`;
+          if (GAME_STATE.level < 5) {
+            rematchText.innerText = `進入 關卡 ${GAME_STATE.level + 1}`;
           } else {
-            rematchText.innerText = `重新挑戰 Level 4`;
+            rematchText.innerText = `重新挑戰 關卡 5`;
           }
         }
       } else {
@@ -2030,7 +2031,7 @@ function formatAbsoluteBracketGroup(a, b, op) {
   const hasParentheses = (a < 0 || b < 0);
   const leftBracket = hasParentheses ? '[' : '(';
   const rightBracket = hasParentheses ? ']' : ')';
-  return `${leftBracket} | ${formatNumber(a)} | ${op} | ${formatNumber(b)} | ${rightBracket}`;
+  return `${leftBracket} | ${a} | ${op} | ${b} | ${rightBracket}`;
 }
 
 // ==========================================================================
@@ -2275,14 +2276,14 @@ function generateQuestion(level, stage = 1) {
             // |a| - |b|
             const a = getRandomInteger(-25, 25, [0]);
             const b = getRandomInteger(-25, 25, [0]);
-            formula = `| ${formatNumber(a)} | - | ${formatNumber(b)} | = ?`;
+            formula = `| ${a} | - | ${b} | = ?`;
             answer = Math.abs(a) - Math.abs(b);
             operands = [a, b];
           } else {
             // |a| + b
             const a = getRandomInteger(-25, 25, [0]);
             const b = getRandomInteger(-15, 15, [0]);
-            formula = `| ${formatNumber(a)} | + ${formatNumber(b)} = ?`;
+            formula = `| ${a} | + ${formatNumber(b)} = ?`;
             answer = Math.abs(a) + b;
             operands = [a, b];
           }
@@ -2294,7 +2295,7 @@ function generateQuestion(level, stage = 1) {
             const a = getRandomInteger(-6, 6, [0]);
             const b = getRandomInteger(-6, 6, [0]);
             const c = getRandomInteger(-15, 15, [0]);
-            formula = `| ${formatNumber(a)} × ${formatNumber(b)} | - ${formatNumber(c)} = ?`;
+            formula = `| ${a} × ${b} | - ${formatNumber(c)} = ?`;
             answer = Math.abs(a * b) - c;
             operands = [a, b, c];
           } else {
@@ -2302,7 +2303,7 @@ function generateQuestion(level, stage = 1) {
             const a = getRandomInteger(-15, 15, [0]);
             const b = getRandomInteger(-12, 12, [0]);
             const c = getRandomInteger(-12, 12, [0]);
-            formula = `${formatNumber(a)} + | ${formatNumber(b)} + ${formatNumber(c)} | = ?`;
+            formula = `${formatNumber(a)} + | ${b} + ${c} | = ?`;
             answer = a + Math.abs(b + c);
             operands = [a, b, c];
           }
@@ -2315,7 +2316,7 @@ function generateQuestion(level, stage = 1) {
             const b = getRandomInteger(-4, 4, [0]);
             const c = getRandomInteger(-10, 10, [0]);
             const d = getRandomInteger(-10, 10, [0, -c]);
-            formula = `| ${formatNumber(a)} × ${formatNumber(b)} | - | ${formatNumber(c)} + ${formatNumber(d)} | = ?`;
+            formula = `| ${a} × ${b} | - | ${c} + ${d} | = ?`;
             answer = Math.abs(a * b) - Math.abs(c + d);
             operands = [a, b, c, d];
           } else {
@@ -2331,6 +2332,46 @@ function generateQuestion(level, stage = 1) {
         }
         break;
       }
+      case 5: { // 兩點間的距離
+        if (stage === 1) {
+          // Stage 1: 一正一負，座標在 [-20, 20] 區間
+          const a = getRandomInteger(2, 20);
+          const b = getRandomInteger(-20, -2);
+          const isAFirst = Math.random() < 0.5;
+          const p1 = isAFirst ? a : b;
+          const p2 = isAFirst ? b : a;
+          formula = `數線上兩點 A(${p1}) 與 B(${p2}) 的距離 = ?`;
+          answer = Math.abs(p1 - p2);
+          operands = [p1, p2];
+        } else if (stage === 2) {
+          // Stage 2: 兩個負數，座標在 [-20, -2] 區間
+          const a = getRandomInteger(-20, -2);
+          const b = getRandomInteger(-20, -2, [a]);
+          formula = `數線上兩點 A(${a}) 與 B(${b}) 的距離 = ?`;
+          answer = Math.abs(a - b);
+          operands = [a, b];
+        } else {
+          // Stage 3: 混合出題，擴大座標區間 [-35, 35]，且避免雙正數
+          const isBothNegative = Math.random() < 0.5;
+          if (isBothNegative) {
+            const a = getRandomInteger(-35, -2);
+            const b = getRandomInteger(-35, -2, [a]);
+            formula = `數線上兩點 A(${a}) 與 B(${b}) 的距離 = ?`;
+            answer = Math.abs(a - b);
+            operands = [a, b];
+          } else {
+            const a = getRandomInteger(5, 35);
+            const b = getRandomInteger(-35, -5);
+            const isAFirst = Math.random() < 0.5;
+            const p1 = isAFirst ? a : b;
+            const p2 = isAFirst ? b : a;
+            formula = `數線上兩點 A(${p1}) 與 B(${p2}) 的距離 = ?`;
+            answer = Math.abs(p1 - p2);
+            operands = [p1, p2];
+          }
+        }
+        break;
+      }
     }
 
     if (!isAllPositive(operands, answer)) {
@@ -2338,7 +2379,44 @@ function generateQuestion(level, stage = 1) {
     }
   }
 
-  const options = generateUniqueOptions(answer, [-1, 1, -2, 2, -10, 10, -answer, answer + 5]);
+  let options;
+  if (level === 5) {
+    const correctVal = answer;
+    const optionsSet = new Set();
+    optionsSet.add(correctVal);
+
+    const a = operands[0];
+    const b = operands[1];
+
+    // 迷思 1: 直接減去絕對值 | |a| - |b| |
+    const d1 = Math.abs(Math.abs(a) - Math.abs(b));
+    // 迷思 2: 絕對值直接相加 |a| + |b|（同號時會錯，例如 -8 與 -3 算成 11）
+    const d2 = Math.abs(a) + Math.abs(b);
+    // 迷思 3: 直接相加 |a + b|
+    const d3 = Math.abs(a + b);
+    // 迷思 4: 運算符號混淆迷思（將 a - (-b) 誤算為 a - b，反之亦然）
+    const d4 = Math.abs(correctVal - 2 * Math.min(Math.abs(a), Math.abs(b)));
+
+    [d1, d2, d3, d4].forEach(d => {
+      if (d > 0 && d !== correctVal) {
+        optionsSet.add(d);
+      }
+    });
+
+    // 若選項不足 4 個，用相近的數字填補
+    const offsets = [1, 2, 3, 5, 10];
+    for (let offset of offsets) {
+      if (optionsSet.size >= 4) break;
+      if (correctVal + offset > 0) optionsSet.add(correctVal + offset);
+      if (optionsSet.size >= 4) break;
+      if (correctVal - offset > 0) optionsSet.add(correctVal - offset);
+    }
+
+    options = Array.from(optionsSet).slice(0, 4);
+    options.sort(() => Math.random() - 0.5);
+  } else {
+    options = generateUniqueOptions(answer, [-1, 1, -2, 2, -10, 10, -answer, answer + 5]);
+  }
   const correctIdx = options.indexOf(answer);
 
   return { formula, options, answer, correctIdx };
