@@ -334,10 +334,18 @@ function renderTools() {
         const card = document.createElement('a');
         card.href = tool.path;
         card.className = 'tool-card';
+        
+        let badgesHTML = '';
+        if (tool.categories && tool.categories.length > 0) {
+            badgesHTML = tool.categories.map(cat => `<span class="badge-grade" data-grade="${cat}">${cat}</span>`).join(' ');
+        } else {
+            badgesHTML = `<span class="badge-grade" data-grade="${tool.category}">${tool.category}</span>`;
+        }
+
         card.innerHTML = `
             <div class="card-top">
                 <div class="card-meta">
-                    <span class="badge-grade" data-grade="${tool.category}">${tool.category}</span>
+                    ${badgesHTML}
                 </div>
                 <h3>${tool.name}</h3>
                 <p class="card-desc">${tool.desc}</p>
