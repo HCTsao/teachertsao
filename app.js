@@ -5,6 +5,13 @@
 // 教具資料庫
 const toolsData = [
     {
+        name: "數字貪食蛇",
+        category: "一上",
+        categories: ["一上", "一下", "二上"],
+        path: "一上/數字貪食蛇.html",
+        desc: "經典像素風貪食蛇遊戲！吃下指定數字加長身體，在有趣的遊戲中熟練數字序列與大小關係。"
+    },
+    {
         name: "合十打地鼠",
         category: "一上",
         path: "一上/合十打地鼠.html",
@@ -285,10 +292,13 @@ function renderTools() {
 
     // 篩選資料
     const filteredTools = toolsData.filter(tool => {
-        const matchesCategory = currentCategory === 'all' || tool.category === currentCategory;
+        const matchesCategory = currentCategory === 'all' || 
+                                tool.category === currentCategory ||
+                                (tool.categories && tool.categories.includes(currentCategory));
         const matchesSearch = tool.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                               tool.desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                              tool.category.toLowerCase().includes(searchQuery.toLowerCase());
+                              tool.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              (tool.categories && tool.categories.some(cat => cat.toLowerCase().includes(searchQuery.toLowerCase())));
         return matchesCategory && matchesSearch;
     });
 
@@ -298,7 +308,11 @@ function renderTools() {
     // 處理空白分類的「敬請期待」卡片
     if (filteredTools.length === 0) {
         // 如果是空白分類，顯示敬請期待
-        const isBlankCategory = ['一下', '二下', '三下'].includes(currentCategory) || (currentCategory !== 'all' && toolsData.filter(t => t.category === currentCategory).length === 0);
+        const hasToolsForCategory = toolsData.some(t => 
+            t.category === currentCategory || 
+            (t.categories && t.categories.includes(currentCategory))
+        );
+        const isBlankCategory = ['一下', '二下', '三下'].includes(currentCategory) || (currentCategory !== 'all' && !hasToolsForCategory);
         
         if (isBlankCategory && searchQuery === '') {
             toolsGrid.appendChild(createComingSoonCard(currentCategory));

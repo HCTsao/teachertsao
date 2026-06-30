@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>數字順序貪食蛇 - 經典像素風小遊戲</title>
+    <!-- 引入 Google Fonts 提升文字質感 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f7f5eb;          /* 明亮暖色調背景 */
+            --panel-bg: rgba(255, 255, 255, 0.85);
+            --border-color: #e2decb;
+            --text-color: #4a4439;
+            --text-muted: #8c826e;
+            --snake-head: #2ecc71;        /* 翠綠色蛇頭 */
+            --snake-body: #27ae60;        /* 深綠色蛇身 */
+            --feed-bg: #ff4d4d;           /* 紅色飼料背景 */
+            --feed-border: #c0392b;       /* 紅色飼料邊框 */
+            --feed-text: #000000;         /* 飼料數字顏色（黑色） */
+            --correct-glow: #2ecc71;      /* 吃對時的閃爍光芒 */
+            --wrong-glow: #e74c3c;        /* 吃錯時的閃爍光芒 */
+            --primary-btn: #4caf50;
+            --primary-btn-hover: #45a049;
+            --shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+            --neon-shadow: 0 0 10px rgba(46, 204, 113, 0.3);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 10px;
+            overflow: hidden;
+        }
+
+        /* 背景微弱網格裝飾，增強像素感 */
+        body::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: radial-gradient(var(--border-color) 1.5px, transparent 1.5px);
+            background-size: 24px 24px;
+            z-index: -1;
+            opacity: 0.5;
+        }
+
+        .game-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 600px; /* 寬度拉大 */
+            gap: 15px;
+            position: relative;
+        }
+
+        /* 頂部控制與顯示面板 */
+        .header-panel {
+            width: 100%;
+            background: var(--panel-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            padding: 12px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            position: relative;
+        }
+
+        .stats-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .heart {
+            color: #ff4757;
+            font-size: 1.3rem;
+            filter: drop-shadow(0 2px 4px rgba(255, 71, 87, 0.2));
+            transition: transform 0.2s ease;
+        }
+
+        /* 右上角提示當前數字 */
+        .target-prompt {
+            background: #ffffff;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 6px 12px;
+            text-align: right;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .target-prompt .stat-value {
+            color: #000000; /* 改為黑色以提升辨識度 */
+            font-family: 'Press Start 2P', monospace;
+            font-size: 1.3rem; /* 字體加大 */
+        }
+
+        /* 遊戲主畫布容器 */
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background: #ffffff;
+            border: 4px solid var(--text-color);
+            border-radius: 16px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background-color: #faf8f5;
+        }
+
+        /* 進度條指示器 (0 -> 18) */
+        .progress-bar-container {
+            width: 100%;
+            height: 8px;
+            background: var(--border-color);
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #2ecc71, #27ae60);
+            border-radius: 4px;
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 螢幕震動特效 CSS */
+        .shake {
+            animation: shakeAnim 0.2s ease-in-out;
+        }
+        @keyframes shakeAnim {
+            0%, 100% { transform: translate(0, 0); }
+            20%, 60% { transform: translate(-6px, 4px) rotate(-1deg); }
+            40%, 80% { transform: translate(6px, -4px) rotate(1deg); }
+        }
+
+        /* 畫面閃爍紅光 */
+        .damage-flash {
+            animation: redFlash 0.3s ease-out;
+        }
+        @keyframes redFlash {
+            0% { box-shadow: inset 0 0 50px rgba(231, 76, 60, 0.6); }
+            100% { box-shadow: inset 0 0 0px rgba(231, 76, 60, 0); }
+        }
+
+        /* 畫面閃爍綠光 */
+        .success-flash {
+            animation: greenFlash 0.3s ease-out;
+        }
+        @keyframes greenFlash {
+            0% { box-shadow: inset 0 0 50px rgba(46, 204, 113, 0.4); }
+            100% { box-shadow: inset 0 0 0px rgba(46, 204, 113, 0); }
+        }
+
+        /* 規則說明面板 */
+        .rules-content {
+            text-align: left;
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid var(--border-color);
+            margin-bottom: 20px;
+            max-width: 90%;
+        }
+        .rules-content ul {
+            padding-left: 20px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+        .rules-content li {
+            margin-bottom: 8px;
+        }
+
+        /* 覆蓋面板：遊戲開始、遊戲結束、勝利畫面 */
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(247, 245, 235, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            text-align: center;
+            z-index: 10;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .overlay h2 {
+            font-size: 2.2rem; /* 標題字體加大 */
+            margin-bottom: 12px;
+            font-family: 'Press Start 2P', monospace;
+            line-height: 1.5;
+        }
+
+        .overlay p {
+            color: var(--text-muted);
+            margin-bottom: 24px;
+            font-size: 1.05rem;
+            line-height: 1.6;
+        }
+
+        .overlay .action-btn {
+            background-color: var(--text-color);
+            color: #ffffff;
+            border: none;
+            border-radius: 12px;
+            padding: 14px 28px;
+            font-size: 1.25rem; /* 字體加大 */
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .overlay .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+
+        .overlay .action-btn:active {
+            transform: translateY(0);
+        }
+
+        .game-over-title {
+            color: #e74c3c;
+        }
+
+        .victory-title {
+            color: #2ecc71;
+            animation: bounce 1s infinite alternate;
+        }
+
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-10px); }
+        }
+
+        /* 鍵盤操作提示 */
+        .keyboard-tips {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 5px;
+        }
+
+        /* 關卡選擇選單樣式 */
+        .level-select-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px; /* 間隙加大 */
+            width: 100%;
+            max-width: 520px;
+            margin: 10px 0;
+            padding: 4px;
+        }
+        .level-btn {
+            background: #ffffff;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 14px 8px; /* 增加 padding */
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .level-btn:hover {
+            border-color: var(--text-color);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.06);
+        }
+        .level-btn .lvl-name {
+            font-weight: 800;
+            font-size: 1.15rem; /* 關卡按鈕字體加大 */
+            color: var(--text-color);
+        }
+
+        /* 左上角固定導覽按鈕群組 */
+        #pageNavBar {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        #pageNavBar a,
+        #pageNavBar button {
+            display: block;
+            background: white;
+            color: var(--text-color);
+            border: 2px solid var(--border-color);
+            padding: 7px 16px;
+            font-size: 1rem;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            border-radius: 20px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+            transition: all 0.15s ease;
+            text-decoration: none;
+            text-align: center;
+        }
+        #pageNavBar a:hover,
+        #pageNavBar button:hover {
+            background: var(--text-color);
+            color: white;
+        }
+        /* 回主選單按鈕：遊戲中才顯示 */
+        #abandonBtn {
+            display: none;
+        }
+
+        /* 行動裝置隱藏鍵盤提示 */
+        @media (max-width: 600px) {
+            .keyboard-tips {
+                display: none;
+            }
+            .level-select-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 左上角固定按鈕群組（網頁層級，所有畫面通用） -->
+    <div id="pageNavBar">
+        <a href="index.html" id="homeBtn">🏠 回首頁</a>
+        <button id="abandonBtn">← 回主選單</button>
+    </div>
+
+    <div class="game-wrapper" id="gameWrapper">
+        <!-- 頂部資訊列 -->
+        <div class="header-panel">
+            <div class="stats-group">
+                <div class="stat-item">
+                    <span class="stat-label">生命值 LIVES</span>
+                    <span class="stat-value" id="livesDisplay">
+                        <span class="heart">❤️</span>
+                        <span class="heart">❤️</span>
+                        <span class="heart">❤️</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- 進度顯示 -->
+            <div class="stat-item" style="flex-grow: 1; margin: 0 10px; max-width: 130px;">
+                <span class="stat-label" id="progressLabel" style="text-align: center; width: 100%;">通關進度 (18)</span>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+            </div>
+
+            <!-- 右上角當前數字提示 -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <div class="target-prompt">
+                    <span class="stat-label">當前提示</span>
+                    <span class="stat-value" id="currentNumberPrompt">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 遊戲畫布與覆蓋層 -->
+        <div class="canvas-container" id="canvasContainer">
+            <canvas id="gameCanvas" width="400" height="400"></canvas>
+
+            <!-- 開始遊戲覆蓋層 (主選單) -->
+            <div class="overlay active" id="startOverlay">
+                <h2 style="color: var(--text-color); margin-bottom: 8px; font-size: 2.2rem;">數字貪食蛇</h2>
+                <p style="margin-bottom: 12px; font-size: 1.1rem; color: var(--text-muted);">請點擊選擇關卡開始挑戰：</p>
+                <div class="level-select-grid" id="levelSelectGrid">
+                    <!-- 關卡按鈕將由 JS 動態生成 -->
+                </div>
+                <div style="display:flex; flex-direction:row; gap:8px; justify-content:center;">
+                    <button class="action-btn" id="rulesBtn" style="background-color: var(--text-muted); padding: 10px 20px; font-size: 1.1rem;">規則說明</button>
+                </div>
+                <label id="volumeLabel" style="color: var(--text-color); margin-top:8px;">語音音量</label>
+                <input type="range" id="volumeSlider" min="1.0" max="3.0" step="0.5" value="3.0" style="width:150px;">
+            </div>
+
+            <!-- 規則說明覆蓋層 -->
+            <div class="overlay" id="rulesOverlay">
+                <h2 style="color: var(--text-color)">遊戲規則</h2>
+                <div class="rules-content" style="max-height: 240px; overflow-y: auto;">
+                    <ul>
+                        <li><strong>目標：</strong>依序吃掉紅色數字飼料（依各關卡規則）。</li>
+                        <li><strong>操作：</strong>電腦使用方向鍵；行動裝置則直接<strong>點擊遊戲畫面的上、下、左、右側邊緣</strong>進行轉向。</li>
+                        <li><strong>機制：</strong>畫面上會有 3 個紅色飼料，只有 1 個是正確順序的數字。</li>
+                        <li><strong>生命：</strong>共有 3 條命，吃到錯誤數字生命 -1。所有飼料位置會重新隨機生成。</li>
+                        <li><strong>死亡：</strong>生命歸零、蛇頭咬到自己的身體、或是撞到牆壁，遊戲皆會立刻結束。</li>
+                    </ul>
+                </div>
+                <button class="action-btn" id="closeRulesBtn">我知道了</button>
+            </div>
+
+            <!-- 遊戲結束覆蓋層 -->
+            <div class="overlay" id="gameOverOverlay">
+                <h2 class="game-over-title">挑戰失敗！</h2>
+                <p id="gameOverReason">你撞到了牆壁！</p>
+                <p style="margin-top: -15px;">最終提示數字：<strong id="finalScore">0</strong></p>
+                <div style="display: flex; gap: 10px;">
+                    <button class="action-btn" id="restartBtn">再試一次</button>
+                    <button class="action-btn" id="gameOverHomeBtn" style="background-color: var(--text-muted);">回主選單</button>
+                </div>
+            </div>
+
+            <!-- 遊戲勝利覆蓋層 -->
+            <div class="overlay" id="victoryOverlay">
+                <h2 class="victory-title">👑 恭喜通關！ 👑</h2>
+                <p id="victoryDesc">你成功的完成了關卡挑戰！</p>
+                <div style="display: flex; gap: 10px;">
+                    <button class="action-btn" id="victoryRestartBtn">重新挑戰</button>
+                    <button class="action-btn" id="victoryHomeBtn" style="background-color: var(--text-muted);">回主選單</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 提示 -->
+        <div class="keyboard-tips">
+            電腦玩家：使用方向鍵 ↑ ↓ ← → 控制，或點擊遊戲視窗的上下左右側轉向
+        </div>
+    </div>
+
+    <script>
+        // --- Web Audio API 音效產生器 ---
+        class SoundEffects {
+            constructor() {
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            playCorrect() {
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'triangle';
+                // 短暫的高音階序列
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.setValueAtTime(880, now + 0.08); // A5
+
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.25);
+            }
+
+            playWrong() {
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, now); // A3
+                osc.frequency.linearRampToValueAtTime(110, now + 0.2); // A2
+
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.25);
+            }
+
+            playGameOver() {
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const notes = [293.66, 261.63, 220.00, 196.00]; // D4, C4, A3, G3
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.15);
+                    gain.gain.setValueAtTime(0.15, now + idx * 0.15);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.15 + 0.2);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now + idx * 0.15);
+                    osc.stop(now + idx * 0.15 + 0.2);
+                });
+            }
+
+            playVictory() {
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                // 歡樂的上行大和弦
+                const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50]; // C4, E4, G4, C5, E5, G5, C6
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+                    gain.gain.setValueAtTime(0.12, now + idx * 0.08);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.08 + 0.3);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now + idx * 0.08);
+                    osc.stop(now + idx * 0.08 + 0.3);
+                });
+            }
+        }
+
+        const sounds = new SoundEffects();
+
+        // --- 關卡設定 ---
+        const LEVELS = {
+            1: {
+                name: "18以內的數",
+                startNum: 0,
+                firstTarget: 1,
+                maxTarget: 18,
+                step: 1,
+                growthPerEat: 1,
+                eatsPerGrowth: 1,
+            },
+            2: {
+                name: "30以內的數",
+                startNum: 17,
+                firstTarget: 18,
+                maxTarget: 30,
+                step: 1,
+                growthPerEat: 1,
+                eatsPerGrowth: 1,
+            },
+            3: {
+                name: "50以內的數",
+                startNum: 29,
+                firstTarget: 30,
+                maxTarget: 50,
+                step: 1,
+                growthPerEat: 1,
+                eatsPerGrowth: 1,
+            },
+            4: {
+                name: "2個一數",
+                startNum: 0,
+                firstTarget: 2,
+                maxTarget: 50,
+                step: 2,
+                growthPerEat: 1,
+                eatsPerGrowth: 1,
+            },
+            5: {
+                name: "5個一數",
+                startNum: 0,
+                firstTarget: 5,
+                maxTarget: 50,
+                step: 5,
+                growthPerEat: 2,
+                eatsPerGrowth: 1,
+            },
+            6: {
+                name: "100以內的數",
+                startNum: 49,
+                firstTarget: 50,
+                maxTarget: 100,
+                step: 1,
+                growthPerEat: 1,
+                eatsPerGrowth: 3,
+            },
+            7: {
+                name: "10個一數",
+                startNum: 0,
+                firstTarget: 10,
+                maxTarget: 100,
+                step: 10,
+                growthPerEat: 2,
+                eatsPerGrowth: 1,
+            },
+            8: {
+                name: "200以內的數",
+                startNum: 99,
+                firstTarget: 100,
+                maxTarget: 200,
+                step: 1,
+                growthPerEat: 1,
+                eatsPerGrowth: 4,
+            }
+        };
+
+        // --- 遊戲邏輯變數 ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const GRID_COUNT = 20; // 20x20 網格
+        let tileSize = canvas.width / GRID_COUNT;
+
+        let currentLevel = 1;
+        let correctEatsInLevel = 0;
+        let growthPending = 0;
+
+        let snake = [];
+        let direction = 'right';
+        let nextDirection = 'right';
+        let currentTarget = 1; // 根據關卡設定調整
+        let lives = 3;
+        let feeds = [];        // 包含三個飼料物件 {x, y, value}
+        let particles = [];    // 備用
+        let gameInterval = null;
+        let isGameRunning = false;
+        let speed = 200;       // 移動速度（毫秒）
+
+        // 監聽視窗縮放以確保 Canvas 的高解析度繪製
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.width * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            tileSize = rect.width / GRID_COUNT;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // 綁定虛擬按鈕與鍵盤控制
+        const directions = {
+            ArrowUp: 'up',
+            ArrowDown: 'down',
+            ArrowLeft: 'left',
+            ArrowRight: 'right',
+            KeyW: 'up',
+            KeyS: 'down',
+            KeyA: 'left',
+            KeyD: 'right'
+        };
+
+        // 綁定鍵盤控制
+        window.addEventListener('keydown', (e) => {
+            if (directions[e.code]) {
+                changeDirection(directions[e.code]);
+                e.preventDefault(); // 阻止頁面滾動
+            }
+        });
+
+        // 行動裝置與滑鼠點擊：點擊 Canvas 的上下左右側
+        canvas.addEventListener('touchstart', handleCanvasTouch, { passive: false });
+        canvas.addEventListener('mousedown', handleCanvasClick);
+
+        function handleCanvasTouch(e) {
+            if (!isGameRunning) return;
+            sounds.init();
+            const touch = e.touches[0];
+            processTap(touch.clientX, touch.clientY);
+            e.preventDefault(); // 阻止瀏覽器預設滾動
+        }
+
+        function handleCanvasClick(e) {
+            if (!isGameRunning) return;
+            sounds.init();
+            processTap(e.clientX, e.clientY);
+        }
+
+        function processTap(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            // 計算點擊點相對於 Canvas 中心的偏移量
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            const dx = x - centerX;
+            const dy = y - centerY;
+
+            // 依據 dx 與 dy 的大小判斷玩家點擊了哪一個方向的扇區 (以 45 度對角線劃分)
+            if (Math.abs(dx) > Math.abs(dy)) {
+                if (dx > 0) {
+                    changeDirection('right');
+                } else {
+                    changeDirection('left');
+                }
+            } else {
+                if (dy > 0) {
+                    changeDirection('down');
+                } else {
+                    changeDirection('up');
+                }
+            }
+        }
+
+        function changeDirection(newDir) {
+            if (!isGameRunning) return;
+            sounds.init(); // 藉由使用者互動啟動 AudioContext
+
+            if (newDir === 'up' && direction !== 'down') nextDirection = 'up';
+            if (newDir === 'down' && direction !== 'up') nextDirection = 'down';
+            if (newDir === 'left' && direction !== 'right') nextDirection = 'left';
+            if (newDir === 'right' && direction !== 'left') nextDirection = 'right';
+        }
+
+        // --- 飼料生成邏輯 ---
+        function generateFeeds() {
+            feeds = [];
+            const levelConfig = LEVELS[currentLevel];
+            const max = levelConfig.maxTarget;
+            const step = levelConfig.step;
+
+            // 1. 生成正確的飼料
+            const correctPos = getEmptyGridPosition();
+            feeds.push({
+                x: correctPos.x,
+                y: correctPos.y,
+                value: currentTarget,
+                isCorrect: true
+            });
+
+            // 2. 如果是最後一個目標，只放一個飼料
+            if (currentTarget === max) return;
+
+            // 3. 生成 2 個錯誤飼料，確保總共 3 個
+            //    優先取 currentTarget 後面的數字；若超過 max，改取前面的數字補充
+            const usedVals = new Set([currentTarget]);
+            let wrongVals = [];
+
+            // 先嘗試向後取
+            const next1 = currentTarget + step;
+            const next2 = currentTarget + 2 * step;
+            if (next1 <= max) { wrongVals.push(next1); usedVals.add(next1); }
+            if (next2 <= max && wrongVals.length < 2) { wrongVals.push(next2); usedVals.add(next2); }
+
+            // 若還不足 2 個，往前取數字補充
+            if (wrongVals.length < 2) {
+                let candidate = currentTarget - step;
+                while (wrongVals.length < 2 && candidate >= levelConfig.firstTarget) {
+                    if (!usedVals.has(candidate)) {
+                        wrongVals.push(candidate);
+                        usedVals.add(candidate);
+                    }
+                    candidate -= step;
+                }
+            }
+
+            // 隨機打亂順序後加入 feeds
+            wrongVals.sort(() => Math.random() - 0.5);
+            for (const val of wrongVals) {
+                const pos = getEmptyGridPosition();
+                feeds.push({ x: pos.x, y: pos.y, value: val, isCorrect: false });
+            }
+        }
+
+        function getEmptyGridPosition() {
+            let attempts = 0;
+            while (attempts < 200) {
+                const x = Math.floor(Math.random() * GRID_COUNT);
+                const y = Math.floor(Math.random() * GRID_COUNT);
+                
+                // 檢查是否生成在蛇身上
+                const onSnake = snake.some(segment => segment.x === x && segment.y === y);
+                // 檢查是否生成在已有的飼料位置上
+                const onFeed = feeds.some(f => f.x === x && f.y === y);
+
+                if (!onSnake && !onFeed) {
+                    return { x, y };
+                }
+                attempts++;
+            }
+            return { x: 0, y: 0 };
+        }
+
+        // --- 特效：粒子發散 ---
+        function spawnParticles(x, y) {
+            const centerX = (x + 0.5) * tileSize;
+            const centerY = (y + 0.5) * tileSize;
+            for (let i = 0; i < 15; i++) {
+                particles.push({
+                    x: centerX,
+                    y: centerY,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: (Math.random() - 0.5) * 6,
+                    radius: Math.random() * 3 + 2,
+                    color: `hsl(${120 + Math.random() * 30}, 80%, 50%)`, // 綠色像素粒子
+                    alpha: 1,
+                    decay: Math.random() * 0.05 + 0.02
+                });
+            }
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= p.decay;
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        function drawParticles() {
+            particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                // 像素風用矩形粒子代替圓形
+                ctx.fillRect(p.x - p.radius, p.y - p.radius, p.radius * 2, p.radius * 2);
+                ctx.restore();
+            });
+        }
+
+        // --- 視覺震動與紅綠光特效 ---
+        function triggerScreenShake() {
+            const wrapper = document.getElementById('gameWrapper');
+            wrapper.classList.remove('shake');
+            void wrapper.offsetWidth; // 強制重繪
+            wrapper.classList.add('shake');
+            
+            const container = document.getElementById('canvasContainer');
+            container.classList.remove('damage-flash');
+            void container.offsetWidth;
+            container.classList.add('damage-flash');
+        }
+
+        function triggerSuccessFlash() {
+            const container = document.getElementById('canvasContainer');
+            container.classList.remove('success-flash');
+            void container.offsetWidth;
+            container.classList.add('success-flash');
+        }
+
+        // --- 遊戲邏輯循環 ---
+        function update() {
+            if (!isGameRunning) return;
+
+            direction = nextDirection;
+            const head = { ...snake[0] };
+
+            // 依方向前進
+            if (direction === 'up') head.y -= 1;
+            else if (direction === 'down') head.y += 1;
+            else if (direction === 'left') head.x -= 1;
+            else if (direction === 'right') head.x += 1;
+
+            // 1. 碰撞檢測：穿牆（螢幕邊界環繞）
+            if (head.x < 0) head.x = GRID_COUNT - 1;
+            if (head.x >= GRID_COUNT) head.x = 0;
+            if (head.y < 0) head.y = GRID_COUNT - 1;
+            if (head.y >= GRID_COUNT) head.y = 0;
+
+
+            // 2. 碰撞檢測：咬到自己死亡
+            const bitSelf = snake.some((segment, idx) => idx > 0 && segment.x === head.x && segment.y === head.y);
+            if (bitSelf) {
+                gameOver("你咬到了自己的身體！");
+                return;
+            }
+
+            // 將新頭部插入蛇頭
+            snake.unshift(head);
+
+            // 3. 碰撞檢測：吃飼料
+            let ateFeed = false;
+            const levelConfig = LEVELS[currentLevel];
+            for (let i = 0; i < feeds.length; i++) {
+                const feed = feeds[i];
+                if (head.x === feed.x && head.y === feed.y) {
+                    ateFeed = true;
+                    if (feed.isCorrect) {
+                        // 吃對正確飼料
+                        sounds.playCorrect();
+                        triggerSuccessFlash();
+                        speakNumber(currentTarget); // 語音播報
+                        
+                        // 提示數字與進度條更新
+                        document.getElementById('currentNumberPrompt').innerText = currentTarget;
+                        const totalSteps = Math.round((levelConfig.maxTarget - levelConfig.firstTarget) / levelConfig.step) + 1;
+                        const completed = Math.round((currentTarget - levelConfig.firstTarget) / levelConfig.step) + 1;
+                        const progressPercent = (completed / totalSteps) * 100;
+                        document.getElementById('progressBar').style.width = `${progressPercent}%`;
+
+                        // 判斷是否過關 (吃到 maxTarget 算過關)
+                        if (currentTarget === levelConfig.maxTarget) {
+                            victory();
+                            return;
+                        }
+
+                        currentTarget += levelConfig.step;
+
+                        // 蛇蛇增長邏輯
+                        correctEatsInLevel++;
+                        if (correctEatsInLevel % levelConfig.eatsPerGrowth === 0) {
+                            growthPending += levelConfig.growthPerEat;
+                        }
+
+                        // 消耗 growthPending (因為 unshift(head) 已經讓長度 +1，故減 1)
+                        if (growthPending > 0) {
+                            growthPending--;
+                        } else {
+                            snake.pop(); // 尚未達到增長時機，pop 掉尾巴保持原長度
+                        }
+
+                        generateFeeds(); // 重新生成飼料
+                    } else {
+                        // 吃錯錯誤飼料
+                        sounds.playWrong();
+                        triggerScreenShake();
+                        lives--;
+                        updateLivesUI();
+
+                        if (lives <= 0) {
+                            gameOver("吃錯 3 次飼料，生命值歸零！");
+                            return;
+                        } else {
+                            // 吃錯不增長，pop 掉尾巴，並重新生成飼料
+                            snake.pop();
+                            generateFeeds();
+                        }
+                    }
+                    break;
+                }
+            }
+
+            // 如果沒吃到飼料，蛇前進
+            if (!ateFeed) {
+                // 如果先前吃對所累積的增長點數尚未消耗完 (例如 growthPerEat = 2)
+                if (growthPending > 0) {
+                    growthPending--;
+                } else {
+                    snake.pop(); // 正常移動，移除最後一格
+                }
+            }
+
+            updateParticles();
+        }
+
+        // --- 畫布渲染繪製 ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
+
+            const normalTileSize = canvas.width / window.devicePixelRatio / GRID_COUNT;
+
+            // 1. 繪製微弱背景網格
+            ctx.strokeStyle = '#f0ebe0';
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i <= GRID_COUNT; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * normalTileSize, 0);
+                ctx.lineTo(i * normalTileSize, canvas.height / window.devicePixelRatio);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(0, i * normalTileSize);
+                ctx.lineTo(canvas.width / window.devicePixelRatio, i * normalTileSize);
+                ctx.stroke();
+            }
+
+            // 2. 繪製飼料（紅色像素盒）
+            feeds.forEach(feed => {
+                const x = feed.x * normalTileSize;
+                const y = feed.y * normalTileSize;
+                const pad = 2;
+                const size = normalTileSize - pad * 2;
+
+                // 畫圓角矩形
+                ctx.fillStyle = '#ff4d4d'; // 紅色飼料背景
+                ctx.strokeStyle = '#c0392b'; // 紅色飼料邊框
+                ctx.lineWidth = 2;
+                drawRoundRect(ctx, x + pad, y + pad, size, size, 6, true, true);
+
+                // 畫數字
+                ctx.fillStyle = '#000000'; // 黑色數字
+                ctx.font = `bold ${normalTileSize * 0.55}px 'Outfit', sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(feed.value, x + normalTileSize / 2, y + normalTileSize / 2 + 1);
+            });
+
+            // 3. 繪製蛇蛇（綠色像素蛇）
+            snake.forEach((segment, index) => {
+                const x = segment.x * normalTileSize;
+                const y = segment.y * normalTileSize;
+                const isHead = index === 0;
+
+                ctx.fillStyle = isHead ? '#2ecc71' : '#27ae60'; // 翠綠色與深綠色
+                
+                // 圓角像素風格
+                const pad = isHead ? 1 : 2;
+                const size = normalTileSize - pad * 2;
+                
+                // 蛇身漸層綠色
+                if (!isHead) {
+                    const gradient = ctx.createLinearGradient(x, y, x + size, y + size);
+                    gradient.addColorStop(0, '#2ecc71');
+                    gradient.addColorStop(1, '#27ae60');
+                    ctx.fillStyle = gradient;
+                }
+
+                drawRoundRect(ctx, x + pad, y + pad, size, size, isHead ? 8 : 4, true, false);
+
+                // 繪製蛇眼
+                if (isHead) {
+                    ctx.fillStyle = '#ffffff';
+                    let eyeX1, eyeY1, eyeX2, eyeY2;
+                    const eyeOffset = size * 0.22;
+                    const eyeSize = size * 0.18;
+
+                    if (direction === 'right') {
+                        eyeX1 = x + size * 0.7; eyeY1 = y + eyeOffset;
+                        eyeX2 = x + size * 0.7; eyeY2 = y + size - eyeOffset - eyeSize;
+                    } else if (direction === 'left') {
+                        eyeX1 = x + size * 0.15; eyeY1 = y + eyeOffset;
+                        eyeX2 = x + size * 0.15; eyeY2 = y + size - eyeOffset - eyeSize;
+                    } else if (direction === 'up') {
+                        eyeX1 = x + eyeOffset; eyeY1 = y + size * 0.15;
+                        eyeX2 = x + size - eyeOffset - eyeSize; eyeY2 = y + size * 0.15;
+                    } else { // down
+                        eyeX1 = x + eyeOffset; eyeY1 = y + size * 0.7;
+                        eyeX2 = x + size - eyeOffset - eyeSize; eyeY2 = y + size * 0.7;
+                    }
+
+                    ctx.fillRect(eyeX1, eyeY1, eyeSize, eyeSize);
+                    ctx.fillRect(eyeX2, eyeY2, eyeSize, eyeSize);
+                    
+                    // 瞳孔
+                    ctx.fillStyle = '#1e1e1e';
+                    ctx.fillRect(eyeX1 + eyeSize/4, eyeY1 + eyeSize/4, eyeSize/2, eyeSize/2);
+                    ctx.fillRect(eyeX2 + eyeSize/4, eyeY2 + eyeSize/4, eyeSize/2, eyeSize/2);
+                }
+            });
+
+            // 4. 繪製粒子特效
+            drawParticles();
+        }
+
+        // 輔助繪製圓角矩形
+        function drawRoundRect(ctx, x, y, width, height, radius, fill, stroke) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+            if (fill) ctx.fill();
+            if (stroke) ctx.stroke();
+        }
+
+        // --- 狀態更新 UI ---
+        function updateLivesUI() {
+            const container = document.getElementById('livesDisplay');
+            container.innerHTML = '';
+            for (let i = 0; i < 3; i++) {
+                const heart = document.createElement('span');
+                heart.className = 'heart';
+                heart.innerText = i < lives ? '❤️' : '🖤';
+                // 如果是剛被扣掉的生命，加入縮放特效
+                if (i === lives) {
+                    heart.style.transform = 'scale(0.5)';
+                }
+                container.appendChild(heart);
+            }
+        }
+
+        // --- 語音播報 ---
+        let selectedVoice = null;
+        let speechVolume = 3.0; // 預設最大值 3.0
+
+        // 預先載入語音列表
+        function loadVoices() {
+            const voices = window.speechSynthesis.getVoices();
+            // 優先尋找 Microsoft Traditional Chinese 語音 (如 Hanhan、Yating、Apple Meijia)
+            // 因為本機語音音量非常均勻，且 1 和 4 不會特別小聲
+            selectedVoice = voices.find(v => /zh-?TW/.test(v.lang) && /(Hanhan|Yating|Meijia|Sinji)/i.test(v.name))
+                         || voices.find(v => /zh-?TW/.test(v.lang) && /Microsoft/i.test(v.name))
+                         || voices.find(v => /zh-?TW/.test(v.lang) && /Google/i.test(v.name))
+                         || voices.find(v => /zh-?TW/.test(v.lang))
+                         || voices[0] || null;
+        }
+        if (window.speechSynthesis) {
+            loadVoices();
+            window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
+
+        function speakNumber(num) {
+            if (!window.speechSynthesis) return;
+            window.speechSynthesis.cancel();
+            
+            // 針對 1 轉換為 "衣"，4 轉換為 "寺" 來優化發音清晰度
+            let textToSpeak = String(num);
+            if (num === 1) textToSpeak = "衣";
+            if (num === 4) textToSpeak = "寺";
+
+            const utter = new SpeechSynthesisUtterance(textToSpeak);
+            utter.lang = 'zh-TW';
+            utter.voice = selectedVoice;
+            
+            // 基礎音量因子：滑桿最右邊預設為 3.0 (對應 1.0 最大音量)
+            const factor = speechVolume * 0.33;
+            
+            if (num === 1 || num === 4) {
+                // 1 與 4 特別提升音量權重 (放大 2.0 倍)，並調慢語速讓字音更洪亮清晰
+                utter.volume = Math.min(1.0, factor * 2.0);
+                utter.rate = 0.75;
+                utter.pitch = 1.15;
+            } else {
+                utter.volume = Math.min(1.0, factor);
+                utter.rate = 0.85;
+                utter.pitch = 1.1;
+            }
+            window.speechSynthesis.speak(utter);
+        }
+
+
+        // 動態生成關卡選單
+        function renderLevelSelector() {
+            const grid = document.getElementById('levelSelectGrid');
+            grid.innerHTML = '';
+            
+            Object.keys(LEVELS).forEach(key => {
+                const lvl = LEVELS[key];
+                const btn = document.createElement('button');
+                btn.className = 'level-btn';
+                btn.innerHTML = `<span class="lvl-name">關卡${key}：${lvl.name}</span>`;
+                btn.addEventListener('click', () => {
+                    currentLevel = parseInt(key);
+                    startGame();
+                });
+                grid.appendChild(btn);
+            });
+        }
+
+        // --- 遊戲狀態切換 ---
+        function startGame() {
+            sounds.init();
+            // 語音不需要特別初始化 AudioContext
+            
+            const levelConfig = LEVELS[currentLevel];
+            
+            // 初始化變數
+            snake = [
+                { x: 10, y: 10 },
+                { x: 9, y: 10 }
+            ];
+            direction = 'right';
+            nextDirection = 'right';
+            currentTarget = levelConfig.firstTarget;
+            correctEatsInLevel = 0;
+            growthPending = 0;
+            lives = 3;
+            particles = [];
+            
+            updateLivesUI();
+            document.getElementById('currentNumberPrompt').innerText = levelConfig.startNum;
+            document.getElementById('progressBar').style.width = '0%';
+            document.getElementById('progressLabel').innerText = `通關進度 (${levelConfig.maxTarget})`;
+            // 顯示左上角的回主選單按鈕
+            document.getElementById('abandonBtn').style.display = 'block';
+
+            // 關閉所有覆蓋面板
+            document.querySelectorAll('.overlay').forEach(el => el.classList.remove('active'));
+
+            generateFeeds();
+            isGameRunning = true;
+
+            // 啟動主迴圈
+            if (gameInterval) clearInterval(gameInterval);
+            gameInterval = setInterval(() => {
+                update();
+                draw();
+            }, speed);
+        }
+
+        function gameOver(reason) {
+            isGameRunning = false;
+            clearInterval(gameInterval);
+            sounds.playGameOver();
+            window.speechSynthesis && window.speechSynthesis.cancel();
+
+            document.getElementById('abandonBtn').style.display = 'none';
+            document.getElementById('gameOverReason').innerText = reason;
+            const levelConfig = LEVELS[currentLevel];
+            let finalVal = currentTarget - levelConfig.step;
+            document.getElementById('finalScore').innerText = finalVal; 
+            document.getElementById('gameOverOverlay').classList.add('active');
+        }
+
+        function victory() {
+            isGameRunning = false;
+            clearInterval(gameInterval);
+            // 延遲播放勝利音效，讓最後一個數字語音播完
+            setTimeout(() => {
+                window.speechSynthesis && window.speechSynthesis.cancel();
+                sounds.playVictory();
+            }, 1200);
+
+            document.getElementById('abandonBtn').style.display = 'none';
+            const levelConfig = LEVELS[currentLevel];
+            document.getElementById('victoryDesc').innerHTML = `你成功按順序完成了 <strong>${levelConfig.name}</strong> 的挑戰！`;
+            document.getElementById('victoryOverlay').classList.add('active');
+        }
+
+        function goHome() {
+            isGameRunning = false;
+            clearInterval(gameInterval);
+            window.speechSynthesis && window.speechSynthesis.cancel();
+            document.getElementById('abandonBtn').style.display = 'none';
+            document.querySelectorAll('.overlay').forEach(el => el.classList.remove('active'));
+            document.getElementById('startOverlay').classList.add('active');
+            draw(); // 重新整理背景
+        }
+
+        // 綁定按鈕點擊事件
+        document.getElementById('restartBtn').addEventListener('click', startGame);
+        document.getElementById('victoryRestartBtn').addEventListener('click', startGame);
+        
+        document.getElementById('abandonBtn').addEventListener('click', goHome);
+        document.getElementById('gameOverHomeBtn').addEventListener('click', goHome);
+        document.getElementById('victoryHomeBtn').addEventListener('click', goHome);
+        
+        document.getElementById('rulesBtn').addEventListener('click', () => {
+            document.getElementById('startOverlay').classList.remove('active');
+            document.getElementById('rulesOverlay').classList.add('active');
+        });
+        
+        document.getElementById('closeRulesBtn').addEventListener('click', () => {
+            document.getElementById('rulesOverlay').classList.remove('active');
+            document.getElementById('startOverlay').classList.add('active');
+        });
+
+        // 音量滑桿事件 - 直接控制 utter.volume
+        document.getElementById('volumeSlider').addEventListener('input', function() {
+            speechVolume = parseFloat(this.value);
+        });
+
+        // 初始化
+        renderLevelSelector();
+
+        // 初始繪製畫面，背景格線
+        draw();
+    </script>
+</body>
+</html>
