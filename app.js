@@ -38,7 +38,7 @@ const toolsData = [
         category: "二上",
         path: "二上/直式加減密碼鎖/index.html",
         desc: "挑戰密室解謎！包含加減法簡單、基礎與進階墨水挖空版，結合直式進退位引導，推理還原算式解開金庫密碼！",
-        type: "遊戲"
+        type: "評量"
     },
     {
         name: "幾分之幾",
