@@ -65,12 +65,46 @@
             transform: translate(-15px, -15px) rotate(-35deg);
         }
 
-        /* 回首頁按鈕 */
-        .back-home-btn {
+        /* 頂部控制面板導覽列 */
+        .top-nav-bar {
             position: fixed;
             top: 15px;
             left: 15px;
             z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .nav-buttons-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .volume-slider-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 2px solid #2E7D32;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            font-size: 0.95rem;
+            font-weight: 900;
+            color: #2E7D32;
+        }
+
+        #volumeSlider {
+            width: 100px;
+            cursor: pointer;
+            accent-color: #2E7D32;
+        }
+
+        /* 回首頁按鈕 */
+        .back-home-btn {
             background: #2E7D32;
             color: white;
             border: 2px solid #2E7D32;
@@ -96,10 +130,6 @@
 
         /* 左上角回主選單按鈕 */
         #abandonBtn {
-            position: fixed;
-            top: 15px;
-            left: 130px; 
-            z-index: 1000;
             display: none; 
             background: white;
             color: #2E7D32;
@@ -123,10 +153,6 @@
 
         /* 音效開關按鈕 */
         #soundToggleBtn {
-            position: fixed;
-            top: 15px;
-            left: 245px; 
-            z-index: 1000;
             background: white;
             color: #2E7D32;
             border: 2px solid #2E7D32;
@@ -748,21 +774,22 @@
                 font-size: 1.2rem !important;
                 padding: 8px 25px !important;
             }
-            #abandonBtn {
-                top: 8px !important;
-                left: 95px !important;
-                padding: 4px 10px !important;
-                font-size: 0.85rem !important;
-            }
-            .back-home-btn {
+            .top-nav-bar {
                 top: 8px !important;
                 left: 8px !important;
-                padding: 4px 10px !important;
-                font-size: 0.85rem !important;
+                gap: 6px !important;
             }
-            #soundToggleBtn {
-                top: 8px !important;
-                left: 182px !important;
+            .nav-buttons-row {
+                gap: 6px !important;
+            }
+            .volume-slider-row {
+                padding: 4px 10px !important;
+                font-size: 0.8rem !important;
+            }
+            #volumeSlider {
+                width: 80px !important;
+            }
+            .back-home-btn, #abandonBtn, #soundToggleBtn {
                 padding: 4px 10px !important;
                 font-size: 0.85rem !important;
             }
@@ -778,14 +805,22 @@
     <!-- 追隨滑鼠的可愛槌子 -->
     <div class="hammer-cursor" id="hammer"></div>
 
-    <!-- 左上角回首頁按鈕 -->
-    <a href="../index.html" class="back-home-btn">🏠 回首頁</a>
-
-    <!-- 左上角回主選單按鈕 -->
-    <button id="abandonBtn">🏠 回主選單</button>
-
-    <!-- 左上角音效開關按鈕 -->
-    <button id="soundToggleBtn">🔊 音效: 開</button>
+    <!-- 頂部控制面板組合 -->
+    <div class="top-nav-bar">
+        <div class="nav-buttons-row">
+            <!-- 左上角回首頁按鈕 -->
+            <a href="../index.html" class="back-home-btn">🏠 回首頁</a>
+            <!-- 左上角回主選單按鈕 -->
+            <button id="abandonBtn">🏠 回主選單</button>
+            <!-- 左上角音效開關按鈕 -->
+            <button id="soundToggleBtn">🔊 音效: 開</button>
+        </div>
+        <div class="volume-slider-row">
+            <span>🎵 配樂音量:</span>
+            <input type="range" id="volumeSlider" min="0" max="100" value="50">
+            <span id="volumeVal">50%</span>
+        </div>
+    </div>
 
     <h1>十力全開！合十打地鼠</h1>
     <div class="subtitle">🎯 規則：只有「兩個數字合起來是 10」的地鼠才能打喔！</div>
@@ -881,6 +916,7 @@
         let audioCtx = null;
         let isSoundMuted = false;
         let bgmTimer = null;
+        let globalVolume = 0.5; // 預設 50% 音量
 
         function initAudio() {
             if (!audioCtx) {
@@ -901,7 +937,9 @@
             osc.type = type;
             osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
             
-            gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+            // 全域音量縮放
+            const finalVolume = volume * globalVolume;
+            gainNode.gain.setValueAtTime(finalVolume, audioCtx.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
             
             osc.connect(gainNode);
@@ -948,7 +986,8 @@
             if (isSoundMuted || timeUp) return;
             initAudio();
             const step = bgmNotes[bgmNoteIndex];
-            playTone(step.note, 'sine', step.dur * 1.5, 0.02);
+            // 基礎音量調高至 0.08，以便搭配音量滑桿控制
+            playTone(step.note, 'sine', step.dur * 1.5, 0.08);
             bgmNoteIndex = (bgmNoteIndex + 1) % bgmNotes.length;
             bgmTimer = setTimeout(playBgmStep, step.dur * 1000);
         }
@@ -1279,6 +1318,15 @@
                 initAudio();
                 if (!timeUp) startBgm();
             }
+        });
+
+        // 音量滑桿事件監聽
+        const volumeSlider = document.getElementById('volumeSlider');
+        const volumeVal = document.getElementById('volumeVal');
+        volumeSlider.addEventListener('input', (e) => {
+            const val = e.target.value;
+            volumeVal.textContent = `${val}%`;
+            globalVolume = val / 100;
         });
 
         document.querySelectorAll('.mole').forEach(mole => mole.addEventListener('click', bonk));
