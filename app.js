@@ -8,7 +8,7 @@ const toolsData = [
         name: "數字貪食蛇",
         category: "一上",
         categories: ["一上", "一下", "二上"],
-        path: "一上/數字貪食蛇.html",
+        path: "一上/數字貪食蛇.html?v=1.3",
         desc: "經典像素風貪食蛇遊戲！吃下指定數字加長身體，在有趣的遊戲中熟練數字序列與大小關係。"
     },
     {

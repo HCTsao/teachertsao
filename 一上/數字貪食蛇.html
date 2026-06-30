@@ -1201,9 +1201,13 @@
             
             // 行動裝置觸控/點擊解鎖語音播放
             const unlockSpeech = () => {
-                const u = new SpeechSynthesisUtterance("");
-                u.volume = 0;
-                window.speechSynthesis.speak(u);
+                try {
+                    // 播報一個極短且低音量的單字以解除 iOS 靜音鎖
+                    const u = new SpeechSynthesisUtterance("開");
+                    u.volume = 0.01;
+                    u.rate = 2.0;
+                    window.speechSynthesis.speak(u);
+                } catch (e) {}
                 window.removeEventListener('touchstart', unlockSpeech);
                 window.removeEventListener('click', unlockSpeech);
             };
@@ -1213,7 +1217,14 @@
 
         function speakNumber(num) {
             if (!window.speechSynthesis) return;
-            window.speechSynthesis.cancel();
+            
+            // iOS 呼叫 cancel() 會導致語音播放列鎖死，故 iOS 排除 cancel
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            if (!isIOS) {
+                try {
+                    window.speechSynthesis.cancel();
+                } catch (e) {}
+            }
             
             // 針對 1 轉換為 "衣"，4 轉換為 "寺" 來優化發音清晰度
             let textToSpeak = String(num);
@@ -1222,7 +1233,11 @@
 
             const utter = new SpeechSynthesisUtterance(textToSpeak);
             utter.lang = 'zh-TW';
-            utter.voice = selectedVoice;
+            
+            // iOS 上使用系統預設 Traditional Chinese 語音最穩定，避免設定 selectedVoice
+            if (!isIOS && selectedVoice) {
+                utter.voice = selectedVoice;
+            }
             
             // 基礎音量因子：滑桿最右邊預設為 3.0 (對應 1.0 最大音量)
             const factor = speechVolume * 0.33;
@@ -1237,7 +1252,12 @@
                 utter.rate = 0.85;
                 utter.pitch = 1.1;
             }
-            window.speechSynthesis.speak(utter);
+            
+            try {
+                window.speechSynthesis.speak(utter);
+            } catch (e) {
+                console.error("Speech play failed:", e);
+            }
         }
 
 
