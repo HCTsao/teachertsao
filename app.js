@@ -298,7 +298,7 @@ function renderTools() {
     // 處理空白分類的「敬請期待」卡片
     if (filteredTools.length === 0) {
         // 如果是空白分類，顯示敬請期待
-        const isBlankCategory = ['二下', '三下'].includes(currentCategory) || (currentCategory !== 'all' && toolsData.filter(t => t.category === currentCategory).length === 0);
+        const isBlankCategory = ['一下', '二下', '三下'].includes(currentCategory) || (currentCategory !== 'all' && toolsData.filter(t => t.category === currentCategory).length === 0);
         
         if (isBlankCategory && searchQuery === '') {
             toolsGrid.appendChild(createComingSoonCard(currentCategory));
