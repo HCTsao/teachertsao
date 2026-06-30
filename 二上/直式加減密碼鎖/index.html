@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>密室脫逃：直式密碼鎖</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container">
+        <!-- 音效與靜音按鈕 -->
+        <div id="sound-controls">
+            <button id="sound-toggle" class="control-btn" title="切換音效">🔊</button>
+            <button id="bgm-toggle" class="control-btn" title="切換音樂">🎵</button>
+        </div>
+
+        <!-- 1. 難度選擇畫面 -->
+        <div id="difficulty-screen" class="screen active">
+            <div class="header-area">
+                <h1 class="game-title">密室脫逃</h1>
+                <h2 class="game-subtitle">直式密碼鎖 🗝️</h2>
+                <p class="game-intro">解鎖古老金庫的大門，拿到失落的數學秘寶吧！</p>
+            </div>
+
+            <!-- 第一步：選擇運算類型 -->
+            <div id="op-selection-panel" class="difficulty-options">
+                <!-- 加法練習 -->
+                <button class="diff-card" id="btn-op-add">
+                    <div class="diff-icon">➕</div>
+                    <div class="diff-info">
+                        <h3>加法練習</h3>
+                        <p>挑戰二位數直式加法，包含基礎加法與進位挑戰！</p>
+                    </div>
+                </button>
+
+                <!-- 減法練習 -->
+                <button class="diff-card" id="btn-op-sub">
+                    <div class="diff-icon">➖</div>
+                    <div class="diff-info">
+                        <h3>減法練習</h3>
+                        <p>挑戰二位數直式減法，包含基礎減法與退位借位挑戰！</p>
+                    </div>
+                </button>
+            </div>
+
+            <!-- 第二步：選擇難度版 (預設隱藏) -->
+            <div id="diff-selection-panel" class="difficulty-options hide">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; width: 100%;">
+                    <button id="btn-back-op" class="back-btn" style="padding: 4px 10px; font-size: 12px; margin-bottom: 5px;">⬅️ 重選加減法</button>
+                    <span id="selected-op-lbl" style="font-weight: bold; color: #0284c7; font-size: 15px;">已選擇：加法練習</span>
+                </div>
+
+                <!-- 簡單版 -->
+                <button class="diff-card" data-diff="easy">
+                    <div class="diff-icon">🟢</div>
+                    <div class="diff-info">
+                        <h3 id="easy-title">簡單版 (不進退位)</h3>
+                        <p id="easy-desc">練習基礎二位數直式加減，十個位對齊輕鬆算！</p>
+                    </div>
+                </button>
+
+                <!-- 基礎版 -->
+                <button class="diff-card" data-diff="basic">
+                    <div class="diff-icon">🟡</div>
+                    <div class="diff-info">
+                        <h3 id="basic-title">基礎版 (進退位加減)</h3>
+                        <p id="basic-desc">進位標記 +1、借位劃斜線，熟練進退位加減法！</p>
+                    </div>
+                </button>
+
+                <!-- 進階版 -->
+                <button class="diff-card" data-diff="advanced">
+                    <div class="diff-icon">🔴</div>
+                    <div class="diff-info">
+                        <h3 id="advanced-title">進階版 (墨水遮掩挖空)</h3>
+                        <p id="advanced-desc">算式數字被神秘墨水遮住了！逆向思考還原算式！</p>
+                    </div>
+                </button>
+            </div>
+            
+            <div class="footer-note">適合國小二年級總結性評量練習</div>
+        </div>
+
+        <!-- 2. 遊戲主畫面 -->
+        <div id="play-screen" class="screen">
+            <!-- 遊戲頂端導航 -->
+            <div class="play-header">
+                <button id="btn-back-menu" class="back-btn">⬅️ 返回選單</button>
+                <div class="header-mode-lbl">密碼鎖解密中</div>
+            </div>
+
+            <!-- 金庫大門密碼鎖面板 -->
+            <div class="vault-stage">
+                <div class="vault-door">
+                    <!-- 密碼鎖容器，將由 JavaScript 動態生成輪盤 -->
+                    <div class="vault-lock-ring" id="wheels-container">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 進度與說明框 -->
+            <div id="status-bar">
+                點擊算式底下的問號開始計算吧！
+            </div>
+
+            <!-- 直式魔法書算式與鍵盤 -->
+            <div id="arithmetic-workspace">
+                <!-- 左半邊：直式算式區 -->
+                <div class="workspace-page formula-page">
+                    <div class="vertical-arithmetic-box">
+                        <!-- 輔助標記列 (進位、借位)，欄位寬度與下方算式對齊 -->
+                        <div class="notation-row">
+                            <div class="notation-op"></div>
+                            <div class="notation-hundreds hide" id="notation-hundreds-spacer"></div>
+                            <div class="notation-tens" id="notation-tens">
+                                <!-- 進位輸入框 -->
+                                <div id="carry-box" class="carry-box hide" data-field="carry">?</div>
+                                <div id="borrow-tens-box" class="borrow-tens-box hide"></div>
+                            </div>
+                            <div class="notation-units" id="notation-units">
+                                <div id="borrow-units-box" class="borrow-units-box hide">10</div>
+                            </div>
+                        </div>
+
+                        <!-- 主要直式算式 -->
+                        <div class="equation-table">
+                            <!-- 被加數 / 被減數 -->
+                            <div class="equation-row" id="row-num1">
+                                <div class="op-cell"></div>
+                                <div class="digit-cell empty-hundreds" id="n1-hundreds"></div>
+                                <div class="digit-cell" id="n1-tens" data-field="n1-tens">5</div>
+                                <div class="digit-cell" id="n1-units" data-field="n1-units">6</div>
+                            </div>
+                            <!-- 加數 / 減數 -->
+                            <div class="equation-row" id="row-num2">
+                                <div class="op-cell" id="math-op">+</div>
+                                <div class="digit-cell empty-hundreds" id="n2-hundreds"></div>
+                                <div class="digit-cell" id="n2-tens" data-field="n2-tens">2</div>
+                                <div class="digit-cell" id="n2-units" data-field="n2-units">3</div>
+                            </div>
+                            <!-- 底線 -->
+                            <div class="line-row"></div>
+                            <!-- 答案行 -->
+                            <div class="equation-row answer-row" id="row-ans">
+                                <div class="op-cell"></div>
+                                <!-- 百位數答案輸入 (預設隱藏，答案 >= 100 時顯示) -->
+                                <div class="digit-cell hide" id="ans-hundreds" data-field="ans-hundreds">?</div>
+                                <div class="digit-cell" id="ans-tens" data-field="ans-tens">?</div>
+                                <div class="digit-cell" id="ans-units" data-field="ans-units">?</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右半邊：操作虛擬鍵盤與引導 -->
+                <div class="workspace-page controller-page">
+                    <div class="hint-action-bar">
+                        <span id="step-tip">點擊個位格開始輸入</span>
+                        <div class="action-btns">
+                            <button id="btn-carry-mark" class="helper-btn hide">➕ 進位1</button>
+                            <button id="btn-borrow-mark" class="helper-btn hide">🪓 借位</button>
+                        </div>
+                    </div>
+
+                    <!-- 數字鍵盤 -->
+                    <div id="virtual-numpad">
+                        <button class="num-btn" data-val="1">1</button>
+                        <button class="num-btn" data-val="2">2</button>
+                        <button class="num-btn" data-val="3">3</button>
+                        <button class="num-btn" data-val="4">4</button>
+                        <button class="num-btn" data-val="5">5</button>
+                        <button class="num-btn" data-val="6">6</button>
+                        <button class="num-btn" data-val="7">7</button>
+                        <button class="num-btn" data-val="8">8</button>
+                        <button class="num-btn" data-val="9">9</button>
+                        <button class="num-btn clear-btn" data-val="clear">清除</button>
+                        <button class="num-btn" data-val="0">0</button>
+                        <button class="num-btn confirm-btn" data-val="confirm">確認</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 遊戲過關彈窗 -->
+        <div id="victory-modal" class="modal-overlay">
+            <div class="modal-content">
+                <h2 class="modal-title">🔓 金庫順利解鎖！</h2>
+                <div class="modal-icon">🏆</div>
+                <p>你用正確的直式心算成功開啟了密室，獲得了傳奇秘寶！</p>
+                <div class="stat-summary">
+                    <div>通關難度：<span id="val-diff">簡單版</span></div>
+                    <div>作答次數：<span id="val-correct">3</span> / <span id="val-total">3</span> 次</div>
+                </div>
+                <button id="btn-next-victory" class="menu-btn">再玩一次</button>
+            </div>
+        </div>
+
+        <!-- 4. 遊戲失敗彈窗 -->
+        <div id="defeat-modal" class="modal-overlay">
+            <div class="modal-content defeat-content">
+                <h2 class="modal-title alert-text">💥 體力不支</h2>
+                <div class="modal-icon">💀</div>
+                <p>密碼鎖防禦機制啟動，勇者被震退了...</p>
+                <button id="btn-retry" class="menu-btn retry-btn">重新挑戰</button>
+                <button id="btn-quit" class="menu-btn secondary-btn">返回選單</button>
+            </div>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
