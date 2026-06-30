@@ -121,6 +121,31 @@
             box-shadow: 0 2px 3px rgba(0,0,0,0.1);
         }
 
+        /* 音效開關按鈕 */
+        #soundToggleBtn {
+            position: fixed;
+            top: 15px;
+            left: 245px; 
+            z-index: 1000;
+            background: white;
+            color: #2E7D32;
+            border: 2px solid #2E7D32;
+            padding: 8px 16px;
+            font-size: 1.1rem;
+            font-weight: 900;
+            border-radius: 20px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.1s ease;
+        }
+        #soundToggleBtn:hover {
+            background: #E8F5E9;
+        }
+        #soundToggleBtn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 3px rgba(0,0,0,0.1);
+        }
+
         h1 {
             font-family: 'Fredoka One', 'Noto Sans TC', sans-serif;
             color: #2E7D32;
@@ -735,6 +760,12 @@
                 padding: 4px 10px !important;
                 font-size: 0.85rem !important;
             }
+            #soundToggleBtn {
+                top: 8px !important;
+                left: 182px !important;
+                padding: 4px 10px !important;
+                font-size: 0.85rem !important;
+            }
         }
     </style>
 
@@ -752,6 +783,9 @@
 
     <!-- 左上角回主選單按鈕 -->
     <button id="abandonBtn">🏠 回主選單</button>
+
+    <!-- 左上角音效開關按鈕 -->
+    <button id="soundToggleBtn">🔊 音效: 開</button>
 
     <h1>十力全開！合十打地鼠</h1>
     <div class="subtitle">🎯 規則：只有「兩個數字合起來是 10」的地鼠才能打喔！</div>
@@ -839,6 +873,99 @@
             }
         } catch(e) {
             console.error("Firebase 初始化失敗：", e);
+        }
+
+        // ==========================================
+        // 1.5 音效與音樂系統 (Web Audio API)
+        // ==========================================
+        let audioCtx = null;
+        let isSoundMuted = false;
+        let bgmTimer = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playTone(freq, type, duration, volume = 0.1) {
+            if (isSoundMuted) return;
+            initAudio();
+            
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            
+            gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function playCorrectSound() {
+            if (isSoundMuted) return;
+            playTone(523.25, 'sine', 0.15, 0.15); // C5
+            setTimeout(() => playTone(659.25, 'sine', 0.15, 0.15), 80); // E5
+            setTimeout(() => playTone(783.99, 'sine', 0.3, 0.15), 160); // G5
+        }
+
+        function playIncorrectSound() {
+            if (isSoundMuted) return;
+            playTone(220, 'sawtooth', 0.25, 0.08); // A3
+            setTimeout(() => playTone(185, 'sawtooth', 0.35, 0.08), 100); // F#3
+        }
+
+        function playMagicSound() {
+            if (isSoundMuted) return;
+            const notes = [880, 1046.50, 1318.51, 1567.98, 2093]; // A5, C6, E6, G6, C7
+            notes.forEach((freq, idx) => {
+                setTimeout(() => {
+                    playTone(freq, 'triangle', 0.25, 0.10);
+                }, idx * 60);
+            });
+        }
+
+        // 輕快放鬆的背景音樂 (BGM)
+        const bgmNotes = [
+            { note: 261.63, dur: 0.4 }, { note: 329.63, dur: 0.4 }, { note: 392.00, dur: 0.4 }, { note: 523.25, dur: 0.4 },
+            { note: 293.66, dur: 0.4 }, { note: 349.23, dur: 0.4 }, { note: 440.00, dur: 0.4 }, { note: 587.33, dur: 0.4 },
+            { note: 329.63, dur: 0.4 }, { note: 392.00, dur: 0.4 }, { note: 493.88, dur: 0.4 }, { note: 659.25, dur: 0.4 },
+            { note: 349.23, dur: 0.4 }, { note: 440.00, dur: 0.4 }, { note: 523.25, dur: 0.4 }, { note: 698.46, dur: 0.4 }
+        ];
+
+        let bgmNoteIndex = 0;
+
+        function playBgmStep() {
+            if (isSoundMuted || timeUp) return;
+            initAudio();
+            const step = bgmNotes[bgmNoteIndex];
+            playTone(step.note, 'sine', step.dur * 1.5, 0.02);
+            bgmNoteIndex = (bgmNoteIndex + 1) % bgmNotes.length;
+            bgmTimer = setTimeout(playBgmStep, step.dur * 1000);
+        }
+
+        function startBgm() {
+            stopBgm();
+            bgmNoteIndex = 0;
+            if (!isSoundMuted && !timeUp) {
+                playBgmStep();
+            }
+        }
+
+        function stopBgm() {
+            if (bgmTimer) {
+                clearTimeout(bgmTimer);
+                bgmTimer = null;
+            }
         }
 
         // ==========================================
@@ -1035,6 +1162,9 @@
             });
             holes.forEach(h => h.classList.remove('busy'));
 
+            initAudio();
+            startBgm();
+
             peep();
             setTimeout(peep, 600); 
             setTimeout(peep, 1300); 
@@ -1049,6 +1179,7 @@
         function endGame() {
             timeUp = true;
             clearInterval(timerInterval);
+            stopBgm();
             abandonBtn.style.display = 'none'; 
             document.getElementById('finalScore').textContent = score;
             endOverlay.classList.remove('hidden');
@@ -1094,14 +1225,17 @@
                 timeBoard.textContent = gameTime;
                 feedback.classList.add('plus');
                 feedback.innerHTML = `⏱️加5秒!`;
+                playMagicSound();
             } else if (isTen) {
                 score += 10;
                 feedback.classList.add('plus');
                 feedback.innerHTML = `加10分<br>對了！`;
+                playCorrectSound();
             } else {
                 score = Math.max(0, score - 5);
                 feedback.classList.add('minus');
                 feedback.innerHTML = `-5分<br>不對唷`;
+                playIncorrectSound();
             }
 
             document.body.appendChild(feedback);
@@ -1119,6 +1253,7 @@
             leaderboardSection.style.display = 'none'; 
             timeUp = true;
             clearInterval(timerInterval);
+            stopBgm();
             score = 0;
             scoreBoard.textContent = score;
             timeBoard.textContent = 60;
@@ -1131,6 +1266,19 @@
 
         abandonBtn.addEventListener('click', () => {
             if(confirm("確定要放棄這場挑戰並回主選單嗎？")) resetToMenu();
+        });
+
+        const soundToggleBtn = document.getElementById('soundToggleBtn');
+        soundToggleBtn.addEventListener('click', () => {
+            isSoundMuted = !isSoundMuted;
+            if (isSoundMuted) {
+                soundToggleBtn.textContent = '🔇 音效: 關';
+                stopBgm();
+            } else {
+                soundToggleBtn.textContent = '🔊 音效: 開';
+                initAudio();
+                if (!timeUp) startBgm();
+            }
         });
 
         document.querySelectorAll('.mole').forEach(mole => mole.addEventListener('click', bonk));
