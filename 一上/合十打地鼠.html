@@ -757,8 +757,7 @@
 
         function randomHole() {
             const availableHoles = Array.from(holes).filter(hole => {
-                const mole = hole.querySelector('.mole');
-                return !mole.classList.contains('up');
+                return !hole.classList.contains('busy');
             });
             if (availableHoles.length === 0) return null;
             const idx = Math.floor(Math.random() * availableHoles.length);
@@ -814,6 +813,7 @@
                 signEl.innerHTML = `<span class="formula">${data.num1}+${data.num2}</span>`;
             }
 
+            hole.classList.add('busy');
             moleEl.classList.add('up');
 
             let minTime = 5000, maxTime = 6000;
@@ -825,6 +825,9 @@
 
             let timer = setTimeout(() => {
                 moleEl.classList.remove('up');
+                setTimeout(() => {
+                    hole.classList.remove('busy');
+                }, 350);
                 if (!timeUp) peep();
             }, showDuration);
             moleEl.dataset.timerId = timer;
@@ -843,7 +846,11 @@
             timeBoard.textContent = gameTime;
             timeUp = false;
 
-            document.querySelectorAll('.mole').forEach(m => m.classList.remove('up'));
+            document.querySelectorAll('.mole').forEach(m => {
+                m.classList.remove('up');
+                if (m.dataset.timerId) clearTimeout(parseInt(m.dataset.timerId));
+            });
+            holes.forEach(h => h.classList.remove('busy'));
 
             peep();
             setTimeout(peep, 600); 
@@ -870,6 +877,7 @@
                 m.classList.remove('up');
                 if (m.dataset.timerId) clearTimeout(parseInt(m.dataset.timerId));
             });
+            holes.forEach(h => h.classList.remove('busy'));
         }
 
         function bonk(e) {
@@ -880,6 +888,14 @@
             mole.dataset.hitThisTurn = "true";
 
             mole.classList.remove('up');
+            
+            const hole = mole.closest('.hole');
+            if (hole) {
+                setTimeout(() => {
+                    hole.classList.remove('busy');
+                }, 350);
+            }
+
             if (mole.dataset.timerId) clearTimeout(parseInt(mole.dataset.timerId));
 
             const isTen = mole.dataset.isTen === 'true';
@@ -927,6 +943,7 @@
                 m.classList.remove('up');
                 if (m.dataset.timerId) clearTimeout(parseInt(m.dataset.timerId));
             });
+            holes.forEach(h => h.classList.remove('busy'));
         }
 
         abandonBtn.addEventListener('click', () => {
