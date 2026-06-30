@@ -1098,7 +1098,11 @@
         let gameTime = 60; 
         let timerInterval;
         let currentDifficulty = 'easy'; 
-        let localLeaderboard = []; 
+        let localLeaderboard = {
+            easy: [],
+            normal: [],
+            hard: []
+        }; 
 
         function randomTime(min, max) {
             return Math.round(Math.random() * (max - min) + min);
@@ -1165,11 +1169,18 @@
             hole.classList.add('busy');
             moleEl.classList.add('up');
 
-            let minTime = 5000, maxTime = 6000;
-            if (currentDifficulty === 'normal') { minTime = 3000; maxTime = 4000; }
-            else if (currentDifficulty === 'hard') { minTime = 1500; maxTime = 2500; }
-
-            const showDuration = randomTime(minTime, maxTime); 
+            let showDuration;
+            if (isSpecial) {
+                // 困難版加時地鼠 1 秒，普通版 2 秒，簡單版 1 秒
+                if (currentDifficulty === 'hard') showDuration = 1000;
+                else if (currentDifficulty === 'normal') showDuration = 2000;
+                else showDuration = 1000; // easy
+            } else {
+                let minTime = 5000, maxTime = 6000;
+                if (currentDifficulty === 'normal') { minTime = 3000; maxTime = 4000; }
+                else if (currentDifficulty === 'hard') { minTime = 1500; maxTime = 2500; }
+                showDuration = randomTime(minTime, maxTime);
+            } 
             moleEl.dataset.hitThisTurn = "false";
 
             let timer = setTimeout(() => {
@@ -1346,9 +1357,18 @@
             const listEl = document.getElementById('leaderboardList');
             listEl.innerHTML = '<li class="leaderboard-item" style="color: #999; justify-content: center;">載入排行中...</li>';
 
+            // 根據難度決定英雄榜標題
+            const titleMap = { easy: '簡單版', normal: '普通版', hard: '困難版' };
+            const titleEl = document.querySelector('.leaderboard-title');
+            if (titleEl) {
+                titleEl.textContent = `🏆 英雄榜 - ${titleMap[currentDifficulty]} (Top 10)`;
+            }
+
+            const dbPath = `whack_mole_leaderboard_${currentDifficulty}`;
+
             if (db) {
                 // Realtime Database 排序通常是升序，所以我們拿最後 10 筆並在前端做反轉排序來呈現 Top 10
-                db.ref("whack_mole_leaderboard")
+                db.ref(dbPath)
                   .orderByChild("score")
                   .limitToLast(10)
                   .once("value")
@@ -1398,17 +1418,19 @@
         function renderLocalLeaderboard() {
             const listEl = document.getElementById('leaderboardList');
             listEl.innerHTML = '';
-            if (localLeaderboard.length === 0) {
+            const currentList = localLeaderboard[currentDifficulty] || [];
+            if (currentList.length === 0) {
                 listEl.innerHTML = '<li class="leaderboard-item" style="color: #999; justify-content: center;">尚無排行，快來當第一名！</li>';
                 return;
             }
-            localLeaderboard.sort((a, b) => b.score - a.score).slice(0, 10).forEach((data, index) => addLeaderboardRow(index + 1, data.name, data.score));
+            [...currentList].sort((a, b) => b.score - a.score).slice(0, 10).forEach((data, index) => addLeaderboardRow(index + 1, data.name, data.score));
         }
 
         document.getElementById('submitScoreBtn').addEventListener('click', () => {
             const name = document.getElementById('playerName').value.trim() || '神秘挑戰者';
+            const dbPath = `whack_mole_leaderboard_${currentDifficulty}`;
             if (db) {
-                db.ref("whack_mole_leaderboard").push({
+                db.ref(dbPath).push({
                     name: name,
                     score: score,
                     timestamp: firebase.database.ServerValue.TIMESTAMP
@@ -1417,7 +1439,10 @@
                     loadLeaderboard(); 
                 }).catch(() => alert("上傳失敗，請重試！"));
             } else {
-                localLeaderboard.push({ name: name, score: score });
+                if (!localLeaderboard[currentDifficulty]) {
+                    localLeaderboard[currentDifficulty] = [];
+                }
+                localLeaderboard[currentDifficulty].push({ name: name, score: score });
                 document.getElementById('submitForm').style.display = 'none';
                 renderLocalLeaderboard();
             }
