@@ -423,15 +423,28 @@ function setupEventListeners() {
       // 線上模式與大廳 UI 連動
       const onlineSetupCard = document.getElementById('online-setup');
       const levelSetupCard = document.getElementById('level-setup');
+      const p1InputLabel = document.getElementById('p1-input-label');
+      const p2InputBlock = document.getElementById('p2-input-block');
+      
       if (GAME_STATE.mode === 'online') {
         onlineSetupCard.classList.remove('hidden');
         levelSetupCard.classList.remove('hidden');
         DOM.btnStartGame.classList.add('hidden');
         updateOnlineStatus('請選擇「創建連線房間」或輸入房號後「連線加入」對手。');
+        if (p1InputLabel) p1InputLabel.style.display = 'none';
+        if (p2InputBlock) p2InputBlock.style.display = 'none';
+      } else if (GAME_STATE.mode === 'pvp') {
+        onlineSetupCard.classList.add('hidden');
+        levelSetupCard.classList.remove('hidden');
+        DOM.btnStartGame.classList.remove('hidden');
+        if (p1InputLabel) p1InputLabel.style.display = 'block';
+        if (p2InputBlock) p2InputBlock.style.display = 'block';
       } else {
         onlineSetupCard.classList.add('hidden');
         levelSetupCard.classList.remove('hidden');
         DOM.btnStartGame.classList.remove('hidden');
+        if (p1InputLabel) p1InputLabel.style.display = 'none';
+        if (p2InputBlock) p2InputBlock.style.display = 'none';
       }
     });
   });
@@ -454,6 +467,16 @@ function setupEventListeners() {
       alert("請先輸入您的「班級/座號/姓名」喔！");
       if (studentInfoInput) studentInfoInput.focus();
       return;
+    }
+
+    if (GAME_STATE.mode === 'pvp') {
+      const studentInfoInputP2 = document.getElementById('input-student-info-p2');
+      const studentInfoP2 = studentInfoInputP2 ? studentInfoInputP2.value.trim() : '';
+      if (!studentInfoP2) {
+        alert("請輸入右邊玩家 2 的「班級/座號/姓名」喔！");
+        if (studentInfoInputP2) studentInfoInputP2.focus();
+        return;
+      }
     }
 
     // 線上模式禁止用此按鈕啟動，必須透過 PeerJS 連線後自動啟動
@@ -684,10 +707,18 @@ function updatePvpRoleLabels() {
       DOM.pvpLayout.classList.add('pvp-role-p2');
     }
   } else {
-    p1NameEl.innerText = '玩家 1';
-    if (p1OpNameEl) p1OpNameEl.innerText = '玩家 2';
-    p2NameEl.innerText = '玩家 2';
-    if (p2OpNameEl) p2OpNameEl.innerText = '玩家 1';
+    const studentInfoInputP1 = document.getElementById('input-student-info');
+    const studentInfoP1 = studentInfoInputP1 ? studentInfoInputP1.value.trim() : '';
+    const studentInfoInputP2 = document.getElementById('input-student-info-p2');
+    const studentInfoP2 = studentInfoInputP2 ? studentInfoInputP2.value.trim() : '';
+
+    const name1 = studentInfoP1 || '玩家 1';
+    const name2 = studentInfoP2 || '玩家 2';
+
+    p1NameEl.innerText = name1;
+    if (p1OpNameEl) p1OpNameEl.innerText = name2;
+    p2NameEl.innerText = name2;
+    if (p2OpNameEl) p2OpNameEl.innerText = name1;
   }
   
   // 清除本地高亮與對調
@@ -888,7 +919,7 @@ function displayQuestion(q) {
 
     btn.innerHTML = `
       <div class="card-inner">
-        <span class="card-value">${typeof val === 'number' ? (val >= 0 ? '+' + val : val) : val}</span>
+        <span class="card-value">${GAME_STATE.level === 5 ? val : (typeof val === 'number' ? (val >= 0 ? '+' + val : val) : val)}</span>
       </div>
     `;
 
@@ -1248,7 +1279,7 @@ function renderModalButtons(options, correctVal, onChoose) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'modal-btn';
-    btn.innerText = typeof val === 'number' ? (val >= 0 ? `+${val}` : val) : val;
+    btn.innerText = GAME_STATE.level === 5 ? val : (typeof val === 'number' ? (val >= 0 ? `+${val}` : val) : val);
     btn.addEventListener('click', () => {
       onChoose(btn, val);
     });
@@ -1489,7 +1520,7 @@ function displayPvpQuestion(playerId, q) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'pvp-btn';
-    btn.innerText = typeof val === 'number' ? (val >= 0 ? `+${val}` : val) : val;
+    btn.innerText = GAME_STATE.level === 5 ? val : (typeof val === 'number' ? (val >= 0 ? `+${val}` : val) : val);
     if (isLocal) {
       btn.addEventListener('click', () => checkPvpAnswer(playerId, idx));
     } else {
@@ -1780,16 +1811,18 @@ function checkPvpAnswer(playerId, selectedIdx) {
 
   // 記錄作答數據
   const studentInfoInput = document.getElementById('input-student-info');
-  const studentInfo = studentInfoInput ? studentInfoInput.value.trim() : '未命名學生';
+  const studentInfo = studentInfoInput ? studentInfoInput.value.trim() : '';
+  const studentInfoInputP2 = document.getElementById('input-student-info-p2');
+  const studentInfoP2 = studentInfoInputP2 ? studentInfoInputP2.value.trim() : '';
   const selectedOptionVal = q.options[selectedIdx];
   const selectedOptionText = typeof selectedOptionVal === 'number' ? (selectedOptionVal >= 0 ? `+${selectedOptionVal}` : `${selectedOptionVal}`) : selectedOptionVal;
 
   let shouldRecord = false;
-  let customStudentInfo = studentInfo;
+  let customStudentInfo = studentInfo || '玩家 1';
 
   if (GAME_STATE.mode === 'pvp') {
     shouldRecord = true;
-    customStudentInfo = `[玩家${playerId}] ${studentInfo}`;
+    customStudentInfo = playerId === 1 ? (studentInfo || '玩家 1') : (studentInfoP2 || '玩家 2');
   } else if (GAME_STATE.mode === 'online') {
     const localPlayerId = GAME_STATE.online.role === 'p1' ? 1 : 2;
     if (playerId === localPlayerId) {
@@ -2989,7 +3022,7 @@ function renderSpectatorQuestion(playerId, q) {
     btn.type = 'button';
     btn.className = 'pvp-btn disabled';
     btn.disabled = true;
-    btn.innerText = typeof val === 'number' ? (val >= 0 ? `+${val}` : val) : val;
+    btn.innerText = GAME_STATE.level === 5 ? val : (typeof val === 'number' ? (val >= 0 ? `+${val}` : val) : val);
     optionsEl.appendChild(btn);
   });
 }
