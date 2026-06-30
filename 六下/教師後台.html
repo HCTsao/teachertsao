@@ -432,7 +432,7 @@
         <!-- 控制列 -->
         <div class="controls-row">
             <div class="search-box">
-                <input type="text" id="search-input" placeholder="🔍 輸入學生座號或姓名搜尋...">
+                <input type="text" id="search-input" placeholder="🔍 輸入班級/座號/姓名搜尋...">
             </div>
             <select id="scenario-filter" class="filter-select">
                 <option value="all">所有日常情境</option>
@@ -456,7 +456,7 @@
                 <thead>
                     <tr>
                         <th style="width: 15%;">時間</th>
-                        <th style="width: 18%;">學生座號/姓名</th>
+                        <th style="width: 18%;">班級/座號/姓名</th>
                         <th style="width: 15%;">挑戰情境</th>
                         <th style="width: 12%;">題目設定</th>
                         <th style="width: 10%;">解題路徑</th>
@@ -664,14 +664,35 @@
 
             let stepsHtml = "";
             for (let s = 1; s <= 5; s++) {
-                const stepAns = rec.stepAnswers && rec.stepAnswers[s] ? rec.stepAnswers[s] : { eq: "無數據", meaning: "無數據" };
+                const stepAns = rec.stepAnswers && rec.stepAnswers[s] ? rec.stepAnswers[s] : { eq: "無數據", meaning: "無數據", attempts: [] };
+                
+                let attemptsListHtml = "";
+                if (stepAns.attempts && stepAns.attempts.length > 0) {
+                    attemptsListHtml = `<div style="margin-top: 10px; font-size: 0.85rem; border-top: 1px dotted #ccc; padding-top: 8px;">`;
+                    attemptsListHtml += `<b>💡 所有嘗試歷程：</b><ol style="padding-left: 20px; margin-top: 5px;">`;
+                    stepAns.attempts.forEach((att, idx) => {
+                        const statusColor = att.valid ? 'var(--success)' : 'var(--error)';
+                        const statusTag = att.valid ? '【答對】' : '【答錯/不完整】';
+                        attemptsListHtml += `
+                            <li style="margin-bottom: 6px;">
+                                <span style="font-family: monospace; font-weight: bold; color: var(--primary);">${escapeHtml(att.eq)}</span>
+                                <span style="color: var(--text-secondary); margin-left: 10px;">解釋：</span><span>${escapeHtml(att.meaning)}</span>
+                                <span style="color: ${statusColor}; font-weight: bold; margin-left: 8px;">${statusTag}</span>
+                                ${att.reason ? `<div style="color: #b45309; font-size: 0.8rem; margin-top: 2px; padding-left: 10px; border-left: 2px solid var(--warning);">系統提示：${escapeHtml(att.reason)}</div>` : ''}
+                            </li>
+                        `;
+                    });
+                    attemptsListHtml += `</ol></div>`;
+                }
+
                 stepsHtml += `
                     <div class="step-record-card step-${s}">
                         <div class="step-header">
                             <span>步驟 ${s}</span>
                         </div>
                         <div class="step-eq">${escapeHtml(stepAns.eq)}</div>
-                        <div class="step-meaning">👉 <b>解釋：</b>${escapeHtml(stepAns.meaning)}</div>
+                        <div class="step-meaning">👉 <b>過關解釋：</b>${escapeHtml(stepAns.meaning)}</div>
+                        ${attemptsListHtml}
                     </div>
                 `;
             }
@@ -679,7 +700,7 @@
             content.innerHTML = `
                 <div class="student-summary-cards">
                     <div class="summary-card">
-                        <div class="label">學生名字/座號</div>
+                        <div class="label">班級/座號/姓名</div>
                         <div class="value" style="color: var(--primary);">${escapeHtml(rec.student)}</div>
                     </div>
                     <div class="summary-card">
@@ -711,10 +732,10 @@
         function clearAllData() {
             if (!isFirebaseActive) return;
 
-            const pw = prompt("⚠️ 警告：這將會永久清空資料庫中「所有學生」的解題紀錄！\n請輸入密碼以確認清空（預設密碼：admin888）：");
+            const pw = prompt("⚠️ 警告：這將會永久清空資料庫中「所有學生」的解題紀錄！\n請輸入密碼以確認清空：");
             if (pw === null) return; // 點擊取消
 
-            if (pw === "admin888") {
+            if (pw === "0987912307") {
                 db.ref('records').set(null)
                     .then(() => {
                         alert("✨ 已成功清空所有學生作答數據！");

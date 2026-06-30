@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>十力全開！合十打地鼠</title>
+    <!-- Google Fonts & 字嗨注音字型 -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+    <style>
+        /* 引入字嗨開源注音圓體 */
+        @font-face {
+            font-family: 'BpmfYen';
+            src: url('https://cdn.jsdelivr.net/gh/ButKo/bpmf-font@gh-pages/font/BpmfYen-Regular.woff2') format('woff2');
+            font-display: swap;
+        }
+
+        :root {
+            --primary-green: #4CAF50;
+            --dark-green: #2E7D32;
+            --light-green: #C8E6C9;
+            --dirt-color: #8D6E63;
+            --active-dirt: #5D4037;
+            --accent-yellow: #FFEB3B;
+            --accent-red: #FF5252;
+            --wood-brown: #A0522D;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Noto Sans TC', sans-serif;
+            background: linear-gradient(135deg, #A5D6A7 0%, #81C784 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+            padding-bottom: 30px;
+        }
+
+        /* 槌子游標容器 */
+        .hammer-cursor {
+            width: 60px;
+            height: 60px;
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            /* 調整偏移為 -15px, -15px，讓 🔨 Emoji 左上角鐵槌頭的打擊點剛好落在滑鼠的點擊座標上 */
+            transform: translate(-15px, -15px) rotate(0deg);
+            transition: transform 0.05s ease;
+            transform-origin: 15px 15px; 
+            display: none; 
+        }
+        .hammer-cursor::before {
+            content: '🔨';
+            font-size: 45px;
+            display: block;
+        }
+        .hammer-cursor.hit {
+            transform: translate(-15px, -15px) rotate(-35deg);
+        }
+
+        /* 頂部控制面板導覽列 */
+        .top-nav-bar {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .nav-buttons-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .volume-slider-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 2px solid #2E7D32;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            font-size: 0.95rem;
+            font-weight: 900;
+            color: #2E7D32;
+        }
+
+        #volumeSlider {
+            width: 100px;
+            cursor: pointer;
+            accent-color: #2E7D32;
+        }
+
+        /* 回首頁按鈕 */
+        .back-home-btn {
+            background: #2E7D32;
+            color: white;
+            border: 2px solid #2E7D32;
+            padding: 8px 16px;
+            font-size: 1.1rem;
+            font-weight: 900;
+            border-radius: 20px;
+            text-decoration: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.1s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .back-home-btn:hover {
+            background: #1b5e20;
+            border-color: #1b5e20;
+        }
+        .back-home-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 3px rgba(0,0,0,0.1);
+        }
+
+        /* 左上角回主選單按鈕 */
+        #abandonBtn {
+            display: none; 
+            background: white;
+            color: #2E7D32;
+            border: 2px solid #2E7D32;
+            padding: 8px 16px;
+            font-size: 1.1rem;
+            font-weight: 900;
+            border-radius: 20px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.1s ease;
+        }
+        #abandonBtn:hover {
+            background: #2E7D32;
+            color: white;
+        }
+        #abandonBtn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 3px rgba(0,0,0,0.1);
+        }
+
+        /* 音效開關按鈕 */
+        #soundToggleBtn {
+            background: white;
+            color: #2E7D32;
+            border: 2px solid #2E7D32;
+            padding: 8px 16px;
+            font-size: 1.1rem;
+            font-weight: 900;
+            border-radius: 20px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.1s ease;
+        }
+        #soundToggleBtn:hover {
+            background: #E8F5E9;
+        }
+        #soundToggleBtn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 3px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            font-family: 'Fredoka One', 'Noto Sans TC', sans-serif;
+            color: #2E7D32;
+            text-shadow: 2px 2px 0px #FFF, 4px 4px 0px rgba(0,0,0,0.1);
+            font-size: 2.5rem;
+            margin: 15px 0 5px 0;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #1B5E20;
+            font-weight: 700;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+            background: rgba(255,255,255,0.6);
+            padding: 5px 15px;
+            border-radius: 20px;
+        }
+
+        /* 遊戲資訊面板 */
+        .info-panel {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            background: white;
+            padding: 10px 30px;
+            border-radius: 50px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            font-size: 1.4rem;
+            font-weight: 900;
+            align-items: center;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .score-val { color: #E65100; }
+        .time-val { color: #C62828; }
+
+        /* 遊戲主舞台 */
+        .game-container {
+            position: relative;
+            width: 90%;
+            max-width: 650px;
+            min-height: 720px;
+            background: #81C784;
+            border: 8px solid #388E3C;
+            border-radius: 24px;
+            padding: 30px 20px 20px 20px;
+            box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .game-container.in-game-cursor {
+            cursor: none;
+        }
+        .game-container.in-game-cursor * {
+            cursor: none !important;
+        }
+
+        /* 地洞網格 */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 25px 20px;
+            justify-items: center;
+            align-items: center;
+            flex-grow: 1;
+        }
+
+        /* 類 3D 地洞 */
+        .hole {
+            width: 140px;
+            height: 140px;
+            position: relative;
+        }
+
+        .hole-bg {
+            width: 120px;
+            height: 35px;
+            background: #2D1A14;
+            border-radius: 50%;
+            position: absolute;
+            bottom: 15px;
+            left: 10px;
+            box-shadow: inset 0 5px 10px rgba(0,0,0,0.8);
+            z-index: 1;
+        }
+
+        .mole-wrapper {
+            position: absolute;
+            bottom: 15px; 
+            left: 0;
+            width: 140px;
+            height: 180px; 
+            overflow: hidden;
+            z-index: 2;
+        }
+
+        .mole {
+            width: 90px;
+            height: 110px;
+            position: absolute;
+            bottom: -160px; 
+            left: 25px;
+            background: linear-gradient(135deg, #A1887F 0%, #8D6E63 50%, #795548 100%);
+            border-radius: 50% 50% 25% 25%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding-top: 25px;
+            box-shadow: inset 0 -10px 0 rgba(0,0,0,0.2), inset 0 8px 10px rgba(255,255,255,0.25);
+            transition: bottom 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.15);
+            border-top: 4px solid #D7CCC8;
+        }
+
+        .mole.up {
+            bottom: 0px; 
+        }
+
+        .hole-front {
+            width: 120px;
+            height: 35px;
+            border-radius: 50%;
+            border-bottom: 4px solid rgba(46, 125, 50, 0.4);
+            position: absolute;
+            bottom: 15px;
+            left: 10px;
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        .mole-ears {
+            position: absolute;
+            top: -8px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 15px;
+            box-sizing: border-box;
+        }
+        .ear {
+            width: 26px;
+            height: 26px;
+            background: linear-gradient(135deg, #8D6E63 0%, #795548 100%);
+            border-radius: 50%;
+            border: 2px solid #5D4037;
+            position: relative;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+        }
+        .ear::after {
+            content: '';
+            width: 14px;
+            height: 14px;
+            background: #FFCDD2;
+            border-radius: 50%;
+            position: absolute;
+            top: 4px;
+            left: 4px;
+        }
+
+        .mole-face {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            width: 100%;
+            margin-top: 5px;
+        }
+        .eyes {
+            display: flex;
+            justify-content: space-between;
+            width: 52px;
+            margin-top: 4px;
+            margin-bottom: 4px;
+        }
+        .eye {
+            width: 9px;
+            height: 9px;
+            background: #2D1A14;
+            border-radius: 50%;
+            position: relative;
+        }
+        .eye::after {
+            content: '';
+            width: 3.5px;
+            height: 3.5px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 1px;
+            left: 1px;
+        }
+        .nose {
+            width: 15px;
+            height: 9px;
+            background: #2D1A14;
+            border-radius: 40%;
+            margin-bottom: 2px;
+        }
+        .cheeks {
+            position: absolute;
+            width: 76px;
+            display: flex;
+            justify-content: space-between;
+            top: 10px;
+        }
+        .cheek {
+            width: 13px;
+            height: 9px;
+            background: #FF8A80;
+            border-radius: 50%;
+            opacity: 0.75;
+        }
+        .mouth {
+            width: 10px;
+            height: 6px;
+            border: 2px solid #2D1A14;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+            margin-top: 1px;
+        }
+
+        .paws {
+            position: absolute;
+            top: 18px;
+            width: 120px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 3;
+            pointer-events: none;
+        }
+        .paw {
+            width: 20px;
+            height: 20px;
+            background: #D7CCC8;
+            border: 2.5px solid #5D4037;
+            border-radius: 50%;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+        }
+        .paw-left {
+            transform: translate(8px, 2px) rotate(35deg);
+        }
+        .paw-right {
+            transform: translate(-8px, 2px) rotate(-35deg);
+        }
+
+        .sign {
+            background: linear-gradient(to bottom, #FFFDE7, #FFF9C4);
+            border: 3.5px solid #FFA000;
+            border-radius: 10px;
+            padding: 4px 8px;
+            min-width: 98px;
+            text-align: center;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.25), inset 0 2px 0 rgba(255,255,255,0.5);
+            z-index: 2;
+            position: absolute;
+            top: -24px;
+            transform: rotate(-1.5deg);
+        }
+
+        .formula {
+            font-family: 'Fredoka One', 'Noto Sans TC', sans-serif;
+            font-size: 1.35rem;
+            display: block;
+            text-shadow: 1px 1px 0px rgba(255,255,255,0.8);
+        }
+
+        .mole.special {
+            background: linear-gradient(135deg, #FF8A80 0%, #FF5252 50%, #D50000 100%);
+            border-top: 4px solid #FFCDD2;
+        }
+        .mole.special .ear {
+            background: linear-gradient(135deg, #FF5252 0%, #D50000 100%);
+        }
+        .mole.special .sign {
+            background: linear-gradient(to bottom, #E0F7FA, #B2EBF2);
+            border-color: #00ACC1;
+            color: #006064;
+            transform: rotate(2deg);
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(46, 125, 50, 0.96);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 10;
+            transition: opacity 0.3s ease;
+            padding: 20px;
+        }
+
+        .overlay.hidden {
+            display: none;
+        }
+
+        .difficulty-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 80%;
+            max-width: 320px;
+        }
+
+        .menu-btn {
+            border: none;
+            padding: 14px 20px;
+            font-size: 1.4rem;
+            font-weight: 900;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 6px 0 rgba(0,0,0,0.2), 0 10px 15px rgba(0,0,0,0.2);
+            transition: all 0.1s ease;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+
+        /* 確保按鈕有顏色的範圍(包括裡面的文字)點擊事件不會失真 */
+        .menu-btn *, .play-btn * {
+            pointer-events: none;
+        }
+
+        .menu-btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 3px 0 rgba(0,0,0,0.2), 0 5px 8px rgba(0,0,0,0.2);
+        }
+
+        .easy-btn { background: #4CAF50; box-shadow: 0 6px 0 #388E3C; }
+        .normal-btn { background: #FF9800; box-shadow: 0 6px 0 #F57C00; }
+        .hard-btn { background: #E91E63; box-shadow: 0 6px 0 #C2185B; }
+
+        .play-btn {
+            background: #FFEB3B;
+            color: #2E7D32;
+            border: none;
+            padding: 12px 40px;
+            font-size: 1.6rem;
+            font-weight: 900;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 8px 0 #FBC02D, 0 12px 15px rgba(0,0,0,0.3);
+            transition: all 0.1s ease;
+            margin-top: 15px;
+        }
+
+        .play-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 4px 0 #FBC02D, 0 8px 10px rgba(0,0,0,0.3);
+        }
+
+        /* 遊戲規則區塊 */
+        .rules-content {
+            text-align: left;
+            width: 100%;
+            max-width: 520px;
+            background: rgba(0, 0, 0, 0.25);
+            padding: 15px 25px;
+            border-radius: 16px;
+            border: 2px dashed #A5D6A7;
+            margin-bottom: 12px;
+            overflow: hidden;
+            font-family: 'BpmfYen', 'Noto Sans TC', sans-serif;
+            line-height: 1.6;
+        }
+
+        .rules-content p {
+            margin: 8px 0;
+            font-size: 1.55rem; 
+            font-weight: 900;
+            letter-spacing: 0.5px;
+        }
+
+        /* 回饋文字特效 */
+        .feedback {
+            position: absolute;
+            pointer-events: none;
+            font-size: 1.6rem;
+            font-weight: 900;
+            animation: floatUp 0.8s ease-out forwards;
+            z-index: 100;
+            text-align: center;
+            line-height: 1.2;
+        }
+        .feedback.plus { color: #FFF59D; text-shadow: 2px 2px 0 #2E7D32, -2px -2px 0 #2E7D32, 2px -2px 0 #2E7D32, -2px 2px 0 #2E7D32; }
+        .feedback.minus { color: #FFCDD2; text-shadow: 2px 2px 0 #B71C1C, -2px -2px 0 #B71C1C, 2px -2px 0 #B71C1C, -2px 2px 0 #B71C1C; }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(0.8); opacity: 1; }
+            100% { transform: translateY(-70px) scale(1.3); opacity: 0; }
+        }
+
+        /* 英雄榜區塊 */
+        .leaderboard-section {
+            width: 90%;
+            max-width: 650px;
+            background: white;
+            margin-top: 25px;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            display: none; 
+        }
+
+        .leaderboard-title {
+            font-size: 1.5rem;
+            color: #2E7D32;
+            font-weight: 900;
+            text-align: center;
+            margin-top: 0;
+            border-bottom: 3px dashed #A5D6A7;
+            padding-bottom: 10px;
+        }
+
+        .leaderboard-list {
+            list-style: none;
+            padding: 0;
+            margin: 15px 0 0 0;
+        }
+
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 15px;
+            border-bottom: 1px solid #E8F5E9;
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+        .leaderboard-item:nth-child(1) { color: #D4AF37; font-size: 1.3rem; } 
+        .leaderboard-item:nth-child(2) { color: #C0C0C0; } 
+        .leaderboard-item:nth-child(3) { color: #CD7F32; } 
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            width: 100%;
+        }
+
+        .name-input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 2px solid #A5D6A7;
+            border-radius: 10px;
+            font-size: 1rem;
+            outline: none;
+        }
+        .name-input:focus {
+            border-color: #2E7D32;
+        }
+
+        .submit-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-weight: 900;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        .submit-btn:hover { background: #388E3C; }
+
+        /* 手機或平板等小螢幕響應式適配 */
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.6rem !important;
+                margin: 5px 0 !important;
+            }
+            .subtitle {
+                font-size: 0.95rem !important;
+                margin-bottom: 8px !important;
+            }
+            .info-panel {
+                padding: 6px 15px !important;
+                margin-bottom: 8px !important;
+                font-size: 1.1rem !important;
+            }
+            .game-container {
+                width: 95% !important;
+                min-height: 530px !important;
+                padding: 15px 10px 10px 10px !important;
+                border-width: 5px !important;
+            }
+            .grid {
+                gap: 15px 10px !important;
+            }
+            .hole {
+                width: 95px !important;
+                height: 95px !important;
+            }
+            .hole-bg {
+                width: 82px !important;
+                height: 24px !important;
+                bottom: 10px !important;
+                left: 6.5px !important;
+            }
+            .hole-front {
+                width: 82px !important;
+                height: 24px !important;
+                bottom: 10px !important;
+                left: 6.5px !important;
+            }
+            .mole-wrapper {
+                width: 95px !important;
+                height: 120px !important;
+                bottom: 10px !important;
+            }
+            .mole {
+                width: 60px !important;
+                height: 75px !important;
+                bottom: -110px !important;
+                left: 17.5px !important;
+                padding-top: 15px !important;
+            }
+            .mole.up {
+                bottom: 0px !important;
+            }
+            .paws {
+                width: 80px !important;
+                top: 12px !important;
+            }
+            .paw {
+                width: 14px !important;
+                height: 14px !important;
+                border-width: 1.5px !important;
+            }
+            .sign {
+                top: -18px !important;
+                min-width: 68px !important;
+                padding: 2px 4px !important;
+                border-width: 2px !important;
+            }
+            .formula {
+                font-size: 0.95rem !important;
+            }
+            .ear {
+                width: 18px !important;
+                height: 18px !important;
+                border-width: 1.5px !important;
+            }
+            .ear::after {
+                width: 9px !important;
+                height: 9px !important;
+                top: 3px !important;
+                left: 3px !important;
+            }
+            .mole-ears {
+                padding: 0 10px !important;
+                top: -6px !important;
+            }
+            .eyes {
+                width: 36px !important;
+            }
+            .eye {
+                width: 6px !important;
+                height: 6px !important;
+            }
+            .nose {
+                width: 10px !important;
+                height: 6px !important;
+            }
+            .cheeks {
+                width: 52px !important;
+                top: 8px !important;
+            }
+            .cheek {
+                width: 8px !important;
+                height: 6px !important;
+            }
+            .mouth {
+                width: 7px !important;
+                height: 4px !important;
+            }
+            .feedback {
+                font-size: 1.1rem !important;
+            }
+            .overlay h2 {
+                font-size: 1.4rem !important;
+            }
+            .rules-content p {
+                font-size: 1.05rem !important;
+            }
+            .menu-btn {
+                font-size: 1.1rem !important;
+                padding: 10px 15px !important;
+            }
+            .play-btn {
+                font-size: 1.2rem !important;
+                padding: 8px 25px !important;
+            }
+            .top-nav-bar {
+                top: 8px !important;
+                left: 8px !important;
+                gap: 6px !important;
+            }
+            .nav-buttons-row {
+                gap: 6px !important;
+            }
+            .volume-slider-row {
+                padding: 4px 10px !important;
+                font-size: 0.8rem !important;
+            }
+            #volumeSlider {
+                width: 80px !important;
+            }
+            .back-home-btn, #abandonBtn, #soundToggleBtn {
+                padding: 4px 10px !important;
+                font-size: 0.85rem !important;
+            }
+        }
+    </style>
+
+    <!-- Firebase SDKs (將 Firestore 改為 Realtime Database-compat) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+</head>
+<body>
+
+    <!-- 追隨滑鼠的可愛槌子 -->
+    <div class="hammer-cursor" id="hammer"></div>
+
+    <!-- 頂部控制面板組合 -->
+    <div class="top-nav-bar">
+        <div class="nav-buttons-row">
+            <!-- 左上角回首頁按鈕 -->
+            <a href="../index.html" class="back-home-btn">🏠 回首頁</a>
+            <!-- 左上角回主選單按鈕 -->
+            <button id="abandonBtn">🏠 回主選單</button>
+            <!-- 左上角音效開關按鈕 -->
+            <button id="soundToggleBtn">🔊 音效: 開</button>
+        </div>
+        <div class="volume-slider-row">
+            <span>🎵 配樂音量:</span>
+            <input type="range" id="volumeSlider" min="0" max="100" value="50">
+            <span id="volumeVal">50%</span>
+        </div>
+    </div>
+
+    <h1>十力全開！合十打地鼠</h1>
+    <div class="subtitle">🎯 規則：只有「兩個數字合起來是 10」的地鼠才能打喔！</div>
+
+    <!-- 資訊列 -->
+    <div class="info-panel">
+        <div class="info-item">🏆 得分: <span class="score-val" id="score">0</span></div>
+        <div class="info-item">⏱️ 時間: <span class="time-val" id="timeLeft">60</span> 秒</div>
+    </div>
+
+    <!-- 遊戲主體 -->
+    <div class="game-container" id="gameContainer">
+        <!-- 主選單覆蓋面板 -->
+        <div class="overlay" id="mainMenuOverlay">
+            <h2 style="font-size: 2.2rem; margin-bottom: 25px; font-family: 'Fredoka One', 'Noto Sans TC';">合十打地鼠挑戰賽</h2>
+            <div class="difficulty-buttons">
+                <button class="menu-btn easy-btn" onclick="selectDifficulty('easy')">簡單版</button>
+                <button class="menu-btn normal-btn" onclick="selectDifficulty('normal')">普通版</button>
+                <button class="menu-btn hard-btn" onclick="selectDifficulty('hard')">困難版</button>
+            </div>
+        </div>
+
+        <!-- 規則說明覆蓋面板 -->
+        <div class="overlay hidden" id="rulesOverlay">
+            <h2 style="font-size: 1.8rem; color: #FFEB3B; margin-bottom: 12px; font-family: 'Noto Sans TC'; font-weight: 900;">📜 遊戲規則說明</h2>
+            <div class="rules-content">
+                <p>🎯 規則一：找數字10</p>
+                <p>只打「兩個數字合起來是 10 的地鼠」！例如：3和7 或 1和9。打對加10分，打錯會扣5分唷！</p>
+                
+                <p style="border-top: 1.5px dashed rgba(255,255,255,0.3); padding-top: 8px; margin-top: 8px;">⏱️ 規則二：抓住加時地鼠</p>
+                <p>看見粉紅色地鼠舉著 ⏱️ 加5秒，打牠可以加5秒時間！這隻不會加分數唷！</p>
+            </div>
+            <button class="play-btn" id="rulesConfirmBtn">我知道了，開始挑戰！🚀</button>
+        </div>
+
+        <!-- 遊戲結束覆蓋面板 -->
+        <div class="overlay hidden" id="endOverlay">
+            <h2>時間到！挑戰結束</h2>
+            <p>你的最終得分是：<span id="finalScore" style="font-size: 2.2rem; color: #FFEB3B;">0</span> 分</p>
+            
+            <div style="width: 85%; text-align: center; margin-bottom: 15px;">
+                <div class="input-group" id="submitForm">
+                    <input type="text" id="playerName" class="name-input" placeholder="輸入你的名字上傳排行" maxlength="10">
+                    <button class="submit-btn" id="submitScoreBtn">送出成績</button>
+                </div>
+            </div>
+            <div style="display: flex; gap: 15px;">
+                <button class="play-btn" id="restartBtn" style="font-size: 1.2rem; padding: 10px 25px; margin-top:0;">再玩一次</button>
+                <button class="play-btn" id="backMenuBtn" style="font-size: 1.2rem; padding: 10px 25px; margin-top:0; background:#E0F2F1; color:#00796B; box-shadow:0 8px 0 #B2DFDB;">回主選單</button>
+            </div>
+        </div>
+
+        <!-- 3x3 地洞 -->
+        <div class="grid" id="gameGrid">
+            <!-- JavaScript 動態生成地洞結構 -->
+        </div>
+    </div>
+
+    <!-- 排行榜區塊 (僅在結束畫面顯示) -->
+    <div class="leaderboard-section" id="leaderboardSection">
+        <h3 class="leaderboard-title">🏆 英雄榜 (Top 10)</h3>
+        <ul class="leaderboard-list" id="leaderboardList">
+            <li class="leaderboard-item" style="color: #999; justify-content: center;">載入排行中...</li>
+        </ul>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. FIREBASE 初始化設定 (已成功填入您的 Realtime Database)
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyCfg0RqupJq1ZpUkZVJdVuUODQd2C-hGuw",
+            authDomain: "mathgame-eb605.firebaseapp.com",
+            projectId: "mathgame-eb605",
+            storageBucket: "mathgame-eb605.firebasestorage.app",
+            messagingSenderId: "128497079299",
+            appId: "1:128497079299:web:2a3c27826eaef95ea2aa36"
+        };
+
+        let db = null;
+        try {
+            if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.database(); // 使用 Realtime Database 代替 Firestore
+            }
+        } catch(e) {
+            console.error("Firebase 初始化失敗：", e);
+        }
+
+        // ==========================================
+        // 1.5 音效與音樂系統 (Web Audio API)
+        // ==========================================
+        let audioCtx = null;
+        let isSoundMuted = false;
+        let bgmTimer = null;
+        let globalVolume = 0.5; // 預設 50% 音量
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playTone(freq, type, duration, volume = 0.1) {
+            if (isSoundMuted) return;
+            initAudio();
+            
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            
+            // 全域音量縮放
+            const finalVolume = volume * globalVolume;
+            gainNode.gain.setValueAtTime(finalVolume, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function playCorrectSound() {
+            if (isSoundMuted) return;
+            playTone(523.25, 'sine', 0.15, 0.15); // C5
+            setTimeout(() => playTone(659.25, 'sine', 0.15, 0.15), 80); // E5
+            setTimeout(() => playTone(783.99, 'sine', 0.3, 0.15), 160); // G5
+        }
+
+        function playIncorrectSound() {
+            if (isSoundMuted) return;
+            playTone(220, 'sawtooth', 0.25, 0.08); // A3
+            setTimeout(() => playTone(185, 'sawtooth', 0.35, 0.08), 100); // F#3
+        }
+
+        function playMagicSound() {
+            if (isSoundMuted) return;
+            const notes = [880, 1046.50, 1318.51, 1567.98, 2093]; // A5, C6, E6, G6, C7
+            notes.forEach((freq, idx) => {
+                setTimeout(() => {
+                    playTone(freq, 'triangle', 0.25, 0.10);
+                }, idx * 60);
+            });
+        }
+
+        // 輕快放鬆的背景音樂 (BGM)
+        const bgmNotes = [
+            { note: 261.63, dur: 0.4 }, { note: 329.63, dur: 0.4 }, { note: 392.00, dur: 0.4 }, { note: 523.25, dur: 0.4 },
+            { note: 293.66, dur: 0.4 }, { note: 349.23, dur: 0.4 }, { note: 440.00, dur: 0.4 }, { note: 587.33, dur: 0.4 },
+            { note: 329.63, dur: 0.4 }, { note: 392.00, dur: 0.4 }, { note: 493.88, dur: 0.4 }, { note: 659.25, dur: 0.4 },
+            { note: 349.23, dur: 0.4 }, { note: 440.00, dur: 0.4 }, { note: 523.25, dur: 0.4 }, { note: 698.46, dur: 0.4 }
+        ];
+
+        let bgmNoteIndex = 0;
+
+        function playBgmStep() {
+            if (isSoundMuted || timeUp) return;
+            initAudio();
+            const step = bgmNotes[bgmNoteIndex];
+            // 基礎音量調高至 0.08，以便搭配音量滑桿控制
+            playTone(step.note, 'sine', step.dur * 1.5, 0.08);
+            bgmNoteIndex = (bgmNoteIndex + 1) % bgmNotes.length;
+            bgmTimer = setTimeout(playBgmStep, step.dur * 1000);
+        }
+
+        function startBgm() {
+            stopBgm();
+            bgmNoteIndex = 0;
+            if (!isSoundMuted && !timeUp) {
+                playBgmStep();
+            }
+        }
+
+        function stopBgm() {
+            if (bgmTimer) {
+                clearTimeout(bgmTimer);
+                bgmTimer = null;
+            }
+        }
+
+        // ==========================================
+        // 2. 動態生成網格結構
+        // ==========================================
+        const gameGrid = document.getElementById('gameGrid');
+        for (let i = 0; i < 12; i++) {
+            gameGrid.innerHTML += `
+                <div class="hole" id="hole${i}">
+                    <div class="hole-bg"></div>
+                    <div class="mole-wrapper">
+                        <div class="mole">
+                            <div class="mole-ears">
+                                <div class="ear"></div>
+                                <div class="ear"></div>
+                            </div>
+                            <div class="mole-face">
+                                <div class="eyes">
+                                    <div class="eye"></div>
+                                    <div class="eye"></div>
+                                </div>
+                                <div class="nose"></div>
+                                <div class="cheeks">
+                                    <div class="cheek"></div>
+                                    <div class="cheek"></div>
+                                </div>
+                                <div class="mouth"></div>
+                            </div>
+                            <div class="sign">
+                                <span class="formula">?和?</span>
+                            </div>
+                            <div class="paws">
+                                <div class="paw paw-left"></div>
+                                <div class="paw paw-right"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="hole-front"></div>
+                </div>
+            `;
+        }
+
+        // ==========================================
+        // 3. 游標與槌子邏輯
+        // ==========================================
+        const gameContainer = document.getElementById('gameContainer');
+        const hammer = document.getElementById('hammer');
+
+        // 偵測是否為觸控裝置
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+        if (isTouchDevice) {
+            // 手機或平板：隱藏鐵鎚，使用預設觸控點擊
+            hammer.style.display = 'none';
+        } else {
+            // 電腦桌機：顯示鐵鎚並隱藏預設游標
+            gameContainer.addEventListener('mouseenter', () => {
+                gameContainer.classList.add('in-game-cursor');
+                hammer.style.display = 'block';
+            });
+
+            gameContainer.addEventListener('mouseleave', () => {
+                gameContainer.classList.remove('in-game-cursor');
+                hammer.style.display = 'none';
+            });
+
+            window.addEventListener('mousemove', e => {
+                hammer.style.top = e.clientY + 'px';
+                hammer.style.left = e.clientX + 'px';
+            });
+
+            window.addEventListener('mousedown', () => hammer.classList.add('hit'));
+            window.addEventListener('mouseup', () => hammer.classList.remove('hit'));
+        }
+
+        // ==========================================
+        // 4. 遊戲流程與邏輯
+        // ==========================================
+        const holes = document.querySelectorAll('.hole');
+        const scoreBoard = document.getElementById('score');
+        const timeBoard = document.getElementById('timeLeft');
+        const mainMenuOverlay = document.getElementById('mainMenuOverlay');
+        const rulesOverlay = document.getElementById('rulesOverlay');
+        const endOverlay = document.getElementById('endOverlay');
+        const abandonBtn = document.getElementById('abandonBtn');
+        const leaderboardSection = document.getElementById('leaderboardSection');
+        
+        let lastHole;
+        let timeUp = false;
+        let score = 0;
+        let gameTime = 60; 
+        let timerInterval;
+        let currentDifficulty = 'easy'; 
+        let localLeaderboard = {
+            easy: [],
+            normal: [],
+            hard: []
+        }; 
+
+        function randomTime(min, max) {
+            return Math.round(Math.random() * (max - min) + min);
+        }
+
+        function randomHole() {
+            const availableHoles = Array.from(holes).filter(hole => {
+                return !hole.classList.contains('busy');
+            });
+            if (availableHoles.length === 0) return null;
+            const idx = Math.floor(Math.random() * availableHoles.length);
+            return availableHoles[idx];
+        }
+
+        function generateFormula(isCorrectTen) {
+            const num1 = Math.floor(Math.random() * 9) + 1; 
+            if (isCorrectTen) {
+                return { num1: num1, num2: 10 - num1, isTen: true };
+            } else {
+                let num2 = Math.floor(Math.random() * 9) + 1;
+                while (num1 + num2 === 10) num2 = Math.floor(Math.random() * 9) + 1;
+                return { num1: num1, num2: num2, isTen: false };
+            }
+        }
+
+        function selectDifficulty(diff) {
+            currentDifficulty = diff;
+            mainMenuOverlay.classList.add('hidden');
+            rulesOverlay.classList.remove('hidden');
+            abandonBtn.style.display = 'block'; 
+            leaderboardSection.style.display = 'none'; 
+        }
+
+        function peep() {
+            if (timeUp) return;
+            const hole = randomHole();
+            if (!hole) {
+                setTimeout(peep, 150);
+                return;
+            }
+            const moleEl = hole.querySelector('.mole');
+            const signEl = hole.querySelector('.sign');
+            
+            const rand = Math.random();
+            let isTen = false;
+            let isSpecial = false;
+
+            // 根據難度設定加時地鼠出現機率
+            let specialChance = 0.10; // 簡單版預設 10%
+            if (currentDifficulty === 'hard') specialChance = 0.05; // 困難版 5%
+            else if (currentDifficulty === 'normal') specialChance = 0.07; // 普通版 7%
+
+            if (rand < 0.40) {
+                isTen = true;
+            } else if (rand < 0.40 + specialChance) {
+                isSpecial = true;
+            } 
+
+            const data = generateFormula(isTen);
+            
+            moleEl.dataset.isTen = isTen;
+            moleEl.dataset.isSpecial = isSpecial;
+
+            if (isSpecial) {
+                moleEl.classList.add('special');
+                signEl.innerHTML = `<span class="formula" style="font-size: 1.1rem; color:#006064;">⏱️ 加5秒</span>`;
+            } else {
+                moleEl.classList.remove('special');
+                signEl.innerHTML = `<span class="formula">${data.num1}和${data.num2}</span>`;
+            }
+
+            hole.classList.add('busy');
+            moleEl.classList.add('up');
+
+            let showDuration;
+            if (isSpecial) {
+                // 困難版加時地鼠 1 秒，普通版 2 秒，簡單版 3 秒
+                if (currentDifficulty === 'hard') showDuration = 1000;
+                else if (currentDifficulty === 'normal') showDuration = 2000;
+                else showDuration = 3000; // easy
+            } else {
+                let minTime = 5000, maxTime = 6000;
+                if (currentDifficulty === 'normal') { minTime = 3000; maxTime = 4000; }
+                else if (currentDifficulty === 'hard') { minTime = 1500; maxTime = 2500; }
+                showDuration = randomTime(minTime, maxTime);
+            } 
+            moleEl.dataset.hitThisTurn = "false";
+
+            let timer = setTimeout(() => {
+                moleEl.classList.remove('up');
+                setTimeout(() => {
+                    hole.classList.remove('busy');
+                }, 350);
+                if (!timeUp) peep();
+            }, showDuration);
+            moleEl.dataset.timerId = timer;
+        }
+
+        function startGame() {
+            rulesOverlay.classList.add('hidden');
+            endOverlay.classList.add('hidden');
+            abandonBtn.style.display = 'block';
+            leaderboardSection.style.display = 'none'; 
+            document.getElementById('submitForm').style.display = 'flex';
+            
+            score = 0;
+            gameTime = 60;
+            scoreBoard.textContent = score;
+            timeBoard.textContent = gameTime;
+            timeUp = false;
+
+            document.querySelectorAll('.mole').forEach(m => {
+                m.classList.remove('up');
+                if (m.dataset.timerId) clearTimeout(parseInt(m.dataset.timerId));
+            });
+            holes.forEach(h => h.classList.remove('busy'));
+
+            initAudio();
+            startBgm();
+
+            peep();
+            setTimeout(peep, 600); 
+            setTimeout(peep, 1300); 
+
+            timerInterval = setInterval(() => {
+                gameTime--;
+                timeBoard.textContent = gameTime;
+                if (gameTime <= 0) endGame();
+            }, 1000);
+        }
+
+        function endGame() {
+            timeUp = true;
+            clearInterval(timerInterval);
+            stopBgm();
+            abandonBtn.style.display = 'none'; 
+            document.getElementById('finalScore').textContent = score;
+            endOverlay.classList.remove('hidden');
+            
+            leaderboardSection.style.display = 'block'; 
+            loadLeaderboard();
+
+            document.querySelectorAll('.mole').forEach(m => {
+                m.classList.remove('up');
+                if (m.dataset.timerId) clearTimeout(parseInt(m.dataset.timerId));
+            });
+            holes.forEach(h => h.classList.remove('busy'));
+        }
+
+        function bonk(e) {
+            if (!e.isTrusted) return; 
+            const mole = e.currentTarget;
+            
+            if (!mole.classList.contains('up') || mole.dataset.hitThisTurn === "true") return;
+            mole.dataset.hitThisTurn = "true";
+
+            mole.classList.remove('up');
+            
+            const hole = mole.closest('.hole');
+            if (hole) {
+                setTimeout(() => {
+                    hole.classList.remove('busy');
+                }, 350);
+            }
+
+            if (mole.dataset.timerId) clearTimeout(parseInt(mole.dataset.timerId));
+
+            const isTen = mole.dataset.isTen === 'true';
+            const isSpecial = mole.dataset.isSpecial === 'true';
+            
+            const feedback = document.createElement('div');
+            feedback.classList.add('feedback');
+            feedback.style.left = (e.clientX - 45) + 'px';
+            feedback.style.top = (e.clientY - 45) + 'px';
+
+            if (isSpecial) {
+                gameTime += 5;
+                timeBoard.textContent = gameTime;
+                feedback.classList.add('plus');
+                feedback.innerHTML = `⏱️加5秒!`;
+                playMagicSound();
+            } else if (isTen) {
+                score += 10;
+                feedback.classList.add('plus');
+                feedback.innerHTML = `加10分<br>對了！`;
+                playCorrectSound();
+            } else {
+                score = Math.max(0, score - 5);
+                feedback.classList.add('minus');
+                feedback.innerHTML = `-5分<br>不對唷`;
+                playIncorrectSound();
+            }
+
+            document.body.appendChild(feedback);
+            scoreBoard.textContent = score;
+
+            setTimeout(() => feedback.remove(), 800);
+            if (!timeUp) setTimeout(peep, randomTime(300, 800));
+        }
+
+        function resetToMenu() {
+            endOverlay.classList.add('hidden');
+            rulesOverlay.classList.add('hidden');
+            mainMenuOverlay.classList.remove('hidden');
+            abandonBtn.style.display = 'none';
+            leaderboardSection.style.display = 'none'; 
+            timeUp = true;
+            clearInterval(timerInterval);
+            stopBgm();
+            score = 0;
+            scoreBoard.textContent = score;
+            timeBoard.textContent = 60;
+            document.querySelectorAll('.mole').forEach(m => {
+                m.classList.remove('up');
+                if (m.dataset.timerId) clearTimeout(parseInt(m.dataset.timerId));
+            });
+            holes.forEach(h => h.classList.remove('busy'));
+        }
+
+        abandonBtn.addEventListener('click', () => {
+            if(confirm("確定要放棄這場挑戰並回主選單嗎？")) resetToMenu();
+        });
+
+        const soundToggleBtn = document.getElementById('soundToggleBtn');
+        soundToggleBtn.addEventListener('click', () => {
+            isSoundMuted = !isSoundMuted;
+            if (isSoundMuted) {
+                soundToggleBtn.textContent = '🔇 音效: 關';
+                stopBgm();
+            } else {
+                soundToggleBtn.textContent = '🔊 音效: 開';
+                initAudio();
+                if (!timeUp) startBgm();
+            }
+        });
+
+        // 音量滑桿事件監聽
+        const volumeSlider = document.getElementById('volumeSlider');
+        const volumeVal = document.getElementById('volumeVal');
+        volumeSlider.addEventListener('input', (e) => {
+            const val = e.target.value;
+            volumeVal.textContent = `${val}%`;
+            globalVolume = val / 100;
+        });
+
+        document.querySelectorAll('.mole').forEach(mole => mole.addEventListener('click', bonk));
+
+        document.getElementById('rulesConfirmBtn').addEventListener('click', startGame);
+        document.getElementById('restartBtn').addEventListener('click', () => {
+            rulesOverlay.classList.add('hidden');
+            endOverlay.classList.add('hidden');
+            startGame();
+        });
+        document.getElementById('backMenuBtn').addEventListener('click', resetToMenu);
+
+        // ==========================================
+        // 5. 排行榜資料串接 (使用 Realtime Database 代替 Firestore)
+        // ==========================================
+        function loadLeaderboard() {
+            const listEl = document.getElementById('leaderboardList');
+            listEl.innerHTML = '<li class="leaderboard-item" style="color: #999; justify-content: center;">載入排行中...</li>';
+
+            // 根據難度決定英雄榜標題
+            const titleMap = { easy: '簡單版', normal: '普通版', hard: '困難版' };
+            const titleEl = document.querySelector('.leaderboard-title');
+            if (titleEl) {
+                titleEl.textContent = `🏆 英雄榜 - ${titleMap[currentDifficulty]} (Top 10)`;
+            }
+
+            const dbPath = `whack_mole_leaderboard_${currentDifficulty}`;
+
+            if (db) {
+                // Realtime Database 排序通常是升序，所以我們拿最後 10 筆並在前端做反轉排序來呈現 Top 10
+                db.ref(dbPath)
+                  .orderByChild("score")
+                  .limitToLast(10)
+                  .once("value")
+                  .then((snapshot) => {
+                      listEl.innerHTML = '';
+                      if (!snapshot.exists()) {
+                          listEl.innerHTML = '<li class="leaderboard-item" style="color: #999; justify-content: center;">尚無排行，快來當第一名！</li>';
+                          return;
+                      }
+                      
+                      let records = [];
+                      snapshot.forEach((childSnapshot) => {
+                          records.push(childSnapshot.val());
+                      });
+                      
+                      // 因為是升序排列，反轉後就會變成由高分到低分
+                      records.reverse();
+                      
+                      let rank = 1;
+                      records.forEach((data) => {
+                          addLeaderboardRow(rank++, data.name, data.score);
+                      });
+                  })
+                  .catch((error) => {
+                      console.error("載入 Firebase 排行失敗，改用本地資料：", error);
+                      renderLocalLeaderboard();
+                  });
+            } else {
+                renderLocalLeaderboard();
+            }
+        }
+
+        function addLeaderboardRow(rank, name, score) {
+            const listEl = document.getElementById('leaderboardList');
+            const item = document.createElement('li');
+            item.classList.add('leaderboard-item');
+            
+            let medal = rank === 1 ? '🥇 ' : rank === 2 ? '🥈 ' : rank === 3 ? '🥉 ' : `${rank}. `;
+            item.innerHTML = `<span>${medal}${escapeHTML(name)}</span><span>${score} 分</span>`;
+            listEl.appendChild(item);
+        }
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '> ', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+        }
+
+        function renderLocalLeaderboard() {
+            const listEl = document.getElementById('leaderboardList');
+            listEl.innerHTML = '';
+            const currentList = localLeaderboard[currentDifficulty] || [];
+            if (currentList.length === 0) {
+                listEl.innerHTML = '<li class="leaderboard-item" style="color: #999; justify-content: center;">尚無排行，快來當第一名！</li>';
+                return;
+            }
+            [...currentList].sort((a, b) => b.score - a.score).slice(0, 10).forEach((data, index) => addLeaderboardRow(index + 1, data.name, data.score));
+        }
+
+        document.getElementById('submitScoreBtn').addEventListener('click', () => {
+            const name = document.getElementById('playerName').value.trim() || '神秘挑戰者';
+            const dbPath = `whack_mole_leaderboard_${currentDifficulty}`;
+            if (db) {
+                db.ref(dbPath).push({
+                    name: name,
+                    score: score,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                }).then(() => {
+                    document.getElementById('submitForm').style.display = 'none'; 
+                    loadLeaderboard(); 
+                }).catch(() => alert("上傳失敗，請重試！"));
+            } else {
+                if (!localLeaderboard[currentDifficulty]) {
+                    localLeaderboard[currentDifficulty] = [];
+                }
+                localLeaderboard[currentDifficulty].push({ name: name, score: score });
+                document.getElementById('submitForm').style.display = 'none';
+                renderLocalLeaderboard();
+            }
+        });
+    </script>
+</body>
+</html>

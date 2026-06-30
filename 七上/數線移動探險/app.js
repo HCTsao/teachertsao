@@ -249,6 +249,11 @@ function handleTickClick(val) {
   movePawnToValue(val, false);
 
   const q = GAME_STATE.currentQuestion;
+  if (GAME_STATE.mode === 'challenge') {
+    // 冒險挑戰模式：不進行即時驗證與步驟上鎖，保留玩家作答之起點
+    return;
+  }
+
   if (val === q.start) {
     // ✅ 起點正確
     DOM.stepStartCard.className = 'step-card success';
@@ -290,7 +295,8 @@ function movePawnToValue(val, immediate = false, isJump = false) {
   const wrapperWidth = DOM.numberLineWrapper.clientWidth;
   const usableWidth = wrapperWidth - 60; // 左右各 30px 的 padding 範圍
   const percentage = (val + 10) / 20;
-  const leftPos = 30 + percentage * usableWidth;
+  // 由於 tick-node 寬度為 28px，其中心點需向右偏移 14px，且實際可用寬度需扣除 28px
+  const leftPos = 30 + 14 + percentage * (usableWidth - 28);
   
   const pawn = DOM.pawn;
   pawn.style.display = 'flex';
@@ -317,8 +323,9 @@ function drawDisplacementCurve(startVal, endVal, isCorrectResult = false) {
   const wrapperWidth = DOM.numberLineWrapper.clientWidth;
   const usableWidth = wrapperWidth - 60;
   
-  const x1 = 30 + ((startVal + 10) / 20) * usableWidth;
-  const x2 = 30 + ((endVal + 10) / 20) * usableWidth;
+  // 與棋子對齊，同樣套用 14px 及 (usableWidth - 28) 修正
+  const x1 = 30 + 14 + ((startVal + 10) / 20) * (usableWidth - 28);
+  const x2 = 30 + 14 + ((endVal + 10) / 20) * (usableWidth - 28);
   const y = 60; // 數線軸高度中點
   
   const dist = Math.abs(x2 - x1);
@@ -387,6 +394,12 @@ function setupEventListeners() {
   DOM.inputFinalAnswer.addEventListener('input', () => {
     const q = GAME_STATE.currentQuestion;
     if (!q || GAME_STATE.isProcessingAnswer) return;
+
+    if (GAME_STATE.mode === 'challenge') {
+      // 冒險挑戰模式不進行即時驗證
+      return;
+    }
+
     const raw = DOM.inputFinalAnswer.value;
     const val = parseInt(raw);
 
@@ -424,6 +437,18 @@ function setupEventListeners() {
     synth.playClick();
     showScreen(DOM.startScreen);
   });
+
+  // 遊戲中回主選單按鈕
+  const btnGameToMenu = document.getElementById('btn-game-to-menu');
+  if (btnGameToMenu) {
+    btnGameToMenu.addEventListener('click', () => {
+      synth.playClick();
+      if (GAME_STATE.mode === 'challenge') {
+        clearInterval(GAME_STATE.challengeTimer);
+      }
+      showScreen(DOM.startScreen);
+    });
+  }
 }
 
 // 重置步驟三到 disabled 狀態
@@ -442,6 +467,11 @@ function resetStep3() {
 function checkStep2Status() {
   const q = GAME_STATE.currentQuestion;
   if (!q || GAME_STATE.isProcessingAnswer) return;
+
+  if (GAME_STATE.mode === 'challenge') {
+    // 冒險挑戰模式：不進行即時驗證與步驟解鎖/鎖定
+    return;
+  }
 
   const stepsVal  = parseInt(DOM.inputSteps.value);
   const hasDir    = !!GAME_STATE.userAnswer.dir;
@@ -576,19 +606,46 @@ function loadQuestion() {
   DOM.stepStartGuidance.classList.add('hidden');
   DOM.stepStartGuidance.innerText = '';
 
-  DOM.stepMoveCard.className = 'step-card disabled';
-  const dirBtns = DOM.stepMoveCard.querySelectorAll('.dir-btn');
-  dirBtns.forEach(btn => {
-    btn.disabled = true;
-    btn.classList.remove('active');
-  });
-  DOM.inputSteps.value = '';
-  DOM.inputSteps.disabled = true;
-  DOM.stepMoveStatus.innerHTML = '';
-  DOM.stepMoveGuidance.classList.add('hidden');
-  DOM.stepMoveGuidance.innerText = '';
+  const isChallenge = GAME_STATE.mode === 'challenge';
 
-  resetStep3();
+  if (isChallenge) {
+    // 冒險挑戰模式：所有卡片均啟動，開放玩家自行作答
+    DOM.stepMoveCard.className = 'step-card active';
+    const dirBtns = DOM.stepMoveCard.querySelectorAll('.dir-btn');
+    dirBtns.forEach(btn => {
+      btn.disabled = false;
+      btn.classList.remove('active');
+    });
+    DOM.inputSteps.value = '';
+    DOM.inputSteps.disabled = false;
+    DOM.stepMoveStatus.innerHTML = '';
+    DOM.stepMoveGuidance.classList.add('hidden');
+    DOM.stepMoveGuidance.innerText = '';
+
+    DOM.stepAnswerCard.className = 'step-card active';
+    DOM.stepAnswerStatus.innerHTML = '';
+    DOM.stepAnswerGuidance.classList.add('hidden');
+    DOM.stepAnswerGuidance.innerText = '';
+    DOM.inputFinalAnswer.value = '';
+    DOM.inputFinalAnswer.disabled = false;
+    DOM.finalAnswerFormulaHint.innerText = GAME_STATE.currentQuestion.formula;
+    DOM.btnSubmit.style.display = 'block'; // 立即開放玩家送出答案
+  } else {
+    // 自由練習模式：分步解鎖與實時驗證
+    DOM.stepMoveCard.className = 'step-card disabled';
+    const dirBtns = DOM.stepMoveCard.querySelectorAll('.dir-btn');
+    dirBtns.forEach(btn => {
+      btn.disabled = true;
+      btn.classList.remove('active');
+    });
+    DOM.inputSteps.value = '';
+    DOM.inputSteps.disabled = true;
+    DOM.stepMoveStatus.innerHTML = '';
+    DOM.stepMoveGuidance.classList.add('hidden');
+    DOM.stepMoveGuidance.innerText = '';
+
+    resetStep3();
+  }
   DOM.btnNext.style.display = 'none';
   DOM.feedbackPanel.classList.add('hidden');
 
@@ -774,7 +831,9 @@ function verifyAnswer() {
 
   const isAllCorrect = isStartCorrect && isDirCorrect && isStepsCorrect && isFinalCorrect;
 
-  // ── 步驟一 回饋 + 引導 ──
+  const isChallenge = GAME_STATE.mode === 'challenge';
+
+  // ── 步驟一 回饋 ──
   if (isStartCorrect) {
     DOM.stepStartCard.className = 'step-card success';
     DOM.stepStartStatus.innerHTML = '✅';
@@ -782,11 +841,15 @@ function verifyAnswer() {
   } else {
     DOM.stepStartCard.className = 'step-card error';
     DOM.stepStartStatus.innerHTML = '❌';
-    DOM.stepStartGuidance.innerText = getGuidance(q.type, 'start', q);
-    DOM.stepStartGuidance.classList.remove('hidden');
+    if (!isChallenge) {
+      DOM.stepStartGuidance.innerText = getGuidance(q.type, 'start', q);
+      DOM.stepStartGuidance.classList.remove('hidden');
+    } else {
+      DOM.stepStartGuidance.classList.add('hidden');
+    }
   }
 
-  // ── 步驟二 回饋 + 引導（方向和格數分開判斷） ──
+  // ── 步驟二 回饋 ──
   if (isDirCorrect && isStepsCorrect) {
     DOM.stepMoveCard.className = 'step-card success';
     DOM.stepMoveStatus.innerHTML = '✅';
@@ -794,19 +857,23 @@ function verifyAnswer() {
   } else {
     DOM.stepMoveCard.className = 'step-card error';
     DOM.stepMoveStatus.innerHTML = '❌';
-    // 優先顯示方向錯誤的引導，若方向對但格數錯則顯示格數引導
-    const moveHint = !isDirCorrect
-      ? getGuidance(q.type, 'dir', q)
-      : getGuidance(q.type, 'steps', q);
-    // 若兩者都錯，合併顯示
-    const moveHintFull = (!isDirCorrect && !isStepsCorrect)
-      ? getGuidance(q.type, 'dir', q) + '\n' + getGuidance(q.type, 'steps', q)
-      : moveHint;
-    DOM.stepMoveGuidance.innerText = moveHintFull;
-    DOM.stepMoveGuidance.classList.remove('hidden');
+    if (!isChallenge) {
+      // 優先顯示方向錯誤的引導，若方向對但格數錯則顯示格數引導
+      const moveHint = !isDirCorrect
+        ? getGuidance(q.type, 'dir', q)
+        : getGuidance(q.type, 'steps', q);
+      // 若兩者都錯，合併顯示
+      const moveHintFull = (!isDirCorrect && !isStepsCorrect)
+        ? getGuidance(q.type, 'dir', q) + '\n' + getGuidance(q.type, 'steps', q)
+        : moveHint;
+      DOM.stepMoveGuidance.innerText = moveHintFull;
+      DOM.stepMoveGuidance.classList.remove('hidden');
+    } else {
+      DOM.stepMoveGuidance.classList.add('hidden');
+    }
   }
 
-  // ── 步驟三 回饋 + 引導 ──
+  // ── 步驟三 回饋 ──
   if (isFinalCorrect) {
     DOM.stepAnswerCard.className = 'step-card success';
     DOM.stepAnswerStatus.innerHTML = '✅';
@@ -814,8 +881,12 @@ function verifyAnswer() {
   } else {
     DOM.stepAnswerCard.className = 'step-card error';
     DOM.stepAnswerStatus.innerHTML = '❌';
-    DOM.stepAnswerGuidance.innerText = getGuidance(q.type, 'final', q);
-    DOM.stepAnswerGuidance.classList.remove('hidden');
+    if (!isChallenge) {
+      DOM.stepAnswerGuidance.innerText = getGuidance(q.type, 'final', q);
+      DOM.stepAnswerGuidance.classList.remove('hidden');
+    } else {
+      DOM.stepAnswerGuidance.classList.add('hidden');
+    }
   }
 
   // ── 執行動畫與整體回饋 ──
@@ -837,7 +908,7 @@ function verifyAnswer() {
     synth.playError();
     DOM.feedbackPanel.className = 'feedback-panel wrong';
     DOM.feedbackIcon.innerText = '📖';
-    DOM.feedbackTitle.innerText = '有步驟答錯了！請看各步驟的提示：';
+    DOM.feedbackTitle.innerText = isChallenge ? '有步驟答錯了！' : '有步驟答錯了！請看各步驟的提示：';
     DOM.feedbackText.innerText = '棋子即將演示正確路徑，請仔細觀察…';
 
     // 清理刻度高亮，顯示正確起點
