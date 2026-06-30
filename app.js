@@ -297,7 +297,6 @@ const currentCategoryTitleText = document.getElementById('current-category-title
 
 // 全域狀態
 let currentCategory = 'all';
-let currentType = 'all';
 let searchQuery = '';
 
 // 初始化應用程式
@@ -336,13 +335,12 @@ function renderTools() {
         const matchesCategory = currentCategory === 'all' || 
                                 tool.category === currentCategory ||
                                 (tool.categories && tool.categories.includes(currentCategory));
-        const matchesType = currentType === 'all' || tool.type === currentType;
         const matchesSearch = tool.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                               tool.desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
                               tool.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
                               (tool.type && tool.type.toLowerCase().includes(searchQuery.toLowerCase())) ||
                               (tool.categories && tool.categories.some(cat => cat.toLowerCase().includes(searchQuery.toLowerCase())));
-        return matchesCategory && matchesType && matchesSearch;
+        return matchesCategory && matchesSearch;
     });
 
     // 更新數量標誌
@@ -474,23 +472,6 @@ function setupEventListeners() {
 
         renderTools();
     });
-
-    // 4. 類型按鈕點擊監聽 (利用事件代理)
-    const typeFilterTabsContainer = document.getElementById('type-filter-tabs');
-    if (typeFilterTabsContainer) {
-        typeFilterTabsContainer.addEventListener('click', (e) => {
-            const btn = e.target.closest('.filter-btn');
-            if (!btn) return;
-
-            // 切換 active 樣式
-            typeFilterTabsContainer.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-
-            // 更新類型狀態
-            currentType = btn.dataset.type;
-            renderTools();
-        });
-    }
 }
 
 // 啟動應用
