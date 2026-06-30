@@ -481,6 +481,12 @@ function loadProblemIndex(idx) {
     state.isCarry = false;
     state.isBorrow = false;
 
+    if (state.op === '-' && state.requiresBorrow) {
+        dom.statusBar.textContent = "💡 個位數不夠減！按一下十位數字可以借1個十，換成10個一";
+    } else {
+        dom.statusBar.textContent = "點擊算式底下的問號開始計算吧！";
+    }
+
     dom.n1Tens.classList.remove('slashed');
     dom.carryBox.classList.add('hide'); // 預設隱藏進位格，直到個位輸入完成
     dom.carryBox.textContent = '?';
@@ -722,7 +728,6 @@ function triggerBorrowFlow() {
     dom.borrowUnitsBox.textContent = '10';
     
     sounds.playTone(400, 'triangle', 0.12);
-    dom.statusBar.textContent = "🔑 已向十位借 10，個位上方出現 10 囉！";
 }
 
 function toggleCarry() {
@@ -741,7 +746,7 @@ function handleVirtualKey(val) {
     
     // 減法防呆
     if (state.difficulty === 'basic' && state.requiresBorrow && !state.isBorrow && state.activeCellId === 'ans-units') {
-        dom.statusBar.textContent = "⚠️ 個位數不夠減！請先點選上方的十位數進行「借位」！";
+        dom.statusBar.textContent = "💡 個位數不夠減！按一下十位數字可以借1個十，換成10個一";
         sounds.playWrong();
         return;
     }
