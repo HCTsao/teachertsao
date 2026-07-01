@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
@@ -245,10 +245,32 @@
                 btn.className = 'mt-3 text-xs font-bold text-stone-500 bg-stone-100 hover:bg-stone-200 border border-stone-300 px-3 py-1.5 rounded-full inline-flex items-center gap-1 mx-auto transition-colors';
             }
         }
+        if (window.speechSynthesis) {
+            // 行動裝置觸控/點擊解鎖語音播放
+            const unlockSpeech = () => {
+                try {
+                    // 播報一個極短且低音量的單字以解除 iOS 靜音鎖
+                    const u = new SpeechSynthesisUtterance("開");
+                    u.volume = 0.01;
+                    u.rate = 2.0;
+                    window.speechSynthesis.speak(u);
+                } catch (e) {}
+                window.removeEventListener('touchstart', unlockSpeech, { capture: true });
+                window.removeEventListener('click', unlockSpeech, { capture: true });
+            };
+            window.addEventListener('touchstart', unlockSpeech, { capture: true });
+            window.addEventListener('click', unlockSpeech, { capture: true });
+        }
+
         function speakText(text) {
             try {
                 if ('speechSynthesis' in window) {
-                    window.speechSynthesis.cancel();
+                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                    if (!isIOS) {
+                        try {
+                            window.speechSynthesis.cancel();
+                        } catch (e) {}
+                    }
                     let cleanText = text.replace(/<[^>]*>?/gm, '');
                     cleanText = cleanText.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, ''); // remove emojis
                     cleanText = cleanText.replace(/\$/g, ''); // remove dollar sign
@@ -552,7 +574,12 @@
         // Play audio TTS
         function playAudioQuestion(val) {
             if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                if (!isIOS) {
+                    try {
+                        window.speechSynthesis.cancel();
+                    } catch (e) {}
+                }
                 const reading = getChineseStandardReading(val);
                 const action = questionType === 5 ? "請輸入：" : "請排出：";
                 const utter = new SpeechSynthesisUtterance(action + reading);

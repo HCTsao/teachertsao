@@ -1209,23 +1209,27 @@
                     u.rate = 2.0;
                     window.speechSynthesis.speak(u);
                 } catch (e) {}
-                window.removeEventListener('touchstart', unlockSpeech);
-                window.removeEventListener('click', unlockSpeech);
+                window.removeEventListener('touchstart', unlockSpeech, { capture: true });
+                window.removeEventListener('click', unlockSpeech, { capture: true });
             };
-            window.addEventListener('touchstart', unlockSpeech, { passive: true });
-            window.addEventListener('click', unlockSpeech);
+            window.addEventListener('touchstart', unlockSpeech, { capture: true });
+            window.addEventListener('click', unlockSpeech, { capture: true });
         }
 
-        function speakNumber(num) {
+        function safeCancelSpeech() {
             if (!window.speechSynthesis) return;
-            
-            // iOS 呼叫 cancel() 會導致語音播放列鎖死，故 iOS 排除 cancel
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
             if (!isIOS) {
                 try {
                     window.speechSynthesis.cancel();
                 } catch (e) {}
             }
+        }
+
+        function speakNumber(num) {
+            if (!window.speechSynthesis) return;
+            
+            safeCancelSpeech();
             
             // 針對 1 轉換為 "衣"，4 轉換為 "寺" 來優化發音清晰度
             let textToSpeak = String(num);
@@ -1325,7 +1329,7 @@
             isGameRunning = false;
             clearInterval(gameInterval);
             sounds.playGameOver();
-            window.speechSynthesis && window.speechSynthesis.cancel();
+            safeCancelSpeech();
 
             document.getElementById('abandonBtn').style.display = 'none';
             document.getElementById('gameOverReason').innerText = reason;
@@ -1340,7 +1344,7 @@
             clearInterval(gameInterval);
             // 延遲播放勝利音效，讓最後一個數字語音播完
             setTimeout(() => {
-                window.speechSynthesis && window.speechSynthesis.cancel();
+                safeCancelSpeech();
                 sounds.playVictory();
             }, 1200);
 
@@ -1353,7 +1357,7 @@
         function goHome() {
             isGameRunning = false;
             clearInterval(gameInterval);
-            window.speechSynthesis && window.speechSynthesis.cancel();
+            safeCancelSpeech();
             document.getElementById('abandonBtn').style.display = 'none';
             document.querySelectorAll('.overlay').forEach(el => el.classList.remove('active'));
             document.getElementById('startOverlay').classList.add('active');
