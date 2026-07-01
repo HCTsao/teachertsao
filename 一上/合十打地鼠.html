@@ -842,6 +842,7 @@
                 <button class="menu-btn normal-btn" onclick="selectDifficulty('normal')">普通版</button>
                 <button class="menu-btn hard-btn" onclick="selectDifficulty('hard')">困難版</button>
             </div>
+            <button class="menu-btn view-leaderboard-btn" id="viewLeaderboardBtn" style="margin-top: 15px; background: #FFF9C4; color: #F57F17; border: 2px solid #FBC02D; box-shadow: 0 8px 0 #FBC02D;">🏆 查看三版英雄榜</button>
         </div>
 
         <!-- 規則說明覆蓋面板 -->
@@ -880,9 +881,15 @@
         </div>
     </div>
 
-    <!-- 排行榜區塊 (僅在結束畫面顯示) -->
+    <!-- 排行榜區塊 (在主選單與結束畫面顯示) -->
     <div class="leaderboard-section" id="leaderboardSection">
         <h3 class="leaderboard-title">🏆 英雄榜 (Top 10)</h3>
+        <!-- 難度切換頁籤 -->
+        <div class="leaderboard-tabs" id="leaderboardTabs" style="display: flex; gap: 8px; justify-content: center; margin: 10px 0 15px 0;">
+            <button class="lead-tab" data-lead-diff="easy" style="background:#E8F5E9; border:2px solid #2E7D32; color:#2E7D32; padding:6px 14px; border-radius:15px; font-weight:bold; cursor:pointer; font-size: 0.95rem; font-family: 'Noto Sans TC';">簡單版</button>
+            <button class="lead-tab" data-lead-diff="normal" style="background:#E0F2F1; border:2px solid #00796B; color:#00796B; padding:6px 14px; border-radius:15px; font-weight:bold; cursor:pointer; font-size: 0.95rem; font-family: 'Noto Sans TC';">普通版</button>
+            <button class="lead-tab" data-lead-diff="hard" style="background:#FFEBEE; border:2px solid #C62828; color:#C62828; padding:6px 14px; border-radius:15px; font-weight:bold; cursor:pointer; font-size: 0.95rem; font-family: 'Noto Sans TC';">困難版</button>
+        </div>
         <ul class="leaderboard-list" id="leaderboardList">
             <li class="leaderboard-item" style="color: #999; justify-content: center;">載入排行中...</li>
         </ul>
@@ -1359,6 +1366,28 @@
         });
         document.getElementById('backMenuBtn').addEventListener('click', resetToMenu);
 
+        // 主選單「查看三版英雄榜」按鈕事件
+        const viewLeaderboardBtn = document.getElementById('viewLeaderboardBtn');
+        viewLeaderboardBtn.addEventListener('click', () => {
+            if (leaderboardSection.style.display === 'block') {
+                leaderboardSection.style.display = 'none';
+            } else {
+                leaderboardSection.style.display = 'block';
+                loadLeaderboard();
+                setTimeout(() => {
+                    leaderboardSection.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+            }
+        });
+
+        // 英雄榜難度頁籤切換事件
+        document.querySelectorAll('.lead-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                currentDifficulty = tab.getAttribute('data-lead-diff');
+                loadLeaderboard();
+            });
+        });
+
         // ==========================================
         // 5. 排行榜資料串接 (使用 Realtime Database 代替 Firestore)
         // ==========================================
@@ -1372,6 +1401,19 @@
             if (titleEl) {
                 titleEl.textContent = `🏆 英雄榜 - ${titleMap[currentDifficulty]} (Top 10)`;
             }
+
+            // 同步更新頁籤的 active 樣式
+            document.querySelectorAll('.lead-tab').forEach(t => {
+                if (t.getAttribute('data-lead-diff') === currentDifficulty) {
+                    t.style.filter = 'brightness(1)';
+                    t.style.boxShadow = '0 0 8px rgba(0,0,0,0.2)';
+                    t.style.fontWeight = '900';
+                } else {
+                    t.style.filter = 'brightness(0.85)';
+                    t.style.boxShadow = 'none';
+                    t.style.fontWeight = 'bold';
+                }
+            });
 
             const dbPath = `whack_mole_leaderboard_${currentDifficulty}`;
 
