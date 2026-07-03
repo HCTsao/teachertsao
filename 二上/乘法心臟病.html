@@ -125,6 +125,7 @@
             const [myPeer, setMyPeer] = useState(null);
             const [onlineStatusText, setOnlineStatusText] = useState('');
             const [onlineStatusType, setOnlineStatusType] = useState(''); // 'info', 'success', 'error'
+            const [myPlayerIdx, setMyPlayerIdx] = useState(0);
 
             const timeoutRef = useRef(null);
             const idleTimerRef = useRef(null);
@@ -132,7 +133,7 @@
             const aiSlapScheduledRef = useRef(false);
 
             const isDealing = gameState === 'dealing';
-            const myIndex = isOnlineMode ? (onlineRole === 'host' ? 0 : window.myPlayerIdx) : 0;
+            const myIndex = isOnlineMode ? (onlineRole === 'host' ? 0 : myPlayerIdx) : 0;
 
             const getAiSpeedMultiplier = () => {
                 if (aiLevel === 'easy') return 1.5;
@@ -326,14 +327,52 @@
 
                 try {
                     const hostPeerId = 'heart-attack-' + cleanedRoom;
+                    const iceConfig = {
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' },
+                            { urls: 'stun:stun2.l.google.com:19302' },
+                            { urls: 'stun:stun3.l.google.com:19302' },
+                            { urls: 'stun:stun4.l.google.com:19302' },
+                            { urls: 'stun:global.stun.twilio.com:3478' },
+                            { urls: 'stun:stun.nextcloud.com:443' },
+                            {
+                                urls: 'turn:openrelay.metered.ca:80',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            },
+                            {
+                                urls: 'turn:openrelay.metered.ca:443',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            },
+                            {
+                                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            },
+                            {
+                                urls: 'turn:relay.metered.ca:80',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            },
+                            {
+                                urls: 'turn:relay.metered.ca:443',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            },
+                            {
+                                urls: 'turn:relay.metered.ca:443?transport=tcp',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            }
+                        ]
+                    };
                     const peer = new Peer(hostPeerId, {
-                        config: {
-                            iceServers: [
-                                { urls: 'stun:stun.l.google.com:19302' },
-                                { urls: 'stun:stun1.l.google.com:19302' },
-                                { urls: 'stun:stun2.l.google.com:19302' }
-                            ]
-                        },
+                        host: '0.peerjs.com',
+                        port: 443,
+                        secure: true,
+                        config: iceConfig,
                         debug: 1
                     });
 
@@ -430,14 +469,52 @@
 
             const setupGuestPeer = (nickname, cleanedRoom) => {
                 try {
+                    const iceConfig = {
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' },
+                            { urls: 'stun:stun2.l.google.com:19302' },
+                            { urls: 'stun:stun3.l.google.com:19302' },
+                            { urls: 'stun:stun4.l.google.com:19302' },
+                            { urls: 'stun:global.stun.twilio.com:3478' },
+                            { urls: 'stun:stun.nextcloud.com:443' },
+                            {
+                                urls: 'turn:openrelay.metered.ca:80',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            },
+                            {
+                                urls: 'turn:openrelay.metered.ca:443',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            },
+                            {
+                                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            },
+                            {
+                                urls: 'turn:relay.metered.ca:80',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            },
+                            {
+                                urls: 'turn:relay.metered.ca:443',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            },
+                            {
+                                urls: 'turn:relay.metered.ca:443?transport=tcp',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            }
+                        ]
+                    };
                     const guestPeer = new Peer(null, {
-                        config: {
-                            iceServers: [
-                                { urls: 'stun:stun.l.google.com:19302' },
-                                { urls: 'stun:stun1.l.google.com:19302' },
-                                { urls: 'stun:stun2.l.google.com:19302' }
-                            ]
-                        },
+                        host: '0.peerjs.com',
+                        port: 443,
+                        secure: true,
+                        config: iceConfig,
                         debug: 1
                     });
 
@@ -465,7 +542,7 @@
                             }
                             if (data.type === 'lobby_update') {
                                 setLobbyPlayers(data.lobbyPlayers);
-                                window.myPlayerIdx = data.myIndex;
+                                setMyPlayerIdx(data.myIndex);
                             }
                             if (data.type === 'start_game') {
                                 setMultiplier(data.multiplier);
