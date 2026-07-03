@@ -52,7 +52,6 @@
     </style>
 </head>
 <body>
-    <img src="https://api.visitorbadge.io/api/visitors?path=hctsao.teachertsao&label=Views&labelColor=%23475569&countColor=%23ea580c" alt="Visitor Counter" style="display: none;">
 <!-- HOME_BUTTON_START -->
 <a href="../index.html" style="position: fixed; top: 12px; left: 12px; z-index: 999999; background: rgba(30, 41, 59, 0.85); color: #ffffff; padding: 8px 16px; border-radius: 20px; text-decoration: none; font-family: system-ui, -apple-system, sans-serif; font-size: 14px; font-weight: bold; backdrop-filter: blur(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.1); transition: all 0.2s ease;" onmouseover="this.style.background='rgba(79, 70, 229, 0.9)'" onmouseout="this.style.background='rgba(30, 41, 59, 0.85)'">&#127969; 回首頁</a>
 <script>(function() { function adjustViewport() { var targetWidth = 1024; var screenWidth = window.innerWidth || document.documentElement.clientWidth || window.screen.width; if (screenWidth > 0 && screenWidth < targetWidth) { var scale = screenWidth / targetWidth; var meta = document.querySelector('meta[name="viewport"]'); if (!meta) { meta = document.createElement('meta'); meta.setAttribute('name', 'viewport'); document.head.appendChild(meta); } meta.setAttribute('content', 'width=' + targetWidth + ', initial-scale=' + scale + ', minimum-scale=' + scale + ', maximum-scale=2.0, user-scalable=yes'); } else { var meta = document.querySelector('meta[name="viewport"]'); if (meta) { meta.setAttribute('content', 'width=device-width, initial-scale=1.0'); } } } adjustViewport(); var timer = null; window.addEventListener('resize', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); window.addEventListener('orientationchange', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); })();</script>
@@ -266,7 +265,7 @@
                     
                     if (gameState === 'menu' || gameState === 'dealing') {
                         const updatedLobby = [
-                            { id: 0, name: '你 (房主)', isHost: true },
+                            { id: 0, name: lobbyPlayers[0]?.name || '你 (房主)', isHost: true },
                             ...nextConns.map((c, i) => {
                                 c.playerIdx = i + 1;
                                 return { id: c.playerIdx, name: c.playerName, isHost: false };
@@ -299,8 +298,8 @@
                                     currentCall: currentCall,
                                     flyingCard: flyingCard,
                                     gameState: gameState
-                                    });
                                 });
+                            });
                             return nextPlayers;
                         });
                     }
@@ -308,16 +307,22 @@
                 });
             };
 
-            const createOnlineRoom = () => {
+            const connectToRoom = (nickname, roomNum) => {
+                const cleanedRoom = (roomNum || '').trim();
+                if (!cleanedRoom) {
+                    setOnlineStatusText('請輸入房號！');
+                    setOnlineStatusType('error');
+                    return;
+                }
+
                 destroyPeer();
-                const code = Math.floor(1000 + Math.random() * 9000).toString();
-                setRoomCode(code);
-                setOnlineRole('host');
-                setOnlineStatusText('正在建立房間...');
+                setRoomCode(cleanedRoom);
+                setOnlineStatusText('正在連線中...');
                 setOnlineStatusType('info');
 
                 try {
-                    const peer = new Peer('heart-attack-' + code, {
+                    const hostPeerId = 'heart-attack-' + cleanedRoom;
+                    const peer = new Peer(hostPeerId, {
                         config: {
                             iceServers: [
                                 { urls: 'stun:stun.l.google.com:19302' },
@@ -328,10 +333,15 @@
                         debug: 1
                     });
 
+                    let isRoleDetermined = false;
+
                     peer.on('open', () => {
+                        if (isRoleDetermined) return;
+                        isRoleDetermined = true;
                         setMyPeer(peer);
-                        setLobbyPlayers([{ id: 0, name: '你 (房主)', isHost: true }]);
-                        setOnlineStatusText(`房間建立成功！房號：${code}`);
+                        setOnlineRole('host');
+                        setLobbyPlayers([{ id: 0, name: `${nickname} (你)`, isHost: true }]);
+                        setOnlineStatusText('連線成功，已進入連線大廳！');
                         setOnlineStatusType('success');
                         setIsOnlineMode(true);
                     });
@@ -355,7 +365,7 @@
                                     setConnections(prev => {
                                         const newConns = [...prev, conn];
                                         const updatedLobby = [
-                                            { id: 0, name: '你 (房主)', isHost: true },
+                                            { id: 0, name: `${nickname} (你)`, isHost: true },
                                             ...newConns.map((c) => ({ id: c.playerIdx, name: c.playerName, isHost: false }))
                                         ];
                                         setLobbyPlayers(updatedLobby);
@@ -398,9 +408,12 @@
                     peer.on('error', (err) => {
                         console.error(err);
                         if (err.type === 'unavailable-id') {
-                            createOnlineRoom();
+                            if (isRoleDetermined) return;
+                            isRoleDetermined = true;
+                            peer.destroy();
+                            setupGuestPeer(nickname, cleanedRoom);
                         } else {
-                            setOnlineStatusText('建立房間失敗，請重試！');
+                            setOnlineStatusText('連線錯誤，請重試！');
                             setOnlineStatusType('error');
                         }
                     });
@@ -411,22 +424,9 @@
                 }
             };
 
-            const joinOnlineRoom = (code) => {
-                const cleaned = (code || '').trim();
-                if (!cleaned || cleaned.length !== 4) {
-                    setOnlineStatusText('請輸入 4 位數房號！');
-                    setOnlineStatusType('error');
-                    return;
-                }
-
-                destroyPeer();
-                setRoomCode(cleaned);
-                setOnlineRole('guest');
-                setOnlineStatusText('正在連線加入房間...');
-                setOnlineStatusType('info');
-
+            const setupGuestPeer = (nickname, cleanedRoom) => {
                 try {
-                    const peer = new Peer(null, {
+                    const guestPeer = new Peer(null, {
                         config: {
                             iceServers: [
                                 { urls: 'stun:stun.l.google.com:19302' },
@@ -437,32 +437,31 @@
                         debug: 1
                     });
 
-                    peer.on('open', () => {
-                        setMyPeer(peer);
-                        const conn = peer.connect('heart-attack-' + cleaned);
+                    guestPeer.on('open', () => {
+                        setMyPeer(guestPeer);
+                        const conn = guestPeer.connect('heart-attack-' + cleanedRoom);
                         
                         conn.on('open', () => {
-                            const nick = document.getElementById('online-nickname')?.value.trim() || '訪客';
                             conn.send({
                                 type: 'join_lobby',
-                                playerName: nick
+                                playerName: nickname
                             });
-                            
                             setConnections([conn]);
+                            setOnlineRole('guest');
                             setIsOnlineMode(true);
+                            setOnlineStatusText('已連線加入，進入連線大廳！');
+                            setOnlineStatusType('success');
                         });
 
                         conn.on('data', (data) => {
                             if (data.type === 'error') {
                                 setOnlineStatusText(data.message);
                                 setOnlineStatusType('error');
-                                peer.destroy();
+                                guestPeer.destroy();
                             }
                             if (data.type === 'lobby_update') {
                                 setLobbyPlayers(data.lobbyPlayers);
                                 window.myPlayerIdx = data.myIndex;
-                                setOnlineStatusText(`成功加入房間！你是玩家 ${data.myIndex}`);
-                                setOnlineStatusType('success');
                             }
                             if (data.type === 'start_game') {
                                 setMultiplier(data.multiplier);
@@ -556,18 +555,14 @@
                         });
                     });
 
-                    peer.on('error', (err) => {
+                    guestPeer.on('error', (err) => {
                         console.error(err);
-                        if (err.type === 'peer-not-found') {
-                            setOnlineStatusText('找不到該房間，請確認房號！');
-                        } else {
-                            setOnlineStatusText('連線發生錯誤，請重試！');
-                        }
+                        setOnlineStatusText('連線錯誤，請確認房號或重試！');
                         setOnlineStatusType('error');
                     });
                 } catch (e) {
                     console.error(e);
-                    setOnlineStatusText('加入房間異常！');
+                    setOnlineStatusText('連線異常，請重試！');
                     setOnlineStatusType('error');
                 }
             };
@@ -598,7 +593,7 @@
                 const newPlayers = [];
                 newPlayers.push({
                     id: 0,
-                    name: '你 (房主)',
+                    name: lobbyPlayers[0]?.name || '你 (房主)',
                     cards: [],
                     isAI: false
                 });
@@ -1109,8 +1104,8 @@
                     // 1. Lobby Waiting Screen
                     return (
                         <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center overflow-y-auto bg-slate-900 text-white">
-                            <h1 className="text-4xl md:text-5xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 drop-shadow-md">連線房間：【{roomCode}】</h1>
-                            <p className="text-slate-400 mb-8 font-bold text-sm md:text-base">請將房號告知好友，最多支援 4 人。未滿 4 人開始將安排 AI 玩家。</p>
+                            <h1 className="text-4xl md:text-5xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 drop-shadow-md">👥 線上對戰大廳</h1>
+                            <p className="text-slate-400 mb-8 font-bold text-sm md:text-base">最多支援 4 人同時遊玩。未滿 4 人開始將安排 AI 玩家。</p>
                             
                             <div className="flex flex-col gap-6 w-full max-w-md mb-8">
                                 <div className="bg-slate-800 p-6 rounded-3xl shadow-xl border border-slate-700">
@@ -1246,26 +1241,18 @@
                             
                             <div className="border-t border-slate-700 my-2" />
                             
-                            <button onClick={createOnlineRoom} className="w-full h-14 bg-emerald-600 text-white text-xl font-bold rounded-xl hover:bg-emerald-500 transition-all active:translate-y-0.5">
-                                ➕ 創建連線房間
-                            </button>
-                            
-                            <div className="flex items-center justify-center gap-4 my-2 text-slate-500 font-bold">
-                                <span>───────</span><span>或</span><span>───────</span>
-                            </div>
-                            
                             <div className="flex flex-col gap-2">
-                                <label className="block text-left text-sm font-bold text-slate-300 mb-1">輸入 4 位數房號加入：</label>
-                                <div className="flex gap-2">
-                                    <input id="join-room-code" type="text" maxLength="4" placeholder="例如: 1234" className="w-full px-4 py-3 bg-slate-700 text-center font-black text-xl border border-slate-600 focus:outline-none focus:border-blue-500 uppercase rounded-l-xl" />
-                                    <button onClick={() => {
-                                        const code = document.getElementById('join-room-code')?.value.trim();
-                                        joinOnlineRoom(code);
-                                    }} className="px-6 bg-blue-600 text-white font-bold rounded-r-xl hover:bg-blue-500 transition-all active:translate-y-0.5 border border-l-0 border-blue-600">
-                                        加入
-                                    </button>
-                                </div>
+                                <label className="block text-left text-sm font-bold text-slate-300 mb-1">輸入房號（任意英數字）：</label>
+                                <input id="join-room-code" type="text" placeholder="例如: 1234" className="w-full px-4 py-3 bg-slate-700 text-center font-black text-xl border border-slate-600 focus:outline-none focus:border-blue-500 uppercase rounded-xl" />
                             </div>
+                            
+                            <button onClick={() => {
+                                const nick = document.getElementById('online-nickname')?.value.trim() || '玩家';
+                                const code = document.getElementById('join-room-code')?.value.trim();
+                                connectToRoom(nick, code);
+                            }} className="w-full h-14 bg-blue-600 text-white text-xl font-bold rounded-xl hover:bg-blue-500 transition-all active:translate-y-0.5 mt-2">
+                                🔗 開始連線
+                            </button>
 
                             {onlineStatusText && (
                                 <div className={`p-4 rounded-xl text-sm font-bold border ${onlineStatusType === 'success' ? 'bg-emerald-950/50 border-emerald-500 text-emerald-300' : onlineStatusType === 'error' ? 'bg-red-950/50 border-red-500 text-red-300' : 'bg-slate-700/50 border-slate-600 text-slate-300'}`}>
@@ -1451,7 +1438,7 @@
                 </div>
             );
         };
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        ReactDOM.createRoot(document.getElementById('root')).render(App);
     </script>
 </body>
 </html>
