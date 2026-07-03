@@ -333,6 +333,33 @@
                 });
             };
 
+            // Shared ICE config for all PeerJS connections
+            const buildIceConfig = () => ({
+                iceServers: [
+                    // Google STUN servers
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' },
+                    { urls: 'stun:stun3.l.google.com:19302' },
+                    { urls: 'stun:stun4.l.google.com:19302' },
+                    // Other STUN servers
+                    { urls: 'stun:stun.cloudflare.com:3478' },
+                    { urls: 'stun:stun.nextcloud.com:3478' },
+                    { urls: 'stun:freestun.net:3478' },
+                    // Open Relay TURN servers (UDP + TCP + TLS)
+                    { urls: 'turn:openrelay.metered.ca:80',      username: 'openrelayproject', credential: 'openrelayproject' },
+                    { urls: 'turn:openrelay.metered.ca:443',     username: 'openrelayproject', credential: 'openrelayproject' },
+                    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+                    // freeturn.net TURN servers (different provider)
+                    { urls: 'turn:freeturn.net:3478',  username: 'free', credential: 'free' },
+                    { urls: 'turns:freeturn.net:5349', username: 'free', credential: 'free' },
+                    // relay.metered.ca TURN
+                    { urls: 'turn:relay.metered.ca:80',          username: 'openrelayproject', credential: 'openrelayproject' },
+                    { urls: 'turn:relay.metered.ca:443',         username: 'openrelayproject', credential: 'openrelayproject' },
+                    { urls: 'turn:relay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+                ]
+            });
+
             const createOnlineRoom = () => {
                 try {
                     const silent = new SpeechSynthesisUtterance("");
@@ -350,48 +377,7 @@
                 const nickname = document.getElementById('online-nickname')?.value.trim() || '房主';
 
                 try {
-                    const hostPeerId = 'heart-attack-' + code;
-                    const iceConfig = {
-                        iceServers: [
-                            { urls: 'stun:stun.l.google.com:19302' },
-                            { urls: 'stun:stun1.l.google.com:19302' },
-                            { urls: 'stun:stun2.l.google.com:19302' },
-                            { urls: 'stun:stun3.l.google.com:19302' },
-                            { urls: 'stun:stun4.l.google.com:19302' },
-                            { urls: 'stun:global.stun.twilio.com:3478' },
-                            { urls: 'stun:stun.nextcloud.com:443' },
-                            {
-                                urls: 'turn:openrelay.metered.ca:80',
-                                username: 'openrelayproject',
-                                credential: 'openrelayproject'
-                            },
-                            {
-                                urls: 'turn:openrelay.metered.ca:443',
-                                username: 'openrelayproject',
-                                credential: 'openrelayproject'
-                            },
-                            {
-                                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-                                username: 'openrelayproject',
-                                credential: 'openrelayproject'
-                            },
-                            {
-                                urls: 'turn:relay.metered.ca:80',
-                                username: 'openrelayproject',
-                                credential: 'openrelayproject'
-                            },
-                            {
-                                urls: 'turn:relay.metered.ca:443',
-                                username: 'openrelayproject',
-                                credential: 'openrelayproject'
-                            },
-                            {
-                                urls: 'turn:relay.metered.ca:443?transport=tcp',
-                                username: 'openrelayproject',
-                                credential: 'openrelayproject'
-                            }
-                        ]
-                    };
+                    const iceConfig = buildIceConfig();
                     const peer = new Peer(hostPeerId, {
                         host: '0.peerjs.com',
                         port: 443,
@@ -506,47 +492,7 @@
                 const nickname = document.getElementById('online-nickname')?.value.trim() || '訪客';
 
                 try {
-                    const iceConfig = {
-                        iceServers: [
-                            { urls: 'stun:stun.l.google.com:19302' },
-                            { urls: 'stun:stun1.l.google.com:19302' },
-                            { urls: 'stun:stun2.l.google.com:19302' },
-                            { urls: 'stun:stun3.l.google.com:19302' },
-                            { urls: 'stun:stun4.l.google.com:19302' },
-                            { urls: 'stun:global.stun.twilio.com:3478' },
-                            { urls: 'stun:stun.nextcloud.com:443' },
-                            {
-                                urls: 'turn:openrelay.metered.ca:80',
-                                username: 'openrelayproject',
-                                credential: 'openrelayproject'
-                            },
-                            {
-                                urls: 'turn:openrelay.metered.ca:443',
-                                username: 'openrelayproject',
-                                credential: 'openrelayproject'
-                            },
-                            {
-                                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-                                username: 'openrelayproject',
-                                credential: 'openrelayproject'
-                            },
-                            {
-                                urls: 'turn:relay.metered.ca:80',
-                                username: 'openrelayproject',
-                                credential: 'openrelayproject'
-                            },
-                            {
-                                urls: 'turn:relay.metered.ca:443',
-                                username: 'openrelayproject',
-                                credential: 'openrelayproject'
-                            },
-                            {
-                                urls: 'turn:relay.metered.ca:443?transport=tcp',
-                                username: 'openrelayproject',
-                                credential: 'openrelayproject'
-                            }
-                        ]
-                    };
+                    const iceConfig = buildIceConfig();
                     const peer = new Peer(null, {
                         host: '0.peerjs.com',
                         port: 443,
@@ -556,9 +502,18 @@
                     });
 
                     peer.on('open', () => {
-                        const conn = peer.connect('heart-attack-' + cleaned);
+                        const conn = peer.connect('heart-attack-' + cleaned, { reliable: true });
+
+                        // 15-second connection timeout
+                        const connTimeout = setTimeout(() => {
+                            if (conn.open) return;
+                            setOnlineStatusText('連線逾時！請確認房主是否已開房，或網路環境是否支援 P2P 連線。');
+                            setOnlineStatusType('error');
+                            peer.destroy();
+                        }, 15000);
                         
                         conn.on('open', () => {
+                            clearTimeout(connTimeout);
                             conn.send({
                                 type: 'join_lobby',
                                 playerName: nickname
@@ -667,8 +622,9 @@
                         });
 
                         conn.on('error', (err) => {
+                            clearTimeout(connTimeout);
                             console.error(err);
-                            setOnlineStatusText('與房主連線失敗！');
+                            setOnlineStatusText('與房主的資料通道連線失敗！請確認防火牆設定，或嘗試改用手機熱點後重試。');
                             setOnlineStatusType('error');
                         });
                     });
@@ -676,9 +632,13 @@
                     peer.on('error', (err) => {
                         console.error(err);
                         if (err.type === 'peer-not-found') {
-                            setOnlineStatusText('找不到該房間，請確認房號！');
+                            setOnlineStatusText('找不到該房間，請確認房號是否正確！');
+                        } else if (err.type === 'network') {
+                            setOnlineStatusText('網路連線問題，請檢查網路後重試！');
+                        } else if (err.type === 'server-error') {
+                            setOnlineStatusText('連線伺服器錯誤，請稍後重試！');
                         } else {
-                            setOnlineStatusText('連線錯誤，請確認房號或重試！');
+                            setOnlineStatusText(`連線錯誤（${err.type}），請確認房號或改用手機熱點重試！`);
                         }
                         setOnlineStatusType('error');
                     });
