@@ -650,15 +650,17 @@
                 }
             };
 
-            const startOnlineGame = () => {
+            const startOnlineGame = (multiplierNum) => {
                 if (onlineRole !== 'host') return;
+                // Use the passed-in value directly to avoid React async setState race condition
+                const m = multiplierNum !== undefined ? multiplierNum : multiplier;
                 
                 let deck = [];
                 for (let i = 1; i <= 10; i++) {
                     for (let j = 0; j < CARDS_PER_TYPE; j++) {
                         deck.push({
                             id: `${i}-${j}-${Math.random()}`,
-                            value: multiplier * i,
+                            value: m * i,
                             rot: Math.random() * 20 - 10,
                             ox: Math.random() * 10 - 5,
                             oy: Math.random() * 10 - 5,
@@ -700,6 +702,7 @@
                     }
                 }
                 
+                // Deal exactly 15 cards per player (60 cards / 4 players)
                 const mainDeckCopy = [...deck];
                 for (let i = 0; i < 60; i++) {
                     const targetIdx = i % 4;
@@ -713,7 +716,7 @@
                 connections.forEach(c => {
                     c.send({
                         type: 'start_game',
-                        multiplier: multiplier,
+                        multiplier: m,
                         difficulty: difficulty,
                         aiLevel: aiLevel,
                         players: newPlayers,
@@ -722,6 +725,7 @@
                     });
                 });
                 
+                setMultiplier(m);
                 setPlayers(newPlayers);
                 setCenterPile([]);
                 setTurn(randomStartTurn);
@@ -1296,7 +1300,7 @@
                                                 {MULTIPLIERS.map(num => (
                                                     <button key={num} onClick={() => {
                                                         setMultiplier(num);
-                                                        setTimeout(() => startOnlineGame(), 50);
+                                                        startOnlineGame(num);
                                                     }} className="h-12 bg-white text-slate-900 text-2xl font-black rounded-xl hover:bg-yellow-400 transition-all active:scale-95">
                                                         {num}
                                                     </button>
