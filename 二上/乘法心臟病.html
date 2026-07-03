@@ -201,27 +201,32 @@
 
             window.activeUtterances = window.activeUtterances || [];
             const speakText = (text) => {
-                if (isMuted) return;
-                try {
-                    if (window.speechSynthesis.speaking) {
-                        window.speechSynthesis.cancel();
+                if (isMuted) return Promise.resolve();
+                return new Promise((resolve) => {
+                    try {
+                        if (window.speechSynthesis.speaking) {
+                            window.speechSynthesis.cancel();
+                        }
+                        const utterance = new SpeechSynthesisUtterance(text);
+                        utterance.lang = 'zh-TW';
+                        utterance.rate = 1.5;
+                        
+                        window.activeUtterances.push(utterance);
+                        utterance.onend = () => {
+                            window.activeUtterances = window.activeUtterances.filter(u => u !== utterance);
+                            resolve();
+                        };
+                        utterance.onerror = () => {
+                            window.activeUtterances = window.activeUtterances.filter(u => u !== utterance);
+                            resolve(); // resolve even on error so the game doesn't freeze
+                        };
+                        
+                        window.speechSynthesis.speak(utterance);
+                    } catch (e) {
+                        console.error("Speech synthesis error", e);
+                        resolve();
                     }
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    utterance.lang = 'zh-TW';
-                    utterance.rate = 1.0;
-                    
-                    window.activeUtterances.push(utterance);
-                    utterance.onend = () => {
-                        window.activeUtterances = window.activeUtterances.filter(u => u !== utterance);
-                    };
-                    utterance.onerror = () => {
-                        window.activeUtterances = window.activeUtterances.filter(u => u !== utterance);
-                    };
-                    
-                    window.speechSynthesis.speak(utterance);
-                } catch (e) {
-                    console.error("Speech synthesis error", e);
-                }
+                });
             };
 
             useEffect(() => {
@@ -235,7 +240,8 @@
                         const b = parseInt(match[2]);
                         const c = parseInt(match[3]);
                         const t = getChineseReading(a, b, c);
-                        speakText(t);
+                        // Store speech promise so turn-advance logic can wait for it
+                        window.currentSpeechPromise = speakText(t);
                     }
                 }
             }, [currentCall, myIndex]);
@@ -833,69 +839,74 @@
                 });
 
                 setTimeout(() => {
-                    const newPile = [...centerPile, card];
-                    setCenterPile(newPile);
-                    setFlyingCard(null);
-                    setPlayers(newPlayers);
-                    setIsAnimating(false);
-                    
-                    if (card.value === callValue) {
-                        setGameState('slapping');
-                        aiSlapScheduledRef.current = false;
+                    const advanceOnlineТurn = () => {
+                        const newPile = [...centerPile, card];
+                        setCenterPile(newPile);
+                        setFlyingCard(null);
+                        setPlayers(newPlayers);
+                        setIsAnimating(false);
                         
-                        broadcastStateUpdate({
-                            players: newPlayers,
-                            centerPile: newPile,
-                            turn,
-                            currentStep,
-                            currentCall: newCall,
-                            flyingCard: null,
-                            gameState: 'slapping',
-                            isAnimating: false
-                        });
-                    } else {
-                        newPlayers.forEach((p, idx) => {
-                            if (p.isAI) {
-                                if (isDangerousPair(card.value, callValue)) {
-                                    const chance = aiLevel === 'easy' ? 0.5 : aiLevel === 'normal' ? 0.3 : 0.1;
-                                    if (Math.random() < chance) {
-                                        setTimeout(() => {
-                                            if (onlineRole === 'host') {
-                                                hostExecuteSlap(idx);
-                                            }
-                                        }, (Math.random() * 500 + 300) * getAiSlapMultiplier());
-                                    }
-                                }
-                            }
-                        });
-
-                        const next = findNextPlayerWithCards(turn);
-                        let nextSt = currentStep;
-                        if (next !== null) {
-                            if (difficulty === 'easy') nextSt = (currentStep === 10 ? 1 : currentStep + 1);
-                            else nextSt = (currentStep === 1 ? 10 : currentStep - 1);
-                        }
-                        
-                        setTurn(next !== null ? next : turn);
-                        setCurrentStep(nextSt);
-                        
-                        if (next === null) {
-                            setGameState('gameOver');
-                            setWinner(null);
-                            broadcastGameOver(null);
-                        } else {
+                        if (card.value === callValue) {
+                            setGameState('slapping');
+                            aiSlapScheduledRef.current = false;
+                            
                             broadcastStateUpdate({
                                 players: newPlayers,
                                 centerPile: newPile,
-                                turn: next,
-                                currentStep: nextSt,
+                                turn,
+                                currentStep,
                                 currentCall: newCall,
                                 flyingCard: null,
-                                gameState: 'playing',
+                                gameState: 'slapping',
                                 isAnimating: false
                             });
+                        } else {
+                            newPlayers.forEach((p, idx) => {
+                                if (p.isAI) {
+                                    if (isDangerousPair(card.value, callValue)) {
+                                        const chance = aiLevel === 'easy' ? 0.5 : aiLevel === 'normal' ? 0.3 : 0.1;
+                                        if (Math.random() < chance) {
+                                            setTimeout(() => {
+                                                if (onlineRole === 'host') {
+                                                    hostExecuteSlap(idx);
+                                                }
+                                            }, (Math.random() * 500 + 300) * getAiSlapMultiplier());
+                                        }
+                                    }
+                                }
+                            });
+
+                            const next = findNextPlayerWithCards(turn);
+                            let nextSt = currentStep;
+                            if (next !== null) {
+                                if (difficulty === 'easy') nextSt = (currentStep === 10 ? 1 : currentStep + 1);
+                                else nextSt = (currentStep === 1 ? 10 : currentStep - 1);
+                            }
+                            
+                            setTurn(next !== null ? next : turn);
+                            setCurrentStep(nextSt);
+                            
+                            if (next === null) {
+                                setGameState('gameOver');
+                                setWinner(null);
+                                broadcastGameOver(null);
+                            } else {
+                                broadcastStateUpdate({
+                                    players: newPlayers,
+                                    centerPile: newPile,
+                                    turn: next,
+                                    currentStep: nextSt,
+                                    currentCall: newCall,
+                                    flyingCard: null,
+                                    gameState: 'playing',
+                                    isAnimating: false
+                                });
+                            }
                         }
-                    }
+                    };
+                    // Wait for speech to finish before advancing turn
+                    const speechDone = window.currentSpeechPromise || Promise.resolve();
+                    speechDone.then(advanceOnlineТurn);
                 }, 600);
             };
 
@@ -1081,8 +1092,9 @@
                 
                 setCurrentCall({ playerIdx: turn, text: `${multiplier} × ${currentStep} = ${callValue}` });
                 setFlyingCard({ value: card.value, fromPlayer: turn });
-                
-                setTimeout(() => {
+
+                // Wait for the card animation (600ms) AND for any ongoing speech to finish
+                const advanceTurn = () => {
                     const newPile = [...centerPile, card];
                     setCenterPile(newPile); setFlyingCard(null); setPlayers(newPlayers);
                     
@@ -1106,7 +1118,12 @@
                         } else { setGameState('gameOver'); setWinner(null); }
                         setIsAnimating(false);
                     }
-                }, 600); 
+                };
+
+                setTimeout(() => {
+                    const speechDone = window.currentSpeechPromise || Promise.resolve();
+                    speechDone.then(advanceTurn);
+                }, 600);
             };
 
             const handleSlap = (playerIndex) => {
