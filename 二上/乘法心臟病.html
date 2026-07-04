@@ -272,12 +272,15 @@
             // Online Room Handlers
             const destroyPeer = () => {
                 if (myPeer) {
-                    myPeer.destroy();
+                    try {
+                        myPeer.destroy();
+                    } catch (e) {
+                        console.error("Error destroying peer:", e);
+                    }
                     setMyPeer(null);
                 }
                 setConnections([]);
                 setLobbyPlayers([]);
-                setIsOnlineMode(false);
                 setOnlineRole(null);
             };
 
@@ -377,14 +380,17 @@
                 const code = Math.floor(1000 + Math.random() * 9000).toString();
                 setRoomCode(code);
                 setOnlineRole('host');
-                setOnlineStatusText('正在建立房間...');
+                setOnlineStatusText('正在連接連線伺服器...');
                 setOnlineStatusType('info');
+                setIsOnlineMode(true); // Stay in online mode UI to show status
 
                 const nickname = document.getElementById('online-nickname')?.value.trim() || '房主';
 
                 try {
                     const hostPeerId = 'heart-attack-' + code;
                     const iceConfig = buildIceConfig();
+                    
+                    let peerOpened = false;
                     const peer = new Peer(hostPeerId, {
                         host: '0.peerjs.com',
                         port: 443,
@@ -393,12 +399,22 @@
                         debug: 1
                     });
 
+                    // 12-second signaling server connection timeout
+                    const serverTimeout = setTimeout(() => {
+                        if (!peerOpened) {
+                            setOnlineStatusText('建立房間逾時！無法連接到連線伺服器，請檢查網路或稍後重試。');
+                            setOnlineStatusType('error');
+                            try { peer.destroy(); } catch(e){}
+                        }
+                    }, 12000);
+
                     peer.on('open', () => {
+                        peerOpened = true;
+                        clearTimeout(serverTimeout);
                         setMyPeer(peer);
                         setLobbyPlayers([{ id: 0, name: `${nickname} (你)`, isHost: true }]);
                         setOnlineStatusText(`房間建立成功！房號：${code}`);
                         setOnlineStatusType('success');
-                        setIsOnlineMode(true);
                     });
 
                     peer.on('connection', (conn) => {
@@ -461,11 +477,14 @@
                     });
 
                     peer.on('error', (err) => {
-                        console.error(err);
+                        console.error("Peer Error:", err);
+                        peerOpened = true; // prevent timeout trigger
+                        clearTimeout(serverTimeout);
                         if (err.type === 'unavailable-id') {
+                            // ID is somehow taken, retry with a new code
                             createOnlineRoom();
                         } else {
-                            setOnlineStatusText('建立房間失敗，請重試！');
+                            setOnlineStatusText(`建立房間失敗（錯誤類型：${err.type || 'unknown'}）。請重試！`);
                             setOnlineStatusType('error');
                         }
                     });
@@ -493,13 +512,17 @@
                 destroyPeer();
                 setRoomCode(cleaned);
                 setOnlineRole('guest');
-                setOnlineStatusText('正在連線加入房間...');
+                setOnlineStatusText('正在連接連線伺服器...');
                 setOnlineStatusType('info');
+                setIsOnlineMode(true); // Stay in online mode UI to show status
 
                 const nickname = document.getElementById('online-nickname')?.value.trim() || '訪客';
 
                 try {
                     const iceConfig = buildIceConfig();
+                    let peerOpened = false;
+                    let connOpened = false;
+                    
                     const peer = new Peer(null, {
                         host: '0.peerjs.com',
                         port: 443,
@@ -508,19 +531,28 @@
                         debug: 1
                     });
 
+                    // 15-second total connection timeout
+                    const joinTimeout = setTimeout(() => {
+                        if (!connOpened) {
+                            if (!peerOpened) {
+                                setOnlineStatusText('連線伺服器逾時！無法連接到連線伺服器，請檢查網路。');
+                            } else {
+                                setOnlineStatusText('與房主連線逾時！請確認房主是否已開房，或雙方網路是否支援 P2P 連線。');
+                            }
+                            setOnlineStatusType('error');
+                            try { peer.destroy(); } catch(e){}
+                        }
+                    }, 15000);
+
                     peer.on('open', () => {
+                        peerOpened = true;
+                        setOnlineStatusText('已連接伺服器，正在尋找房主並建立 P2P 連線...');
+                        
                         const conn = peer.connect('heart-attack-' + cleaned, { reliable: true });
 
-                        // 15-second connection timeout
-                        const connTimeout = setTimeout(() => {
-                            if (conn.open) return;
-                            setOnlineStatusText('連線逾時！請確認房主是否已開房，或網路環境是否支援 P2P 連線。');
-                            setOnlineStatusType('error');
-                            peer.destroy();
-                        }, 15000);
-                        
                         conn.on('open', () => {
-                            clearTimeout(connTimeout);
+                            connOpened = true;
+                            clearTimeout(joinTimeout);
                             conn.send({
                                 type: 'join_lobby',
                                 playerName: nickname
@@ -528,7 +560,6 @@
                             
                             setMyPeer(peer);
                             setConnections([conn]);
-                            setIsOnlineMode(true);
                             setOnlineStatusText('已連線加入，進入連線大廳！');
                             setOnlineStatusType('success');
                         });
@@ -537,7 +568,7 @@
                             if (data.type === 'error') {
                                 setOnlineStatusText(data.message);
                                 setOnlineStatusType('error');
-                                peer.destroy();
+                                destroyPeer();
                             }
                             if (data.type === 'lobby_update') {
                                 setLobbyPlayers(data.lobbyPlayers);
@@ -629,7 +660,7 @@
                         });
 
                         conn.on('error', (err) => {
-                            clearTimeout(connTimeout);
+                            clearTimeout(joinTimeout);
                             console.error(err);
                             setOnlineStatusText('與房主的資料通道連線失敗！請確認防火牆設定，或嘗試改用手機熱點後重試。');
                             setOnlineStatusType('error');
@@ -637,7 +668,9 @@
                     });
 
                     peer.on('error', (err) => {
-                        console.error(err);
+                        console.error("Peer Error:", err);
+                        peerOpened = true; // prevent timeout trigger
+                        clearTimeout(joinTimeout);
                         if (err.type === 'peer-not-found') {
                             setOnlineStatusText('找不到該房間，請確認房號是否正確！');
                         } else if (err.type === 'network') {
