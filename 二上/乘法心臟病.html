@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -131,7 +131,11 @@
             const [onlineStatusType, setOnlineStatusType] = useState(''); // 'info', 'success', 'error'
             const [myPlayerIdx, setMyPlayerIdx] = useState(0);
             const [diagnosticLogs, setDiagnosticLogs] = useState([]);
+            const [useWebRelay, setUseWebRelay] = useState(false); // HTTP SSE pub-sub compatibility mode
 
+            const eventSourceRef = useRef(null);
+            const heartbeatTimerRef = useRef(null);
+            const guestIdRef = useRef(null);
             const connectionsRef = useRef([]);
             const lobbyPlayersRef = useRef([]);
             
@@ -284,7 +288,7 @@
 
             // Online Room Handlers
             const destroyPeer = () => {
-                addDiagnosticLog("連線清除：關閉並釋放 Peer / Connections 資源");
+                addDiagnosticLog("\u9023\u7dda\u6e05\u9664\uff1a\u95dc\u9589\u4e26\u91cb\u653e Peer / Connections / EventSource \u8cc7\u6e90");
                 if (myPeer) {
                     try {
                         myPeer.destroy();
@@ -292,6 +296,16 @@
                         console.error("Error destroying peer:", e);
                     }
                     setMyPeer(null);
+                }
+                if (eventSourceRef.current) {
+                    try {
+                        eventSourceRef.current.close();
+                    } catch (e) {}
+                    eventSourceRef.current = null;
+                }
+                if (heartbeatTimerRef.current) {
+                    clearInterval(heartbeatTimerRef.current);
+                    heartbeatTimerRef.current = null;
                 }
                 setConnections([]);
                 setLobbyPlayers([]);
@@ -379,7 +393,7 @@
             const createOnlineRoom = () => {
                 try {
                     const silent = new SpeechSynthesisUtterance("");
-                    silent.lang = 'zh-TW';
+                    silent.lang = "zh-TW";
                     window.speechSynthesis.speak(silent);
                 } catch(e){}
 
@@ -387,23 +401,146 @@
                 setDiagnosticLogs([]); // Clear logs for new session
                 const code = Math.floor(1000 + Math.random() * 9000).toString();
                 setRoomCode(code);
-                setOnlineRole('host');
-                setOnlineStatusText('正在連接連線伺服器...');
-                setOnlineStatusType('info');
+                setOnlineRole("host");
+                setOnlineStatusText("\u6b63\u5728\u9023\u63a5\u9023\u7dda\u4f3a\u670d\u5668...");
+                setOnlineStatusType("info");
                 setIsOnlineMode(true); // Stay in online mode UI to show status
 
-                addDiagnosticLog(`開始創建房間，房號：${code}`);
-                addDiagnosticLog(`正在連接 PeerJS 信令伺服器 (0.peerjs.com)...`);
+                const nickname = document.getElementById("online-nickname")?.value.trim() || "\u623f\u4e3b";
 
-                const nickname = document.getElementById('online-nickname')?.value.trim() || '房主';
+                if (useWebRelay) {
+                    addDiagnosticLog(`\u958b\u59cb\u5275\u5efa\u76f8\u5bb9\u6a21\u5f0f\u623f\u9593\uff0c\u623f\u865f\uff1a${code}`);
+                    setOnlineStatusText("\u6b63\u5728\u958b\u555f\u5f37\u6548\u76f8\u5bb9\u4f3a\u670d\u5668\u983b\u9053...");
+                    
+                    try {
+                        const es = new EventSource(`https://ntfy.sh/heart-attack-hctsao-host-${code}/sse`);
+                        eventSourceRef.current = es;
+                        
+                        es.onopen = () => {
+                            setLobbyPlayers([{ id: 0, name: `${nickname} (\u4f60)`, isHost: true }]);
+                            setOnlineStatusText(`\u76f8\u5bb9\u6a21\u5f0f\u623f\u9593\u5efa\u7acb\u6210\u529f\uff01\u623f\u865f\uff1a${code}`);
+                            setOnlineStatusType("success");
+                            addDiagnosticLog("\u76f8\u5bb9\u6a21\u5f0f\u623f\u9593\u5df2\u5efa\u7acb");
+                        };
+                        
+                        es.onmessage = (e) => {
+                            try {
+                                const sseData = JSON.parse(e.data);
+                                if (sseData.event !== "message") return;
+                                const data = JSON.parse(sseData.message);
+                                
+                                if (data.type === "join_lobby") {
+                                    const currentConns = connectionsRef.current;
+                                    if (currentConns.length >= 3) {
+                                        fetch(`https://ntfy.sh/heart-attack-hctsao-guest-${code}-${data.guestId}`, {
+                                            method: "POST",
+                                            body: JSON.stringify({ type: "error", message: "\u623f\u9593\u5df2\u6eff\uff01" })
+                                        });
+                                        return;
+                                    }
+                                    
+                                    // Check if duplicate guestId
+                                    if (currentConns.some(c => c.guestId === data.guestId)) return;
+                                    
+                                    const nextIdx = currentConns.length + 1;
+                                    const mockConn = {
+                                        guestId: data.guestId,
+                                        playerIdx: nextIdx,
+                                        playerName: data.playerName || `\u73a9\u5bb6 ${nextIdx}`,
+                                        lastActive: Date.now(),
+                                        send: (msg) => {
+                                            fetch(`https://ntfy.sh/heart-attack-hctsao-guest-${code}-${data.guestId}`, {
+                                                method: "POST",
+                                                body: JSON.stringify(msg)
+                                            }).catch(err => console.error(err));
+                                        }
+                                    };
+                                    
+                                    setConnections(prev => {
+                                        const newConns = [...prev, mockConn];
+                                        const updatedLobby = [
+                                            { id: 0, name: `${nickname} (\u4f60)`, isHost: true },
+                                            ...newConns.map(c => ({ id: c.playerIdx, name: c.playerName, isHost: false }))
+                                        ];
+                                        setLobbyPlayers(updatedLobby);
+                                        addDiagnosticLog(`\u76f8\u5bb9\u6a21\u5f0f\u5927\u5ef3\u66f4\u65b0\uff0c\u65b0\u589e\u8a2a\u5ba2: ${mockConn.playerName}`);
+                                        
+                                        newConns.forEach(c => {
+                                            c.send({
+                                                type: "lobby_update",
+                                                lobbyPlayers: updatedLobby,
+                                                myIndex: c.playerIdx
+                                            });
+                                        });
+                                        return newConns;
+                                    });
+                                }
+                                
+                                if (data.type === "pong") {
+                                    setConnections(prev => {
+                                        return prev.map(c => {
+                                            if (c.guestId === data.guestId) {
+                                                return { ...c, lastActive: Date.now() };
+                                            }
+                                            return c;
+                                        });
+                                    });
+                                }
+                                
+                                if (data.type === "flip_request") {
+                                    const sender = connectionsRef.current.find(c => c.guestId === data.guestId);
+                                    if (sender && gameState === "playing" && turn === sender.playerIdx && !isAnimating && !punishingCard) {
+                                        hostExecutePlayTurn();
+                                    }
+                                }
+                                
+                                if (data.type === "slap_request") {
+                                    const sender = connectionsRef.current.find(c => c.guestId === data.guestId);
+                                    if (sender && !punishingCard && centerPile.length > 0) {
+                                        hostExecuteSlap(sender.playerIdx);
+                                    }
+                                }
+                            } catch(err) {
+                                console.error("Error parsing host message:", err);
+                            }
+                        };
+                        
+                        es.onerror = (err) => {
+                            console.error(err);
+                            addDiagnosticLog("\u76f8\u5bb9\u4f3a\u670d\u5668\u983b\u9053\u767c\u751f\u932f\u8aa4\uff0c\u5c07\u91cd\u8a66...");
+                        };
+                        
+                        // Start heartbeat timer
+                        heartbeatTimerRef.current = setInterval(() => {
+                            const now = Date.now();
+                            connectionsRef.current.forEach(c => {
+                                if (now - c.lastActive > 25000) {
+                                    addDiagnosticLog(`\u76f8\u5bb9\u6a21\u5f0f\uff1a\u8a2a\u5ba2 ${c.playerName} \u65b7\u7dda\uff08\u903e\u6642\uff09`);
+                                    handleGuestDisconnect(c);
+                                } else {
+                                    c.send({ type: "ping" });
+                                }
+                            });
+                        }, 10000);
+                        
+                    } catch(err) {
+                        console.error(err);
+                        setOnlineStatusText("\u958b\u555f\u76f8\u5bb9\u623f\u9593\u901a\u9053\u7570\u5e38\uff01");
+                        setOnlineStatusType("error");
+                    }
+                    return;
+                }
+
+                addDiagnosticLog(`\u958b\u59cb\u5275\u5efa\u623f\u9593\uff0c\u623f\u865f\uff1a${code}`);
+                addDiagnosticLog(`\u6b63\u5728\u9023\u63a5\u0020\u0050\u0065\u0065\u0072\u004a\u0053\u0020\u4fe1\u4ee4\u4f3a\u670d\u5668\u0020\u0028\u0030\u002e\u0070\u0065\u0065\u0072\u006a\u0073\u002e\u0063\u006f\u006d\u0029\u002e\u002e\u002e`);
 
                 try {
-                    const hostPeerId = 'heart-attack-' + code;
+                    const hostPeerId = "heart-attack-" + code;
                     const iceConfig = buildIceConfig();
                     
                     let peerOpened = false;
                     const peer = new Peer(hostPeerId, {
-                        host: '0.peerjs.com',
+                        host: "0.peerjs.com",
                         port: 443,
                         secure: true,
                         config: iceConfig,
@@ -413,56 +550,56 @@
                     // 30-second signaling server connection timeout
                     const serverTimeout = setTimeout(() => {
                         if (!peerOpened) {
-                            addDiagnosticLog("連線信令伺服器逾時，無法開啟房間！");
-                            setOnlineStatusText('建立房間逾時！無法連接到連線伺服器，請檢查網路或稍後重試。');
-                            setOnlineStatusType('error');
+                            addDiagnosticLog("\u9023\u7dda\u4fe1\u4ee4\u4f3a\u670d\u5668\u903e\u6642\uff0c\u7121\u6cd5\u958b\u555f\u623f\u9593\uff01");
+                            setOnlineStatusText("\u5efa\u7acb\u623f\u9593\u903e\u6642\uff00\u7121\u6cd5\u9023\u63a5\u5230\u9023\u7dda\u4f3a\u670d\u5668\uff0c\u8acb\u6aa2\u67e5\u7db2\u8def\u6216\u7a0d\u5f8c\u91cd\u8a66\u3002");
+                            setOnlineStatusType("error");
                             try { peer.destroy(); } catch(e){}
                         }
                     }, 30000);
 
-                    peer.on('open', () => {
+                    peer.on("open", () => {
                         peerOpened = true;
                         clearTimeout(serverTimeout);
                         setMyPeer(peer);
-                        setLobbyPlayers([{ id: 0, name: `${nickname} (你)`, isHost: true }]);
-                        setOnlineStatusText(`房間建立成功！房號：${code}`);
-                        setOnlineStatusType('success');
-                        addDiagnosticLog(`房間建立成功！信令 ID: ${hostPeerId}`);
+                        setLobbyPlayers([{ id: 0, name: `${nickname} (\u4f60)`, isHost: true }]);
+                        setOnlineStatusText(`\u623f\u9593\u5efa\u7acb\u6210\u529f\uff01\u623f\u865f\uff1a${code}`);
+                        setOnlineStatusType("success");
+                        addDiagnosticLog(`\u623f\u9593\u5efa\u7acb\u6210\u529f\uff01\u4fe1\u4ee4\u0020\u0049\u0044\uff1a${hostPeerId}`);
                     });
 
-                    peer.on('connection', (conn) => {
+                    peer.on("connection", (conn) => {
                         const currentConns = connectionsRef.current;
-                        addDiagnosticLog(`收到來自訪客的連線請求，訪客 Peer ID: ${conn.peer}`);
+                        addDiagnosticLog(`\u6536\u5230\u4f86\u81ea\u8a2a\u5ba2\u7684\u9023\u7dda\u8acb\u6c42\uff0c\u8a2a\u5ba2\u0020\u0050\u0065\u0065\u0072\u0020\u0049\u0044\uff1a${conn.peer}`);
                         if (currentConns.length >= 3) {
-                            addDiagnosticLog("房間已滿 (已滿 4 人)，拒絕連線");
-                            conn.on('open', () => {
-                                conn.send({ type: 'error', message: '房間已滿！' });
+                            addDiagnosticLog("\u623f\u9593\u5df2\u6eff\u0020\uff08\u5df2\u6eff\u0020\u0034\u0020\u4eba\uff09\uff0c\u62d2\u7d55\u9023\u7dda");
+                            conn.on("open", () => {
+                                conn.send({ type: "error", message: "\u623f\u9593\u5df2\u6eff\uff01" });
                                 setTimeout(() => conn.close(), 500);
                             });
                             return;
                         }
 
-                        conn.on('open', () => {
-                            addDiagnosticLog(`與訪客 P2P 通道連線已開啟 (conn.open = true)`);
-                            conn.on('data', (data) => {
-                                if (data.type === 'join_lobby') {
+                        conn.on("open", () => {
+                            addDiagnosticLog(`\u8207\u8a2a\u5ba2\u0020\u0050\u0032\u0050\u0020\u901a\u9053\u9023\u7dda\u5df2\u958b\u555f\u0020\u0028\u0063\u006f\u006e\u006e\u002e\u006f\u0070\u0065\u006e\u0020\u003d\u0020\u0074\u0072\u0075\u0065\u0029`);
+                            conn.on("data", (data) => {
+                                if (data.type === "join_lobby") {
                                     // Use ref length to avoid React stale closure duplicates!
                                     const nextIdx = connectionsRef.current.length + 1;
                                     conn.playerIdx = nextIdx;
-                                    conn.playerName = data.playerName || `玩家 ${nextIdx}`;
-                                    addDiagnosticLog(`訪客加入大廳成功，分配 ID: ${nextIdx}, 暱稱: ${conn.playerName}`);
+                                    conn.playerName = data.playerName || `\u73a9\u5bb6 ${nextIdx}`;
+                                    addDiagnosticLog(`\u8a2a\u5ba2\u52a0\u5165\u5927\u5ef3\u6210\u529f\uff0c\u5206\u914d\u0020\u0049\u0044\uff1a${nextIdx}, \u66b1\u7a31\uff1a${conn.playerName}`);
                                     
                                     setConnections(prev => {
                                         const newConns = [...prev, conn];
                                         const updatedLobby = [
-                                            { id: 0, name: `${nickname} (你)`, isHost: true },
+                                            { id: 0, name: `${nickname} (\u4f60)`, isHost: true },
                                             ...newConns.map((c) => ({ id: c.playerIdx, name: c.playerName, isHost: false }))
                                         ];
                                         setLobbyPlayers(updatedLobby);
                                         
                                         newConns.forEach((c) => {
                                             c.send({
-                                                type: 'lobby_update',
+                                                type: "lobby_update",
                                                 lobbyPlayers: updatedLobby,
                                                 myIndex: c.playerIdx
                                             });
@@ -471,13 +608,13 @@
                                     });
                                 }
 
-                                if (data.type === 'flip_request') {
-                                    if (gameState === 'playing' && turn === data.playerIdx && !isAnimating && !punishingCard) {
+                                if (data.type === "flip_request") {
+                                    if (gameState === "playing" && turn === data.playerIdx && !isAnimating && !punishingCard) {
                                         hostExecutePlayTurn();
                                     }
                                 }
 
-                                if (data.type === 'slap_request') {
+                                if (data.type === "slap_request") {
                                     if (!punishingCard && centerPile.length > 0) {
                                         hostExecuteSlap(data.playerIdx);
                                     }
@@ -485,64 +622,213 @@
                             });
                         });
 
-                        conn.on('close', () => {
+                        conn.on("close", () => {
                             handleGuestDisconnect(conn);
                         });
 
-                        conn.on('error', (err) => {
+                        conn.on("error", (err) => {
                             console.error(err);
-                            addDiagnosticLog(`訪客資料通道錯誤: ${err.message || err}`);
+                            addDiagnosticLog(`\u8a2a\u5ba2\u8cc7\u6599\u901a\u9053\u932f\u8aa4\uff1a${err.message || err}`);
                             handleGuestDisconnect(conn);
                         });
                     });
 
-                    peer.on('error', (err) => {
+                    peer.on("error", (err) => {
                         console.error("Peer Error:", err);
                         peerOpened = true; // prevent timeout trigger
                         clearTimeout(serverTimeout);
-                        addDiagnosticLog(`信令伺服器錯誤: ${err.type} - ${err.message}`);
-                        if (err.type === 'unavailable-id') {
-                            addDiagnosticLog("房號已被佔用，嘗試自動重新開房...");
+                        addDiagnosticLog(`\u4fe1\u4ee4\u4f3a\u670d\u5668\u932f\u8aa4\uff1a${err.type} - ${err.message}`);
+                        if (err.type === "unavailable-id") {
+                            addDiagnosticLog("\u623f\u865f\u5df2\u88ab\u4f54\u7528\uff0c\u5617\u8a66\u81ea\u52d5\u91cd\u65b0\u958b\u623f...");
                             createOnlineRoom();
                         } else {
-                            setOnlineStatusText(`建立房間失敗（錯誤類型：${err.type || 'unknown'}）。請重試！`);
-                            setOnlineStatusType('error');
+                            setOnlineStatusText(`\u5efa\u7acb\u6210\u529f\u5931\u6557\uff08\u932f\u8aa4\u985e\u578b\uff1a${err.type || "unknown"}\uff09\u3002\u8acb\u91cd\u8a66\uff01`);
+                            setOnlineStatusType("error");
                         }
                     });
                 } catch (e) {
                     console.error(e);
-                    addDiagnosticLog(`開房異常：${e.message || e}`);
-                    setOnlineStatusText('建立房間異常，請重試！');
-                    setOnlineStatusType('error');
+                    addDiagnosticLog(`\u958b\u623f\u7570\u5e38\uff1a${e.message || e}`);
+                    setOnlineStatusText("\u5efa\u7acb\u623f\u9593\u7570\u5e38\uff0c\u8acb\u91cd\u8a66\uff01");
+                    setOnlineStatusType("error");
                 }
             };
 
             const joinOnlineRoom = (code) => {
-                const cleaned = (code || '').trim();
+                const cleaned = (code || "").trim();
                 if (!cleaned || cleaned.length !== 4) {
-                    setOnlineStatusText('請輸入 4 位數房號！');
-                    setOnlineStatusType('error');
+                    setOnlineStatusText("\u8acb\u8f38\u5165\u0020\u0034\u0020\u4f4d\u6578\u623f\u865f\uff01");
+                    setOnlineStatusType("error");
                     return;
                 }
 
                 try {
                     const silent = new SpeechSynthesisUtterance("");
-                    silent.lang = 'zh-TW';
+                    silent.lang = "zh-TW";
                     window.speechSynthesis.speak(silent);
                 } catch(e){}
 
                 destroyPeer();
                 setDiagnosticLogs([]); // Clear logs for new session
                 setRoomCode(cleaned);
-                setOnlineRole('guest');
-                setOnlineStatusText('正在連接連線伺服器...');
-                setOnlineStatusType('info');
+                setOnlineRole("guest");
+                setOnlineStatusText("\u6b63\u5728\u9023\u63a5\u9023\u7dda\u4f3a\u670d\u5668...");
+                setOnlineStatusType("info");
                 setIsOnlineMode(true); // Stay in online mode UI to show status
 
-                addDiagnosticLog(`嘗試加入房號：${cleaned}`);
-                addDiagnosticLog(`正在連接 PeerJS 信令伺服器...`);
+                const nickname = document.getElementById("online-nickname")?.value.trim() || "\u8a2a\u5ba2";
 
-                const nickname = document.getElementById('online-nickname')?.value.trim() || '訪客';
+                if (useWebRelay) {
+                    addDiagnosticLog(`\u76f8\u5bb9\u6a21\u5f0f\u52a0\u5165\u623f\u865f\uff1a${cleaned}`);
+                    setOnlineStatusText("\u6b63\u5728\u9023\u7dda\u76f8\u5bb9\u4f3a\u670d\u5668\u983b\u9053...");
+                    
+                    const myGuestId = "g-" + Math.floor(100000 + Math.random() * 900000).toString();
+                    guestIdRef.current = myGuestId;
+                    
+                    try {
+                        const es = new EventSource(`https://ntfy.sh/heart-attack-hctsao-guest-${cleaned}-${myGuestId}/sse`);
+                        eventSourceRef.current = es;
+                        
+                        const hostConn = {
+                            guestId: myGuestId,
+                            send: (msg) => {
+                                fetch(`https://ntfy.sh/heart-attack-hctsao-host-${cleaned}`, {
+                                    method: "POST",
+                                    body: JSON.stringify({ ...msg, guestId: myGuestId })
+                                }).catch(err => console.error(err));
+                            }
+                        };
+                        
+                        es.onopen = () => {
+                            setConnections([hostConn]);
+                            setOnlineStatusText("\u5df2\u9023\u7dda\u76f8\u5bb9\u983b\u9053\uff0c\u6b63\u5728\u52a0\u5165\u5927\u5ef3...");
+                            setOnlineStatusType("success");
+                            
+                            // Send join request
+                            hostConn.send({
+                                type: "join_lobby",
+                                playerName: nickname
+                            });
+                        };
+                        
+                        es.onmessage = (e) => {
+                            try {
+                                const sseData = JSON.parse(e.data);
+                                if (sseData.event !== "message") return;
+                                const data = JSON.parse(sseData.message);
+                                
+                                if (data.type === "ping") {
+                                    hostConn.send({ type: "pong" });
+                                    return;
+                                }
+                                
+                                if (data.type === "error") {
+                                    setOnlineStatusText(data.message);
+                                    setOnlineStatusType("error");
+                                    destroyPeer();
+                                }
+                                if (data.type === "lobby_update") {
+                                    setLobbyPlayers(data.lobbyPlayers);
+                                    setMyPlayerIdx(data.myIndex);
+                                }
+                                if (data.type === "start_game") {
+                                    addDiagnosticLog("\u9023\u7dda\u904a\u6232\u958b\u59cb\uff0c\u958b\u59cb\u767c\u724c...");
+                                    setMultiplier(data.multiplier);
+                                    setDifficulty(data.difficulty);
+                                    setAiLevel(data.aiLevel);
+                                    setPlayers(data.players);
+                                    setMainDeck(data.mainDeck);
+                                    setTurn(data.turn);
+                                    setCurrentStep(data.currentStep);
+                                    setCenterPile([]);
+                                    setCurrentCall(null);
+                                    setSlapResults([]);
+                                    setWinner(null);
+                                    setPunishingCard(null);
+                                    setErrorMsg("");
+                                    aiSlapScheduledRef.current = false;
+                                    setGameState("dealing");
+                                    setDealingProgress(0);
+                                }
+                                if (data.type === "state_update") {
+                                    setPlayers(data.players);
+                                    setCenterPile(data.centerPile);
+                                    setTurn(data.turn);
+                                    setCurrentStep(data.currentStep);
+                                    setCurrentCall(data.currentCall);
+                                    setFlyingCard(data.flyingCard);
+                                    setGameState(data.gameState);
+                                    setIsAnimating(data.isAnimating);
+                                    if (data.slapResults) setSlapResults(data.slapResults);
+                                }
+                                if (data.type === "penalty_update") {
+                                    playSoundEffect("slap");
+                                    setPunishingCard(data.punishingCard);
+                                    setCurrentCall(null);
+                                    setTimeout(() => {
+                                        setPlayers(data.players);
+                                        setCenterPile(data.centerPile);
+                                        setSlapResults([]);
+                                        setPunishingCard(null);
+                                        setErrorMsg("");
+                                        setGameState("playing");
+                                        setTurn(data.nextTurn);
+                                        setCurrentStep(data.nextStep);
+                                        aiSlapScheduledRef.current = false;
+                                    }, 800);
+                                }
+                                if (data.type === "error_slap") {
+                                    playSoundEffect("error");
+                                    setErrorMsg(data.errorMsg);
+                                    setSlapResults([data.slapPlayerIdx]);
+                                    setPunishingCard(data.punishingCard);
+                                    setTimeout(() => {
+                                        setPlayers(data.players);
+                                        setCenterPile(data.centerPile);
+                                        setSlapResults([]);
+                                        setPunishingCard(null);
+                                        setErrorMsg("");
+                                        setGameState("playing");
+                                        setTurn(data.nextTurn);
+                                        setCurrentStep(data.nextStep);
+                                        aiSlapScheduledRef.current = false;
+                                    }, 800);
+                                }
+                                if (data.type === "game_over") {
+                                    setWinner(data.winner);
+                                    setGameState("gameOver");
+                                }
+                                if (data.type === "lobby_return") {
+                                    setGameState("menu");
+                                    setPlayers([]);
+                                    setCenterPile([]);
+                                    setCurrentCall(null);
+                                    setSlapResults([]);
+                                    setWinner(null);
+                                    setPunishingCard(null);
+                                    setErrorMsg("");
+                                }
+                            } catch(err) {
+                                console.error("Error parsing guest message:", err);
+                            }
+                        };
+                        
+                        es.onerror = (err) => {
+                            console.error(err);
+                            setOnlineStatusText("\u76f8\u5bb9\u9023\u7dda\u901a\u9053\u4e2d\u65b7\uff0c\u8acb\u91cd\u8a66\uff01");
+                            setOnlineStatusType("error");
+                            destroyPeer();
+                        };
+                    } catch(err) {
+                        console.error(err);
+                        setOnlineStatusText("\u52a0\u5165\u76f8\u5bb9\u623f\u9593\u901a\u9053\u7570\u5e38\uff01");
+                        setOnlineStatusType("error");
+                    }
+                    return;
+                }
+
+                addDiagnosticLog(`\u5617\u8a66\u52a0\u5165\u623f\u865f\uff1a${cleaned}`);
+                addDiagnosticLog(`\u6b63\u5728\u9023\u63a5\u0020\u0050\u0065\u0065\u0072\u004a\u0053\u0020\u4fe1\u4ee4\u4f3a\u670d\u5668\u002e\u002e\u002e`);
 
                 try {
                     const iceConfig = buildIceConfig();
@@ -550,7 +836,7 @@
                     let connOpened = false;
                     
                     const peer = new Peer(null, {
-                        host: '0.peerjs.com',
+                        host: "0.peerjs.com",
                         port: 443,
                         secure: true,
                         config: iceConfig,
@@ -561,53 +847,53 @@
                     const joinTimeout = setTimeout(() => {
                         if (!connOpened) {
                             if (!peerOpened) {
-                                addDiagnosticLog("連接信令伺服器逾時，無法連線！");
-                                setOnlineStatusText('連線伺服器逾時！無法連接到連線伺服器，請檢查網路。');
+                                addDiagnosticLog("\u9023\u63a5\u4fe1\u4ee4\u4f3a\u670d\u5668\u903e\u6642\uff0c\u7121\u6cd5\u9023\u7dda\uff01");
+                                setOnlineStatusText("\u9023\u7dda\u4f3a\u670d\u5668\u903e\u6642\uff01\u7121\u6cd5\u9023\u63a5\u5230\u9023\u7dda\u4f3a\u670d\u5668\uff0c\u8acb\u6aa2\u67e5\u7db2\u8def\u3002");
                             } else {
-                                addDiagnosticLog(`連接房主 heart-attack-${cleaned} 逾時，P2P 資料通道未開啟！`);
-                                setOnlineStatusText('與房主連線逾時！請確認房主是否已開房，或雙方網路是否支援 P2P 連線。');
+                                addDiagnosticLog(`\u9023\u63a5\u623f\u4e3b\u0020heart-attack-${cleaned}\u0020\u903e\u6642\uff0c\u0050\u0032\u0050\u0020\u8cc7\u6599\u901a\u9053\u672a\u958b\u555f\uff01`);
+                                setOnlineStatusText("\u8207\u623f\u4e3b\u9023\u7dda\u903e\u6642\uff01\u8acb\u78ba\u8a8d\u623f\u4e3b\u662f\u5426\u5df2\u958b\u623f\uff0c\u6216\u96d9\u65b9\u7db2\u8def\u662f\u5426\u652f\u63f4\u0020\u0050\u0032\u0050\u0020\u9023\u7dda\u3002");
                             }
-                            setOnlineStatusType('error');
+                            setOnlineStatusType("error");
                             try { peer.destroy(); } catch(e){}
                         }
                     }, 30000);
 
-                    peer.on('open', () => {
+                    peer.on("open", () => {
                         peerOpened = true;
-                        addDiagnosticLog(`成功連接信令伺服器，分配訪客 ID: ${peer.id}`);
-                        addDiagnosticLog(`正在與房主 heart-attack-${cleaned} 建立 P2P 連線...`);
-                        setOnlineStatusText('已連接伺服器，正在尋找房主並建立 P2P 連線...');
+                        addDiagnosticLog(`\u6210\u529f\u9023\u63a5\u4fe1\u4ee4\u4f3a\u670d\u5668\uff0c\u5206\u914d\u8a2a\u5ba2\u0020\u0049\u0044\uff1e${peer.id}`);
+                        addDiagnosticLog(`\u6b63\u5728\u8207\u623f\u4e3b\u0020\u0068\u0065\u0061\u0072\u0074\u002d\u0061\u0074\u0074\u0061\u0063\u006b\u002d${cleaned}\u0020\u5efa\u7acb\u0020\u0050\u0032\u0050\u0020\u9023\u7dda\u002e\u002e\u002e`);
+                        setOnlineStatusText("\u5df2\u9023\u63a5\u4f3a\u670d\u5668\uff0c\u6b63\u5728\u5c0b\u627e\u623f\u4e3b\u4e26\u5efa\u7acb\u0020\u0050\u0032\u0050\u0020\u9023\u7dda\u002e\u002e\u002e");
                         
-                        const conn = peer.connect('heart-attack-' + cleaned, { reliable: true });
+                        const conn = peer.connect("heart-attack-" + cleaned, { reliable: true });
 
-                        conn.on('open', () => {
+                        conn.on("open", () => {
                             connOpened = true;
                             clearTimeout(joinTimeout);
-                            addDiagnosticLog(`與房主的 P2P 連線建立成功！發送 join_lobby 握手訊息`);
+                            addDiagnosticLog("\u8207\u623f\u4e3b\u7684\u0020\u0050\u0032\u0050\u0020\u9023\u7dda\u5efa\u7acb\u6210\u529f\uff01\u767c\u9001\u0020\u006a\u006f\u0069\u006e\u005f\u006c\u006f\u0062\u0062\u0079\u0020\u63e1\u624b\u8a0a\u606f");
                             conn.send({
-                                type: 'join_lobby',
+                                type: "join_lobby",
                                 playerName: nickname
                             });
                             
                             setMyPeer(peer);
                             setConnections([conn]);
-                            setOnlineStatusText('已連線加入，進入連線大廳！');
-                            setOnlineStatusType('success');
+                            setOnlineStatusText("\u5df2\u9023\u7dda\u52a0\u5165\uff0c\u9032\u5165\u9023\u7dda\u5927\u5ef3\uff01");
+                            setOnlineStatusType("success");
                         });
 
-                        conn.on('data', (data) => {
-                            if (data.type === 'error') {
-                                addDiagnosticLog(`收到房主拒絕訊息: ${data.message}`);
+                        conn.on("data", (data) => {
+                            if (data.type === "error") {
+                                addDiagnosticLog(`\u6536\u5230\u623f\u4e3b\u62d2\u7d55\u8a0a\u606f\uff1a${data.message}`);
                                 setOnlineStatusText(data.message);
-                                setOnlineStatusType('error');
+                                setOnlineStatusType("error");
                                 destroyPeer();
                             }
-                            if (data.type === 'lobby_update') {
+                            if (data.type === "lobby_update") {
                                 setLobbyPlayers(data.lobbyPlayers);
                                 setMyPlayerIdx(data.myIndex);
                             }
-                            if (data.type === 'start_game') {
-                                addDiagnosticLog("連線遊戲開始，開始發牌...");
+                            if (data.type === "start_game") {
+                                addDiagnosticLog("\u9023\u7dda\u904a\u6232\u958b\u59cb\uff0c\u958b\u59cb\u767c\u724c...");
                                 setMultiplier(data.multiplier);
                                 setDifficulty(data.difficulty);
                                 setAiLevel(data.aiLevel);
@@ -623,10 +909,10 @@
                                 setErrorMsg("");
                                 aiSlapScheduledRef.current = false;
                                 
-                                setGameState('dealing');
+                                setGameState("dealing");
                                 setDealingProgress(0);
                             }
-                            if (data.type === 'state_update') {
+                            if (data.type === "state_update") {
                                 setPlayers(data.players);
                                 setCenterPile(data.centerPile);
                                 setTurn(data.turn);
@@ -637,8 +923,8 @@
                                 setIsAnimating(data.isAnimating);
                                 if (data.slapResults) setSlapResults(data.slapResults);
                             }
-                            if (data.type === 'penalty_update') {
-                                playSoundEffect('slap');
+                            if (data.type === "penalty_update") {
+                                playSoundEffect("slap");
                                 setPunishingCard(data.punishingCard);
                                 setCurrentCall(null);
                                 setTimeout(() => {
@@ -647,14 +933,14 @@
                                     setSlapResults([]);
                                     setPunishingCard(null);
                                     setErrorMsg("");
-                                    setGameState('playing');
+                                    setGameState("playing");
                                     setTurn(data.nextTurn);
                                     setCurrentStep(data.nextStep);
                                     aiSlapScheduledRef.current = false;
                                 }, 800);
                             }
-                            if (data.type === 'error_slap') {
-                                playSoundEffect('error');
+                            if (data.type === "error_slap") {
+                                playSoundEffect("error");
                                 setErrorMsg(data.errorMsg);
                                 setSlapResults([data.slapPlayerIdx]);
                                 setPunishingCard(data.punishingCard);
@@ -664,18 +950,18 @@
                                     setSlapResults([]);
                                     setPunishingCard(null);
                                     setErrorMsg("");
-                                    setGameState('playing');
+                                    setGameState("playing");
                                     setTurn(data.nextTurn);
                                     setCurrentStep(data.nextStep);
                                     aiSlapScheduledRef.current = false;
                                 }, 800);
                             }
-                            if (data.type === 'game_over') {
+                            if (data.type === "game_over") {
                                 setWinner(data.winner);
-                                setGameState('gameOver');
+                                setGameState("gameOver");
                             }
-                            if (data.type === 'lobby_return') {
-                                setGameState('menu');
+                            if (data.type === "lobby_return") {
+                                setGameState("menu");
                                 setPlayers([]);
                                 setCenterPile([]);
                                 setCurrentCall(null);
@@ -686,47 +972,46 @@
                             }
                         });
 
-                        conn.on('close', () => {
-                            addDiagnosticLog("與房主的 P2P 連線已關閉 (conn.on('close'))");
-                            setOnlineStatusText('與房主的連線已斷開！');
-                            setOnlineStatusType('error');
-                            setGameState('menu');
+                        conn.on("close", () => {
+                            addDiagnosticLog("\u8207\u623f\u4e3b\u7684\u0020\u0050\u0032\u0050\u0020\u9023\u7dda\u5df2\u95cd\u9589\u0020\u0028\u0063\u006f\u006e\u006e\u002e\u006f\u006e\u0028\u0027\u0063\u006c\u006f\u0073\u0065\u0027\u0029\u0029");
+                            setOnlineStatusText("\u8207\u623f\u4e3b\u7684\u9023\u7dda\u5df2\u65b7\u958b\uff01");
+                            setOnlineStatusType("error");
+                            setGameState("menu");
                             destroyPeer();
                         });
 
-                        conn.on('error', (err) => {
+                        conn.on("error", (err) => {
                             clearTimeout(joinTimeout);
                             console.error(err);
-                            addDiagnosticLog(`與房主的連線通道發生錯誤: ${err.message || err}`);
-                            setOnlineStatusText('與房主的資料通道連線失敗！請確認防火牆設定，或嘗試改用手機熱點後重試。');
-                            setOnlineStatusType('error');
+                            addDiagnosticLog(`\u8207\u623f\u4e3b\u7684\u9023\u7dda\u901a\u9053\u767c\u751f\u932f\u8aa4: ${err.message || err}`);
+                            setOnlineStatusText("\u8207\u623f\u4e3b\u7684\u8cc7\u6599\u901a\u9053\u9023\u7dda\u5931\u6557\uff01\u8acb\u78ba\u8a8d\u9632\u706b\u7246\u8a2d\u5b9a\uff0c\u6216\u5617\u8a66\u6539\u7528\u624b\u6a5f\u71b1\u9ede\u5f8c\u91cd\u8a66\u3002");
+                            setOnlineStatusType("error");
                         });
                     });
 
-                    peer.on('error', (err) => {
+                    peer.on("error", (err) => {
                         console.error("Peer Error:", err);
                         peerOpened = true; // prevent timeout trigger
                         clearTimeout(joinTimeout);
-                        addDiagnosticLog(`信令伺服器錯誤: ${err.type} - ${err.message}`);
-                        if (err.type === 'peer-not-found') {
-                            setOnlineStatusText('找不到該房間，請確認房號是否正確！');
-                        } else if (err.type === 'network') {
-                            setOnlineStatusText('網路連線問題，請檢查網路後重試！');
-                        } else if (err.type === 'server-error') {
-                            setOnlineStatusText('連線伺服器錯誤，請稍後重試！');
+                        addDiagnosticLog(`\u4fe1\u4ee4\u4f3a\u670d\u5668\u932f\u8aa4: ${err.type} - ${err.message}`);
+                        if (err.type === "peer-not-found") {
+                            setOnlineStatusText("\u627e\u4e0d\u5230\u8a72\u623f\u9593\uff0c\u8acb\u78ba\u8a8d\u623f\u865f\u662f\u5426\u6b63\u78ba\uff01");
+                        } else if (err.type === "network") {
+                            setOnlineStatusText("\u7db2\u8def\u9023\u7dda\u554f\u984c\uff0c\u8acb\u6aa2\u67e5\u7db2\u8def\u5f8c\u91cd\u8a66\uff01");
+                        } else if (err.type === "server-error") {
+                            setOnlineStatusText("\u9023\u7dda\u4f3a\u670d\u5668\u932f\u8aa4\uff0c\u8acb\u7a0d\u5f8c\u91cd\u8a66\uff01");
                         } else {
-                            setOnlineStatusText(`連線錯誤（${err.type}），請確認房號或改用手機熱點重試！`);
+                            setOnlineStatusText(`\u9023\u7dda\u932f\u8aa4\uff08${err.type}\uff09\uff0c\u8acb\u78ba\u8a8d\u623f\u865f\u6216\u6539\u7528\u624b\u6a5f\u71b1\u9ede\u91cd\u8a66\uff01`);
                         }
-                        setOnlineStatusType('error');
+                        setOnlineStatusType("error");
                     });
                 } catch (e) {
                     console.error(e);
-                    addDiagnosticLog(`連線異常: ${e.message || e}`);
-                    setOnlineStatusText('連線異常，請重試！');
-                    setOnlineStatusType('error');
+                    addDiagnosticLog(`\u9023\u7dda\u7570\u5e38: ${e.message || e}`);
+                    setOnlineStatusText("\u9023\u7dda\u7570\u5e38\uff0c\u8acb\u91cd\u8a66\uff01");
+                    setOnlineStatusType("error");
                 }
             };
-
             const startOnlineGame = (multiplierNum) => {
                 if (onlineRole !== 'host') return;
                 // Use the passed-in value directly to avoid React async setState race condition
@@ -1277,6 +1562,13 @@
                             <div>
                                 <label className="block text-left text-sm font-bold text-slate-300 mb-2">玩家暱稱：</label>
                                 <input id="online-nickname" type="text" defaultValue="玩家" placeholder="請輸入你的暱稱" className="w-full px-4 py-3 bg-slate-700 rounded-xl text-white font-bold border border-slate-600 focus:outline-none focus:border-blue-500" />
+                            </div>
+                            <div className="flex items-center gap-3 p-3 bg-slate-700/30 rounded-xl border border-slate-700 text-left select-none cursor-pointer" onClick={() => setUseWebRelay(!useWebRelay)}>
+                                <input type="checkbox" checked={useWebRelay} onChange={() => {}} className="w-5 h-5 accent-emerald-500 cursor-pointer" />
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-bold text-emerald-400">\u26a1 \u555f\u7528\u5f37\u6548\u76f8\u5bb9\u6a21\u5f0f</span>
+                                    <span className="text-[10px] text-slate-400">\u82e5\u8655\u65bc\u5b78\u6821/\u516c\u53f8\u9632\u706b\u7246\uff0c\u6709\u7dda/\u7121\u7dda\u9023\u7dda\u6642\u5efa\u8b70\u52fe\u9078\u3002</span>
+                                </div>
                             </div>
                             
                             <div className="border-t border-slate-700 my-2" />
