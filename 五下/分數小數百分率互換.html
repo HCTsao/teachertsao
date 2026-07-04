@@ -382,7 +382,7 @@
             { val: 0.7, frac: "7/10", dec: "0.7", perc: "70%", isAdvanced: false },
             { val: 0.9, frac: "9/10", dec: "0.9", perc: "90%", isAdvanced: false },
             
-            // 進階題
+            // 進階題 (大於 1.0，用於分數小數互換的普通/困難版)
             { val: 1.5, frac: "1 1/2", dec: "1.5", perc: "150%", isAdvanced: true },
             { val: 1.25, frac: "1 1/4", dec: "1.25", perc: "125%", isAdvanced: true },
             { val: 2.75, frac: "2 3/4", dec: "2.75", perc: "275%", isAdvanced: true },
@@ -399,7 +399,24 @@
             { val: 2.4, frac: "2 2/5", dec: "2.4", perc: "240%", isAdvanced: true },
             { val: 1.7, frac: "1 7/10", dec: "1.7", perc: "170%", isAdvanced: true },
             { val: 2.3, frac: "2 3/10", dec: "2.3", perc: "230%", isAdvanced: true },
-            { val: 1.1, frac: "1 1/10", dec: "1.1", perc: "110%", isAdvanced: true }
+            { val: 1.1, frac: "1 1/10", dec: "1.1", perc: "110%", isAdvanced: true },
+
+            // 進階題 (小於等於 1.0 的分母 20, 25 真分數，用於百分率互換的普通/困難版)
+            { val: 0.15, frac: "3/20", dec: "0.15", perc: "15%", isAdvanced: true },
+            { val: 0.35, frac: "7/20", dec: "0.35", perc: "35%", isAdvanced: true },
+            { val: 0.45, frac: "9/20", dec: "0.45", perc: "45%", isAdvanced: true },
+            { val: 0.55, frac: "11/20", dec: "0.55", perc: "55%", isAdvanced: true },
+            { val: 0.65, frac: "13/20", dec: "0.65", perc: "65%", isAdvanced: true },
+            { val: 0.85, frac: "17/20", dec: "0.85", perc: "85%", isAdvanced: true },
+            { val: 0.95, frac: "19/20", dec: "0.95", perc: "95%", isAdvanced: true },
+            { val: 0.12, frac: "3/25", dec: "0.12", perc: "12%", isAdvanced: true },
+            { val: 0.16, frac: "4/25", dec: "0.16", perc: "16%", isAdvanced: true },
+            { val: 0.24, frac: "6/25", dec: "0.24", perc: "24%", isAdvanced: true },
+            { val: 0.28, frac: "7/25", dec: "0.28", perc: "28%", isAdvanced: true },
+            { val: 0.32, frac: "8/25", dec: "0.32", perc: "32%", isAdvanced: true },
+            { val: 0.36, frac: "9/25", dec: "0.36", perc: "36%", isAdvanced: true },
+            { val: 0.44, frac: "11/25", dec: "0.44", perc: "44%", isAdvanced: true },
+            { val: 0.48, frac: "12/25", dec: "0.48", perc: "48%", isAdvanced: true }
         ];
 
         // --- State Variables ---
@@ -495,15 +512,23 @@
             gridTop.className = "grid grid-cols-5 gap-1.5 sm:gap-2.5 md:gap-4 max-w-3xl mx-auto w-full justify-items-center justify-center";
             gridBottom.className = "grid grid-cols-5 gap-1.5 sm:gap-2.5 md:gap-4 max-w-3xl mx-auto w-full justify-items-center justify-center";
 
-            // Filter math data based on difficulty and mode rules
+            // Filter math data based on difficulty and mode rules (Never exceed 100% in percentage modes)
             let eligibleData = [];
             
-            if (currentDifficulty === 'easy') {
-                // Easy: proper fractions only (isAdvanced: false)
-                eligibleData = mathData.filter(item => !item.isAdvanced);
+            if (currentMode.includes('perc')) {
+                // Percentage modes: NEVER exceed 100% (val <= 1.0)
+                if (currentDifficulty === 'easy') {
+                    eligibleData = mathData.filter(item => !item.isAdvanced && item.val <= 1.0);
+                } else {
+                    eligibleData = mathData.filter(item => item.val <= 1.0);
+                }
             } else {
-                // Normal/Hard: proper, improper, mixed fractions mixed
-                eligibleData = [...mathData];
+                // Non-percentage modes: can have val > 1.0 in Normal/Hard (mixed/improper fractions)
+                if (currentDifficulty === 'easy') {
+                    eligibleData = mathData.filter(item => !item.isAdvanced);
+                } else {
+                    eligibleData = mathData.filter(item => true);
+                }
             }
 
             // Shuffle eligible data and pick required number of pairs
