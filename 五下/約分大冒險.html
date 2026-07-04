@@ -905,17 +905,48 @@
                 ? "bg-gradient-to-r from-amber-500 to-yellow-500 h-full rounded-full transition-all duration-1000"
                 : "bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full transition-all duration-1000";
 
-            // 產生隨機數
-            const factors = [2, 3, 4, 5, 6, 7];
-            const getRnd = () => factors[Math.floor(Math.random() * factors.length)] * (Math.floor(Math.random() * 3) + 2);
-            
-            let n1 = getRnd();
-            let d1 = getRnd();
-            while (n1 === d1) { d1 = getRnd(); }
+            // ── 從「最簡答案」反推題目，保證約分後分子分母均在 1-9（九九乘法表範圍）──
+            // 輔助：從 1-9 中隨機選一個與 exclude 互質的數
+            function pickCoprime(exclude) {
+                const pool = [1,2,3,4,5,6,7,8,9].filter(x => gcd(x, exclude) === 1 && x !== exclude);
+                return pool[Math.floor(Math.random() * pool.length)];
+            }
+            // 隨機選 1-9（不含 1，保留可約分空間）
+            function pickSimple() {
+                return Math.floor(Math.random() * 8) + 2; // 2~9
+            }
 
-            let n2 = getRnd();
-            let d2 = getRnd();
-            while (n2 === d2) { d2 = getRnd(); }
+            // 為每個位置選定「最簡值」(分子 sN、分母 sD，且 gcd(sN,sD)=1)
+            function makeFraction() {
+                let sN, sD;
+                do {
+                    sN = pickSimple();   // 2~9
+                    sD = pickSimple();   // 2~9
+                } while (sN === sD || gcd(sN, sD) !== 1);
+                // 隨機乘以公因數 k (2~4)，讓題目有可以約的地方
+                const k = Math.floor(Math.random() * 3) + 2;
+                return { simple: { n: sN, d: sD }, num: sN * k, den: sD * k };
+            }
+
+            // 乘法篇：兩個分數 (n1/d1) × (n2/d2)
+            // 最簡答案 = (sN1*sN2) / (sD1*sD2)，需確保最終積的分子分母也都 ≤ 9
+            let frac1, frac2;
+            let attempts = 0;
+            do {
+                frac1 = makeFraction();
+                frac2 = makeFraction();
+                attempts++;
+                // 最終最簡積：
+                const finalN = frac1.simple.n * frac2.simple.n;
+                const finalD = frac1.simple.d * frac2.simple.d;
+                const fg = gcd(finalN, finalD);
+                const simpleFinalN = finalN / fg;
+                const simpleFinalD = finalD / fg;
+                if (simpleFinalN <= 9 && simpleFinalD <= 9 && simpleFinalN !== simpleFinalD) break;
+            } while (attempts < 200);
+
+            let n1 = frac1.num, d1 = frac1.den;
+            let n2 = frac2.num, d2 = frac2.den;
 
             // 乘法篇模式設定
             if (gameState.mode === 'mul') {
@@ -925,14 +956,7 @@
                     num2: { current: n2, color: 'white', history: [] },
                     den2: { current: d2, color: 'white', history: [] }
                 };
-                
-                // 確保能約分
-                if(gcd(gameState.data.num1.current, gameState.data.den2.current) === 1 && 
-                   gcd(gameState.data.num2.current, gameState.data.den1.current) === 1) {
-                    gameState.data.num1.current *= 2;
-                    gameState.data.den2.current *= 2;
-                }
-                
+
                 const op = document.getElementById('operator');
                 op.innerText = "×";
                 op.style.cursor = "default";
