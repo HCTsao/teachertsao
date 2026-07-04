@@ -69,11 +69,11 @@ const toolsData = [
         type: "教學"
     },
     {
-        name: "帶分數假分數互換(評量)",
+        name: "分數披薩店",
         category: "四上",
-        path: "四上/帶分數假分數互換(評量).html",
-        desc: "設有計時挑戰與提示機制的趣味小測驗，在時間倒數壓力下熟練帶分數與假分數的轉換能力。",
-        type: "評量"
+        path: "四上/帶分數假分數互換(遊戲).html",
+        desc: "設有計時挑戰的趣味小遊戲，根據客人的要求製作相對應的Pizza吧！在遊戲過程中熟練帶分數與假分數的轉換能力。",
+        type: "遊戲"
     },
     {
         name: "繪製四邊形",
@@ -342,7 +342,7 @@ function getToolIcon(name, type) {
     if (name.includes("整除")) return "fa-solid fa-divide";
     if (name.includes("餘數")) return "fa-solid fa-calculator";
     if (name.includes("互換") && name.includes("教學")) return "fa-solid fa-arrow-right-arrow-left";
-    if (name.includes("互換") && name.includes("遊戲")) return "fa-solid fa-trophy";
+    if ((name.includes("互換") && name.includes("遊戲")) || name.includes("分數披薩店")) return "fa-solid fa-trophy";
     if (name.includes("四邊形")) return "fa-solid fa-draw-polygon";
     if (name.includes("周長")) return "fa-solid fa-ruler-combined";
     if (name.includes("面積") && !name.includes("複合")) return "fa-solid fa-border-all";

@@ -1,0 +1,1472 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>可口分數披薩(遊戲)</title>
+  <!-- 引入 Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入 Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* 隱藏預設數字輸入框的上下箭頭 */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+      -webkit-appearance: none; 
+      margin: 0; 
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+    
+    /* 統一設定字體為 18px */
+    body, button, input, span, p, div {
+      font-size: 18px;
+    }
+
+    /* 手繪風格字體 */
+    .handwritten {
+      font-family: "Comic Sans MS", "Chalkboard SE", "Microsoft JhengHei", sans-serif;
+    }
+
+    /* 手繪風歪斜 wobbly 邊框 */
+    .wobbly-border {
+      border: 3.5px solid #3f2021;
+      border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+    }
+    
+    .wobbly-btn {
+      border: 3px solid #3f2021;
+      border-radius: 255px 20px 225px 15px/15px 200px 18px 255px;
+      transition: transform 0.1s ease, background-color 0.2s;
+    }
+    .wobbly-btn:active {
+      transform: scale(0.95) rotate(-1deg);
+    }
+
+    /* 街機立體巨型按鈕 (Arcade Console Buttons) */
+    .arcade-btn-circle-red {
+      background: radial-gradient(circle, #f87171 0%, #ef4444 100%);
+      color: #ffffff;
+      border: 4px solid #3f2021;
+      border-radius: 9999px;
+      box-shadow: 0 8px 0 #3f2021;
+      transition: all 0.05s ease;
+      text-shadow: 0 2px 2px rgba(0,0,0,0.3);
+    }
+    .arcade-btn-circle-red:active {
+      transform: translateY(6px);
+      box-shadow: 0 2px 0 #3f2021;
+    }
+
+    .arcade-btn-circle-yellow {
+      background: radial-gradient(circle, #fbbf24 0%, #f59e0b 100%);
+      color: #3f2021;
+      border: 4px solid #3f2021;
+      border-radius: 9999px;
+      box-shadow: 0 8px 0 #3f2021;
+      transition: all 0.05s ease;
+    }
+    .arcade-btn-circle-yellow:active {
+      transform: translateY(6px);
+      box-shadow: 0 2px 0 #3f2021;
+    }
+
+    /* 氣泡對話泡泡小尾巴 (指向顧客大頭照) */
+    .bubble-pointer {
+      position: relative;
+      background: #fffdf5;
+      border: 3px solid #3f2021;
+      border-radius: 16px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .bubble-pointer::after {
+      content: '';
+      position: absolute;
+      bottom: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-width: 12px 10px 0;
+      border-style: solid;
+      border-color: #fffdf5 transparent;
+      display: block;
+    }
+    .bubble-pointer::before {
+      content: '';
+      position: absolute;
+      bottom: -16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-width: 15px 12px 0;
+      border-style: solid;
+      border-color: #3f2021 transparent;
+      display: block;
+      z-index: -1;
+    }
+
+    /* 飛出包裝盒動畫 */
+    @keyframes box-serve-fly {
+      0% { transform: scale(1) translate(0, 0) rotate(0deg); opacity: 1; }
+      100% { transform: scale(0.2) translate(300px, -200px) rotate(20deg); opacity: 0; }
+    }
+    .box-serve-animate {
+      animation: box-serve-fly 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+    }
+
+    /* 搖晃與震動 */
+    @keyframes element-shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+    .shake-active {
+      animation: element-shake 0.3s ease-in-out;
+    }
+
+    /* 分數直式寫法 (維持字體比例) */
+    .vertical-fraction {
+      display: inline-flex;
+      align-items: center;
+      vertical-align: middle;
+      margin: 0 2px;
+    }
+    .vertical-fraction .num-den {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .vertical-fraction .numerator {
+      border-bottom: 2.5px solid #3f2021;
+      padding-bottom: 1px;
+      text-align: center;
+      width: 100%;
+      font-family: monospace;
+      font-weight: 900;
+      font-size: 16px;
+    }
+    .vertical-fraction .denominator {
+      padding-top: 1px;
+      text-align: center;
+      width: 100%;
+      font-family: monospace;
+      font-weight: 900;
+      font-size: 16px;
+    }
+    .vertical-fraction .whole-num {
+      font-size: 24px;
+      font-weight: 900;
+      margin-right: 1px;
+      font-family: monospace;
+    }
+
+    /* 顧客彈跳滑入 (Bounce-in) */
+    @keyframes customer-enter {
+      0% { transform: translateY(120px) scale(0.6); opacity: 0; }
+      70% { transform: translateY(-12px) scale(1.05); opacity: 0.9; }
+      100% { transform: translateY(0) scale(1); opacity: 1; }
+    }
+    .animate-cust-enter {
+      animation: customer-enter 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    /* 顧客答對退場滑出 */
+    @keyframes customer-leave-success {
+      0% { transform: translateX(0) scale(1); opacity: 1; }
+      100% { transform: translateX(250px) scale(0.6); opacity: 0; }
+    }
+    .animate-cust-leave-success {
+      animation: customer-leave-success 0.5s ease-in forwards;
+    }
+
+    /* 顧客超時生氣退場 */
+    @keyframes customer-leave-fail {
+      0% { transform: translateY(0) scale(1); opacity: 1; }
+      100% { transform: translateY(150px) scale(0.8); opacity: 0; }
+    }
+    .animate-cust-leave-fail {
+      animation: customer-leave-fail 0.5s ease-in forwards;
+    }
+
+    /* 披薩小盒子果凍彈跳擺放 */
+    @keyframes pizza-pop {
+      0% { transform: scale(0.3); opacity: 0; }
+      70% { transform: scale(1.18); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .animate-pizza-pop {
+      animation: pizza-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+  </style>
+</head>
+<body class="bg-[#ebd5bd] text-[#3f2021] handwritten overflow-x-hidden min-h-screen p-2 md:p-4 flex flex-col items-center justify-center">
+  <audio id="bg-music" src="披薩小店節拍.mp3" loop></audio>
+  <img src="https://api.visitorbadge.io/api/visitors?path=hctsao.teachertsao&label=Views&labelColor=%23475569&countColor=%23ea580c" alt="Visitor Counter" style="display: none;">
+  
+  <!-- HOME_BUTTON_START -->
+  <a href="../index.html" style="position: fixed; top: 12px; left: 12px; z-index: 999999; background: #fdf6e2; color: #3f2021; padding: 8px 16px; border-radius: 20px; text-decoration: none; font-size: 14px; font-weight: bold; border: 3px solid #3f2021; transition: all 0.2s ease; box-shadow: 0 4px 0px #3f2021;" onmouseover="this.style.background='#f5ebd0'" onmouseout="this.style.background='#fdf6e2'">&#127969; 回首頁</a>
+  <script>(function() { function adjustViewport() { var targetWidth = 1024; var screenWidth = window.innerWidth || document.documentElement.clientWidth || window.screen.width; if (screenWidth > 0 && screenWidth < targetWidth) { var scale = screenWidth / targetWidth; var meta = document.querySelector('meta[name="viewport"]'); if (!meta) { meta = document.createElement('meta'); meta.setAttribute('name', 'viewport'); document.head.appendChild(meta); } meta.setAttribute('content', 'width=' + targetWidth + ', initial-scale=' + scale + ', minimum-scale=' + scale + ', maximum-scale=2.0, user-scalable=yes'); } else { var meta = document.querySelector('meta[name="viewport"]'); if (meta) { meta.setAttribute('content', 'width=device-width, initial-scale=1.0'); } } } adjustViewport(); var timer = null; window.addEventListener('resize', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); window.addEventListener('orientationchange', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); })();</script>
+  <!-- HOME_BUTTON_END -->
+
+  <!-- 頂部返回主選單按鈕 (跟隨回首頁按鈕置左且放在其下方) -->
+  <button id="lobby-back-btn" onclick="goHome()" class="hidden" style="position: fixed; top: 60px; left: 12px; z-index: 999999; background: #fdf6e2; color: #3f2021; padding: 8px 16px; border-radius: 20px; text-decoration: none; font-size: 14px; font-weight: bold; border: 3px solid #3f2021; transition: all 0.2s ease; box-shadow: 0 4px 0px #3f2021;" onmouseover="this.style.background='#f5ebd0'" onmouseout="this.style.background='#fdf6e2'">
+    🍕 回主選單
+  </button>
+
+  <!-- 網頁左側固定音量調整器 (跟隨回主選單按鈕下方) -->
+  <div id="fixed-volume-control" class="hidden" style="position: fixed; top: 110px; left: 12px; z-index: 999999; background: #fdf6e2; color: #3f2021; padding: 8px 12px; border-radius: 15px; border: 3px solid #3f2021; box-shadow: 0 4px 0px #3f2021; width: 110px; display: flex; flex-direction: column; items: center; justify-content: center; gap: 4px;">
+    <span style="font-size: 11px; font-weight: bold; color: #3f2021;">🎵 音量調整</span>
+    <input type="range" id="volume-slider-game" min="0" max="1" step="0.05" value="0.5" style="width: 100%; cursor: pointer;" class="accent-[#542a2b]" oninput="adjustBgVolume(this.value)">
+  </div>
+
+  <!-- 總遊戲大外框 (強制以 4:3 比例縮放，完全用 HTML/CSS/SVG 街機佈局) -->
+  <div class="aspect-[4/3] w-full max-w-[850px] relative wobbly-border bg-[#faebdd] shadow-[0_8px_0_#3f2021] overflow-hidden">
+    
+    <!-- ================= 餐廳背景元素 (手繪風) ================= -->
+    <!-- 烤爐 -->
+    <div class="absolute top-[8%] left-[10%] w-[18%] h-[30%] z-0 opacity-40">
+      <svg viewBox="0 0 100 120" class="w-full h-full">
+        <path d="M 10,120 A 40,40 0 0,1 90,120 Z" fill="#d97706" stroke="#3f2021" stroke-width="3"/>
+        <path d="M 20,120 A 30,30 0 0,1 80,120 Z" fill="#78350f" stroke="#3f2021" stroke-width="3"/>
+        <path d="M 35,120 Q 50,85 65,120 Z" fill="#ea580c"/>
+      </svg>
+    </div>
+
+
+
+    <!-- 累積得分與剩餘總時間 (置於右側頂部) -->
+    <div id="score-board" class="absolute top-[3%] left-[68%] w-[28%] h-[12%] bg-[#854d0e] border-[3px] border-[#3f2021] rounded shadow-md z-10 p-1 flex justify-around items-center text-white">
+      <div class="flex flex-col items-center">
+        <span class="text-[9px] font-black text-amber-200">累積得分</span>
+        <span id="score-val" class="text-sm md:text-base font-black text-yellow-300 font-mono" style="font-size:24px;">0</span>
+      </div>
+      <div class="h-6 w-[1px] bg-amber-700/60"></div>
+      <div class="flex flex-col items-center">
+        <span class="text-[9px] font-black text-slate-300">剩餘時間</span>
+        <span id="global-timer-val" class="text-sm md:text-base font-black text-rose-300 font-mono" style="font-size:24px;">120s</span>
+      </div>
+      <!-- 隱藏 Combo 傳遞以防 JS 崩潰 -->
+      <span id="combo-val" class="hidden"></span>
+    </div>
+
+    <!-- 寬木頭櫃檯桌面 (前景底部 36%，鎖定前後景) -->
+    <div class="absolute bottom-0 inset-x-0 h-[36%] bg-[#c68a4c] border-t-[4px] border-[#3f2021] shadow-inner z-10">
+      <svg class="absolute inset-0 w-full h-full opacity-10" preserveAspectRatio="none">
+        <line x1="0" y1="30%" x2="100%" y2="30%" stroke="#3f2021" stroke-width="4"/>
+        <line x1="0" y1="70%" x2="100%" y2="70%" stroke="#3f2021" stroke-width="4"/>
+      </svg>
+    </div>
+
+    <!-- ================= 首頁畫面 ================= -->
+    <div id="home-screen" class="absolute inset-0 bg-[#3f2021]/30 backdrop-blur-[2px] flex items-center justify-center p-4 z-40">
+      <div class="bg-[#fefcf3] wobbly-border shadow-[0_8px_0_#3f2021] p-6 max-w-md w-full text-center relative flex flex-col items-center">
+        
+        <!-- 招牌 -->
+        <div class="mb-4 transform hover:rotate-12 transition-transform duration-300 cursor-pointer">
+          <svg class="w-16 h-16 drop-shadow" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="45" fill="#facc15" stroke="#3f2021" stroke-width="3"/>
+            <circle cx="50" cy="50" r="38" fill="#fef08a"/>
+            <circle cx="35" cy="35" r="5" fill="#dc2626" stroke="#3f2021" stroke-width="1.5"/>
+            <circle cx="65" cy="35" r="5" fill="#dc2626" stroke="#3f2021" stroke-width="1.5"/>
+            <circle cx="50" cy="65" r="5" fill="#dc2626" stroke="#3f2021" stroke-width="1.5"/>
+          </svg>
+        </div>
+
+        <h1 class="text-3xl font-black text-[#3f2021] mb-8 font-serif">
+          分數披薩店
+        </h1>
+
+        <div class="flex flex-col gap-3 w-full px-4 mb-4">
+          <button onclick="startGame('I2M')" class="wobbly-btn w-full flex items-center justify-center py-4 px-4 text-base font-black text-white bg-[#542a2b] hover:bg-[#783f40] shadow-[0_4px_0_#3f2021] hover:translate-y-[2px] hover:shadow-[0_2px_0_#3f2021]">
+            <span class="flex items-center gap-1.5" style="font-size: 18px;">
+              <i data-lucide="pizza" class="w-5 h-5"></i> 挑戰一：假分數 ➔ 帶分數
+            </span>
+          </button>
+
+          <button onclick="startGame('M2I')" class="wobbly-btn w-full flex items-center justify-center py-4 px-4 text-base font-black text-[#3f2021] bg-[#fdf6e2] hover:bg-[#f5ebd0] shadow-[0_4px_0_#3f2021] hover:translate-y-[2px] hover:shadow-[0_2px_0_#3f2021]">
+            <span class="flex items-center gap-1.5" style="font-size: 18px;">
+              <i data-lucide="scissors" class="w-5 h-5"></i> 挑戰二：帶分數 ➔ 假分數
+            </span>
+          </button>
+        </div>
+
+        <!-- 音量調整器 (首頁大廳) -->
+        <div class="mt-2 flex items-center justify-center gap-2 bg-[#fdf6e2] px-4 py-2 rounded-xl border-2 border-[#3f2021] text-xs font-black shadow shadow-orange-950/10">
+          <span>🎵 音量調整:</span>
+          <input type="range" id="volume-slider-home" min="0" max="1" step="0.05" value="0.5" class="w-32 accent-[#542a2b] cursor-pointer" oninput="adjustBgVolume(this.value)">
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 遊戲核心畫面 ================= -->
+    <div id="game-screen" class="absolute inset-0 hidden">
+
+      <!-- 1. 左側三位排隊顧客區域 (置於左側中) -->
+      <div id="customers-container" class="absolute top-[16%] left-[3%] w-[42%] h-[46%] z-0 flex justify-around items-end px-1">
+        <!-- Slot 0 -->
+        <div id="cust-slot-0" class="relative w-[31%] h-full flex flex-col justify-end items-center transition-all duration-300">
+          <!-- 氣泡對話框 (直接浮在頭頂，全民漢堡的感覺) -->
+          <div id="cust-bubble-0" class="bubble-pointer absolute -top-[80px] w-[140px] px-1 py-1.5 bg-[#fffdf5] text-center font-black leading-tight z-20">
+            載入中...
+          </div>
+          <div id="cust-meta-0" class="absolute top-[25%] bg-[#fffdf2] border border-[#3f2021] rounded px-1 w-[90%] text-[8px] font-black shadow flex flex-col items-center leading-none z-10">
+            <span id="cust-timer-0" class="text-rose-600">⏱️ 60s</span>
+            <div class="w-full bg-slate-200 h-1 rounded-full overflow-hidden mt-0.5 border border-[#3f2021]/30">
+              <div id="cust-progress-bar-0" class="h-full bg-emerald-500 transition-all duration-300" style="width: 100%;"></div>
+            </div>
+            <span id="cust-satisfy-0" class="text-amber-700 mt-1 text-[8px] hidden">❤️ 100分</span>
+          </div>
+          <div id="avatar-0" class="w-full h-[65%] flex items-end"></div>
+        </div>
+        <!-- Slot 1 -->
+        <div id="cust-slot-1" class="relative w-[31%] h-full flex flex-col justify-end items-center transition-all duration-300">
+          <div id="cust-bubble-1" class="bubble-pointer absolute -top-[80px] w-[140px] px-1 py-1.5 bg-[#fffdf5] text-center font-black leading-tight z-20">
+            載入中...
+          </div>
+          <div id="cust-meta-1" class="absolute top-[25%] bg-[#fffdf2] border border-[#3f2021] rounded px-1 w-[90%] text-[8px] font-black shadow flex flex-col items-center leading-none z-10">
+            <span id="cust-timer-1" class="text-rose-600">⏱️ 60s</span>
+            <div class="w-full bg-slate-200 h-1 rounded-full overflow-hidden mt-0.5 border border-[#3f2021]/30">
+              <div id="cust-progress-bar-1" class="h-full bg-emerald-500 transition-all duration-300" style="width: 100%;"></div>
+            </div>
+            <span id="cust-satisfy-1" class="text-amber-700 mt-1 text-[8px] hidden">❤️ 100分</span>
+          </div>
+          <div id="avatar-1" class="w-full h-[65%] flex items-end"></div>
+        </div>
+        <!-- Slot 2 -->
+        <div id="cust-slot-2" class="relative w-[31%] h-full flex flex-col justify-end items-center transition-all duration-300">
+          <div id="cust-bubble-2" class="bubble-pointer absolute -top-[80px] w-[140px] px-1 py-1.5 bg-[#fffdf5] text-center font-black leading-tight z-20">
+            載入中...
+          </div>
+          <div id="cust-meta-2" class="absolute top-[25%] bg-[#fffdf2] border border-[#3f2021] rounded px-1 w-[90%] text-[8px] font-black shadow flex flex-col items-center leading-none z-10">
+            <span id="cust-timer-2" class="text-rose-600">⏱️ 60s</span>
+            <div class="w-full bg-slate-200 h-1 rounded-full overflow-hidden mt-0.5 border border-[#3f2021]/30">
+              <div id="cust-progress-bar-2" class="h-full bg-emerald-500 transition-all duration-300" style="width: 100%;"></div>
+            </div>
+            <span id="cust-satisfy-2" class="text-amber-700 mt-1 text-[8px] hidden">❤️ 100分</span>
+          </div>
+          <div id="avatar-2" class="w-full h-[65%] flex items-end"></div>
+        </div>
+      </div>
+
+      <!-- 2. 中間/右側大型開放式外帶紙盒工作台 (置於右側中，高 50% 寬 49%) -->
+      <div id="pizza-box-container" class="absolute top-[16%] left-[48%] w-[49%] h-[46%] z-10 flex flex-col justify-between p-2 bg-[#fffdf8] wobbly-border shadow-md">
+        <!-- 備料紙盒標題與說明 -->
+        <div class="flex justify-between items-center text-xs font-black text-amber-950 bg-white/70 px-2 py-0.5 rounded border border-[#3f2021]/15">
+          <span class="flex items-center gap-1">📦 <span id="box-slot-title">披薩打包盒 (顧客 1)</span></span>
+          <span id="flavor-display-tag" class="text-[9px] bg-amber-900 text-white px-1.5 py-0.5 rounded">鮮蔬起司</span>
+        </div>
+
+        <!-- 紙盒內部砧板與披薩渲染 (高空間，可放置極多切片) -->
+        <div class="flex-grow bg-[#fffdf6] p-1 flex flex-col justify-center items-center relative overflow-hidden mt-1 min-h-0">
+          <div id="pizza-container" class="flex flex-wrap gap-1.5 justify-start items-start w-full h-full overflow-y-auto p-1 content-start">
+            <!-- JS 動態繪製 -->
+          </div>
+          
+          <!-- 出餐打包蓋盒動畫 -->
+          <div id="serving-box-cover" class="absolute inset-0 bg-[#eddccb] border-4 border-[#3f2021] rounded-2xl flex items-center justify-center font-black text-[#3f2021] text-xs hidden">
+            📦 包裝出餐中...
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 底部全幅式街機控制台面板 (新增送出按鈕，字體放大至 20 號字) -->
+      <div class="absolute bottom-[2%] inset-x-[3%] h-[27%] bg-[#dfba9d] border-[3.5px] border-[#3f2021] rounded-2xl shadow-[0_6px_0_#3f2021] z-20 p-2 flex items-center justify-between gap-2">
+        
+        <!-- 左側配置：清空 + 切片數(分母)設定控制 (佔 28% 寬) -->
+        <div class="w-[28%] h-full flex flex-col justify-between items-center py-0.5">
+          <button onclick="triggerTrashClear()" class="w-full py-1 bg-rose-50 border-2 border-[#3f2021] font-black rounded-lg hover:bg-rose-100 transition-colors shadow" style="font-size: 18px;">
+            🗑️ 清空重做
+          </button>
+          
+          <!-- 實時分母設定 -->
+          <div class="flex flex-col items-center justify-center bg-white border-2 border-[#3f2021] rounded-xl px-2 py-0.5 shadow-inner w-full flex-grow mt-1">
+            <span class="font-black text-slate-700 leading-tight block mb-1 text-center" style="font-size: 18px;">每個Pizza切成幾片？</span>
+            <div class="flex items-center justify-center gap-3 w-full mt-0.5">
+              <button onclick="adjustDenInConsole(-1)" class="w-10 h-10 md:w-11 md:h-11 rounded-full bg-[#542a2b] text-white font-black flex items-center justify-center active:scale-90 shadow border-2 border-[#3f2021]" style="font-size: 28px; line-height: 1;">-</button>
+              <span id="console-den-val" class="font-black text-[#542a2b] font-mono leading-none" style="font-size: 32px;">3</span>
+              <button onclick="adjustDenInConsole(1)" class="w-10 h-10 md:w-11 md:h-11 rounded-full bg-[#542a2b] text-white font-black flex items-center justify-center active:scale-90 shadow border-2 border-[#3f2021]" style="font-size: 28px; line-height: 1;">+</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 中間配置：巨型實體街機按鈕 (佔 52% 寬) -->
+        <div class="w-[52%] h-full flex items-center justify-center px-2">
+          <!-- 模式一按鈕組 (雙鈕) -->
+          <div id="console-buttons-i2m" class="w-full h-full flex justify-center items-center gap-6 hidden">
+            <!-- 整個圓按鈕 -->
+            <button onclick="addPizzaWhole()" class="arcade-btn-circle-red w-18 h-18 md:w-20 md:h-20 flex flex-col items-center justify-center font-black">
+              <i data-lucide="circle-dot" class="w-5 h-5"></i>
+              <span class="text-xs mt-0.5">加整個</span>
+            </button>
+            <!-- 鋪單片按鈕 -->
+            <button onclick="addPizzaSlice()" class="arcade-btn-circle-yellow w-18 h-18 md:w-20 md:h-20 flex flex-col items-center justify-center font-black">
+              <i data-lucide="pie-chart" class="w-5 h-5"></i>
+              <span class="text-xs mt-0.5">加一片</span>
+            </button>
+          </div>
+
+          <!-- 模式二按鈕組 (單鈕，移除收據調整欄位，直接算片數) -->
+          <div id="console-buttons-m2i" class="w-full h-full flex justify-center items-center hidden">
+            <button onclick="addPizzaSliceM2I()" class="arcade-btn-circle-yellow w-18 h-18 md:w-20 md:h-20 flex flex-col items-center justify-center font-black">
+              <i data-lucide="pie-chart" class="w-5 h-5"></i>
+              <span class="text-xs mt-0.5">加一片</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 右側配置：手動出餐送出按鈕 (佔 20% 寬，字體為 20 號字) -->
+        <div class="w-[20%] h-full flex items-center justify-center">
+          <button id="submit-bell-btn" onclick="serveOrder()" class="wobbly-btn w-full h-[90%] flex flex-col items-center justify-center bg-emerald-600 text-white font-black hover:bg-emerald-700 shadow-[0_4px_0_#3f2021] rounded-2xl active:scale-95" style="font-size: 20px;">
+            <svg viewBox="0 0 100 100" class="w-7 h-7 drop-shadow text-white mb-0.5">
+              <path d="M 10,75 L 90,75 A 10,10 0 0,0 80,65 L 20,65 A 10,10 0 0,0 10,75 Z" fill="#3f2021" stroke="#ffffff" stroke-width="3.5"/>
+              <path d="M 20,65 A 30,30 0 0,1 80,65 Z" fill="#ffffff" stroke="#3f2021" stroke-width="3.5"/>
+              <circle cx="50" cy="24" r="5.5" fill="#facc15" stroke="#3f2021" stroke-width="2.5"/>
+            </svg>
+            <span style="font-size: 20px; line-height: 1;">送出</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- 隱藏資料傳遞用 Input，避免 JS 報錯 -->
+      <input type="number" id="ans-i2m-den" class="hidden" />
+      <input type="number" id="ans-m2i-den" class="hidden" />
+      <input type="number" id="ans-m2i-num" class="hidden" />
+
+      <!-- 反饋與鼓勵遮罩 (時間先停止，按「繼續製作」才恢復) -->
+      <div id="feedback-correct" class="hidden absolute inset-0 bg-[#fffdf6]/95 z-30 flex flex-col items-center justify-center gap-4 p-6">
+        <!-- 隱藏說明文字，以防 JS 報錯，同時符合使用者移除提示的要求 -->
+        <span class="hidden"></span>
+        
+        <!-- 數學式公式盒 -->
+        <div id="math-formula-box" class="bg-emerald-50 border-[3px] border-[#3f2021] rounded-2xl px-8 py-4 my-2 text-xl md:text-2xl font-black text-[#3f2021] flex items-center justify-center shadow-inner">
+          <!-- JS 動態插入直式數學式 -->
+        </div>
+
+        <button onclick="nextCustomer()" class="wobbly-btn px-8 py-3 bg-[#d97706] text-white font-black text-sm md:text-base shadow-[0_4px_0_#3f2021] hover:bg-amber-600">
+          繼續製作
+        </button>
+      </div>
+      
+      <!-- 顧客超時或做錯提示遮罩 -->
+      <div id="feedback-incorrect" class="hidden absolute inset-0 bg-[#fefcf3]/90 z-30 flex flex-col items-center justify-center">
+        <span class="text-red-500 text-base md:text-lg font-black flex items-center gap-1.5">
+          <i data-lucide="alert-octagon" class="w-5 h-5 text-red-500"></i>
+          <span id="feedback-incorrect-text">這披薩不對啊，重做！</span>
+        </span>
+      </div>
+
+      <!-- 遊戲結束結算遮罩 -->
+      <div id="game-over-screen" class="hidden absolute inset-0 bg-[#3f2021]/95 z-50 flex flex-col items-center justify-center gap-4 p-6">
+        <span class="text-yellow-400 text-3xl font-black flex items-center gap-2 animate-bounce">
+          🏆 營業時間結束！
+        </span>
+        <div class="bg-[#fefcf3] border-[3px] border-[#3f2021] rounded-2xl p-6 my-2 text-center shadow-lg w-[80%] max-w-sm">
+          <p class="font-black text-lg text-slate-500">今日成果</p>
+          <div class="mt-4 flex flex-col gap-2">
+            <div class="flex justify-between font-black text-base border-b pb-1 border-slate-200">
+              <span>總得分：</span>
+              <span id="final-score-val" class="text-[#d97706]">0分</span>
+            </div>
+            <div class="flex justify-between font-black text-base border-b pb-1 border-slate-200">
+              <span>服務顧客數：</span>
+              <span id="final-customers-val" class="text-[#d97706]">0位</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex gap-4">
+          <button onclick="startGame(mode)" class="wobbly-btn px-6 py-3 bg-[#d97706] text-white font-black text-sm md:text-base shadow-[0_4px_0_#3f2021] hover:bg-amber-600">
+            🔄 再玩一次
+          </button>
+          <button onclick="goHome()" class="wobbly-btn px-6 py-3 bg-slate-500 text-white font-black text-sm md:text-base shadow-[0_4px_0_#3f2021] hover:bg-slate-600">
+            🚪 回主選單
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================= 遊戲核心 JavaScript 邏輯 ================= -->
+  <script>
+    // 全局錯誤攔截，便於彈出偵錯訊息
+    window.onerror = function(message, source, lineno, colno, error) {
+      alert("⚠️ 遊戲載入或執行錯誤：\n訊息: " + message + "\n行號: " + lineno + "\n來源: " + source);
+      return false;
+    };
+
+    // ==========================================================================
+    // Web Audio API 8-bit 音效合成器
+    // ==========================================================================
+    class SoundSynth {
+      constructor() {
+        this.ctx = null;
+      }
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      }
+      playClick() {
+        this.init(); if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine'; osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(150, this.ctx.currentTime + 0.05);
+        gain.gain.setValueAtTime(0.04, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.05);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.05);
+      }
+      playSlice() {
+        this.init(); if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const bufferSize = this.ctx.sampleRate * 0.07;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 1300;
+        
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+        
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        noise.start(now);
+      }
+      playBell() {
+        this.init(); if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const playTone = (freq, start, duration) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + start);
+          gain.gain.setValueAtTime(0.05, now + start);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + start + duration);
+          osc.connect(gain); gain.connect(this.ctx.destination);
+          osc.start(now + start); osc.stop(now + start + duration);
+        };
+        playTone(2100, 0, 0.2); 
+        playTone(2600, 0.03, 0.25); 
+      }
+      playCoin() {
+        this.init(); if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const playTone = (freq, start, duration) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + start);
+          gain.gain.setValueAtTime(0.04, now + start);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + start + duration);
+          osc.connect(gain); gain.connect(this.ctx.destination);
+          osc.start(now + start); osc.stop(now + start + duration);
+        };
+        playTone(987.77, 0, 0.08); // B5
+        playTone(1318.51, 0.08, 0.22); // E6
+      }
+      playHurt() {
+        this.init(); if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(140, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(70, this.ctx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.25);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.25);
+      }
+    }
+
+    const synth = new SoundSynth();
+    try {
+      lucide.createIcons();
+    } catch(e) {
+      console.warn("Lucide icons failed to load:", e);
+    }
+
+    // ==========================================================================
+    // 口味配料配置
+    // ==========================================================================
+    const FLAVORS = [
+      { id: 'pepperoni', name: '經典臘腸披薩' },
+      { id: 'hawaii', name: '夏威夷鳳梨披薩' },
+      { id: 'veggie', name: '鮮蔬起司披薩' }
+    ];
+
+    // 人類顧客頭像 SVG 庫
+    const AVATARS = {
+      guy: `<svg viewBox="0 0 100 120" class="w-full h-full">
+              <path d="M 25,50 C 20,25 80,25 75,50 C 85,45 85,25 65,15 C 45,15 25,30 25,50 Z" fill="#3f2021" stroke="#3f2021" stroke-width="3"/>
+              <circle cx="23" cy="58" r="7" fill="#8c6254" stroke="#3f2021" stroke-width="3"/>
+              <circle cx="77" cy="58" r="7" fill="#8c6254" stroke="#3f2021" stroke-width="3"/>
+              <path d="M 28,58 C 28,35 72,35 72,58 C 72,78 28,78 28,58 Z" fill="#8c6254" stroke="#3f2021" stroke-width="3"/>
+              <path d="M 28,45 C 35,35 65,35 72,45" stroke="#3f2021" stroke-width="3" fill="none"/>
+              <path d="M 33,48 Q 40,46 43,50" fill="none" stroke="#3f2021" stroke-width="2.5" stroke-linecap="round"/>
+              <path d="M 67,48 Q 60,46 57,50" fill="none" stroke="#3f2021" stroke-width="2.5" stroke-linecap="round"/>
+              <circle cx="39" cy="54" r="3.5" fill="#1c1917" />
+              <circle cx="61" cy="54" r="3.5" fill="#1c1917" />
+              <path d="M 50,53 Q 47,58 52,63" fill="none" stroke="#3f2021" stroke-width="3" stroke-linecap="round"/>
+              <path d="M 42,68 Q 50,73 58,68" fill="none" stroke="#3f2021" stroke-width="3" stroke-linecap="round"/>
+              <rect x="42" y="75" width="16" height="15" fill="#8c6254" stroke="#3f2021" stroke-width="3"/>
+              <path d="M 20,95 Q 20,85 30,85 L 70,85 Q 80,85 80,95 L 80,120 L 20,120 Z" fill="#2563eb" stroke="#3f2021" stroke-width="3"/>
+              <path d="M 44,85 L 50,98 L 56,85 Z" fill="#ffffff" stroke="#3f2021" stroke-width="2.5"/>
+              <path d="M 38,85 L 50,120 M 62,85 L 50,120" stroke="#3f2021" stroke-width="3"/>
+            </svg>`,
+      girl: `<svg viewBox="0 0 100 120" class="w-full h-full">
+              <path d="M 65,40 C 80,30 90,60 75,70 C 70,60 65,50 65,40 Z" fill="#1e1b4b" stroke="#3f2021" stroke-width="3"/>
+              <circle cx="23" cy="58" r="6" fill="#fbcfe8" stroke="#3f2021" stroke-width="2.5"/>
+              <circle cx="77" cy="58" r="6" fill="#fbcfe8" stroke="#3f2021" stroke-width="2.5"/>
+              <circle cx="50" cy="58" r="22" fill="#fbcfe8" stroke="#3f2021" stroke-width="3"/>
+              <path d="M 28,48 C 28,25 72,25 72,48 C 72,35 28,35 28,48 Z" fill="#1e1b4b" stroke="#3f2021" stroke-width="2.5"/>
+              <circle cx="40" cy="56" r="7" fill="none" stroke="#3f2021" stroke-width="2"/>
+              <circle cx="60" cy="56" r="7" fill="none" stroke="#3f2021" stroke-width="2"/>
+              <line x1="47" y1="56" x2="53" y2="56" stroke="#3f2021" stroke-width="2" />
+              <circle cx="40" cy="56" r="2.5" fill="#1c1917" />
+              <circle cx="60" cy="56" r="2.5" fill="#1c1917" />
+              <path d="M 45,69 Q 50,73 55,69" fill="none" stroke="#3f2021" stroke-width="2.5" stroke-linecap="round"/>
+              <rect x="44" y="80" width="12" height="15" fill="#fbcfe8" stroke="#3f2021" stroke-width="3"/>
+              <path d="M 22,95 Q 22,88 32,88 L 68,88 Q 78,88 78,95 L 78,120 L 22,120 Z" fill="#ea580c" stroke="#3f2021" stroke-width="3"/>
+              <circle cx="50" cy="98" r="4.5" fill="#fef08a" stroke="#3f2021" stroke-width="2"/>
+            </svg>`,
+      grandma: `<svg viewBox="0 0 100 120" class="w-full h-full">
+              <circle cx="50" cy="22" r="12" fill="#d1d5db" stroke="#3f2021" stroke-width="3"/>
+              <path d="M 26,50 C 22,30 78,30 74,50 Z" fill="#d1d5db" stroke="#3f2021" stroke-width="3"/>
+              <circle cx="23" cy="58" r="6" fill="#fed7aa" stroke="#3f2021" stroke-width="2.5"/>
+              <circle cx="77" cy="58" r="6" fill="#fed7aa" stroke="#3f2021" stroke-width="2.5"/>
+              <circle cx="50" cy="58" r="22" fill="#fed7aa" stroke="#3f2021" stroke-width="3"/>
+              <path d="M 42,46 Q 50,44 58,46" fill="none" stroke="#3f2021" stroke-width="1.5"/>
+              <path d="M 33,52 Q 38,50 42,53" fill="none" stroke="#3f2021" stroke-width="2.5" stroke-linecap="round"/>
+              <path d="M 67,52 Q 62,50 58,53" fill="none" stroke="#3f2021" stroke-width="2.5" stroke-linecap="round"/>
+              <circle cx="34" cy="65" r="3.5" fill="#fca5a5" opacity="0.7"/>
+              <circle cx="66" cy="65" r="3.5" fill="#fca5a5" opacity="0.7"/>
+              <path d="M 44,68 Q 50,73 56,68" fill="none" stroke="#3f2021" stroke-linecap="round" stroke-width="2.5"/>
+              <rect x="44" y="80" width="12" height="15" fill="#fed7aa" stroke="#3f2021" stroke-width="3"/>
+              <path d="M 22,95 Q 22,88 32,88 L 68,88 Q 78,88 78,95 L 78,120 L 22,120 Z" fill="#b91c1c" stroke="#3f2021" stroke-width="3"/>
+              <path d="M 35,88 L 38,120 L 62,120 L 65,88 Z" fill="#ffffff" stroke="#3f2021" stroke-width="2.5"/>
+            </svg>`
+    };
+
+    // ==========================================================================
+    // 遊戲狀態變數 (多顧客與計時)
+    // ==========================================================================
+    let mode = null; // 'I2M' or 'M2I'
+    let isFrozen = false; // 出餐鎖定/冷卻
+    let isPaused = false; // 是否因開啟答對公式而暫停
+
+    // 顧客插槽陣列
+    let activeSlots = [null, null, null];
+    let selectedSlotIdx = 0; // 當前選取的 slot (0, 1, 2)
+    let totalCustomersServed = 0; // 成功出餐數
+    let globalScore = 0; // 累積得分
+    let comboCount = 0; // 連擊數 (Combo)
+    let gameInterval = null; // 時鐘心跳
+    let globalTimeRemaining = 120; // 總遊戲剩餘時間 (秒)
+
+    // 目前選取顧客備料數據
+    let playerWholeCount = 0;
+    let playerSliceCount = 0;
+    let currentDenPickerVal = 2; // 控制台即時調整之分母數
+
+    // ==========================================================================
+    // 畫面切換
+    // ==========================================================================
+    function showScreen(screenId) {
+      document.getElementById('home-screen').classList.add('hidden');
+      document.getElementById('game-screen').classList.add('hidden');
+      document.getElementById(screenId).classList.remove('hidden');
+    }
+
+    function goHome() {
+      synth.playClick();
+      if (gameInterval) clearInterval(gameInterval);
+      document.getElementById('lobby-back-btn').classList.add('hidden');
+      document.getElementById('fixed-volume-control').classList.add('hidden'); // 隱藏音量控制
+      document.getElementById('feedback-correct').classList.add('hidden');
+      document.getElementById('serving-box-cover').classList.add('hidden');
+      showScreen('home-screen');
+    }
+
+    // ==========================================================================
+    // 背景音樂音量調整與播放同步
+    // ==========================================================================
+    function adjustBgVolume(val) {
+      const bgMusic = document.getElementById('bg-music');
+      if (bgMusic) {
+        bgMusic.volume = parseFloat(val);
+        if (bgMusic.paused) {
+          bgMusic.play().catch(e => {});
+        }
+        // 同步兩個音量滑桿的值
+        const sliderHome = document.getElementById('volume-slider-home');
+        const sliderGame = document.getElementById('volume-slider-game');
+        if (sliderHome) sliderHome.value = val;
+        if (sliderGame) sliderGame.value = val;
+      }
+    }
+
+    // ==========================================================================
+    // 遊戲初始化
+    // ==========================================================================
+    function startGame(selectedMode) {
+      synth.init();
+      synth.playClick();
+
+      // 啟動背景音樂
+      const bgMusic = document.getElementById('bg-music');
+      if (bgMusic) {
+        const currentVol = parseFloat(document.getElementById('volume-slider-home').value) || 0.5;
+        bgMusic.volume = currentVol;
+        bgMusic.play().catch(e => console.log("Audio play blocked by browser policies."));
+      }
+
+      mode = selectedMode;
+      isFrozen = false;
+      isPaused = false;
+      totalCustomersServed = 0;
+      globalScore = 0;
+      comboCount = 0;
+      activeSlots = [null, null, null];
+      selectedSlotIdx = 0;
+      globalTimeRemaining = 120;
+
+      document.getElementById('score-val').innerText = globalScore;
+      document.getElementById('global-timer-val').innerText = '120s';
+      document.getElementById('game-over-screen').classList.add('hidden');
+      
+      // 初始化 Combo 顯示
+      const cb = document.getElementById('combo-val');
+      cb.innerText = '🔥 Combo x0';
+
+      if (mode === 'I2M') {
+        document.getElementById('console-buttons-i2m').classList.remove('hidden');
+        document.getElementById('console-buttons-m2i').classList.add('hidden');
+      } else {
+        document.getElementById('console-buttons-i2m').classList.add('hidden');
+        document.getElementById('console-buttons-m2i').classList.remove('hidden');
+      }
+
+      document.getElementById('lobby-back-btn').classList.remove('hidden');
+      document.getElementById('fixed-volume-control').classList.remove('hidden'); // 顯示音量控制
+
+      // 載入初始插槽
+      refillSlots();
+      
+      // 啟動倒數計時器
+      startTimer();
+
+      showScreen('game-screen');
+      selectSlot(selectedSlotIdx);
+    }
+
+    // ==========================================================================
+    // 產生隨機顧客資料
+    // ==========================================================================
+    function createCustomerData() {
+      const den = Math.floor(Math.random() * 5) + 2; // 分母 2 ~ 6
+      const whole = Math.floor(Math.random() * 3) + 1; // 整數 1 ~ 3
+      const numPart = Math.floor(Math.random() * (den - 1)) + 1; // 分子
+      const impNum = (whole * den) + numPart;
+      
+      const avatarKeys = Object.keys(AVATARS);
+      const avatar = avatarKeys[Math.floor(Math.random() * avatarKeys.length)];
+      const flavorObj = FLAVORS[Math.floor(Math.random() * FLAVORS.length)];
+      
+      return {
+        den, whole, numPart, impNum,
+        avatar: avatar,
+        flavor: flavorObj.id,
+        flavorName: flavorObj.name,
+        timeRemaining: 30, // 每個顧客時間大約 30 秒
+        satisfaction: 100,
+        
+        // 儲存此顧客的個別進度
+        playerWholeCount: 0,
+        playerSliceCount: 0,
+        playerDen: 3, // 預設控制台分母切3片
+        receiptNum: 0
+      };
+    }
+
+    // ==========================================================================
+    // 補滿顧客插槽
+    // ==========================================================================
+    function refillSlots() {
+      let maxSlots = 1;
+      if (totalCustomersServed >= 1) {
+        maxSlots = 2;
+      }
+
+      if (maxSlots === 1) {
+        document.getElementById('cust-slot-0').classList.add('hidden');
+        document.getElementById('cust-slot-1').classList.remove('hidden');
+        document.getElementById('cust-slot-2').classList.add('hidden');
+        
+        activeSlots[0] = null;
+        activeSlots[2] = null;
+        if (!activeSlots[1]) {
+          activeSlots[1] = createCustomerData();
+          triggerEnterAnimation(1);
+        }
+        selectedSlotIdx = 1;
+      } else if (maxSlots === 2) {
+        document.getElementById('cust-slot-0').classList.remove('hidden');
+        document.getElementById('cust-slot-1').classList.add('hidden');
+        document.getElementById('cust-slot-2').classList.remove('hidden');
+        
+        activeSlots[1] = null;
+        if (!activeSlots[0]) {
+          activeSlots[0] = createCustomerData();
+          triggerEnterAnimation(0);
+        }
+        if (!activeSlots[2]) {
+          activeSlots[2] = createCustomerData();
+          triggerEnterAnimation(2);
+        }
+        if (selectedSlotIdx === 1) {
+          selectedSlotIdx = 0;
+        }
+      } else {
+        document.getElementById('cust-slot-0').classList.remove('hidden');
+        document.getElementById('cust-slot-1').classList.remove('hidden');
+        document.getElementById('cust-slot-2').classList.remove('hidden');
+        
+        for (let i = 0; i < 3; i++) {
+          if (!activeSlots[i]) {
+            activeSlots[i] = createCustomerData();
+            triggerEnterAnimation(i);
+          }
+        }
+      }
+
+      // 更新插槽大頭照與氣泡
+      for (let i = 0; i < 3; i++) {
+        const avatarBox = document.getElementById(`avatar-${i}`);
+        const bubble = document.getElementById(`cust-bubble-${i}`);
+        
+        if (activeSlots[i]) {
+          avatarBox.innerHTML = AVATARS[activeSlots[i].avatar];
+          const cur = activeSlots[i];
+          if (mode === 'I2M') {
+            bubble.innerHTML = `<span class="inline-block mt-1" style="font-size: 20px;">我想要<span class="vertical-fraction"><span class="num-den"><span class="numerator">${cur.impNum}</span><span class="denominator">${cur.den}</span></span></span>個披薩</span>`;
+          } else {
+            bubble.innerHTML = `<span class="inline-block mt-1" style="font-size: 20px;">我想要<span class="vertical-fraction"><span class="whole-num">${cur.whole}</span><span class="num-den"><span class="numerator">${cur.numPart}</span><span class="denominator">${cur.den}</span></span></span>個披薩</span>`;
+          }
+          bubble.classList.remove('opacity-0');
+        } else {
+          avatarBox.innerHTML = '';
+          bubble.classList.add('opacity-0');
+        }
+      }
+
+      updateSlotSelectionUI();
+    }
+
+    function triggerEnterAnimation(idx) {
+      const slotEl = document.getElementById(`cust-slot-${idx}`);
+      slotEl.classList.remove('animate-cust-enter');
+      void slotEl.offsetWidth;
+      slotEl.classList.add('animate-cust-enter');
+    }
+
+    // ==========================================================================
+    // 顧客插槽選擇點擊
+    // ==========================================================================
+    function selectSlot(idx) {
+      // 兩個顧客同時啟動亮著，免點選，直接製作即可
+    }
+
+    // ==========================================================================
+    // 更新顧客插槽與 UI 連動 (所有活躍顧客皆完全亮起，免點選)
+    // ==========================================================================
+    function updateSlotSelectionUI() {
+      for (let i = 0; i < 3; i++) {
+        const slotEl = document.getElementById(`cust-slot-${i}`);
+        const bubble = document.getElementById(`cust-bubble-${i}`);
+        if (!activeSlots[i]) {
+          slotEl.classList.add('opacity-0');
+          continue;
+        }
+        slotEl.classList.remove('opacity-0');
+
+        // 所有活躍顧客都是完全亮起 (100% 透明度)，不套用暗淡樣式
+        slotEl.className = "relative w-[31%] h-full flex flex-col justify-end items-center transition-all duration-300 opacity-100 p-1";
+        if (bubble) {
+          bubble.style.transform = "scale(1.0)";
+          bubble.style.borderColor = "#3f2021";
+          bubble.style.backgroundColor = "#fffdf5";
+        }
+
+        document.getElementById(`cust-timer-${i}`).innerText = `⏱️ ${activeSlots[i].timeRemaining}s`;
+        document.getElementById(`cust-satisfy-${i}`).innerText = `❤️ ${activeSlots[i].satisfaction}分`;
+        
+        const pct = (activeSlots[i].timeRemaining / 30) * 100;
+        const pbar = document.getElementById(`cust-progress-bar-${i}`);
+        if (pbar) {
+          pbar.style.width = pct + '%';
+          if (pct > 50) pbar.className = "h-full bg-emerald-500 transition-all duration-300";
+          else if (pct > 25) pbar.className = "h-full bg-amber-500 transition-all duration-300";
+          else pbar.className = "h-full bg-red-500 transition-all duration-300";
+        }
+      }
+
+      // 更新打包盒標題
+      document.getElementById('box-slot-title').innerText = "披薩打包盒 (準備出餐)";
+
+      // 顯示正在備的披薩口味 tag
+      const flavorTag = document.getElementById('flavor-display-tag');
+      flavorTag.innerText = "手作披薩";
+
+      // 控制台數據連動
+      document.getElementById('console-den-val').innerText = currentDenPickerVal;
+      if (mode === 'I2M') {
+        document.getElementById('ans-i2m-den').value = currentDenPickerVal;
+      } else {
+        document.getElementById('ans-m2i-num').value = receiptNum;
+        document.getElementById('ans-m2i-den').value = currentDenPickerVal;
+      }
+
+      renderPizzaVisuals();
+      onInputsChange();
+    }
+
+    // ==========================================================================
+    // 計時器心跳 (時間倒數與總計時結束判定)
+    // ==========================================================================
+    function startTimer() {
+      if (gameInterval) clearInterval(gameInterval);
+      gameInterval = setInterval(() => {
+        if (isFrozen || isPaused) return;
+
+        // 總遊戲時間倒數
+        globalTimeRemaining--;
+        document.getElementById('global-timer-val').innerText = `${globalTimeRemaining}s`;
+        if (globalTimeRemaining <= 0) {
+          endGame();
+          return;
+        }
+
+        for (let i = 0; i < 3; i++) {
+          const cust = activeSlots[i];
+          if (cust) {
+            cust.timeRemaining--;
+            cust.satisfaction = Math.max(10, Math.ceil((cust.timeRemaining / 30) * 100));
+
+            document.getElementById(`cust-timer-${i}`).innerText = `⏱️ ${cust.timeRemaining}s`;
+            document.getElementById(`cust-satisfy-${i}`).innerText = `❤️ ${cust.satisfaction}分`;
+
+            const pct = (cust.timeRemaining / 30) * 100;
+            const pbar = document.getElementById(`cust-progress-bar-${i}`);
+            if (pbar) {
+              pbar.style.width = pct + '%';
+              if (pct > 50) pbar.className = "h-full bg-emerald-500 transition-all duration-300";
+              else if (pct > 25) pbar.className = "h-full bg-amber-500 transition-all duration-300";
+              else pbar.className = "h-full bg-red-500 transition-all duration-300";
+            }
+
+            const metaEl = document.getElementById(`cust-meta-${i}`);
+            if (cust.timeRemaining <= 5) {
+              metaEl.className = "absolute top-[25%] bg-red-100 border-2 border-red-500 rounded px-1 w-[90%] text-[8px] font-black shadow flex flex-col items-center leading-none z-10 text-red-600 animate-pulse";
+            } else {
+              metaEl.className = "absolute top-[25%] bg-[#fffdf2] border border-[#3f2021] rounded px-1 w-[90%] text-[8px] font-black shadow flex flex-col items-center leading-none z-10 text-[#3f2021]";
+            }
+
+            if (cust.timeRemaining <= 0) {
+              handleCustomerTimeout(i);
+            }
+          }
+        }
+      }, 1000);
+    }
+
+    function endGame() {
+      if (gameInterval) clearInterval(gameInterval);
+      synth.playBell();
+      isFrozen = true;
+      isPaused = true;
+
+      document.getElementById('final-score-val').innerText = `${globalScore}分`;
+      document.getElementById('final-customers-val').innerText = `${totalCustomersServed}位`;
+      document.getElementById('game-over-screen').classList.remove('hidden');
+    }
+
+    function handleCustomerTimeout(idx) {
+      if (isFrozen || isPaused) return;
+      synth.playHurt();
+      isFrozen = true;
+
+      comboCount = 0;
+      document.getElementById('combo-val').innerText = '🔥 Combo x0';
+
+      // 1. 在對話框中顯示生氣的表情符號，文字放大
+      const bubble = document.getElementById(`cust-bubble-${idx}`);
+      bubble.innerHTML = `<span class="block py-1" style="font-size: 24px; line-height: 1;">😡 💢</span>`;
+
+      const slotEl = document.getElementById(`cust-slot-${idx}`);
+
+      // 2. 讓玩家看一眼表情符號後，顧客向下滑動離開
+      setTimeout(() => {
+        slotEl.classList.add('animate-cust-leave-fail');
+        
+        globalScore = Math.max(0, globalScore - 10);
+        document.getElementById('score-val').innerText = globalScore;
+
+        setTimeout(() => {
+          slotEl.classList.remove('animate-cust-leave-fail');
+
+          activeSlots[idx] = createCustomerData();
+          document.getElementById(`avatar-${idx}`).innerHTML = AVATARS[activeSlots[idx].avatar];
+          slotEl.classList.add('animate-cust-enter');
+
+          isFrozen = false;
+          refillSlots();
+        }, 500); // 下滑動畫時間約 500ms
+      }, 800); // 氣泡生氣停留 800ms
+    }
+
+    // ==========================================================================
+    // 披薩口味圖案 SVG 渲染
+    // ==========================================================================
+    function drawPizzaSVG(filled, total, flavor = 'pepperoni') {
+      let svg = `<svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-md">`;
+      
+      const drawToppings = (rx, ry, flav) => {
+        let toppingSvg = '';
+        if (flav === 'pepperoni') {
+          toppingSvg += `<circle cx="${rx}" cy="${ry}" r="4" fill="#dc2626" stroke="#3f2021" stroke-width="1.2"/>`;
+        } else if (flav === 'hawaii') {
+          toppingSvg += `<rect x="${rx-2}" y="${ry-3}" width="4" height="6" rx="1.5" fill="#facc15" stroke="#3f2021" stroke-width="1" transform="rotate(30, ${rx}, ${ry})"/>`;
+          toppingSvg += `<rect x="${rx+1}" y="${ry+1}" width="4" height="4" fill="#fca5a5" stroke="#3f2021" stroke-width="1"/>`;
+        } else if (flav === 'veggie') {
+          toppingSvg += `<rect x="${rx-3}" y="${ry-2}" width="2.5" height="5" rx="1" fill="#16a34a" stroke="#3f2021" stroke-width="1" transform="rotate(-40, ${rx}, ${ry})"/>`;
+          toppingSvg += `<path d="M ${rx} ${ry+1} A 3.5 3.5 0 0 1 ${rx+7} ${ry+1} Z" fill="#b45309" stroke="#3f2021" stroke-width="1"/>`;
+        }
+        return toppingSvg;
+      };
+
+      const radiusCrust = 45;
+      const radiusCheese = 37;
+
+      if (total === 1) {
+        svg += `<circle cx="50" cy="50" r="46" fill="#d97706" stroke="#3f2021" stroke-width="2.5"/>`;
+        svg += `<circle cx="50" cy="50" r="38" fill="#fbbf24" stroke="#3f2021" stroke-width="1.5"/>`;
+        svg += drawToppings(36, 36, flavor);
+        svg += drawToppings(64, 36, flavor);
+        svg += drawToppings(50, 65, flavor);
+        svg += drawToppings(50, 46, flavor);
+      } else {
+        for (let i = 0; i < filled; i++) {
+          const a1 = i * (2 * Math.PI / total) - Math.PI / 2;
+          const a2 = (i + 1) * (2 * Math.PI / total) - Math.PI / 2;
+          
+          const cx1 = 50 + radiusCrust * Math.cos(a1);
+          const cy1 = 50 + radiusCrust * Math.sin(a1);
+          const cx2 = 50 + radiusCrust * Math.cos(a2);
+          const cy2 = 50 + radiusCrust * Math.sin(a2);
+          svg += `<path d="M 50,50 L ${cx1},${cy1} A ${radiusCrust},${radiusCrust} 0 0,1 ${cx2},${cy2} Z" fill="#d97706" stroke="#3f2021" stroke-width="2.5"/>`;
+          
+          const zx1 = 50 + radiusCheese * Math.cos(a1);
+          const zy1 = 50 + radiusCheese * Math.sin(a1);
+          const zx2 = 50 + radiusCheese * Math.cos(a2);
+          const zy2 = 50 + radiusCheese * Math.sin(a2);
+          svg += `<path d="M 50,50 L ${zx1},${zy1} A ${radiusCheese},${radiusCheese} 0 0,1 ${zx2},${zy2} Z" fill="#fbbf24" stroke="#3f2021" stroke-width="1.5"/>`;
+          
+          const aMid = a1 + (Math.PI / total);
+          const rx = 50 + 22 * Math.cos(aMid);
+          const ry = 50 + 22 * Math.sin(aMid);
+          svg += drawToppings(rx, ry, flavor);
+          
+          svg += `<line x1="50" y1="50" x2="${cx1}" y2="${cy1}" stroke="#3f2021" stroke-width="2"/>`;
+          svg += `<line x1="50" y1="50" x2="${cx2}" y2="${cy2}" stroke="#3f2021" stroke-width="2"/>`;
+        }
+      }
+
+      svg += `</svg>`;
+      return svg;
+    }
+
+    // ==========================================================================
+    // 渲染打包盒
+    // ==========================================================================
+    function renderPizzaVisuals() {
+      const container = document.getElementById('pizza-container');
+      container.innerHTML = '';
+
+      const cur = activeSlots[selectedSlotIdx];
+      if (!cur) return;
+
+      const flavor = cur.flavor || 'pepperoni';
+
+      if (mode === 'I2M') {
+        const den = currentDenPickerVal;
+        
+        for (let i = 0; i < playerWholeCount; i++) {
+          const wrap = document.createElement('div');
+          wrap.className = "w-20 h-20 md:w-24 md:h-24 relative transition-transform transform hover:scale-105 animate-pizza-pop";
+          wrap.innerHTML = drawPizzaSVG(den, den, flavor);
+          container.appendChild(wrap);
+        }
+
+        if (playerSliceCount > 0) {
+          const wrap = document.createElement('div');
+          wrap.className = "w-20 h-20 md:w-24 md:h-24 relative transition-transform transform hover:scale-105 mb-1 animate-pizza-pop";
+          wrap.innerHTML = drawPizzaSVG(playerSliceCount, den, flavor);
+          container.appendChild(wrap);
+        }
+      } else {
+        const den = currentDenPickerVal;
+        for (let i = 0; i < playerSliceCount; i++) {
+          const wrap = document.createElement('div');
+          wrap.className = "w-9 h-9 md:w-10 md:h-10 relative transition-transform transform hover:scale-105 p-0.5 bg-amber-50/20 border border-[#3f2021]/30 rounded-lg flex items-center justify-center animate-pizza-pop";
+          wrap.innerHTML = drawPizzaSVG(1, den, flavor);
+          container.appendChild(wrap);
+        }
+      }
+
+      if (container.children.length === 0) {
+        container.innerHTML = `<span class="text-amber-800/40 text-xs font-black py-4 w-full text-center">請拍擊下方街機按鈕快速製作！</span>`;
+      }
+    }
+
+    // ==========================================================================
+    // 控制台即時變更分母 (自動判定答案是否正確，正確自動出餐)
+    // ==========================================================================
+    function adjustDenInConsole(delta) {
+      if (isFrozen || isPaused) return;
+      synth.playClick();
+      
+      currentDenPickerVal = Math.max(2, currentDenPickerVal + delta);
+      document.getElementById('console-den-val').innerText = currentDenPickerVal;
+      
+      if (mode === 'I2M') {
+        document.getElementById('ans-i2m-den').value = currentDenPickerVal;
+      } else {
+        document.getElementById('ans-m2i-den').value = currentDenPickerVal;
+      }
+
+      // 保存至當前 slot 快照
+      activeSlots[selectedSlotIdx].playerDen = currentDenPickerVal;
+
+      // 變更分母時自動重置備料 (重新切割)
+      playerSliceCount = 0;
+      playerWholeCount = 0;
+
+      renderPizzaVisuals();
+      onInputsChange();
+    }
+
+    // ==========================================================================
+    // 炸裂報廢與灑花
+    // ==========================================================================
+    function animatePizzaExplosion(callback) {
+      const container = document.getElementById('pizza-container');
+      const items = container.querySelectorAll('div');
+      
+      if (items.length === 0) {
+        if (callback) callback();
+        return;
+      }
+
+      items.forEach(item => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 100 + Math.random() * 80;
+        const tx = Math.cos(angle) * dist;
+        const ty = Math.sin(angle) * dist - 35;
+        const rot = 180 + Math.random() * 360;
+
+        item.style.transition = 'all 0.4s cubic-bezier(0.1, 0.8, 0.3, 1)';
+        item.style.transform = `translate(${tx}px, ${ty}px) rotate(${rot}deg) scale(0.2)`;
+        item.style.opacity = '0';
+      });
+
+      setTimeout(() => {
+        if (callback) callback();
+      }, 400);
+    }
+
+    function spawnConfetti(parentEl) {
+      const rect = parentEl.getBoundingClientRect();
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
+      
+      for (let i = 0; i < 18; i++) {
+        const p = document.createElement('div');
+        p.className = 'absolute rounded-full pointer-events-none z-50';
+        const colors = ['#facc15', '#dc2626', '#16a34a', '#2563eb', '#c084fc', '#fb923c'];
+        p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        const size = Math.floor(Math.random() * 8) + 6;
+        p.style.width = size + 'px';
+        p.style.height = size + 'px';
+        p.style.left = cx + 'px';
+        p.style.top = cy + 'px';
+        
+        parentEl.appendChild(p);
+        
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 60 + Math.random() * 80;
+        const tx = Math.cos(angle) * dist;
+        const ty = Math.sin(angle) * dist - (30 + Math.random() * 30);
+        
+        p.style.transition = 'all 0.6s cubic-bezier(0.1, 0.8, 0.3, 1)';
+        void p.offsetWidth;
+        p.style.transform = `translate(${tx}px, ${ty}px) scale(0)`;
+        p.style.opacity = '0';
+        
+        setTimeout(() => p.remove(), 600);
+      }
+    }
+
+    // ==========================================================================
+    // ==========================================================================
+    // 街機按鍵加料控制 (手動按「送出」始判定)
+    // ==========================================================================
+    function addPizzaWhole() {
+      if (isFrozen || isPaused) return;
+      synth.playSlice();
+      playerWholeCount++;
+      renderPizzaVisuals();
+      onInputsChange();
+    }
+
+    // 當前顧客切幾片即時生效，直接反應於單片累加
+    function addPizzaSlice() {
+      if (isFrozen || isPaused) return;
+      synth.playSlice();
+      playerSliceCount++;
+      if (playerSliceCount >= currentDenPickerVal) {
+        playerWholeCount += Math.floor(playerSliceCount / currentDenPickerVal);
+        playerSliceCount = playerSliceCount % currentDenPickerVal;
+      }
+      renderPizzaVisuals();
+      onInputsChange();
+    }
+
+    function triggerTrashClear() {
+      if (isFrozen || isPaused) return;
+      animatePizzaExplosion(() => {
+        synth.playClick();
+        playerWholeCount = 0;
+        playerSliceCount = 0;
+        receiptNum = 0;
+        
+        if (mode === 'M2I') {
+          document.getElementById('ans-m2i-num').value = 0;
+        }
+
+        renderPizzaVisuals();
+        onInputsChange();
+      });
+    }
+
+    function addPizzaSliceM2I() {
+      if (isFrozen || isPaused) return;
+      synth.playSlice();
+      playerSliceCount++;
+      renderPizzaVisuals();
+      onInputsChange();
+    }
+
+    function adjustNumerator(delta) {
+      synth.playClick();
+      const input = document.getElementById('ans-m2i-num');
+      let currentVal = parseInt(input.value) || 0;
+      let newVal = Math.max(0, currentVal + delta);
+      input.value = newVal;
+      receiptNum = newVal;
+      onInputsChange();
+    }
+
+    function onInputsChange() {
+      renderPizzaVisuals();
+    }
+
+    // ==========================================================================
+    // 實時自動檢驗答案是否正確 (做出正確答案立刻自動送餐給客人，免手動敲鈴)
+    // ==========================================================================
+    function checkCorrectInstant() {
+      if (isFrozen || isPaused) return false;
+
+      // 檢查目前打包盒內容是否符合任何一位活躍客人的訂單
+      for (let i = 0; i < 3; i++) {
+        const cur = activeSlots[i];
+        if (!cur) continue;
+
+        let isCorrect = false;
+
+        if (mode === 'I2M') {
+          if (playerWholeCount === cur.whole && playerSliceCount === cur.numPart && currentDenPickerVal === cur.den) {
+            isCorrect = true;
+          }
+        } else {
+          // 帶分數換假分數無收據欄位，只要披薩盒中裝的總片數等於假分數分子、且切片分母相符即可！
+          if (playerSliceCount === cur.impNum && currentDenPickerVal === cur.den) {
+            isCorrect = true;
+          }
+        }
+
+        if (isCorrect) {
+          selectedSlotIdx = i; // 設定當前出餐的顧客 Slot 索引
+          handleCorrect();
+          return true;
+        }
+      }
+      return false;
+    }
+
+    // ==========================================================================
+    // 出餐主判定 (手動按「送出」時觸發)
+    // ==========================================================================
+    function serveOrder() {
+      if (isFrozen || isPaused) return;
+      const ok = checkCorrectInstant();
+      if (!ok) {
+        handleIncorrect();
+      }
+    }
+
+    function handleCorrect() {
+      synth.playBell();
+      isPaused = true;
+
+      const cur = activeSlots[selectedSlotIdx];
+      if (!cur) return;
+
+      spawnConfetti(document.getElementById(`cust-slot-${selectedSlotIdx}`));
+
+      comboCount++;
+      document.getElementById('combo-val').innerText = `🔥 Combo x${comboCount}`;
+
+      const comboMult = 1 + Math.floor(comboCount / 2);
+      const scoreEarned = cur.satisfaction * comboMult;
+      
+      globalScore += scoreEarned;
+      document.getElementById('score-val').innerText = globalScore;
+
+      const formulaBox = document.getElementById('math-formula-box');
+      if (mode === 'I2M') {
+        formulaBox.innerHTML = `
+          <span class="vertical-fraction"><span class="num-den"><span class="numerator">${cur.impNum}</span><span class="denominator">${cur.den}</span></span></span>
+          <span class="mx-3">=</span>
+          <span class="vertical-fraction"><span class="whole-num">${cur.whole}</span><span class="num-den"><span class="numerator">${cur.numPart}</span><span class="denominator">${cur.den}</span></span></span>
+        `;
+      } else {
+        formulaBox.innerHTML = `
+          <span class="vertical-fraction"><span class="whole-num">${cur.whole}</span><span class="num-den"><span class="numerator">${cur.numPart}</span><span class="denominator">${cur.den}</span></span></span>
+          <span class="mx-3">=</span>
+          <span class="vertical-fraction"><span class="num-den"><span class="numerator">${cur.impNum}</span><span class="denominator">${cur.den}</span></span></span>
+        `;
+      }
+
+      const textTitle = document.querySelector('#feedback-correct > span');
+      if (mode === 'I2M') {
+        textTitle.innerHTML = `
+          <i data-lucide="party-popper" class="w-6 h-6 text-emerald-500 inline-block mr-1"></i>
+          沒錯！ 
+          <span class="vertical-fraction"><span class="num-den"><span class="numerator">${cur.impNum}</span><span class="denominator">${cur.den}</span></span></span> 
+          ＝ 
+          <span class="vertical-fraction"><span class="whole-num">${cur.whole}</span><span class="num-den"><span class="numerator">${cur.numPart}</span><span class="denominator">${cur.den}</span></span></span> 
+          ，客人非常滿意地拿走了！
+        `;
+      } else {
+        textTitle.innerHTML = `
+          <i data-lucide="party-popper" class="w-6 h-6 text-emerald-500 inline-block mr-1"></i>
+          沒錯！ 
+          <span class="vertical-fraction"><span class="whole-num">${cur.whole}</span><span class="num-den"><span class="numerator">${cur.numPart}</span><span class="denominator">${cur.den}</span></span></span> 
+          ＝ 
+          <span class="vertical-fraction"><span class="num-den"><span class="numerator">${cur.impNum}</span><span class="denominator">${cur.den}</span></span></span> 
+          ，客人非常滿意地拿走了！
+        `;
+      }
+
+      document.getElementById('feedback-correct').classList.remove('hidden');
+
+      const cover = document.getElementById('serving-box-cover');
+      cover.classList.remove('hidden');
+      cover.classList.add('box-serve-animate');
+      
+      synth.playCoin();
+    }
+
+    function nextCustomer() {
+      synth.playClick();
+      
+      const cover = document.getElementById('serving-box-cover');
+      cover.classList.add('hidden');
+      cover.classList.remove('box-serve-animate');
+
+      const slotEl = document.getElementById(`cust-slot-${selectedSlotIdx}`);
+      slotEl.classList.add('animate-cust-leave-success');
+
+      setTimeout(() => {
+        slotEl.classList.remove('animate-cust-leave-success');
+
+        activeSlots[selectedSlotIdx] = null;
+        totalCustomersServed++;
+
+        document.getElementById('feedback-correct').classList.add('hidden');
+        
+        // 出餐成功後自動清空工作台，開始做下一份披薩！
+        playerWholeCount = 0;
+        playerSliceCount = 0;
+        receiptNum = 0;
+        if (mode === 'M2I') {
+          document.getElementById('ans-m2i-num').value = 0;
+        }
+
+        isPaused = false;
+        refillSlots();
+        isFrozen = false;
+      }, 450);
+    }
+
+    function handleIncorrect() {
+      synth.playHurt();
+      isFrozen = true;
+      
+      const box = document.getElementById('pizza-box-container');
+      box.classList.add('shake-active');
+      setTimeout(() => box.className = "absolute top-[16%] left-[48%] w-[49%] h-[46%] z-10 flex flex-col justify-between p-2 bg-[#fffdf8] wobbly-border shadow-md", 300);
+
+      document.getElementById('feedback-incorrect-text').innerText = "這披薩不對啊，重做！";
+      document.getElementById('feedback-incorrect').classList.remove('hidden');
+
+      animatePizzaExplosion(() => {
+        playerWholeCount = 0;
+        playerSliceCount = 0;
+        activeSlots[selectedSlotIdx].playerWholeCount = 0;
+        activeSlots[selectedSlotIdx].playerSliceCount = 0;
+        activeSlots[selectedSlotIdx].receiptNum = 0;
+        
+        if (mode === 'M2I') {
+          document.getElementById('ans-m2i-num').value = 0;
+        }
+
+        setTimeout(() => {
+          document.getElementById('feedback-incorrect').classList.add('hidden');
+          isFrozen = false;
+          updateSlotSelectionUI();
+        }, 800);
+      });
+    }
+
+    function clickSure() {
+      // 略過 OK 彈窗
+    }
+  </script>
+</body>
+</html>
