@@ -183,9 +183,14 @@
                         <span class="text-yellow-300 font-extrabold" id="status-label">分數 ↔ 小數 (簡單)</span>
                     </div>
                     <div class="flex items-center gap-4">
+                        <!-- Preview Countdown Timer Display in Info Bar -->
+                        <div id="preview-timer-container" class="hidden bg-yellow-500/20 text-yellow-300 px-3 py-1 rounded-lg border border-yellow-500/30 font-bold flex items-center gap-1.5 animate-pulse cursor-pointer" onclick="startShufflingNow()" title="點選立即開始">
+                            <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+                            <span>記牌: <span id="preview-timer" class="font-black text-yellow-400">10</span>秒 (立即翻牌)</span>
+                        </div>
                         <span class="text-slate-300">配對: <span id="match-label" class="text-emerald-400 font-black text-sm">0/5</span></span>
                         <span class="text-slate-300">步數: <span id="move-count" class="text-white font-black text-sm">0</span></span>
-                        <button onclick="resetGame()" class="p-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 rounded-lg transition-all" title="重新洗牌">
+                        <button onclick="resetGame()" class="p-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 rounded-lg transition-all" title="重新翻牌">
                             <i data-lucide="refresh-cw" class="w-4 h-4"></i>
                         </button>
                     </div>
@@ -213,18 +218,6 @@
 
                 </div>
 
-            </div>
-
-            <!-- 3. Preview Overlay Timer -->
-            <div id="preview-overlay" class="hidden absolute inset-0 bg-black/45 rounded-[12px] md:rounded-[20px] z-20 flex flex-col items-center justify-center transition-opacity duration-300 p-4">
-                <div class="bg-slate-900/95 border border-slate-700/80 p-6 rounded-2xl shadow-2xl text-center max-w-sm w-full">
-                    <h3 class="text-lg md:text-xl font-black text-white mb-1">記住底牌位置！</h3>
-                    <p class="text-slate-400 text-xs md:text-sm mb-4">倒數結束後卡牌將翻面並洗牌。</p>
-                    <div class="text-6xl font-black text-yellow-400 mb-5 animate-pulse" id="preview-timer">3</div>
-                    <button onclick="startShufflingNow()" class="w-full py-2.5 bg-yellow-500 hover:bg-yellow-600 text-slate-950 rounded-xl font-bold transition-all shadow-md">
-                        立即翻牌洗牌 🃏
-                    </button>
-                </div>
             </div>
 
         </main>
@@ -667,11 +660,13 @@
             return `<span class="font-black font-mono tracking-tight text-slate-800" style="font-size: 20px; line-height: 1;">${val}</span>`;
         }
 
-        // --- Preview Phase Timer ---
+        // --- Preview Phase Timer (10 Seconds) ---
         function startPreviewCountdown() {
-            previewCountdown = 3;
+            previewCountdown = 10;
             document.getElementById('preview-timer').textContent = previewCountdown;
-            document.getElementById('preview-overlay').classList.remove('hidden');
+            document.getElementById('preview-timer-container').classList.remove('hidden');
+            
+            isProcessing = true; // Lock flipping during countdown
 
             if (previewTimerId) clearInterval(previewTimerId);
 
@@ -686,91 +681,33 @@
             }, 1000);
         }
 
-        // --- Flip & Shuffle Sequence Trigger ---
+        // --- Flip Cards Down directly (No redealing/shuffling animation) ---
         function startShufflingNow() {
             if (previewTimerId) {
                 clearInterval(previewTimerId);
                 previewTimerId = null;
             }
-            document.getElementById('preview-overlay').classList.add('hidden');
+            document.getElementById('preview-timer-container').classList.add('hidden');
             
-            // Flip cards face-down
+            // Flip cards face-down directly
             const cardInners = document.querySelectorAll('.card-inner');
             cardInners.forEach(inner => {
                 inner.classList.remove('rotate-y-180');
             });
             synthAudio.playFlip();
 
-            // Run shuffle dealing animation
-            setTimeout(() => {
-                playShuffleAnimation();
-            }, 500);
-        }
-
-        // --- Interactive Gathering and Shuffle Animation ---
-        function playShuffleAnimation() {
-            isProcessing = true; // Lock interaction
-            
-            const cardContainers = document.querySelectorAll('.card-container');
-            const feltArea = document.getElementById('poker-felt-area');
-            
-            const feltRect = feltArea.getBoundingClientRect();
-            const feltCenterX = feltRect.left + feltRect.width / 2;
-            const feltCenterY = feltRect.top + feltRect.height / 2;
-
-            // Gather to center
-            cardContainers.forEach((card, index) => {
-                const rect = card.getBoundingClientRect();
-                const cardCenterX = rect.left + rect.width / 2;
-                const cardCenterY = rect.top + rect.height / 2;
-                const dx = feltCenterX - cardCenterX;
-                const dy = feltCenterY - cardCenterY;
-
-                card.style.transition = 'transform 0.6s cubic-bezier(0.25, 1, 0.5, 1)';
-                card.style.transform = `translate(${dx}px, ${dy}px) rotate(${Math.random() * 40 - 20}deg) scale(0.9)`;
-                
-                // Play soft card dealing sound effect in sequence
-                setTimeout(() => {
-                    synthAudio.playDeal();
-                }, index * 20);
-            });
-
-            // Simulate slight wash shuffle in the center
-            setTimeout(() => {
-                cardContainers.forEach((card) => {
-                    const currentTransform = card.style.transform;
-                    const shuffleOffset = Math.random() * 20 - 10;
-                    const shuffleRot = Math.random() * 30 - 15;
-                    card.style.transition = 'transform 0.3s ease-in-out';
-                    card.style.transform = currentTransform.replace(/rotate\(.*?\)/, `rotate(${shuffleRot}deg)`) + ` translate(${shuffleOffset}px, ${shuffleOffset}px)`;
-                });
-            }, 650);
-
-            // Deal back staggered
-            setTimeout(() => {
-                cardContainers.forEach((card, index) => {
-                    setTimeout(() => {
-                        card.style.transition = 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.2)';
-                        card.style.transform = ''; // Clear translation to return to original CSS grid slot
-                        synthAudio.playDeal();
-                    }, index * 50);
-                });
-
-                // Unlock board for interaction
-                const totalDuration = cardContainers.length * 50 + 550;
-                setTimeout(() => {
-                    isProcessing = false;
-                    // Reset CSS transition timers so card flips feel fast
-                    cardContainers.forEach(card => {
-                        card.style.transition = '';
-                    });
-                }, totalDuration);
-
-            }, 1050);
+            // Unlock board immediately so the player can play
+            isProcessing = false;
         }
 
         // --- Card Click Handler ---
         function handleCardClick(index) {
+            // If clicking during preview countdown, instantly skip countdown, flip down, and start playing!
+            if (previewTimerId) {
+                startShufflingNow();
+                return;
+            }
+
             if (isProcessing) return;
             if (flippedIndices.includes(index)) return;
             if (matchedPairIds.includes(cards[index].pairId)) return;
