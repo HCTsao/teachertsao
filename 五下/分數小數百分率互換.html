@@ -149,20 +149,17 @@
                 <div class="mb-6">
                     <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">2. 選擇難度 (卡牌對數)</label>
                     <div class="grid grid-cols-3 gap-2">
-                        <button onclick="setMenuDifficulty('easy')" id="menu-btn-easy" class="py-3 px-2 rounded-xl text-xs md:text-sm font-bold border transition-all flex flex-col items-center gap-1 bg-emerald-950/40 border-emerald-500 text-emerald-200">
+                        <button onclick="setMenuDifficulty('easy')" id="menu-btn-easy" class="py-3 px-2 rounded-xl text-xs md:text-sm font-bold border transition-all flex flex-col items-center justify-center gap-1 bg-emerald-950/40 border-emerald-500 text-emerald-200">
                             <span class="text-lg text-emerald-400 font-extrabold">🟢 簡單</span>
                             <span class="text-[10px] opacity-75">5 對 (共 10 張)</span>
-                            <span class="text-[9px] text-emerald-400 opacity-90 mt-0.5">真分數</span>
                         </button>
-                        <button onclick="setMenuDifficulty('normal')" id="menu-btn-normal" class="py-3 px-2 rounded-xl text-xs md:text-sm font-bold border transition-all flex flex-col items-center gap-1 bg-slate-800/80 border-slate-700 text-slate-400 hover:border-slate-500">
+                        <button onclick="setMenuDifficulty('normal')" id="menu-btn-normal" class="py-3 px-2 rounded-xl text-xs md:text-sm font-bold border transition-all flex flex-col items-center justify-center gap-1 bg-slate-800/80 border-slate-700 text-slate-400 hover:border-slate-500">
                             <span class="text-lg text-amber-400 font-extrabold">🟡 普通</span>
                             <span class="text-[10px] opacity-75">10 對 (共 20 張)</span>
-                            <span class="text-[9px] text-amber-400 opacity-90 mt-0.5">真/假/帶分數</span>
                         </button>
-                        <button onclick="setMenuDifficulty('hard')" id="menu-btn-hard" class="py-3 px-2 rounded-xl text-xs md:text-sm font-bold border transition-all flex flex-col items-center gap-1 bg-slate-800/80 border-slate-700 text-slate-400 hover:border-slate-500">
+                        <button onclick="setMenuDifficulty('hard')" id="menu-btn-hard" class="py-3 px-2 rounded-xl text-xs md:text-sm font-bold border transition-all flex flex-col items-center justify-center gap-1 bg-slate-800/80 border-slate-700 text-slate-400 hover:border-slate-500">
                             <span class="text-lg text-rose-500 font-extrabold">🔴 困難</span>
                             <span class="text-[10px] opacity-75">15 對 (共 30 張)</span>
-                            <span class="text-[9px] text-rose-400 opacity-90 mt-0.5">真/假/帶分數</span>
                         </button>
                     </div>
                 </div>
@@ -640,7 +637,7 @@
             });
         }
 
-        // --- Helper: Generate Card Content HTML ---
+        // --- Helper: Generate Card Content HTML (Force 20px font-size) ---
         function generateCardContentHTML(val) {
             if (typeof val === 'string' && val.includes('/')) {
                 // Fraction (can be proper, improper, mixed)
@@ -656,23 +653,18 @@
                 const [num, den] = fraction.split('/');
                 
                 return `
-                    <div class="flex items-center justify-center gap-0.5 text-slate-800">
-                        ${integerPart ? `<span class="text-sm sm:text-lg md:text-xl font-black mr-0.5">${integerPart}</span>` : ''}
+                    <div class="flex items-center justify-center gap-0.5 text-slate-800" style="font-size: 20px;">
+                        ${integerPart ? `<span class="font-black mr-0.5" style="font-size: 20px; line-height: 1;">${integerPart}</span>` : ''}
                         <div class="flex flex-col items-center leading-none">
-                            <span class="text-xs sm:text-base md:text-lg font-black border-b-2 border-slate-800 px-0.5 pb-0.5">${num}</span>
-                            <span class="text-xs sm:text-base md:text-lg font-black pt-0.5">${den}</span>
+                            <span class="font-black border-b-2 border-slate-800 px-0.5 pb-0.5" style="font-size: 20px; line-height: 0.85;">${num}</span>
+                            <span class="font-black pt-0.5" style="font-size: 20px; line-height: 0.85;">${den}</span>
                         </div>
                     </div>
                 `;
             }
             
             // Decimal or Percentage
-            // Adjust sizing for long percentages (e.g. 312.5%)
-            let textClass = "text-xs sm:text-base md:text-lg";
-            if (typeof val === 'string' && val.length > 4) {
-                textClass = "text-[10px] sm:text-sm md:text-base";
-            }
-            return `<span class="${textClass} font-black font-mono tracking-tight text-slate-800">${val}</span>`;
+            return `<span class="font-black font-mono tracking-tight text-slate-800" style="font-size: 20px; line-height: 1;">${val}</span>`;
         }
 
         // --- Preview Phase Timer ---
@@ -887,11 +879,34 @@
             }
         }
 
-        // --- Reset/Restart Current Mode ---
+        // --- Reset/Restart Current Mode (Flip back face-down directly without redealing) ---
         function resetGame() {
             synthAudio.playFlip();
             document.getElementById('win-modal').classList.add('hidden');
-            initGame();
+            
+            moves = 0;
+            flippedIndices = [];
+            matchedPairIds = [];
+            isProcessing = false; // Player can click immediately
+            
+            document.getElementById('move-count').textContent = moves;
+            const numPairs = currentDifficulty === 'easy' ? 5 : (currentDifficulty === 'normal' ? 10 : 15);
+            document.getElementById('match-label').textContent = `0/${numPairs}`;
+
+            // Reset card visuals: flip all face-down, remove matched style
+            const cardContainers = document.querySelectorAll('.card-container');
+            cardContainers.forEach(cardEl => {
+                cardEl.classList.remove('matched');
+                cardEl.style.transform = ''; // Clear any residual shuffle transforms
+                cardEl.style.transition = '';
+                
+                const innerEl = cardEl.querySelector('.card-inner');
+                innerEl.classList.remove('rotate-y-180');
+                
+                // Reset card front borders back to default style
+                const frontEl = cardEl.querySelector('.card-front');
+                frontEl.className = "card-front absolute inset-0 w-full h-full backface-hidden rotate-y-180 rounded-xl border border-slate-200 flex flex-col justify-between p-1 bg-white text-slate-800 shadow-md";
+            });
         }
 
         // --- Run Lucide Icon Loader ---
