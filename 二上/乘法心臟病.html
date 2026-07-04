@@ -130,6 +130,19 @@
             const [onlineStatusText, setOnlineStatusText] = useState('');
             const [onlineStatusType, setOnlineStatusType] = useState(''); // 'info', 'success', 'error'
             const [myPlayerIdx, setMyPlayerIdx] = useState(0);
+            const [diagnosticLogs, setDiagnosticLogs] = useState([]);
+
+            const connectionsRef = useRef([]);
+            const lobbyPlayersRef = useRef([]);
+            
+            useEffect(() => { connectionsRef.current = connections; }, [connections]);
+            useEffect(() => { lobbyPlayersRef.current = lobbyPlayers; }, [lobbyPlayers]);
+
+            const addDiagnosticLog = (msg) => {
+                const time = new Date().toLocaleTimeString();
+                setDiagnosticLogs(prev => [...prev, `[${time}] ${msg}`]);
+                console.log(`[Diagnostic] ${msg}`);
+            };
 
             const timeoutRef = useRef(null);
             const idleTimerRef = useRef(null);
@@ -265,12 +278,9 @@
                 for (let i = 0; i < PLAYERS_COUNT; i++) { newPlayers.push({ id: i, name: i === 0 ? "你" : `電腦 ${i}`, cards: [], isAI: i !== 0 }); }
                 setMainDeck(deck); setPlayers(newPlayers); setCenterPile([]);
                 setCurrentStep(difficulty === 'easy' ? 1 : 10); setCurrentCall(null);
-                setSlapResults([]); setWinner(null); setPunishingCard(null); setErrorMsg(""); setShowIdleHint(false); aiSlapScheduledRef.current = false;
-                setGameState('dealing'); setDealingProgress(0);
-            };
-
-            // Online Room Handlers
+                setSlapResults([]); setWinner(null); setPunishingCard(null); setErrorMsg(""); setShowIdleHint(false); aiSlapScheduledRef.             // Online Room Handlers
             const destroyPeer = () => {
+                addDiagnosticLog("連線清除：關閉並釋放 Peer / Connections 資源");
                 if (myPeer) {
                     try {
                         myPeer.destroy();
@@ -295,18 +305,21 @@
             }, [myPeer, connections]);
 
             const handleGuestDisconnect = (closedConn) => {
+                addDiagnosticLog(`訪客斷線處理，名稱: ${closedConn.playerName || closedConn.peer}`);
                 setConnections(prev => {
                     const nextConns = prev.filter(c => c !== closedConn);
                     
                     if (gameState === 'menu' || gameState === 'dealing') {
+                        const hostName = lobbyPlayersRef.current[0]?.name || '你 (房主)';
                         const updatedLobby = [
-                            { id: 0, name: lobbyPlayers[0]?.name || '你 (房主)', isHost: true },
+                            { id: 0, name: hostName, isHost: true },
                             ...nextConns.map((c, i) => {
                                 c.playerIdx = i + 1;
                                 return { id: c.playerIdx, name: c.playerName, isHost: false };
                             })
                         ];
                         setLobbyPlayers(updatedLobby);
+                        addDiagnosticLog(`大廳成員已更新，剩餘玩家數: ${updatedLobby.length}`);
                         
                         nextConns.forEach((c) => {
                             c.send({
@@ -319,6 +332,7 @@
                         setPlayers(prevPlayers => {
                             const nextPlayers = prevPlayers.map(p => {
                                 if (p.id === closedConn.playerIdx) {
+                                    addDiagnosticLog(`遊戲進行中訪客 ${p.name} 斷線，改由電腦代管`);
                                     return { ...p, name: `${p.name} (電腦代管)`, isAI: true };
                                 }
                                 return p;
@@ -377,12 +391,16 @@
                 } catch(e){}
 
                 destroyPeer();
+                setDiagnosticLogs([]); // Clear logs for new session
                 const code = Math.floor(1000 + Math.random() * 9000).toString();
                 setRoomCode(code);
                 setOnlineRole('host');
                 setOnlineStatusText('正在連接連線伺服器...');
                 setOnlineStatusType('info');
                 setIsOnlineMode(true); // Stay in online mode UI to show status
+
+                addDiagnosticLog(`開始創建房間，房號：${code}`);
+                addDiagnosticLog(`正在連接 PeerJS 信令伺服器 (0.peerjs.com)...`);
 
                 const nickname = document.getElementById('online-nickname')?.value.trim() || '房主';
 
@@ -402,6 +420,7 @@
                     // 12-second signaling server connection timeout
                     const serverTimeout = setTimeout(() => {
                         if (!peerOpened) {
+                            addDiagnosticLog("連線信令伺服器逾時，無法開啟房間！");
                             setOnlineStatusText('建立房間逾時！無法連接到連線伺服器，請檢查網路或稍後重試。');
                             setOnlineStatusType('error');
                             try { peer.destroy(); } catch(e){}
@@ -415,10 +434,14 @@
                         setLobbyPlayers([{ id: 0, name: `${nickname} (你)`, isHost: true }]);
                         setOnlineStatusText(`房間建立成功！房號：${code}`);
                         setOnlineStatusType('success');
+                        addDiagnosticLog(`房間建立成功！信令 ID: ${hostPeerId}`);
                     });
 
                     peer.on('connection', (conn) => {
-                        if (connections.length >= 3) {
+                        const currentConns = connectionsRef.current;
+                        addDiagnosticLog(`收到來自訪客的連線請求，訪客 Peer ID: ${conn.peer}`);
+                        if (currentConns.length >= 3) {
+                            addDiagnosticLog("房間已滿 (已滿 4 人)，拒絕連線");
                             conn.on('open', () => {
                                 conn.send({ type: 'error', message: '房間已滿！' });
                                 setTimeout(() => conn.close(), 500);
@@ -427,11 +450,14 @@
                         }
 
                         conn.on('open', () => {
+                            addDiagnosticLog(`與訪客 P2P 通道連線已開啟 (conn.open = true)`);
                             conn.on('data', (data) => {
                                 if (data.type === 'join_lobby') {
-                                    const nextIdx = connections.length + 1;
+                                    // Use ref length to avoid React stale closure duplicates!
+                                    const nextIdx = connectionsRef.current.length + 1;
                                     conn.playerIdx = nextIdx;
                                     conn.playerName = data.playerName || `玩家 ${nextIdx}`;
+                                    addDiagnosticLog(`訪客加入大廳成功，分配 ID: ${nextIdx}, 暱稱: ${conn.playerName}`);
                                     
                                     setConnections(prev => {
                                         const newConns = [...prev, conn];
@@ -472,6 +498,7 @@
 
                         conn.on('error', (err) => {
                             console.error(err);
+                            addDiagnosticLog(`訪客資料通道錯誤: ${err.message || err}`);
                             handleGuestDisconnect(conn);
                         });
                     });
@@ -480,8 +507,9 @@
                         console.error("Peer Error:", err);
                         peerOpened = true; // prevent timeout trigger
                         clearTimeout(serverTimeout);
+                        addDiagnosticLog(`信令伺服器錯誤: ${err.type} - ${err.message}`);
                         if (err.type === 'unavailable-id') {
-                            // ID is somehow taken, retry with a new code
+                            addDiagnosticLog("房號已被佔用，嘗試自動重新開房...");
                             createOnlineRoom();
                         } else {
                             setOnlineStatusText(`建立房間失敗（錯誤類型：${err.type || 'unknown'}）。請重試！`);
@@ -490,6 +518,7 @@
                     });
                 } catch (e) {
                     console.error(e);
+                    addDiagnosticLog(`開房異常：${e.message || e}`);
                     setOnlineStatusText('建立房間異常，請重試！');
                     setOnlineStatusType('error');
                 }
@@ -510,11 +539,15 @@
                 } catch(e){}
 
                 destroyPeer();
+                setDiagnosticLogs([]); // Clear logs for new session
                 setRoomCode(cleaned);
                 setOnlineRole('guest');
                 setOnlineStatusText('正在連接連線伺服器...');
                 setOnlineStatusType('info');
                 setIsOnlineMode(true); // Stay in online mode UI to show status
+
+                addDiagnosticLog(`嘗試加入房號：${cleaned}`);
+                addDiagnosticLog(`正在連接 PeerJS 信令伺服器...`);
 
                 const nickname = document.getElementById('online-nickname')?.value.trim() || '訪客';
 
@@ -535,8 +568,10 @@
                     const joinTimeout = setTimeout(() => {
                         if (!connOpened) {
                             if (!peerOpened) {
+                                addDiagnosticLog("連接信令伺服器逾時，無法連線！");
                                 setOnlineStatusText('連線伺服器逾時！無法連接到連線伺服器，請檢查網路。');
                             } else {
+                                addDiagnosticLog(`連接房主 heart-attack-${cleaned} 逾時，P2P 資料通道未開啟！`);
                                 setOnlineStatusText('與房主連線逾時！請確認房主是否已開房，或雙方網路是否支援 P2P 連線。');
                             }
                             setOnlineStatusType('error');
@@ -546,6 +581,8 @@
 
                     peer.on('open', () => {
                         peerOpened = true;
+                        addDiagnosticLog(`成功連接信令伺服器，分配訪客 ID: ${peer.id}`);
+                        addDiagnosticLog(`正在與房主 heart-attack-${cleaned} 建立 P2P 連線...`);
                         setOnlineStatusText('已連接伺服器，正在尋找房主並建立 P2P 連線...');
                         
                         const conn = peer.connect('heart-attack-' + cleaned, { reliable: true });
@@ -553,6 +590,7 @@
                         conn.on('open', () => {
                             connOpened = true;
                             clearTimeout(joinTimeout);
+                            addDiagnosticLog(`與房主的 P2P 連線建立成功！發送 join_lobby 握手訊息`);
                             conn.send({
                                 type: 'join_lobby',
                                 playerName: nickname
@@ -566,6 +604,7 @@
 
                         conn.on('data', (data) => {
                             if (data.type === 'error') {
+                                addDiagnosticLog(`收到房主拒絕訊息: ${data.message}`);
                                 setOnlineStatusText(data.message);
                                 setOnlineStatusType('error');
                                 destroyPeer();
@@ -575,6 +614,7 @@
                                 setMyPlayerIdx(data.myIndex);
                             }
                             if (data.type === 'start_game') {
+                                addDiagnosticLog("連線遊戲開始，開始發牌...");
                                 setMultiplier(data.multiplier);
                                 setDifficulty(data.difficulty);
                                 setAiLevel(data.aiLevel);
@@ -653,6 +693,7 @@
                         });
 
                         conn.on('close', () => {
+                            addDiagnosticLog("與房主的 P2P 連線已關閉 (conn.on('close'))");
                             setOnlineStatusText('與房主的連線已斷開！');
                             setOnlineStatusType('error');
                             setGameState('menu');
@@ -662,6 +703,7 @@
                         conn.on('error', (err) => {
                             clearTimeout(joinTimeout);
                             console.error(err);
+                            addDiagnosticLog(`與房主的連線通道發生錯誤: ${err.message || err}`);
                             setOnlineStatusText('與房主的資料通道連線失敗！請確認防火牆設定，或嘗試改用手機熱點後重試。');
                             setOnlineStatusType('error');
                         });
@@ -671,6 +713,7 @@
                         console.error("Peer Error:", err);
                         peerOpened = true; // prevent timeout trigger
                         clearTimeout(joinTimeout);
+                        addDiagnosticLog(`信令伺服器錯誤: ${err.type} - ${err.message}`);
                         if (err.type === 'peer-not-found') {
                             setOnlineStatusText('找不到該房間，請確認房號是否正確！');
                         } else if (err.type === 'network') {
@@ -684,9 +727,9 @@
                     });
                 } catch (e) {
                     console.error(e);
+                    addDiagnosticLog(`連線異常: ${e.message || e}`);
                     setOnlineStatusText('連線異常，請重試！');
                     setOnlineStatusType('error');
-                }
             };
 
             const startOnlineGame = (multiplierNum) => {
@@ -1275,6 +1318,25 @@
                                     {onlineStatusText}
                                 </div>
                             )}
+
+                            {/* Diagnostic Logs Panel */}
+                            <div className="mt-4 border-t border-slate-700 pt-4 text-left">
+                                <details className="group">
+                                    <summary className="flex items-center justify-between cursor-pointer text-xs font-bold text-slate-400 hover:text-slate-200 select-none">
+                                        <span>🔍 連線診斷日誌 (調試用)</span>
+                                        <span className="transition-transform group-open:rotate-180">▼</span>
+                                    </summary>
+                                    <div className="mt-2 p-3 bg-black/50 border border-slate-800 rounded-xl text-[10px] font-mono leading-relaxed max-h-40 overflow-y-auto text-slate-300">
+                                        {diagnosticLogs.length === 0 ? (
+                                            <span className="text-slate-500">尚無日誌。請創建或加入房間來開始診斷。</span>
+                                        ) : (
+                                            diagnosticLogs.map((log, index) => (
+                                                <div key={index} className="border-b border-slate-900/50 py-0.5 last:border-0">{log}</div>
+                                            ))
+                                        )}
+                                    </div>
+                                </details>
+                            </div>
                         </div>
                         
                         <button onClick={() => { destroyPeer(); setIsOnlineMode(false); }} className="mt-8 px-8 py-3 bg-slate-800 text-slate-400 rounded-xl hover:bg-slate-700 hover:text-white transition-all">
