@@ -1538,123 +1538,29 @@
         }
 
         // ============================================================
-        // 背景音樂 (Web Audio API 合成)
+        // 背景音樂 (使用 約分大冒險.mp3)
         // ============================================================
-        const bgMusic = (() => {
-            let ctx = null, gainNode = null, playing = false, muted = false;
-            let oscillators = [], lfoGain = null;
+        const bgAudio = new Audio('約分大冒險.mp3');
+        bgAudio.loop = true;
+        bgAudio.volume = 0.4;
 
-            // 旋律音符序列 (Dorian 調式 8-bit 電玩風)
-            const melody = [
-                { note: 'D4', dur: 0.25 }, { note: 'E4', dur: 0.25 },
-                { note: 'F4', dur: 0.25 }, { note: 'A4', dur: 0.25 },
-                { note: 'A4', dur: 0.5  }, { note: 'G4', dur: 0.25 },
-                { note: 'F4', dur: 0.25 }, { note: 'E4', dur: 0.5  },
-                { note: 'D4', dur: 0.25 }, { note: 'F4', dur: 0.25 },
-                { note: 'A4', dur: 0.25 }, { note: 'C5', dur: 0.25 },
-                { note: 'B4', dur: 0.5  }, { note: 'A4', dur: 0.25 },
-                { note: 'G4', dur: 0.25 }, { note: 'A4', dur: 0.5  },
-            ];
-
-            const noteFreq = {
-                'C4':261.63,'D4':293.66,'E4':329.63,'F4':349.23,
-                'G4':392.00,'A4':440.00,'B4':493.88,'C5':523.25
-            };
-
-            const BPM = 132;
-            const beatDur = 60 / BPM;
-
-            function initCtx() {
-                if (ctx) return;
-                ctx = new (window.AudioContext || window.webkitAudioContext)();
-                gainNode = ctx.createGain();
-                gainNode.gain.value = 0.4;
-                gainNode.connect(ctx.destination);
-            }
-
-            function scheduleNote(freq, startTime, duration) {
-                const osc = ctx.createOscillator();
-                const envGain = ctx.createGain();
-                osc.type = 'square';
-                osc.frequency.value = freq;
-                envGain.gain.setValueAtTime(0, startTime);
-                envGain.gain.linearRampToValueAtTime(0.5, startTime + 0.01);
-                envGain.gain.linearRampToValueAtTime(0.3, startTime + duration * 0.6);
-                envGain.gain.linearRampToValueAtTime(0, startTime + duration - 0.02);
-                osc.connect(envGain);
-                envGain.connect(gainNode);
-                osc.start(startTime);
-                osc.stop(startTime + duration);
-            }
-
-            function scheduleBass(startTime) {
-                // 簡單低音鼓點
-                const bassNotes = ['D3', 'A3', 'F3', 'A3'];
-                const bassFreqs = { 'D3': 146.83, 'A3': 220.00, 'F3': 174.61 };
-                bassNotes.forEach((n, i) => {
-                    const osc = ctx.createOscillator();
-                    const eg = ctx.createGain();
-                    osc.type = 'sawtooth';
-                    osc.frequency.value = bassFreqs[n] || 146.83;
-                    const t = startTime + i * beatDur * 0.5;
-                    eg.gain.setValueAtTime(0.25, t);
-                    eg.gain.linearRampToValueAtTime(0, t + beatDur * 0.4);
-                    osc.connect(eg);
-                    eg.connect(gainNode);
-                    osc.start(t);
-                    osc.stop(t + beatDur * 0.4);
-                });
-            }
-
-            function playLoop() {
-                if (!ctx || !playing) return;
-                let t = ctx.currentTime + 0.05;
-                // 分配旋律
-                melody.forEach(({ note, dur }) => {
-                    const freq = noteFreq[note] || 440;
-                    scheduleNote(freq, t, dur * beatDur);
-                    t += dur * beatDur;
-                });
-                const loopDuration = melody.reduce((a, m) => a + m.dur * beatDur, 0);
-                // 低音 (每個 loop 4 個 bass notes)
-                scheduleBass(ctx.currentTime + 0.05);
-                setTimeout(playLoop, (loopDuration - 0.1) * 1000);
-            }
-
-            return {
-                start() {
-                    initCtx();
-                    if (ctx.state === 'suspended') ctx.resume();
-                    if (!playing) {
-                        playing = true;
-                        playLoop();
-                    }
-                },
-                stop() {
-                    playing = false;
-                    if (gainNode) gainNode.gain.value = 0;
-                },
-                setVolume(v) {
-                    if (!gainNode) initCtx();
-                    gainNode.gain.value = muted ? 0 : v;
-                },
-                toggleMute() {
-                    muted = !muted;
-                    if (gainNode) {
-                        const slider = document.getElementById('volSlider');
-                        gainNode.gain.value = muted ? 0 : (slider ? slider.value / 100 : 0.4);
-                    }
-                    return muted;
-                },
-                isMuted() { return muted; }
-            };
-        })();
+        const bgMusic = {
+            start() {
+                bgAudio.play().catch(() => {});
+            },
+            setVolume(v) {
+                bgAudio.volume = v;
+            },
+            toggleMute() {
+                bgAudio.muted = !bgAudio.muted;
+                return bgAudio.muted;
+            },
+            isMuted() { return bgAudio.muted; }
+        };
 
         // 音量滑桿同步
         function setVolume(val) {
-            const v = val / 100;
-            bgMusic.setVolume(v);
-            // 更新滑桿填充色
+            bgMusic.setVolume(val / 100);
             const slider = document.getElementById('volSlider');
             if (slider) slider.style.setProperty('--vol', val + '%');
         }
@@ -1668,7 +1574,7 @@
             }
         }
 
-        // 初始化滑桿填充色
+        // 初始化滑桿填充色與音量
         (function initSlider() {
             const slider = document.getElementById('volSlider');
             if (slider) slider.style.setProperty('--vol', slider.value + '%');
