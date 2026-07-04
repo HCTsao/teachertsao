@@ -923,8 +923,11 @@
         // ==========================================
         let audioCtx = null;
         let isSoundMuted = false;
-        let bgmTimer = null;
         let globalVolume = 0.5; // 預設 50% 音量
+
+        // 使用 MP3 作為背景音樂
+        const bgmAudio = new Audio('打地鼠樂園.mp3');
+        bgmAudio.loop = true;
 
         function initAudio() {
             if (!audioCtx) {
@@ -980,39 +983,18 @@
             });
         }
 
-        // 輕快放鬆的背景音樂 (BGM)
-        const bgmNotes = [
-            { note: 261.63, dur: 0.4 }, { note: 329.63, dur: 0.4 }, { note: 392.00, dur: 0.4 }, { note: 523.25, dur: 0.4 },
-            { note: 293.66, dur: 0.4 }, { note: 349.23, dur: 0.4 }, { note: 440.00, dur: 0.4 }, { note: 587.33, dur: 0.4 },
-            { note: 329.63, dur: 0.4 }, { note: 392.00, dur: 0.4 }, { note: 493.88, dur: 0.4 }, { note: 659.25, dur: 0.4 },
-            { note: 349.23, dur: 0.4 }, { note: 440.00, dur: 0.4 }, { note: 523.25, dur: 0.4 }, { note: 698.46, dur: 0.4 }
-        ];
-
-        let bgmNoteIndex = 0;
-
-        function playBgmStep() {
-            if (isSoundMuted || timeUp) return;
-            initAudio();
-            const step = bgmNotes[bgmNoteIndex];
-            // 基礎音量調高至 0.08，以便搭配音量滑桿控制
-            playTone(step.note, 'sine', step.dur * 1.5, 0.08);
-            bgmNoteIndex = (bgmNoteIndex + 1) % bgmNotes.length;
-            bgmTimer = setTimeout(playBgmStep, step.dur * 1000);
-        }
-
         function startBgm() {
             stopBgm();
-            bgmNoteIndex = 0;
             if (!isSoundMuted && !timeUp) {
-                playBgmStep();
+                bgmAudio.volume = globalVolume;
+                bgmAudio.play().catch(err => {
+                    console.log("BGM 自動播放失敗，需等待使用者互動:", err);
+                });
             }
         }
 
         function stopBgm() {
-            if (bgmTimer) {
-                clearTimeout(bgmTimer);
-                bgmTimer = null;
-            }
+            bgmAudio.pause();
         }
 
         // ==========================================
@@ -1354,6 +1336,7 @@
             const val = e.target.value;
             volumeVal.textContent = `${val}%`;
             globalVolume = val / 100;
+            bgmAudio.volume = globalVolume;
         });
 
         document.querySelectorAll('.mole').forEach(mole => mole.addEventListener('click', bonk));
