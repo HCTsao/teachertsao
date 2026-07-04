@@ -127,7 +127,7 @@
             position: relative;
             display: inline-block;
             margin-right: 10px;
-            font-size: 2rem;
+            font-size: 32px;
             font-weight: 800;
             line-height: 1;
             opacity: 0.85;
@@ -154,7 +154,7 @@
         .current-num {
             font-weight: 900;
             line-height: 1;
-            font-size: 5.2rem;
+            font-size: 80px;
             text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
         }
 
@@ -277,6 +277,77 @@
         .btn-game:hover::before {
             left: 100%;
         }
+
+        /* 隱藏瀏覽器預設的數字輸入上下微調按鈕 */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+
+        /* 音量控制小工具 */
+        #volumeWidget {
+            position: fixed;
+            top: 72px;
+            left: 16px;
+            z-index: 999998;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+            font-family: system-ui, -apple-system, sans-serif;
+            transition: all 0.3s ease;
+        }
+        #volumeWidget:hover {
+            background: rgba(79, 70, 229, 0.5);
+            border-color: rgba(255,255,255,0.25);
+        }
+        #muteBtn {
+            background: none;
+            border: none;
+            color: #facc15;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            transition: transform 0.2s;
+        }
+        #muteBtn:hover { transform: scale(1.2); }
+        #volSlider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 80px;
+            height: 4px;
+            border-radius: 2px;
+            background: linear-gradient(90deg, #facc15 var(--vol, 50%), rgba(255,255,255,0.15) var(--vol, 50%));
+            outline: none;
+            cursor: pointer;
+        }
+        #volSlider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #facc15;
+            box-shadow: 0 0 6px rgba(250,204,21,0.6);
+            cursor: pointer;
+        }
+        #volSlider::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #facc15;
+            border: none;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body class="flex flex-col items-center justify-center p-4 relative">
@@ -289,54 +360,49 @@
     <script>(function() { function adjustViewport() { var targetWidth = 1024; var screenWidth = window.innerWidth || document.documentElement.clientWidth || window.screen.width; if (screenWidth > 0 && screenWidth < targetWidth) { var scale = screenWidth / targetWidth; var meta = document.querySelector('meta[name="viewport"]'); if (!meta) { meta = document.createElement('meta'); meta.setAttribute('name', 'viewport'); document.head.appendChild(meta); } meta.setAttribute('content', 'width=' + targetWidth + ', initial-scale=' + scale + ', minimum-scale=' + scale + ', maximum-scale=2.0, user-scalable=yes'); } else { var meta = document.querySelector('meta[name="viewport"]'); if (meta) { meta.setAttribute('content', 'width=device-width, initial-scale=1.0'); } } } adjustViewport(); var timer = null; window.addEventListener('resize', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); window.addEventListener('orientationchange', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); })();</script>
     <!-- HOME_BUTTON_END -->
 
+    <!-- 音量控制 -->
+    <div id="volumeWidget">
+        <button id="muteBtn" onclick="toggleMute()" title="靜音/取消靜音">
+            <i id="muteIcon" class="fa-solid fa-music"></i>
+        </button>
+        <input type="range" id="volSlider" min="0" max="100" value="40"
+               oninput="setVolume(this.value)"
+               title="音量">
+    </div>
+
     <!-- ================== 遊戲大廳主選單 ================== -->
-    <div id="mainLobby" class="max-w-2xl w-full glass-panel rounded-3xl p-8 text-center space-y-8 z-10 celebration">
-        <div class="space-y-3">
-            <span class="px-4 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-widest bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
-                <i class="fa-solid fa-gamepad mr-1"></i> AI 智慧互動數學遊戲
-            </span>
-            <h1 class="text-6xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500 py-2" style="font-family: 'ZCOOL KuaiLe', sans-serif;">
+    <div id="mainLobby" class="max-w-md w-full glass-panel rounded-3xl p-8 text-center space-y-6 z-10 celebration">
+        <div class="space-y-2">
+            <h1 class="text-5xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500 py-1" style="font-family: 'ZCOOL KuaiLe', sans-serif;">
                 約分大冒險
             </h1>
-            <p class="text-slate-400 text-lg">精熟分數乘法約分與除法變倒數，挑戰心算速度！</p>
+            <p class="text-slate-400 font-bold">請選擇挑戰單元</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+        <div class="flex flex-col gap-4 pt-2">
             <!-- 乘法篇按鈕 -->
-            <button onclick="selectMode('mul')" class="btn-game group flex flex-col items-center justify-between p-6 rounded-2xl border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10 hover:border-amber-400 transition-all text-left shadow-lg">
-                <div class="flex items-center justify-between w-full mb-3">
+            <button onclick="selectMode('mul')" class="btn-game flex items-center justify-between p-5 rounded-2xl border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10 hover:border-amber-400 transition-all text-left shadow-lg">
+                <div class="flex items-center gap-4">
                     <span class="text-amber-400 text-3xl"><i class="fa-solid fa-square-xmark"></i></span>
-                    <span class="px-3 py-1 rounded-md text-xs font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">五年級下學期</span>
+                    <div>
+                        <h3 class="text-xl font-bold text-white">分數乘法篇</h3>
+                        <span class="text-xs font-bold text-amber-300">五年級下學期</span>
+                    </div>
                 </div>
-                <h3 class="text-2xl font-bold text-white mb-2 group-hover:text-amber-300 transition-colors">分數乘法篇</h3>
-                <p class="text-slate-400 text-sm">直接點選分子與分母進行約分，找出「最大公因數」取得高分加倍！</p>
-                <div class="mt-4 w-full text-right text-amber-400 font-bold text-sm">
-                    進入大冒險 <i class="fa-solid fa-arrow-right ml-1"></i>
-                </div>
+                <i class="fa-solid fa-chevron-right text-slate-500"></i>
             </button>
 
             <!-- 除法篇按鈕 -->
-            <button onclick="selectMode('div')" class="btn-game group flex flex-col items-center justify-between p-6 rounded-2xl border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-400 transition-all text-left shadow-lg">
-                <div class="flex items-center justify-between w-full mb-3">
+            <button onclick="selectMode('div')" class="btn-game flex items-center justify-between p-5 rounded-2xl border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-400 transition-all text-left shadow-lg">
+                <div class="flex items-center gap-4">
                     <span class="text-blue-400 text-3xl"><i class="fa-solid fa-divide"></i></span>
-                    <span class="px-3 py-1 rounded-md text-xs font-bold bg-blue-400/20 text-blue-300 border border-blue-400/30">六年級上學期</span>
+                    <div>
+                        <h3 class="text-xl font-bold text-white">分數除法篇</h3>
+                        <span class="text-xs font-bold text-blue-300">六年級上學期</span>
+                    </div>
                 </div>
-                <h3 class="text-2xl font-bold text-white mb-2 group-hover:text-blue-300 transition-colors">分數除法篇</h3>
-                <p class="text-slate-400 text-sm">學習「除號改乘號，除數上下顛倒」的口訣，進行 reciprocal 顛倒驗證與約分。</p>
-                <div class="mt-4 w-full text-right text-blue-400 font-bold text-sm">
-                    進入大冒險 <i class="fa-solid fa-arrow-right ml-1"></i>
-                </div>
+                <i class="fa-solid fa-chevron-right text-slate-500"></i>
             </button>
-        </div>
-
-        <!-- 說明區 -->
-        <div class="bg-white/5 rounded-2xl p-6 border border-white/10 text-left space-y-2">
-            <h4 class="text-yellow-400 font-bold text-lg"><i class="fa-solid fa-circle-info mr-2"></i>冒險規則說明：</h4>
-            <ul class="text-slate-300 text-sm space-y-1.5 list-disc list-inside">
-                <li>挑戰共 <span class="text-white font-bold">3</span> 關，每過一關答題限時會遞減，挑戰心算靈敏度！</li>
-                <li>點選一組分子分母，輸入其公因數即可約分，一次除以「最大公因數」有額外加分！</li>
-                <li>最終答案務必化為「最簡分數」，否則無法成功過關喔！</li>
-            </ul>
         </div>
     </div>
 
@@ -456,7 +522,7 @@
                     <div class="text-5xl font-black text-slate-500 px-2">=</div>
 
                     <!-- 答案輸入 -->
-                    <div class="flex flex-col items-center gap-2 bg-slate-900/60 p-4 border border-white/5 rounded-2xl">
+                    <div id="answerAreaContainer" class="flex flex-col items-center gap-2 bg-slate-900/60 p-4 border border-white/5 rounded-2xl">
                         <span class="text-xs font-bold text-slate-500 mb-1">輸入最簡分數</span>
                         <input type="number" id="ansNum" class="w-24 h-24 bg-slate-950 border-4 border-slate-700 rounded-2xl text-center text-4xl font-black text-blue-400 input-glow" placeholder="">
                         <div class="fraction-line !h-1 !my-1"></div>
@@ -966,9 +1032,8 @@
                         `;
                     });
                     // 目前值
-                    const curColorClass = info.color === 'white' ? 'text-white' : 'current-num';
-                    const styleAttr = info.color !== 'white' ? `style="color: ${info.color};"` : '';
-                    html += `<span class="${curColorClass}" ${styleAttr}>${info.current}</span>`;
+                    const styleAttr = info.color !== 'white' ? `style="color: ${info.color};"` : 'style="color: white;"';
+                    html += `<span class="current-num" ${styleAttr}>${info.current}</span>`;
                     return html;
                 };
 
@@ -993,6 +1058,7 @@
                     `;
                 }
             });
+            updateAnswerAreaLayout();
         }
 
         // ==========================================================================
@@ -1008,13 +1074,6 @@
                 gameState.isMultiplication = true;
                 op.innerText = "×";
                 op.classList.add('active');
-                
-                // 僅在尚未獲得改號分數時加分
-                if (gameState.score < (gameState.round * 100)) { 
-                    gameState.score += 20;
-                    document.getElementById('score').innerText = gameState.score;
-                    spawnFloatingScore('operator', '+20 改乘號');
-                }
                 
                 showSuccessMsg("除號成功變乘號！請將除數上下顛倒吧！");
                 startHintTimer();
@@ -1438,6 +1497,195 @@
             msg.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles text-green-400 mr-2 animate-bounce"></i>${txt}`;
             msg.className = "text-2xl text-green-400 font-bold h-10 text-center celebration";
         }
+
+        // 動態根據分母是否為 1 來更新答案輸入區的版面
+        function updateAnswerAreaLayout() {
+            // 在除法模式且尚未切換為乘法時，原分母還不能視為最終分母
+            // 所以如果尚未改乘號，我們先維持預設的分數輸入框
+            if (gameState.mode === 'div' && !gameState.isMultiplication) {
+                const container = document.getElementById('answerAreaContainer');
+                if (container) {
+                    container.innerHTML = `
+                        <span class="text-xs font-bold text-slate-500 mb-1">輸入最簡分數</span>
+                        <input type="number" id="ansNum" class="w-24 h-24 bg-slate-950 border-4 border-slate-700 rounded-2xl text-center text-4xl font-black text-blue-400 input-glow" placeholder="">
+                        <div class="fraction-line !h-1 !my-1"></div>
+                        <input type="number" id="ansDen" class="w-24 h-24 bg-slate-950 border-4 border-slate-700 rounded-2xl text-center text-4xl font-black text-blue-400 input-glow" placeholder="">
+                    `;
+                }
+                return;
+            }
+
+            const cD = gameState.data.den1.current * gameState.data.den2.current;
+            const container = document.getElementById('answerAreaContainer');
+            if (!container) return;
+
+            if (cD === 1) {
+                // 如果分母乘積為 1，渲染單個整數輸入框，並帶有一個隱藏的分母為 1 元素
+                container.innerHTML = `
+                    <span class="text-xs font-bold text-slate-500 mb-1">輸入整數答案</span>
+                    <input type="number" id="ansNum" class="w-24 h-24 bg-slate-950 border-4 border-slate-700 rounded-2xl text-center text-4xl font-black text-blue-400 input-glow" placeholder="">
+                    <input type="hidden" id="ansDen" value="1">
+                `;
+            } else {
+                // 否則，渲染標準的分數輸入框
+                container.innerHTML = `
+                    <span class="text-xs font-bold text-slate-500 mb-1">輸入最簡分數</span>
+                    <input type="number" id="ansNum" class="w-24 h-24 bg-slate-950 border-4 border-slate-700 rounded-2xl text-center text-4xl font-black text-blue-400 input-glow" placeholder="">
+                    <div class="fraction-line !h-1 !my-1"></div>
+                    <input type="number" id="ansDen" class="w-24 h-24 bg-slate-950 border-4 border-slate-700 rounded-2xl text-center text-4xl font-black text-blue-400 input-glow" placeholder="">
+                `;
+            }
+        }
+
+        // ============================================================
+        // 背景音樂 (Web Audio API 合成)
+        // ============================================================
+        const bgMusic = (() => {
+            let ctx = null, gainNode = null, playing = false, muted = false;
+            let oscillators = [], lfoGain = null;
+
+            // 旋律音符序列 (Dorian 調式 8-bit 電玩風)
+            const melody = [
+                { note: 'D4', dur: 0.25 }, { note: 'E4', dur: 0.25 },
+                { note: 'F4', dur: 0.25 }, { note: 'A4', dur: 0.25 },
+                { note: 'A4', dur: 0.5  }, { note: 'G4', dur: 0.25 },
+                { note: 'F4', dur: 0.25 }, { note: 'E4', dur: 0.5  },
+                { note: 'D4', dur: 0.25 }, { note: 'F4', dur: 0.25 },
+                { note: 'A4', dur: 0.25 }, { note: 'C5', dur: 0.25 },
+                { note: 'B4', dur: 0.5  }, { note: 'A4', dur: 0.25 },
+                { note: 'G4', dur: 0.25 }, { note: 'A4', dur: 0.5  },
+            ];
+
+            const noteFreq = {
+                'C4':261.63,'D4':293.66,'E4':329.63,'F4':349.23,
+                'G4':392.00,'A4':440.00,'B4':493.88,'C5':523.25
+            };
+
+            const BPM = 132;
+            const beatDur = 60 / BPM;
+
+            function initCtx() {
+                if (ctx) return;
+                ctx = new (window.AudioContext || window.webkitAudioContext)();
+                gainNode = ctx.createGain();
+                gainNode.gain.value = 0.4;
+                gainNode.connect(ctx.destination);
+            }
+
+            function scheduleNote(freq, startTime, duration) {
+                const osc = ctx.createOscillator();
+                const envGain = ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.value = freq;
+                envGain.gain.setValueAtTime(0, startTime);
+                envGain.gain.linearRampToValueAtTime(0.5, startTime + 0.01);
+                envGain.gain.linearRampToValueAtTime(0.3, startTime + duration * 0.6);
+                envGain.gain.linearRampToValueAtTime(0, startTime + duration - 0.02);
+                osc.connect(envGain);
+                envGain.connect(gainNode);
+                osc.start(startTime);
+                osc.stop(startTime + duration);
+            }
+
+            function scheduleBass(startTime) {
+                // 簡單低音鼓點
+                const bassNotes = ['D3', 'A3', 'F3', 'A3'];
+                const bassFreqs = { 'D3': 146.83, 'A3': 220.00, 'F3': 174.61 };
+                bassNotes.forEach((n, i) => {
+                    const osc = ctx.createOscillator();
+                    const eg = ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.value = bassFreqs[n] || 146.83;
+                    const t = startTime + i * beatDur * 0.5;
+                    eg.gain.setValueAtTime(0.25, t);
+                    eg.gain.linearRampToValueAtTime(0, t + beatDur * 0.4);
+                    osc.connect(eg);
+                    eg.connect(gainNode);
+                    osc.start(t);
+                    osc.stop(t + beatDur * 0.4);
+                });
+            }
+
+            function playLoop() {
+                if (!ctx || !playing) return;
+                let t = ctx.currentTime + 0.05;
+                // 分配旋律
+                melody.forEach(({ note, dur }) => {
+                    const freq = noteFreq[note] || 440;
+                    scheduleNote(freq, t, dur * beatDur);
+                    t += dur * beatDur;
+                });
+                const loopDuration = melody.reduce((a, m) => a + m.dur * beatDur, 0);
+                // 低音 (每個 loop 4 個 bass notes)
+                scheduleBass(ctx.currentTime + 0.05);
+                setTimeout(playLoop, (loopDuration - 0.1) * 1000);
+            }
+
+            return {
+                start() {
+                    initCtx();
+                    if (ctx.state === 'suspended') ctx.resume();
+                    if (!playing) {
+                        playing = true;
+                        playLoop();
+                    }
+                },
+                stop() {
+                    playing = false;
+                    if (gainNode) gainNode.gain.value = 0;
+                },
+                setVolume(v) {
+                    if (!gainNode) initCtx();
+                    gainNode.gain.value = muted ? 0 : v;
+                },
+                toggleMute() {
+                    muted = !muted;
+                    if (gainNode) {
+                        const slider = document.getElementById('volSlider');
+                        gainNode.gain.value = muted ? 0 : (slider ? slider.value / 100 : 0.4);
+                    }
+                    return muted;
+                },
+                isMuted() { return muted; }
+            };
+        })();
+
+        // 音量滑桿同步
+        function setVolume(val) {
+            const v = val / 100;
+            bgMusic.setVolume(v);
+            // 更新滑桿填充色
+            const slider = document.getElementById('volSlider');
+            if (slider) slider.style.setProperty('--vol', val + '%');
+        }
+
+        function toggleMute() {
+            const muted = bgMusic.toggleMute();
+            const icon = document.getElementById('muteIcon');
+            if (icon) {
+                icon.className = muted ? 'fa-solid fa-volume-xmark' : 'fa-solid fa-music';
+                icon.style.color = muted ? '#94a3b8' : '#facc15';
+            }
+        }
+
+        // 初始化滑桿填充色
+        (function initSlider() {
+            const slider = document.getElementById('volSlider');
+            if (slider) slider.style.setProperty('--vol', slider.value + '%');
+        })();
+
+        // 第一次使用者互動後啟動背景音樂
+        (function startBGM() {
+            const startOnce = () => {
+                bgMusic.start();
+                setVolume(document.getElementById('volSlider')?.value || 40);
+                document.removeEventListener('click', startOnce);
+                document.removeEventListener('keydown', startOnce);
+            };
+            document.addEventListener('click', startOnce);
+            document.addEventListener('keydown', startOnce);
+        })();
+
     </script>
 </body>
 </html>
