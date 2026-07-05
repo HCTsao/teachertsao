@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -43,6 +43,10 @@
         .animate-deal-1 { animation: dealTo1 0.5s cubic-bezier(0.1, 0.5, 0.5, 1) forwards; --rot: -20deg; }
         .animate-deal-2 { animation: dealTo2 0.5s cubic-bezier(0.1, 0.5, 0.5, 1) forwards; --rot: 45deg; }
         .animate-deal-3 { animation: dealTo3 0.5s cubic-bezier(0.1, 0.5, 0.5, 1) forwards; --rot: -10deg; }
+
+        /* 拍牌波紋動畫 */
+        @keyframes slapRipple { 0% { transform: translate(-50%,-50%) scale(0.2); opacity: 0.9; } 100% { transform: translate(-50%,-50%) scale(2.8); opacity: 0; } }
+        .slap-ripple { position: absolute; top: 50%; left: 50%; width: 120px; height: 120px; border-radius: 50%; background: rgba(251,191,36,0.7); pointer-events: none; animation: slapRipple 0.5s ease-out forwards; }
 
         * { touch-action: manipulation; }
         .slap-area { touch-action: none !important; }
@@ -102,23 +106,13 @@
         };
 
         const getChantText = (m, s, p) => {
-            const chM = toChineseNum(m);
-            const chS = toChineseNum(s);
-            const chP = toChineseNum(p);
-            if (s === 10) {
-                return chM + "\u5341\u5f97" + chP;
-            }
-            if (p < 10) {
-                if (s === 1) {
-                    return chM + "\u4e00" + chP;
-                }
-                return chM + chS + "\u5f97" + chP;
-            }
-            return chM + chS + chP;
+            // Simple concatenation: e.g. 3x1=3 -> "\u4e09\u4e00\u4e09", 3x4=12 -> "\u4e09\u56db\u5341\u4e8c"
+            return toChineseNum(m) + toChineseNum(s) + toChineseNum(p);
         };
 
         const App = () => {
-            const [gameState, setGameState] = useState('menu'); 
+            const [gameState, setGameState] = useState('menu');
+            const [slapRipple, setSlapRipple] = useState(false);
             const [scale, setScale] = useState(1);
             useEffect(() => {
                 const handleResize = () => {
@@ -212,9 +206,11 @@
                 for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
                 const newPlayers = [];
                 for (let i = 0; i < PLAYERS_COUNT; i++) { newPlayers.push({ id: i, name: i === 0 ? "你" : `電腦 ${i}`, cards: [], isAI: i !== 0 }); }
+                const startingPlayer = Math.floor(Math.random() * PLAYERS_COUNT);
                 setMainDeck(deck); setPlayers(newPlayers); setCenterPile([]);
                 setCurrentStep(difficulty === 'easy' ? 1 : 10); setCurrentCall(null);
                 setSlapResults([]); setWinner(null); setPunishingCard(null); setErrorMsg(""); setShowIdleHint(false); aiSlapScheduledRef.current = false;
+                setTurn(startingPlayer);
                 setGameState('dealing'); setDealingProgress(0);
             };
 
@@ -386,6 +382,10 @@
                     setIsAnimating(false);
                     setGameState('slapping');
 
+                    // Trigger slap ripple animation
+                    setSlapRipple(true);
+                    setTimeout(() => setSlapRipple(false), 500);
+
                     setSlapResults([playerIndex]);
                     playSoundEffect('slap');
 
@@ -542,13 +542,13 @@
                             const active = turn === idx;
                             const isCallForMe = currentCall && currentCall.playerIdx === idx;
                             
-                            const unifiedCallBoxClass = "bg-yellow-400 text-slate-900 px-8 py-6 rounded-[40px] text-5xl font-black shadow-2xl border-4 border-white whitespace-nowrap";
+                            const unifiedCallBoxClass = "bg-yellow-400 text-slate-900 px-5 py-3 rounded-[30px] text-3xl font-black shadow-2xl border-4 border-white whitespace-nowrap";
 
                             return (
                                 <Fragment key={player.id}>
                                     <div className={`absolute ${cfg.pos} flex flex-col items-center z-20`}>
                                         <div className="relative">
-                                            <div className={`w-20 h-20 rounded-full border-4 flex items-center justify-center text-4xl bg-white shadow-xl transition-all duration-300 ${active ? 'scale-125 border-yellow-400 ring-4 ring-yellow-400/30' : 'border-slate-200'}`}>
+                                            <div className={`w-14 h-14 rounded-full border-4 flex items-center justify-center text-2xl bg-white shadow-xl transition-all duration-300 ${active ? 'scale-125 border-yellow-400 ring-4 ring-yellow-400/30' : 'border-slate-200'}`}>
                                                 {idx === 0 ? "\ud83d\ude4b" : "\ud83e\udd16"}
                                             </div>
                                             {/* ?餉?摰嗅撘?雿?頛?*/}
@@ -563,7 +563,7 @@
                                         <div className="mt-2 bg-slate-900/80 backdrop-blur-sm text-white px-4 py-1 rounded-full text-sm font-bold border border-white/20 text-center min-w-[120px]">
                                             {player.name} {player.cards.length === 0 ? "\uff08\u6436\u62cd\u596a\u51a0\uff09" : "(" + player.cards.length + "\u5f35)"}
                                         </div>
-                                        <div className="relative mt-6 w-24 h-32 flex justify-center items-center">
+                                        <div className="relative mt-3 w-16 h-24 flex justify-center items-center">
                                             <div className={`relative w-full h-full transition-all duration-500 ${idx === 0 && gameState === 'playing' && player.cards.length > 0 ? 'hover:scale-105 active:scale-95 cursor-pointer' : ''}`} onClick={() => idx === 0 && playTurn(true)}>
                                                 {player.cards.length > 0 ? [...Array(Math.min(Math.ceil(player.cards.length / 1.5), 15))].map((_, i) => {
                                                     const cd = player.cards[player.cards.length - 1 - i] || {};
@@ -593,24 +593,34 @@
                                 </Fragment>
                             );
                         })}
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-64 h-80">
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-52 h-64">
                             <div className={`relative w-full h-full bg-emerald-800/40 rounded-[40px] border-4 border-dashed border-white/20 flex items-center justify-center cursor-pointer transition-colors slap-area ${gameState === 'slapping' ? 'bg-red-500/30 border-red-500' : ''}`} onClick={() => handleSlap(0)}>
                                 {isDealing ? (
-                                    <div className="relative w-48 h-64">
+                                    <div className="relative w-36 h-48">
                                         {[...Array(Math.min(mainDeck.length, 20))].map((_, i) => (<div key={i} className="absolute inset-0 bg-blue-500 rounded-2xl shadow-xl border-2 border-blue-600" style={{ top: -i * 1.5, left: i * 0.2, zIndex: 100 - i }} />))}
-                                        {dealingProgress < 60 && (<div className={`fixed top-1/2 left-1/2 w-24 h-32 bg-blue-500 rounded-xl border-2 border-blue-600 shadow-lg z-[200] animate-deal-${dealingProgress % 4}`} />)}
+                                        {dealingProgress < 60 && (<div className={`fixed top-1/2 left-1/2 w-20 h-28 bg-blue-500 rounded-xl border-2 border-blue-600 shadow-lg z-[200] animate-deal-${dealingProgress % 4}`} />)}
                                     </div>
-                                ) : (centerPile.length > 0 || flyingCard) && !punishingCard ? (
-                                    <div className="relative w-48 h-64">
-                                        {centerPile.slice(-8).map((card, i) => (<div key={card.id} className="absolute inset-0 bg-white rounded-2xl shadow-xl flex items-center justify-center text-7xl font-black text-slate-900 border-4 border-slate-50" style={{ zIndex: i }}>{i === centerPile.slice(-8).length - 1 ? card.value : ""}</div>))}
+                                ) : punishingCard ? (
+                                    <div className="relative w-36 h-48">
+                                        {punishingCard.pileSnapshot.map((card, i) => (
+                                            <div key={card.id || i} className={`absolute inset-0 bg-white rounded-2xl shadow-xl flex items-center justify-center text-5xl font-black text-slate-900 border-4 border-slate-50 animate-return-${punishingCard.toPlayer}`} style={{ zIndex: i }}>
+                                                {i === punishingCard.pileSnapshot.length - 1 ? card.value : ""}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (centerPile.length > 0 || flyingCard) ? (
+                                    <div className="relative w-36 h-48">
+                                        {centerPile.slice(-8).map((card, i) => (<div key={card.id} className="absolute inset-0 bg-white rounded-2xl shadow-xl flex items-center justify-center text-5xl font-black text-slate-900 border-4 border-slate-50" style={{ zIndex: i }}>{i === centerPile.slice(-8).length - 1 ? card.value : ""}</div>))}
                                         {flyingCard && (
-                                            <div className={`absolute inset-0 bg-white rounded-2xl shadow-2xl flex items-center justify-center text-7xl font-black text-slate-900 z-[100] border-4 border-slate-200 pointer-events-none animate-fly-${flyingCard.fromPlayer}`}>
+                                            <div className={`absolute inset-0 bg-white rounded-2xl shadow-2xl flex items-center justify-center text-5xl font-black text-slate-900 z-[100] border-4 border-slate-200 pointer-events-none animate-fly-${flyingCard.fromPlayer}`}>
                                                 {flyingCard.value}
                                             </div>
                                         )}
                                     </div>
-                                ) : (!punishingCard && gameState !== 'dealing') && (<div className="text-white/10 font-black text-xl uppercase tracking-widest text-center text-slate-300">{"\u62cd\u724c\u5340"}</div>)}
-                                {errorMsg && (<div className="absolute z-[160] bg-yellow-400 px-6 py-4 rounded-xl border-4 border-white shadow-2xl animate-pulse whitespace-nowrap pointer-events-none text-center text-slate-900"><h3 className="text-2xl font-black">{errorMsg}</h3></div>)}
+                                ) : (gameState !== 'dealing') && (<div className="text-white/10 font-black text-lg uppercase tracking-widest text-center text-slate-300">{"\u62cd\u724c\u5340"}</div>)}
+                                {/* 拍牌波紋效果 */}
+                                {slapRipple && <div className="slap-ripple" />}
+                                {errorMsg && (<div className="absolute z-[160] bg-yellow-400 px-4 py-3 rounded-xl border-4 border-white shadow-2xl animate-pulse whitespace-nowrap pointer-events-none text-center text-slate-900"><h3 className="text-xl font-black">{errorMsg}</h3></div>)}
                             </div>
                         </div>
                         {showIdleHint && (<div className="fixed bottom-40 left-1/2 -translate-x-1/2 z-[100] bg-white text-emerald-800 px-6 py-3 rounded-full shadow-2xl border-4 border-yellow-400 font-black text-2xl flex items-center gap-2 animate-pulse text-center"><AlertCircle className="text-yellow-500" /> {"\u8f2a\u5230\u4f60\u4e86\uff01"}</div>)}
