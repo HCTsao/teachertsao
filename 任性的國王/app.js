@@ -115,6 +115,8 @@ function initDOMElements() {
     DOM.mySelectValue = document.getElementById('my-select-value');
     DOM.mySelectDecimal = document.getElementById('my-select-decimal');
     DOM.myCardCount = document.getElementById('my-card-count');
+    DOM.bgMusic = document.getElementById('bg-music');
+    DOM.volumeSlider = document.getElementById('volume-slider');
     
     DOM.currentTargetValue = document.getElementById('current-target-value');
     DOM.currentTargetDesc = document.getElementById('current-target-desc');
@@ -231,6 +233,24 @@ function setupEvents() {
             location.reload();
         }
     });
+
+    // 音量控制
+    if (DOM.volumeSlider && DOM.bgMusic) {
+        DOM.volumeSlider.addEventListener('input', (e) => {
+            const vol = parseFloat(e.target.value);
+            DOM.bgMusic.volume = vol;
+            const speakerIcon = DOM.volumeSlider.previousElementSibling;
+            if (speakerIcon) {
+                if (vol === 0) {
+                    speakerIcon.className = 'fa-solid fa-volume-xmark';
+                } else if (vol < 0.5) {
+                    speakerIcon.className = 'fa-solid fa-volume-low';
+                } else {
+                    speakerIcon.className = 'fa-solid fa-volume-high';
+                }
+            }
+        });
+    }
 
     // 揭曉角色 (文字版中已無此 DOM 元素，做安全保護)
     if (DOM.roleCardInner) {
@@ -400,6 +420,14 @@ function rollAllDice() {
 
 // ==================== 5. 遊戲啟動 ====================
 function startGame(starterId) {
+    // 播放背景音樂
+    if (DOM.bgMusic) {
+        DOM.bgMusic.volume = parseFloat(DOM.volumeSlider ? DOM.volumeSlider.value : 0.5);
+        DOM.bgMusic.play().catch(err => {
+            console.log("Autoplay blocked or audio load error:", err);
+        });
+    }
+
     gameState.gameActive = true;
     addLog('system', '遊戲開始！正在洗牌並分發角色身分...');
     
