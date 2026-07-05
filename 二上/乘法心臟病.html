@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -973,8 +973,39 @@
             };
 
             const hostExecuteSlap = (slapPlayerIdx) => {
-                if (punishingCard || centerPile.length === 0) return;
-                const isMatch = centerPile[centerPile.length - 1].value === multiplier * currentStep;
+                if (punishingCard) return;
+                const currentCardValue = flyingCard ? flyingCard.value : (centerPile.length > 0 ? centerPile[centerPile.length - 1].value : null);
+                if (currentCardValue === null) return;
+                const isMatch = currentCardValue === multiplier * currentStep;
+                
+                if (gameState === 'playing' && isMatch) {
+                    if (isFlipResolvedRef.current) return;
+                    isFlipResolvedRef.current = true;
+                    
+                    const card = flippedCardRef.current;
+                    const newPile = [...centerPile, card];
+                    
+                    setCenterPile(newPile);
+                    setFlyingCard(null);
+                    setIsAnimating(false);
+                    setGameState('slapping');
+                    
+                    setSlapResults([slapPlayerIdx]);
+                    playSoundEffect('slap');
+                    
+                    broadcastStateUpdate({
+                        players,
+                        centerPile: newPile,
+                        turn,
+                        currentStep,
+                        currentCall,
+                        flyingCard: null,
+                        gameState: 'slapping',
+                        slapResults: [slapPlayerIdx],
+                        isAnimating: false
+                    });
+                    return;
+                }
                 
                 if (gameState === 'slapping') {
                     setSlapResults(prev => {
@@ -1042,6 +1073,15 @@
                         playSoundEffect('error');
                         setErrorMsg(`${players[slapPlayerIdx].name} 拍錯了！`);
                         setSlapResults([slapPlayerIdx]);
+                        
+                        if (!isFlipResolvedRef.current) {
+                            isFlipResolvedRef.current = true;
+                            const card = flippedCardRef.current;
+                            const newPile = [...centerPile, card];
+                            setCenterPile(newPile);
+                            setFlyingCard(null);
+                            setIsAnimating(false);
+                        }
                         
                         const punishing = { toPlayer: slapPlayerIdx, pileSnapshot: centerPile.slice(-8) };
                         setPunishingCard(punishing);
@@ -1189,15 +1229,38 @@
             };
 
             const handleSlap = (playerIndex) => {
-                if (punishingCard || centerPile.length === 0) return;
-                const isMatch = centerPile.length > 0 && centerPile[centerPile.length - 1].value === multiplier * currentStep;
-                
+                if (punishingCard) return;
+                const currentCardValue = flyingCard ? flyingCard.value : (centerPile.length > 0 ? centerPile[centerPile.length - 1].value : null);
+                if (currentCardValue === null) return;
+                const isMatch = currentCardValue === multiplier * currentStep;
+
+                if (gameState === 'playing' && isMatch) {
+                    if (isFlipResolvedRef.current) return;
+                    isFlipResolvedRef.current = true;
+
+                    const card = flippedCardRef.current;
+                    const newPile = [...centerPile, card];
+                    setCenterPile(newPile);
+                    setFlyingCard(null);
+                    setIsAnimating(false);
+                    setGameState('slapping');
+
+                    setSlapResults([playerIndex]);
+                    playSoundEffect('slap');
+
+                    if (players[playerIndex].cards.length === 0) {
+                        setWinner(players[playerIndex]);
+                        setGameState('gameOver');
+                    }
+                    return;
+                }
+
                 if (gameState === 'slapping') {
                     setSlapResults(prev => {
                         if (prev.includes(playerIndex)) return prev;
                         const newResults = [...prev, playerIndex];
                         playSoundEffect('slap');
-                        
+
                         if (players[playerIndex].cards.length === 0 && newResults.length <= 3) {
                             setWinner(players[playerIndex]);
                             setGameState('gameOver');
@@ -1212,7 +1275,20 @@
                     });
                 } else if (gameState === 'playing' && !isMatch) {
                     if (slapResults.length === 0) {
-                        playSoundEffect('error'); setErrorMsg(`${players[playerIndex].name} 拍錯了！`); setSlapResults([playerIndex]); executePenalty(playerIndex);
+                        playSoundEffect('error'); 
+                        setErrorMsg(`${players[playerIndex].name} 拍錯了！`); 
+                        setSlapResults([playerIndex]); 
+
+                        if (!isFlipResolvedRef.current) {
+                            isFlipResolvedRef.current = true;
+                            const card = flippedCardRef.current;
+                            const newPile = [...centerPile, card];
+                            setCenterPile(newPile);
+                            setFlyingCard(null);
+                            setIsAnimating(false);
+                        }
+
+                        executePenalty(playerIndex);
                     }
                 }
             };
