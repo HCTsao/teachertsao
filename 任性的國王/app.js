@@ -800,20 +800,30 @@ function setClockwiseTurnOrder(starterId) {
 function updateRolePanel() {
     const player = gameState.players[0];
     const displayEl = document.getElementById('my-role-text-display');
-    if (!displayEl) return;
+    const displayElMobile = document.getElementById('my-role-text-display-mobile');
 
     const emoji = player.role ? getRoleEmoji(player.role.name) : "👤";
     const roleName = player.role ? player.role.name : "未知";
     const roleDesc = player.role ? player.role.desc : "";
 
+    const setHTML = (el) => {
+        if (!el) return;
+        if (player.skillUsed) {
+            el.innerHTML = `${emoji} <span class="role-name-bold">【${roleName}】</span> <span class="role-skill-used">(技能已使用)</span>`;
+        } else {
+            el.innerHTML = `${emoji} <span class="role-name-bold">【${roleName}】</span> <span class="role-skill-desc">${roleDesc}</span>`;
+        }
+    };
+
+    setHTML(displayEl);
+    setHTML(displayElMobile);
+
     if (player.skillUsed) {
-        displayEl.innerHTML = `${emoji} <span class="role-name-bold">【${roleName}】</span> <span class="role-skill-used">(技能已使用)</span>`;
         DOM.btnUseSkill.textContent = "技能已使用";
         DOM.btnUseSkill.classList.add('btn-disabled');
         DOM.btnUseSkill.disabled = true;
         DOM.btnUseSkill.style.animation = 'none';
     } else {
-        displayEl.innerHTML = `${emoji} <span class="role-name-bold">【${roleName}】</span> <span class="role-skill-desc">${roleDesc}</span>`;
         
         // 判斷技能是否可以使用
         let skillCanUse = false;
