@@ -59,9 +59,9 @@ const CARD_DESC = {
 let gameState = {
     players: [
         { id: 0, name: '您', cards: [], role: null, roleRevealed: false, skillUsed: false, isPass: false },
-        { id: 1, name: '電腦 樂樂', cards: [], role: null, roleRevealed: false, skillUsed: false, isPass: false },
-        { id: 2, name: '電腦 奇奇', cards: [], role: null, roleRevealed: false, skillUsed: false, isPass: false },
-        { id: 3, name: '電腦 糖糖', cards: [], role: null, roleRevealed: false, skillUsed: false, isPass: false }
+        { id: 1, name: '電腦1', cards: [], role: null, roleRevealed: false, skillUsed: false, isPass: false },
+        { id: 2, name: '電腦2', cards: [], role: null, roleRevealed: false, skillUsed: false, isPass: false },
+        { id: 3, name: '電腦3', cards: [], role: null, roleRevealed: false, skillUsed: false, isPass: false }
     ],
     deck: [],
     discardPile: [],
