@@ -621,12 +621,15 @@ function updateUI() {
     // 玩家座位當前輪次亮起
     const mySeat = document.getElementById('seat-0');
     const myRoleBox = document.querySelector('.role-text-box');
-    if (gameState.turnOrder[gameState.currentTurnIndex] === 0) {
+    const playerTurnHint = document.getElementById('player-turn-hint');
+    if (gameState.turnOrder[gameState.currentTurnIndex] === 0 && gameState.gameActive) {
         if (mySeat) mySeat.classList.add('current-turn');
         if (myRoleBox) myRoleBox.classList.add('current-turn');
+        if (playerTurnHint) playerTurnHint.classList.remove('hidden');
     } else {
         if (mySeat) mySeat.classList.remove('current-turn');
         if (myRoleBox) myRoleBox.classList.remove('current-turn');
+        if (playerTurnHint) playerTurnHint.classList.add('hidden');
     }
 
     // 渲染 Pass 狀態提示標籤
