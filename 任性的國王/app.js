@@ -86,10 +86,24 @@ let gameState = {
 let cardUidCounter = 0;
 
 // ==================== 3. 初始化與設定 ====================
+let mainMenuMusicStarted = false;
+
 document.addEventListener('DOMContentLoaded', () => {
     initDOMElements();
     setupEvents();
     showMainMenu();
+    
+    // 嘗試直接播放音樂 (部分環境支援)
+    playMainMenuMusic();
+    
+    // 點擊或觸控即解鎖播放音樂
+    const unlockAudio = () => {
+        playMainMenuMusic();
+        document.removeEventListener('click', unlockAudio);
+        document.removeEventListener('touchstart', unlockAudio);
+    };
+    document.addEventListener('click', unlockAudio);
+    document.addEventListener('touchstart', unlockAudio);
 });
 
 // DOM 元素快取
@@ -291,6 +305,18 @@ function showMainMenu() {
     }
 }
 
+function playMainMenuMusic() {
+    if (mainMenuMusicStarted) return;
+    if (DOM.bgMusic) {
+        DOM.bgMusic.volume = parseFloat(DOM.volumeSlider ? DOM.volumeSlider.value : 0.5);
+        DOM.bgMusic.play().then(() => {
+            mainMenuMusicStarted = true;
+        }).catch(err => {
+            console.log("Autoplay blocked:", err);
+        });
+    }
+}
+
 // ==================== 4. 擲骰子決定出牌順序 ====================
 function showDiceModal() {
     const modal = document.getElementById('modal-dice');
@@ -420,8 +446,9 @@ function rollAllDice() {
 
 // ==================== 5. 遊戲啟動 ====================
 function startGame(starterId) {
-    // 播放背景音樂
+    // 重新播放背景音樂 (回到 0 秒起播)
     if (DOM.bgMusic) {
+        DOM.bgMusic.currentTime = 0;
         DOM.bgMusic.volume = parseFloat(DOM.volumeSlider ? DOM.volumeSlider.value : 0.5);
         DOM.bgMusic.play().catch(err => {
             console.log("Autoplay blocked or audio load error:", err);
