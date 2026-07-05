@@ -13,6 +13,10 @@
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- Firebase Web SDK (v8.10.1 Namespace version) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
     <style>
         body {
             font-family: 'Outfit', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
@@ -404,6 +408,22 @@
                 <i class="fa-solid fa-chevron-right text-slate-500"></i>
             </button>
         </div>
+
+        <!-- 主選單排行榜 -->
+        <div class="bg-black/40 border border-white/5 rounded-2xl p-5 text-left mt-6">
+            <h3 class="text-yellow-400 font-black mb-3 flex items-center gap-2">
+                <i class="fa-solid fa-trophy text-amber-400 animate-pulse"></i> 英雄排行榜
+            </h3>
+            <!-- 分頁切換按鈕 -->
+            <div class="flex gap-2 mb-3 bg-slate-950/80 p-1 rounded-xl border border-white/5 text-xs font-bold">
+                <button id="tabMul" onclick="switchLobbyLeaderboard('mul')" class="flex-1 py-1.5 rounded-lg text-center bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-all">分數乘法篇</button>
+                <button id="tabDiv" onclick="switchLobbyLeaderboard('div')" class="flex-1 py-1.5 rounded-lg text-center text-slate-400 hover:text-slate-200 transition-all">分數除法篇</button>
+            </div>
+            <!-- 排行榜清單 -->
+            <ul id="lobbyLeaderboard" class="space-y-2">
+                <!-- 動態載入 -->
+            </ul>
+        </div>
     </div>
 
     <!-- ================== 遊戲主畫面 (隱藏，啟動時顯示) ================== -->
@@ -781,7 +801,8 @@
             isMultiplication: false,
             flipped: { num2: false, den2: false },
             originalTarget: { num2: 0, den2: 0 },
-            initialDivisor: { num: 0, den: 0 }
+            initialDivisor: { num: 0, den: 0 },
+            isFirebaseActive: false
         };
 
         function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
@@ -826,6 +847,7 @@
             document.getElementById('gameScreen').classList.add('hidden');
             document.getElementById('gameOverModal').classList.add('hidden');
             document.getElementById('mainLobby').classList.remove('hidden');
+            renderLobbyLeaderboard();
         }
 
         function resetWholeGame() {
@@ -1384,40 +1406,159 @@
             updateLeaderboard();
         }
 
+        // ==========================================
+        // Firebase 伺服器設定 (連接實時資料庫)
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyCFNaVRETt862_As1hF7Mfyr22pKM5-lvk",
+            authDomain: "chickenrabbit-ea442.firebaseapp.com",
+            databaseURL: "https://chickenrabbit-ea442-default-rtdb.firebaseio.com",
+            projectId: "chickenrabbit-ea442",
+            storageBucket: "chickenrabbit-ea442.appspot.com",
+            messagingSenderId: "65728951973",
+            appId: "1:65728951973:web:efff912caf5f6f185abf4c"
+        };
+
+        // 初始化 Firebase (若有載入 SDK 且有正確的金鑰)
+        (function initFirebase() {
+            if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "") {
+                try {
+                    firebase.initializeApp(firebaseConfig);
+                    gameState.isFirebaseActive = true;
+                    console.log("Firebase 排行榜伺服器初始化成功！");
+                } catch (e) {
+                    console.error("Firebase 初始化失敗", e);
+                }
+            }
+        })();
+
+        let lobbyActiveTab = 'mul'; // 'mul' (乘法) 或 'div' (除法)
+
+        function switchLobbyLeaderboard(mode) {
+            lobbyActiveTab = mode;
+            const tabMul = document.getElementById('tabMul');
+            const tabDiv = document.getElementById('tabDiv');
+            if (mode === 'mul') {
+                tabMul.className = "flex-1 py-1.5 rounded-lg text-center bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-all";
+                tabDiv.className = "flex-1 py-1.5 rounded-lg text-center text-slate-400 hover:text-slate-200 transition-all";
+            } else {
+                tabMul.className = "flex-1 py-1.5 rounded-lg text-center text-slate-400 hover:text-slate-200 transition-all";
+                tabDiv.className = "flex-1 py-1.5 rounded-lg text-center bg-blue-500/20 text-blue-300 border border-blue-500/30 transition-all";
+            }
+            renderLobbyLeaderboard();
+        }
+
+        function renderLobbyLeaderboard() {
+            const list = document.getElementById('lobbyLeaderboard');
+            if (!list) return;
+
+            list.innerHTML = '<li class="text-center text-slate-500 py-3 text-xs"><i class="fa-solid fa-spinner animate-spin mr-1"></i> 排行榜載入中...</li>';
+
+            const dbPath = lobbyActiveTab === 'mul' ? 'leaderboard_mul' : 'leaderboard_div';
+            const storageKey = lobbyActiveTab === 'mul' ? 'math_adventure_scores_mul' : 'math_adventure_scores_div';
+
+            if (gameState.isFirebaseActive) {
+                firebase.database().ref(dbPath).orderByChild('score').limitToLast(5).once('value')
+                    .then((snapshot) => {
+                        let scores = [];
+                        snapshot.forEach((child) => {
+                            scores.push(child.val());
+                        });
+                        scores.reverse(); // 由大到小排序
+                        displayLeaderboardList(list, scores);
+                    })
+                    .catch((err) => {
+                        console.error("Firebase read failed, using LocalStorage fallback", err);
+                        const scores = JSON.parse(localStorage.getItem(storageKey) || '[]');
+                        displayLeaderboardList(list, scores);
+                    });
+            } else {
+                const scores = JSON.parse(localStorage.getItem(storageKey) || '[]');
+                displayLeaderboardList(list, scores);
+            }
+        }
+
+        function displayLeaderboardList(listEl, scores) {
+            const rankMedals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+            const isLobby = listEl.id === 'lobbyLeaderboard';
+            const paddingClass = isLobby ? 'px-3 py-2 text-sm' : 'px-4 py-2.5 text-base';
+            const scoreClass = isLobby ? 'font-black text-green-400' : 'font-black text-xl text-green-400';
+            
+            listEl.innerHTML = scores.map((s, i) => `
+                <li class="flex justify-between items-center bg-white/5 border border-white/5 rounded-xl ${paddingClass}">
+                    <span class="font-extrabold flex items-center gap-2">
+                        <span>${rankMedals[i]}</span>
+                        <span class="text-white">${s.name}</span>
+                    </span>
+                    <span class="${scoreClass}">${s.score} 分</span>
+                </li>
+            `).join('') || '<li class="text-center text-slate-500 py-4 font-bold text-xs">目前尚無挑戰紀錄</li>';
+        }
+
         function submitScore() {
             synth.playClick();
             const nameEl = document.getElementById('playerName');
             const name = nameEl.value.trim() || "匿名冒險者";
             
+            const dbPath = gameState.mode === 'mul' ? 'leaderboard_mul' : 'leaderboard_div';
             const storageKey = gameState.mode === 'mul' ? 'math_adventure_scores_mul' : 'math_adventure_scores_div';
-            let scores = JSON.parse(localStorage.getItem(storageKey) || '[]');
             
-            scores.push({ name, score: gameState.score, date: Date.now() });
-            scores.sort((a, b) => b.score - a.score);
-            
-            // 僅保留前五名
-            localStorage.setItem(storageKey, JSON.stringify(scores.slice(0, 5)));
+            const record = { name, score: gameState.score, date: Date.now() };
+
+            // 1. 本地 LocalStorage 儲存備份
+            let localScores = JSON.parse(localStorage.getItem(storageKey) || '[]');
+            localScores.push(record);
+            localScores.sort((a, b) => b.score - a.score);
+            localStorage.setItem(storageKey, JSON.stringify(localScores.slice(0, 5)));
+
+            // 2. Firebase 實時上傳
+            if (gameState.isFirebaseActive) {
+                firebase.database().ref(dbPath).push(record)
+                    .then(() => {
+                        console.log("成績已成功上傳至 Firebase！");
+                        updateLeaderboard();
+                        renderLobbyLeaderboard();
+                    })
+                    .catch((err) => {
+                        console.error("Firebase 上傳失敗", err);
+                        updateLeaderboard();
+                        renderLobbyLeaderboard();
+                    });
+            } else {
+                updateLeaderboard();
+                renderLobbyLeaderboard();
+            }
             
             document.getElementById('nameInputArea').classList.add('hidden');
-            updateLeaderboard();
         }
 
         function updateLeaderboard() {
+            const dbPath = gameState.mode === 'mul' ? 'leaderboard_mul' : 'leaderboard_div';
             const storageKey = gameState.mode === 'mul' ? 'math_adventure_scores_mul' : 'math_adventure_scores_div';
-            const scores = JSON.parse(localStorage.getItem(storageKey) || '[]');
             const list = document.getElementById('leaderboard');
-            
-            const rankMedals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
-            
-            list.innerHTML = scores.map((s, i) => `
-                <li class="flex justify-between items-center bg-white/5 border border-white/5 rounded-xl px-4 py-2.5">
-                    <span class="font-extrabold flex items-center gap-2">
-                        <span class="text-lg">${rankMedals[i]}</span>
-                        <span class="text-white">${s.name}</span>
-                    </span>
-                    <span class="font-black text-xl text-green-400">${s.score} 分</span>
-                </li>
-            `).join('') || '<li class="text-center text-slate-500 py-4 font-bold">目前尚無挑戰紀錄</li>';
+            if (!list) return;
+
+            list.innerHTML = '<li class="text-center text-slate-500 py-4 font-bold"><i class="fa-solid fa-spinner animate-spin mr-1"></i> 載入中...</li>';
+
+            if (gameState.isFirebaseActive) {
+                firebase.database().ref(dbPath).orderByChild('score').limitToLast(5).once('value')
+                    .then((snapshot) => {
+                        let scores = [];
+                        snapshot.forEach((child) => {
+                            scores.push(child.val());
+                        });
+                        scores.reverse();
+                        displayLeaderboardList(list, scores);
+                    })
+                    .catch((err) => {
+                        console.error("Firebase read failed for game-over modal", err);
+                        const scores = JSON.parse(localStorage.getItem(storageKey) || '[]');
+                        displayLeaderboardList(list, scores);
+                    });
+            } else {
+                const scores = JSON.parse(localStorage.getItem(storageKey) || '[]');
+                displayLeaderboardList(list, scores);
+            }
         }
 
         // ==========================================================================
@@ -1614,6 +1755,11 @@
             };
             document.addEventListener('click', startOnce);
             document.addEventListener('keydown', startOnce);
+        })();
+
+        // 頁面載入時初始化載入大廳排行榜
+        (function initLobbyLeaderboard() {
+            renderLobbyLeaderboard();
         })();
 
     </script>
