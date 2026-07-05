@@ -1961,6 +1961,60 @@ function executeLuckyStarSkill(luckyId) {
         const maxPick = Math.min(3, gameState.discardPile.length);
         
         document.getElementById('lucky-modal-title').textContent = `幸運星：從棄牌堆挑選 ${maxPick} 張牌`;
+        
+        // 渲染當前目標分數與手牌預覽
+        const targetInfo = document.getElementById('lucky-target-info');
+        if (targetInfo) {
+            if (gameState.roundTargetCombination) {
+                const count = gameState.roundTargetCombination.count;
+                const den = gameState.roundTargetCombination.den;
+                const mult = gameState.roundTargetCombination.mult;
+                let targetText = `${count}/${den}`;
+                if (mult > 1) {
+                    targetText += ` (使用 ${mult} 倍卡)`;
+                }
+                targetInfo.innerHTML = `🎯 <b>當前目標分數：</b><span style="color: var(--color-gold); font-size: 1.1rem;">${targetText}</span>`;
+            } else {
+                targetInfo.innerHTML = `🎯 <b>當前目標分數：</b><span style="color: var(--color-muted);">無 (自由起出首家出牌)</span>`;
+            }
+        }
+        
+        const handPreview = document.getElementById('lucky-hand-cards-preview');
+        if (handPreview) {
+            handPreview.innerHTML = '';
+            if (gameState.players[0].cards.length === 0) {
+                handPreview.innerHTML = `<span style="color: var(--color-muted); font-size: 0.85rem; padding: 0.2rem 0.5rem;">手牌為空</span>`;
+            } else {
+                gameState.players[0].cards.forEach(c => {
+                    const cardBadge = document.createElement('span');
+                    cardBadge.style.cssText = `
+                        font-size: 0.82rem;
+                        font-weight: bold;
+                        padding: 0.2rem 0.5rem;
+                        background: #f1f5f9;
+                        border: 1px solid #cbd5e1;
+                        border-radius: 8px;
+                        color: var(--text-light);
+                        display: inline-block;
+                    `;
+                    if (c.type === 'multiplier') {
+                        cardBadge.textContent = `${c.mult}倍卡`;
+                        cardBadge.style.background = '#fffbeb';
+                        cardBadge.style.borderColor = '#fef08a';
+                        cardBadge.style.color = '#ca8a04';
+                    } else if (c.type === 'restrict') {
+                        cardBadge.textContent = `${c.display} (限)`;
+                        cardBadge.style.background = '#fef2f2';
+                        cardBadge.style.borderColor = '#fecaca';
+                        cardBadge.style.color = '#ef4444';
+                    } else {
+                        cardBadge.textContent = c.display;
+                    }
+                    handPreview.appendChild(cardBadge);
+                });
+            }
+        }
+
         document.getElementById('lucky-modal-desc').textContent = `請點選 ${maxPick} 張卡牌加入手牌：`;
 
         // 列出棄牌堆中不重複或所有牌
