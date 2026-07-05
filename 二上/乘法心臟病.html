@@ -1,16 +1,11 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>乘法心臟病</title>
-    <!-- v20260703-lobbyfix -->
+    <title>十十乘法心臟病 - 終極競賽版</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- PeerJS P2P Connection Library -->
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <!-- React & Babel CDN -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
@@ -49,19 +44,13 @@
         .animate-deal-2 { animation: dealTo2 0.5s cubic-bezier(0.1, 0.5, 0.5, 1) forwards; --rot: 45deg; }
         .animate-deal-3 { animation: dealTo3 0.5s cubic-bezier(0.1, 0.5, 0.5, 1) forwards; --rot: -10deg; }
 
-        * { touch-action: manipulation; }
         body { overflow: hidden; background-color: #0f172a; margin: 0; font-family: system-ui, -apple-system, sans-serif; }
         .custom-range::-webkit-slider-runnable-track { background: #334155; height: 8px; border-radius: 4px; }
         .custom-range::-webkit-slider-thumb { margin-top: -6px; height: 20px; width: 20px; border-radius: 50%; background: #fbbf24; cursor: pointer; -webkit-appearance: none; }
     </style>
 </head>
 <body>
-    <img src="https://api.visitorbadge.io/api/visitors?path=hctsao.teachertsao&label=Views&labelColor=%23475569&countColor=%23ea580c" alt="Visitor Counter" style="display: none;">
-<!-- HOME_BUTTON_START -->
-<a href="../index.html" style="position: fixed; top: 12px; left: 12px; z-index: 999999; background: rgba(30, 41, 59, 0.85); color: #ffffff; padding: 8px 16px; border-radius: 20px; text-decoration: none; font-family: system-ui, -apple-system, sans-serif; font-size: 14px; font-weight: bold; backdrop-filter: blur(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.1); transition: all 0.2s ease;" onmouseover="this.style.background='rgba(79, 70, 229, 0.9)'" onmouseout="this.style.background='rgba(30, 41, 59, 0.85)'">&#127969; &#22238;&#39318;&#38913;</a>
-<script>(function() { function adjustViewport() { var targetWidth = 1024; var screenWidth = window.innerWidth || document.documentElement.clientWidth || window.screen.width; if (screenWidth > 0 && screenWidth < targetWidth) { var scale = screenWidth / targetWidth; var meta = document.querySelector('meta[name="viewport"]'); if (!meta) { meta = document.createElement('meta'); meta.setAttribute('name', 'viewport'); document.head.appendChild(meta); } meta.setAttribute('content', 'width=' + targetWidth + ', initial-scale=' + scale + ', minimum-scale=' + scale + ', maximum-scale=' + scale + ', user-scalable=no'); } else { var meta = document.querySelector('meta[name="viewport"]'); if (meta) { meta.setAttribute('content', 'width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no'); } } } adjustViewport(); var timer = null; window.addEventListener('resize', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); window.addEventListener('orientationchange', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); })();</script>
-<!-- HOME_BUTTON_END -->
-<div id="root"></div>
+    <div id="root"></div>
 
     <script type="text/babel" data-type="module">
         const { useState, useEffect, useRef, Fragment } = React;
@@ -120,40 +109,19 @@
             const [errorMsg, setErrorMsg] = useState(""); 
             const [showIdleHint, setShowIdleHint] = useState(false); 
 
-            // Multiplayer connection state
-            const [isOnlineMode, setIsOnlineMode] = useState(false);
-            const [onlineRole, setOnlineRole] = useState(null); // 'host' or 'guest'
-            const [roomCode, setRoomCode] = useState('');
-            const [lobbyPlayers, setLobbyPlayers] = useState([]);
-            const [connections, setConnections] = useState([]);
-            const [myPeer, setMyPeer] = useState(null);
-            const [onlineStatusText, setOnlineStatusText] = useState('');
-            const [onlineStatusType, setOnlineStatusType] = useState(''); // 'info', 'success', 'error'
-            const [myPlayerIdx, setMyPlayerIdx] = useState(0);
-            const [diagnosticLogs, setDiagnosticLogs] = useState([]);
-
-            const connectionsRef = useRef([]);
-            const lobbyPlayersRef = useRef([]);
-            
-            useEffect(() => { connectionsRef.current = connections; }, [connections]);
-            useEffect(() => { lobbyPlayersRef.current = lobbyPlayers; }, [lobbyPlayers]);
-
-            const addDiagnosticLog = (msg) => {
-                const time = new Date().toLocaleTimeString();
-                setDiagnosticLogs(prev => [...prev, `[${time}] ${msg}`]);
-                console.log(`[Diagnostic] ${msg}`);
-            };
-
             const timeoutRef = useRef(null);
             const idleTimerRef = useRef(null);
             const audioCtxRef = useRef(null);
             const aiSlapScheduledRef = useRef(false);
+            const flippedCardRef = useRef(null);
+            const isFlipResolvedRef = useRef(false);
 
             const isDealing = gameState === 'dealing';
-            const myIndex = isOnlineMode ? (onlineRole === 'host' ? 0 : myPlayerIdx) : 0;
 
             const getAiSpeedMultiplier = () => {
-                return 1.0; // All AI difficulty levels deal cards at the same speed
+                if (aiLevel === 'easy') return 1.5;
+                if (aiLevel === 'hard') return 0.5 / 1.3; 
+                return 1.0;
             };
 
             const getAiSlapMultiplier = () => {
@@ -185,79 +153,6 @@
                 }
             };
 
-            // TTS implementation
-            const getChineseReading = (a, b, c) => {
-                const digits = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
-                const readDigit = (n) => digits[n] || "";
-                
-                const strA = a === 10 ? "十" : readDigit(a);
-                const strB = b === 10 ? "十" : readDigit(b);
-                
-                let strC = "";
-                if (c < 10) {
-                    strC = readDigit(c);
-                } else if (c === 10) {
-                    strC = "一十";
-                } else if (c < 20) {
-                    strC = "十" + readDigit(c - 10);
-                } else if (c === 100) {
-                    strC = "一百";
-                } else {
-                    const tens = Math.floor(c / 10);
-                    const ones = c % 10;
-                    strC = readDigit(tens) + "十" + (ones > 0 ? readDigit(ones) : "");
-                }
-                return strA + strB + strC;
-            };
-
-            window.activeUtterances = window.activeUtterances || [];
-            const speakText = (text) => {
-                if (isMuted) return Promise.resolve();
-                return new Promise((resolve) => {
-                    try {
-                        if (window.speechSynthesis.speaking) {
-                            window.speechSynthesis.cancel();
-                        }
-                        const utterance = new SpeechSynthesisUtterance(text);
-                        utterance.lang = 'zh-TW';
-                        utterance.rate = 1.0; // Set to normal speech rate
-                        
-                        window.activeUtterances.push(utterance);
-                        utterance.onend = () => {
-                            window.activeUtterances = window.activeUtterances.filter(u => u !== utterance);
-                            resolve();
-                        };
-                        utterance.onerror = () => {
-                            window.activeUtterances = window.activeUtterances.filter(u => u !== utterance);
-                            resolve(); // resolve even on error so the game doesn't freeze
-                        };
-                        
-                        window.speechSynthesis.speak(utterance);
-                    } catch (e) {
-                        console.error("Speech synthesis error", e);
-                        resolve();
-                    }
-                });
-            };
-
-            useEffect(() => {
-                if (currentCall) {
-                    // Do not speak if it is the local player's own turn
-                    if (currentCall.playerIdx === myIndex) return;
-
-                    const match = currentCall.text.match(/(\d+)\s*×\s*(\d+)\s*=\s*(\d+)/);
-                    if (match) {
-                        const a = parseInt(match[1]);
-                        const b = parseInt(match[2]);
-                        const c = parseInt(match[3]);
-                        const t = getChineseReading(a, b, c);
-                        // Store speech promise so turn-advance logic can wait for it
-                        window.currentSpeechPromise = speakText(t);
-                    }
-                }
-            }, [currentCall, myIndex]);
-
-            // Single player start
             const startGame = async (num) => {
                 try {
                     const silent = new SpeechSynthesisUtterance("");
@@ -280,855 +175,6 @@
                 setGameState('dealing'); setDealingProgress(0);
             };
 
-            // Online Room Handlers
-            const destroyPeer = () => {
-                addDiagnosticLog("連線清除：關閉並釋放 Peer / Connections 資源");
-                if (myPeer) {
-                    try {
-                        myPeer.destroy();
-                    } catch (e) {
-                        console.error("Error destroying peer:", e);
-                    }
-                    setMyPeer(null);
-                }
-                setConnections([]);
-                setLobbyPlayers([]);
-                setOnlineRole(null);
-            };
-
-            useEffect(() => {
-                const handleUnload = () => {
-                    destroyPeer();
-                };
-                window.addEventListener('beforeunload', handleUnload);
-                return () => {
-                    window.removeEventListener('beforeunload', handleUnload);
-                };
-            }, [myPeer, connections]);
-
-            const handleGuestDisconnect = (closedConn) => {
-                addDiagnosticLog(`訪客斷線處理，名稱: ${closedConn.playerName || closedConn.peer}`);
-                setConnections(prev => {
-                    const nextConns = prev.filter(c => c !== closedConn);
-                    
-                    if (gameState === 'menu' || gameState === 'dealing') {
-                        const hostName = lobbyPlayersRef.current[0]?.name || '你 (房主)';
-                        const updatedLobby = [
-                            { id: 0, name: hostName, isHost: true },
-                            ...nextConns.map((c, i) => {
-                                c.playerIdx = i + 1;
-                                return { id: c.playerIdx, name: c.playerName, isHost: false };
-                            })
-                        ];
-                        setLobbyPlayers(updatedLobby);
-                        addDiagnosticLog(`大廳成員已更新，剩餘玩家數: ${updatedLobby.length}`);
-                        
-                        nextConns.forEach((c) => {
-                            c.send({
-                                type: 'lobby_update',
-                                lobbyPlayers: updatedLobby,
-                                myIndex: c.playerIdx
-                            });
-                        });
-                    } else {
-                        setPlayers(prevPlayers => {
-                            const nextPlayers = prevPlayers.map(p => {
-                                if (p.id === closedConn.playerIdx) {
-                                    addDiagnosticLog(`遊戲進行中訪客 ${p.name} 斷線，改由電腦代管`);
-                                    return { ...p, name: `${p.name} (電腦代管)`, isAI: true };
-                                }
-                                return p;
-                            });
-                            nextConns.forEach(c => {
-                                c.send({
-                                    type: 'state_update',
-                                    players: nextPlayers,
-                                    centerPile: centerPile,
-                                    turn: turn,
-                                    currentStep: currentStep,
-                                    currentCall: currentCall,
-                                    flyingCard: flyingCard,
-                                    gameState: gameState
-                                });
-                            });
-                            return nextPlayers;
-                        });
-                    }
-                    return nextConns;
-                });
-            };
-
-            // Shared ICE config for all PeerJS connections
-            const buildIceConfig = () => ({
-                iceServers: [
-                    // Google STUN servers
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    // Cloudflare STUN
-                    { urls: 'stun:stun.cloudflare.com:3478' },
-                    // Metered TURN servers - free tier, very reliable, supports TCP/TLS
-                    { urls: 'turn:relay1.expressturn.com:3478',      username: 'efWG2AV1BJFUKK9ZNG', credential: 'Kf0C4rWC0nf3q0oK' },
-                    { urls: 'turn:a.relay.metered.ca:80',            username: 'e3efc08c85df2fffbbf45e6a', credential: 'Z5A8FG2eFmPCBvp/' },
-                    { urls: 'turn:a.relay.metered.ca:80?transport=tcp', username: 'e3efc08c85df2fffbbf45e6a', credential: 'Z5A8FG2eFmPCBvp/' },
-                    { urls: 'turn:a.relay.metered.ca:443',           username: 'e3efc08c85df2fffbbf45e6a', credential: 'Z5A8FG2eFmPCBvp/' },
-                    { urls: 'turn:a.relay.metered.ca:443?transport=tcp', username: 'e3efc08c85df2fffbbf45e6a', credential: 'Z5A8FG2eFmPCBvp/' }
-                ]
-            });
-
-            const createOnlineRoom = () => {
-                try {
-                    const silent = new SpeechSynthesisUtterance("");
-                    silent.lang = 'zh-TW';
-                    window.speechSynthesis.speak(silent);
-                } catch(e){}
-
-                destroyPeer();
-                setDiagnosticLogs([]); // Clear logs for new session
-                const code = Math.floor(1000 + Math.random() * 9000).toString();
-                setRoomCode(code);
-                setOnlineRole('host');
-                setOnlineStatusText('正在連接連線伺服器...');
-                setOnlineStatusType('info');
-                setIsOnlineMode(true); // Stay in online mode UI to show status
-
-                addDiagnosticLog(`開始創建房間，房號：${code}`);
-                addDiagnosticLog(`正在連接 PeerJS 信令伺服器 (0.peerjs.com)...`);
-
-                const nickname = document.getElementById('online-nickname')?.value.trim() || '房主';
-
-                try {
-                    const hostPeerId = 'heart-attack-' + code;
-                    const iceConfig = buildIceConfig();
-                    
-                    let peerOpened = false;
-                    const peer = new Peer(hostPeerId, {
-                        host: '0.peerjs.com',
-                        port: 443,
-                        secure: true,
-                        config: iceConfig,
-                        debug: 1
-                    });
-
-                    const serverTimeout = setTimeout(() => {
-                        if (!peerOpened) {
-                            addDiagnosticLog('連線信令伺服器逾時，無法開啟房間！');
-                            setOnlineStatusText('建立房間逾時！請確認網路正常，或稍後重試。');
-                            setOnlineStatusType('error');
-                            try { peer.destroy(); } catch(e){}
-                        }
-                    }, 30000);
-
-                    peer.on('open', () => {
-                        peerOpened = true;
-                        clearTimeout(serverTimeout);
-                        setMyPeer(peer);
-                        setLobbyPlayers([{ id: 0, name: `${nickname} (你)`, isHost: true }]);
-                        setOnlineStatusText(`房間建立成功！房號：${code}`);
-                        setOnlineStatusType('success');
-                        addDiagnosticLog(`房間建立成功！信令 ID: ${hostPeerId}`);
-                    });
-
-                    peer.on('connection', (conn) => {
-                        const currentConns = connectionsRef.current;
-                        addDiagnosticLog(`收到來自訪客的連線請求，訪客 Peer ID: ${conn.peer}`);
-                        if (currentConns.length >= 3) {
-                            addDiagnosticLog("房間已滿 (已滿 4 人)，拒絕連線");
-                            conn.on('open', () => {
-                                conn.send({ type: 'error', message: '房間已滿！' });
-                                setTimeout(() => conn.close(), 500);
-                            });
-                            return;
-                        }
-
-                        conn.on('open', () => {
-                            addDiagnosticLog(`與訪客 P2P 通道連線已開啟 (conn.open = true)`);
-                            conn.on('data', (data) => {
-                                if (data.type === 'join_lobby') {
-                                    // Use ref length to avoid React stale closure duplicates!
-                                    const nextIdx = connectionsRef.current.length + 1;
-                                    conn.playerIdx = nextIdx;
-                                    conn.playerName = data.playerName || `玩家 ${nextIdx}`;
-                                    addDiagnosticLog(`訪客加入大廳成功，分配 ID: ${nextIdx}, 暱稱: ${conn.playerName}`);
-                                    
-                                    setConnections(prev => {
-                                        const newConns = [...prev, conn];
-                                        const updatedLobby = [
-                                            { id: 0, name: `${nickname} (你)`, isHost: true },
-                                            ...newConns.map((c) => ({ id: c.playerIdx, name: c.playerName, isHost: false }))
-                                        ];
-                                        setLobbyPlayers(updatedLobby);
-                                        
-                                        newConns.forEach((c) => {
-                                            c.send({
-                                                type: 'lobby_update',
-                                                lobbyPlayers: updatedLobby,
-                                                myIndex: c.playerIdx
-                                            });
-                                        });
-                                        return newConns;
-                                    });
-                                }
-
-                                if (data.type === 'flip_request') {
-                                    if (gameState === 'playing' && turn === data.playerIdx && !isAnimating && !punishingCard) {
-                                        hostExecutePlayTurn();
-                                    }
-                                }
-
-                                if (data.type === 'slap_request') {
-                                    if (!punishingCard && centerPile.length > 0) {
-                                        hostExecuteSlap(data.playerIdx);
-                                    }
-                                }
-                            });
-                        });
-
-                        conn.on('close', () => {
-                            handleGuestDisconnect(conn);
-                        });
-
-                        conn.on('error', (err) => {
-                            console.error(err);
-                            addDiagnosticLog(`訪客資料通道錯誤: ${err.message || err}`);
-                            handleGuestDisconnect(conn);
-                        });
-                    });
-
-                    peer.on('error', (err) => {
-                        console.error("Peer Error:", err);
-                        peerOpened = true; // prevent timeout trigger
-                        clearTimeout(serverTimeout);
-                        addDiagnosticLog(`信令伺服器錯誤: ${err.type} - ${err.message}`);
-                        if (err.type === 'unavailable-id') {
-                            addDiagnosticLog("房號已被佔用，嘗試自動重新開房...");
-                            createOnlineRoom();
-                        } else {
-                            setOnlineStatusText(`建立房間失敗（錯誤類型：${err.type || 'unknown'}）。請重試！`);
-                            setOnlineStatusType('error');
-                        }
-                    });
-                } catch (e) {
-                    console.error(e);
-                    addDiagnosticLog(`開房異常：${e.message || e}`);
-                    setOnlineStatusText('建立房間異常，請重試！');
-                    setOnlineStatusType('error');
-                }
-            };
-
-            const joinOnlineRoom = (code) => {
-                const cleaned = (code || '').trim();
-                if (!cleaned || cleaned.length !== 4) {
-                    setOnlineStatusText('請輸入 4 位數房號！');
-                    setOnlineStatusType('error');
-                    return;
-                }
-
-                try {
-                    const silent = new SpeechSynthesisUtterance("");
-                    silent.lang = 'zh-TW';
-                    window.speechSynthesis.speak(silent);
-                } catch(e){}
-
-                destroyPeer();
-                setDiagnosticLogs([]); // Clear logs for new session
-                setRoomCode(cleaned);
-                setOnlineRole('guest');
-                setOnlineStatusText('正在連接連線伺服器...');
-                setOnlineStatusType('info');
-                setIsOnlineMode(true); // Stay in online mode UI to show status
-
-                addDiagnosticLog(`嘗試加入房號：${cleaned}`);
-                addDiagnosticLog(`正在連接 PeerJS 信令伺服器...`);
-
-                const nickname = document.getElementById('online-nickname')?.value.trim() || '訪客';
-
-                try {
-                    const iceConfig = buildIceConfig();
-                    let peerOpened = false;
-                    let connOpened = false;
-                    
-                    const peer = new Peer(null, {
-                        host: '0.peerjs.com',
-                        port: 443,
-                        secure: true,
-                        config: iceConfig,
-                        debug: 1
-                    });
-
-                    const joinTimeout = setTimeout(() => {
-                        if (!connOpened) {
-                            if (!peerOpened) {
-                                addDiagnosticLog('連接信令伺服器逾時，無法連線！');
-                                setOnlineStatusText('連線伺服器逾時！請確認網路是否正常。');
-                            } else {
-                                addDiagnosticLog('連接房主逾時，P2P 通道未開啟！');
-                                setOnlineStatusText('與房主連線逾時！請確認：① 房主已開房 ② 雙方網路正常。若仍失敗請房主重新開房再試。');
-                            }
-                            setOnlineStatusType('error');
-                            try { peer.destroy(); } catch(e){}
-                        }
-                    }, 30000);
-
-                    peer.on('open', () => {
-                        peerOpened = true;
-                        addDiagnosticLog(`成功連接信令伺服器，分配訪客 ID: ${peer.id}`);
-                        addDiagnosticLog(`正在與房主 heart-attack-${cleaned} 建立 P2P 連線...`);
-                        setOnlineStatusText('已連接伺服器，正在尋找房主並建立 P2P 連線...');
-                        
-                        const conn = peer.connect('heart-attack-' + cleaned, { reliable: true });
-
-                        conn.on('open', () => {
-                            connOpened = true;
-                            clearTimeout(joinTimeout);
-                            addDiagnosticLog(`與房主的 P2P 連線建立成功！發送 join_lobby 握手訊息`);
-                            conn.send({
-                                type: 'join_lobby',
-                                playerName: nickname
-                            });
-                            
-                            setMyPeer(peer);
-                            setConnections([conn]);
-                            setOnlineStatusText('已連線加入，進入連線大廳！');
-                            setOnlineStatusType('success');
-                        });
-
-                        conn.on('data', (data) => {
-                            if (data.type === 'error') {
-                                addDiagnosticLog(`收到房主拒絕訊息: ${data.message}`);
-                                setOnlineStatusText(data.message);
-                                setOnlineStatusType('error');
-                                destroyPeer();
-                            }
-                            if (data.type === 'lobby_update') {
-                                setLobbyPlayers(data.lobbyPlayers);
-                                setMyPlayerIdx(data.myIndex);
-                            }
-                            if (data.type === 'start_game') {
-                                addDiagnosticLog("連線遊戲開始，開始發牌...");
-                                setMultiplier(data.multiplier);
-                                setDifficulty(data.difficulty);
-                                setAiLevel(data.aiLevel);
-                                setPlayers(data.players);
-                                setMainDeck(data.mainDeck); // Store the shared deck on the guest side!
-                                setTurn(data.turn);
-                                setCurrentStep(data.currentStep);
-                                setCenterPile([]);
-                                setCurrentCall(null);
-                                setSlapResults([]);
-                                setWinner(null);
-                                setPunishingCard(null);
-                                setErrorMsg("");
-                                aiSlapScheduledRef.current = false;
-                                
-                                setGameState('dealing');
-                                setDealingProgress(0);
-                            }
-                            if (data.type === 'state_update') {
-                                setPlayers(data.players);
-                                setCenterPile(data.centerPile);
-                                setTurn(data.turn);
-                                setCurrentStep(data.currentStep);
-                                setCurrentCall(data.currentCall);
-                                setFlyingCard(data.flyingCard);
-                                setGameState(data.gameState);
-                                setIsAnimating(data.isAnimating);
-                                if (data.slapResults) setSlapResults(data.slapResults);
-                            }
-                            if (data.type === 'penalty_update') {
-                                playSoundEffect('slap');
-                                setPunishingCard(data.punishingCard);
-                                setCurrentCall(null);
-                                setTimeout(() => {
-                                    setPlayers(data.players);
-                                    setCenterPile(data.centerPile);
-                                    setSlapResults([]);
-                                    setPunishingCard(null);
-                                    setErrorMsg("");
-                                    setGameState('playing');
-                                    setTurn(data.nextTurn);
-                                    setCurrentStep(data.nextStep);
-                                    aiSlapScheduledRef.current = false;
-                                }, 800);
-                            }
-                            if (data.type === 'error_slap') {
-                                playSoundEffect('error');
-                                setErrorMsg(data.errorMsg);
-                                setSlapResults([data.slapPlayerIdx]);
-                                setPunishingCard(data.punishingCard);
-                                setTimeout(() => {
-                                    setPlayers(data.players);
-                                    setCenterPile(data.centerPile);
-                                    setSlapResults([]);
-                                    setPunishingCard(null);
-                                    setErrorMsg("");
-                                    setGameState('playing');
-                                    setTurn(data.nextTurn);
-                                    setCurrentStep(data.nextStep);
-                                    aiSlapScheduledRef.current = false;
-                                }, 800);
-                            }
-                            if (data.type === 'game_over') {
-                                setWinner(data.winner);
-                                setGameState('gameOver');
-                            }
-                            if (data.type === 'lobby_return') {
-                                setGameState('menu');
-                                setPlayers([]);
-                                setCenterPile([]);
-                                setCurrentCall(null);
-                                setSlapResults([]);
-                                setWinner(null);
-                                setPunishingCard(null);
-                                setErrorMsg("");
-                            }
-                        });
-
-                        conn.on('close', () => {
-                            addDiagnosticLog("與房主的 P2P 連線已關閉 (conn.on('close'))");
-                            setOnlineStatusText('與房主的連線已斷開！');
-                            setOnlineStatusType('error');
-                            setGameState('menu');
-                            destroyPeer();
-                        });
-
-                        conn.on('error', (err) => {
-                            clearTimeout(joinTimeout);
-                            console.error(err);
-                            addDiagnosticLog(`與房主的連線通道發生錯誤: ${err.message || err}`);
-                            setOnlineStatusText('與房主的資料通道連線失敗！請確認防火牆設定，或嘗試改用手機熱點後重試。');
-                            setOnlineStatusType('error');
-                        });
-                    });
-
-                    peer.on('error', (err) => {
-                        console.error("Peer Error:", err);
-                        peerOpened = true; // prevent timeout trigger
-                        clearTimeout(joinTimeout);
-                        addDiagnosticLog(`信令伺服器錯誤: ${err.type} - ${err.message}`);
-                        if (err.type === 'peer-not-found') {
-                            setOnlineStatusText('找不到該房間，請確認房號是否正確！');
-                        } else if (err.type === 'network') {
-                            setOnlineStatusText('網路連線問題，請檢查網路後重試！');
-                        } else if (err.type === 'server-error') {
-                            setOnlineStatusText('連線伺服器錯誤，請稍後重試！');
-                        } else {
-                            setOnlineStatusText(`連線錯誤（${err.type}），請確認房號或改用手機熱點重試！`);
-                        }
-                        setOnlineStatusType('error');
-                    });
-                } catch (e) {
-                    console.error(e);
-                    addDiagnosticLog(`連線異常: ${e.message || e}`);
-                    setOnlineStatusText('連線異常，請重試！');
-                    setOnlineStatusType('error');
-                }
-            };
-
-            const startOnlineGame = (multiplierNum) => {
-                if (onlineRole !== 'host') return;
-                // Use the passed-in value directly to avoid React async setState race condition
-                const m = multiplierNum !== undefined ? multiplierNum : multiplier;
-                
-                let deck = [];
-                for (let i = 1; i <= 10; i++) {
-                    for (let j = 0; j < CARDS_PER_TYPE; j++) {
-                        deck.push({
-                            id: `${i}-${j}-${Math.random()}`,
-                            value: m * i,
-                            rot: Math.random() * 20 - 10,
-                            ox: Math.random() * 10 - 5,
-                            oy: Math.random() * 10 - 5,
-                            dealRot: Math.random() * 60 - 30,
-                            dealOx: Math.random() * 30 - 15,
-                            dealOy: Math.random() * 30 - 15
-                        });
-                    }
-                }
-                for (let i = deck.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [deck[i], deck[j]] = [deck[j], deck[i]];
-                }
-                
-                const newPlayers = [];
-                newPlayers.push({
-                    id: 0,
-                    name: lobbyPlayers[0]?.name || '你 (房主)',
-                    cards: [],
-                    isAI: false
-                });
-                
-                for (let i = 1; i < 4; i++) {
-                    const guestConn = connections.find(c => c.playerIdx === i);
-                    if (guestConn) {
-                        newPlayers.push({
-                            id: i,
-                            name: guestConn.playerName,
-                            cards: [],
-                            isAI: false
-                        });
-                    } else {
-                        newPlayers.push({
-                            id: i,
-                            name: `電腦 ${i}`,
-                            cards: [],
-                            isAI: true
-                        });
-                    }
-                }
-                
-                const randomStartTurn = Math.floor(Math.random() * 4);
-                const startStep = difficulty === 'easy' ? 1 : 10;
-                
-                connections.forEach(c => {
-                    c.send({
-                        type: 'start_game',
-                        multiplier: m,
-                        difficulty: difficulty,
-                        aiLevel: aiLevel,
-                        players: newPlayers,
-                        mainDeck: deck, // Send the shuffled deck!
-                        turn: randomStartTurn,
-                        currentStep: startStep
-                    });
-                });
-                
-                setMultiplier(m);
-                setMainDeck(deck); // Set host mainDeck state!
-                setPlayers(newPlayers);
-                setCenterPile([]);
-                setTurn(randomStartTurn);
-                setCurrentStep(startStep);
-                setCurrentCall(null);
-                setSlapResults([]);
-                setWinner(null);
-                setPunishingCard(null);
-                setErrorMsg("");
-                aiSlapScheduledRef.current = false;
-                
-                setGameState('dealing');
-                setDealingProgress(0);
-            };
-
-            const returnToLobby = () => {
-                connections.forEach(c => c.send({ type: 'lobby_return' }));
-                setGameState('menu');
-                setPlayers([]);
-                setCenterPile([]);
-                setCurrentCall(null);
-                setSlapResults([]);
-                setWinner(null);
-                setPunishingCard(null);
-                setErrorMsg("");
-            };
-
-            const broadcastStateUpdate = (state) => {
-                connections.forEach(c => {
-                    c.send({
-                        type: 'state_update',
-                        players: state.players || players,
-                        centerPile: state.centerPile || centerPile,
-                        turn: state.turn !== undefined ? state.turn : turn,
-                        currentStep: state.currentStep !== undefined ? state.currentStep : currentStep,
-                        currentCall: state.currentCall !== undefined ? state.currentCall : currentCall,
-                        flyingCard: state.flyingCard !== undefined ? state.flyingCard : flyingCard,
-                        gameState: state.gameState || gameState,
-                        isAnimating: state.isAnimating !== undefined ? state.isAnimating : isAnimating,
-                        slapResults: state.slapResults || slapResults
-                    });
-                });
-            };
-
-            const broadcastGameOver = (w) => {
-                connections.forEach(c => {
-                    c.send({
-                        type: 'game_over',
-                        winner: w
-                    });
-                });
-            };
-
-            const hostExecutePlayTurn = () => {
-                if (gameState !== 'playing' || isAnimating || punishingCard) return;
-
-                const playersWithCards = players.filter(p => p.cards.length > 0);
-                if (playersWithCards.length === 0) {
-                    setGameState('gameOver');
-                    setWinner(null);
-                    broadcastGameOver(null);
-                    return;
-                }
-                
-                if (players[turn].cards.length === 0) {
-                    const next = findNextPlayerWithCards(turn);
-                    if (next !== null) {
-                        setTurn(next);
-                        broadcastStateUpdate({
-                            players,
-                            centerPile,
-                            turn: next,
-                            currentStep,
-                            currentCall,
-                            flyingCard: null,
-                            gameState: 'playing'
-                        });
-                    }
-                    return;
-                }
-
-                playSoundEffect('flip');
-                setIsAnimating(true);
-                setShowIdleHint(false);
-                
-                const newPlayers = [...players];
-                const card = newPlayers[turn].cards.pop();
-                flippedCardRef.current = card;
-                isFlipResolvedRef.current = false;
-                const callValue = multiplier * currentStep;
-                
-                const newCall = { playerIdx: turn, text: `${multiplier} \u00d7 ${currentStep} = ${callValue}` };
-                const newFlying = { value: card.value, fromPlayer: turn };
-                
-                setCurrentCall(newCall);
-                setFlyingCard(newFlying);
-                
-                broadcastStateUpdate({
-                    players: newPlayers,
-                    centerPile,
-                    turn,
-                    currentStep,
-                    currentCall: newCall,
-                    flyingCard: newFlying,
-                    gameState: 'playing',
-                    isAnimating: true
-                });
-
-                setTimeout(() => {
-                    const advanceOnlineTurn = () => {
-                        if (isFlipResolvedRef.current) return;
-                        isFlipResolvedRef.current = true;
-                        const newPile = [...centerPile, card];
-                        setCenterPile(newPile);
-                        setFlyingCard(null);
-                        setPlayers(newPlayers);
-                        setIsAnimating(false);
-                        
-                        if (card.value === callValue) {
-                            setGameState('slapping');
-                            aiSlapScheduledRef.current = false;
-                            
-                            broadcastStateUpdate({
-                                players: newPlayers,
-                                centerPile: newPile,
-                                turn,
-                                currentStep,
-                                currentCall: newCall,
-                                flyingCard: null,
-                                gameState: 'slapping',
-                                slapResults: [],
-                                isAnimating: false
-                            });
-                        } else {
-                            players.forEach((p, idx) => {
-                                if (p.isAI) {
-                                    if (isDangerousPair(card.value, callValue)) {
-                                        const chance = aiLevel === 'easy' ? 0.5 : aiLevel === 'normal' ? 0.3 : 0.1;
-                                        if (Math.random() < chance) {
-                                            const delay = (Math.random() * 500 + 300) * getAiSlapMultiplier();
-                                            setTimeout(() => {
-                                                setGameState(curr => { if (curr === 'slapping') hostExecuteSlap(idx); return curr; });
-                                            }, delay);
-                                        }
-                                    }
-                                }
-                            });
-
-                            const next = findNextPlayerWithCards(turn);
-                            if (next !== null) {
-                                setTurn(next);
-                                const nextSt = (difficulty === 'easy') ? (currentStep === 10 ? 1 : currentStep + 1) : (currentStep === 1 ? 10 : currentStep - 1);
-                                setCurrentStep(nextSt);
-                                
-                                broadcastStateUpdate({
-                                    players: newPlayers,
-                                    centerPile: newPile,
-                                    turn: next,
-                                    currentStep: nextSt,
-                                    currentCall: null,
-                                    flyingCard: null,
-                                    gameState: 'playing',
-                                    isAnimating: false
-                                });
-                            } else {
-                                setGameState('gameOver');
-                                setWinner(null);
-                                broadcastGameOver(null);
-                            }
-                        }
-                    };
-                    // Wait for speech to finish before advancing turn
-                    const speechDone = window.currentSpeechPromise || Promise.resolve();
-                    speechDone.then(advanceOnlineTurn);
-                }, 600);
-            };
-
-            const hostExecuteSlap = (slapPlayerIdx) => {
-                if (punishingCard) return;
-                const currentCardValue = flyingCard ? flyingCard.value : (centerPile.length > 0 ? centerPile[centerPile.length - 1].value : null);
-                if (currentCardValue === null) return;
-                const isMatch = currentCardValue === multiplier * currentStep;
-                
-                if (gameState === 'playing' && isMatch) {
-                    if (isFlipResolvedRef.current) return;
-                    isFlipResolvedRef.current = true;
-                    
-                    const card = flippedCardRef.current;
-                    const newPile = [...centerPile, card];
-                    
-                    setCenterPile(newPile);
-                    setFlyingCard(null);
-                    setIsAnimating(false);
-                    setGameState('slapping');
-                    
-                    setSlapResults([slapPlayerIdx]);
-                    playSoundEffect('slap');
-                    
-                    broadcastStateUpdate({
-                        players,
-                        centerPile: newPile,
-                        turn,
-                        currentStep,
-                        currentCall,
-                        flyingCard: null,
-                        gameState: 'slapping',
-                        slapResults: [slapPlayerIdx],
-                        isAnimating: false
-                    });
-                    return;
-                }
-                
-                if (gameState === 'slapping') {
-                    setSlapResults(prev => {
-                        if (prev.includes(slapPlayerIdx)) return prev;
-                        const newResults = [...prev, slapPlayerIdx];
-                        playSoundEffect('slap');
-                        
-                        broadcastStateUpdate({
-                            players,
-                            centerPile,
-                            turn,
-                            currentStep,
-                            currentCall,
-                            flyingCard: null,
-                            gameState: 'slapping',
-                            slapResults: newResults
-                        });
-
-                        if (players[slapPlayerIdx].cards.length === 0 && newResults.length <= 3) {
-                            setWinner(players[slapPlayerIdx]);
-                            setGameState('gameOver');
-                            broadcastGameOver(players[slapPlayerIdx]);
-                            return newResults;
-                        }
-
-                        if (newResults.length === 3) {
-                            const loserIndex = [0, 1, 2, 3].find(idx => !newResults.includes(idx));
-                            
-                            playSoundEffect('slap');
-                            const punishing = { toPlayer: loserIndex, pileSnapshot: centerPile.slice(-8) };
-                            setPunishingCard(punishing);
-                            setCurrentCall(null);
-                            
-                            const nextSt = (difficulty === 'easy') ? (currentStep === 10 ? 1 : currentStep + 1) : (currentStep === 1 ? 10 : currentStep - 1);
-                            
-                            connections.forEach(c => {
-                                c.send({
-                                    type: 'penalty_update',
-                                    punishingCard: punishing,
-                                    players: players.map((p, idx) => idx === loserIndex ? { ...p, cards: [...centerPile, ...p.cards] } : p),
-                                    centerPile: [],
-                                    nextTurn: loserIndex,
-                                    nextStep: nextSt
-                                });
-                            });
-
-                            setTimeout(() => {
-                                setPlayers(prevPlayers => {
-                                    const newPlayers = [...prevPlayers];
-                                    newPlayers[loserIndex] = {
-                                        ...newPlayers[loserIndex],
-                                        cards: [...centerPile, ...newPlayers[loserIndex].cards]
-                                    };
-                                    return newPlayers;
-                                });
-                                setCenterPile([]);
-                                setSlapResults([]);
-                                setPunishingCard(null);
-                                setErrorMsg("");
-                                setGameState('playing');
-                                setTurn(loserIndex);
-                                setCurrentStep(nextSt);
-                                aiSlapScheduledRef.current = false;
-                            }, 800);
-                        }
-                        return newResults;
-                    });
-                } else if (gameState === 'playing' && !isMatch) {
-                    if (slapResults.length === 0) {
-                        playSoundEffect('error');
-                        setErrorMsg(`${players[slapPlayerIdx].name} 拍錯了！`);
-                        setSlapResults([slapPlayerIdx]);
-                        
-                        let activePile = centerPile;
-                        if (!isFlipResolvedRef.current) {
-                            isFlipResolvedRef.current = true;
-                            const card = flippedCardRef.current;
-                            activePile = [...centerPile, card];
-                            setCenterPile(activePile);
-                            setFlyingCard(null);
-                            setIsAnimating(false);
-                        }
-                        
-                        const punishing = { toPlayer: slapPlayerIdx, pileSnapshot: activePile.slice(-8) };
-                        setPunishingCard(punishing);
-                        setCurrentCall(null);
-                        
-                        const nextSt = (difficulty === 'easy') ? (currentStep === 10 ? 1 : currentStep + 1) : (currentStep === 1 ? 10 : currentStep - 1);
-
-                        connections.forEach(c => {
-                            c.send({
-                                type: 'error_slap',
-                                errorMsg: `${players[slapPlayerIdx].name} 拍錯了！`,
-                                slapPlayerIdx: slapPlayerIdx,
-                                punishingCard: punishing,
-                                players: players.map((p, idx) => idx === slapPlayerIdx ? { ...p, cards: [...activePile, ...p.cards] } : p),
-                                centerPile: [],
-                                nextTurn: slapPlayerIdx,
-                                nextStep: nextSt
-                            });
-                        });
-
-                        setTimeout(() => {
-                            setPlayers(prevPlayers => {
-                                const newPlayers = [...prevPlayers];
-                                newPlayers[slapPlayerIdx] = {
-                                    ...newPlayers[slapPlayerIdx],
-                                    cards: [...activePile, ...newPlayers[slapPlayerIdx].cards]
-                                };
-                                return newPlayers;
-                            });
-                            setCenterPile([]);
-                            setSlapResults([]);
-                            setPunishingCard(null);
-                            setErrorMsg("");
-                            setGameState('playing');
-                            setTurn(slapPlayerIdx);
-                            setCurrentStep(nextSt);
-                            aiSlapScheduledRef.current = false;
-                        }, 800);
-                    }
-                }
-            };
-
             useEffect(() => {
                 if (gameState === 'dealing') {
                     if (dealingProgress < 60) {
@@ -1141,21 +187,22 @@
                         }, 50);
                         return () => clearTimeout(timer);
                     } else {
-                        if (isOnlineMode) {
-                            if (onlineRole === 'host') {
-                                setGameState('playing');
-                                broadcastStateUpdate({ gameState: 'playing' });
-                            }
-                        } else {
-                            const randomStartTurn = Math.floor(Math.random() * PLAYERS_COUNT);
-                            setTurn(randomStartTurn);
-                            setStartPrompt(`發牌完畢！由 ${players[randomStartTurn]?.name || "你"} 先出牌！`);
-                            setGameState('starting');
-                            setTimeout(() => { setGameState('playing'); setStartPrompt(""); }, 2000);
-                        }
+                        setGameState('starting'); setStartPrompt("3");
+                        setTimeout(() => {
+                            setStartPrompt("2");
+                            setTimeout(() => {
+                                setStartPrompt("1");
+                                setTimeout(() => {
+                                    setStartPrompt("GO!");
+                                    setTimeout(() => {
+                                        setGameState('playing'); setStartPrompt("");
+                                    }, 800);
+                                }, 1000);
+                            }, 1000);
+                        }, 1000);
                     }
                 }
-            }, [gameState, dealingProgress, mainDeck, players, isOnlineMode, onlineRole]);
+            }, [gameState, dealingProgress, mainDeck, players]);
 
             const executePenalty = (loserIndex, currentPile) => {
                 if (punishingCard) return;
@@ -1209,10 +256,41 @@
                 isFlipResolvedRef.current = false;
                 const callValue = multiplier * currentStep;
                 
-                setCurrentCall({ playerIdx: turn, text: `${multiplier} \u00d7 ${currentStep} = ${callValue}` });
-                setFlyingCard({ value: card.value, fromPlayer: turn });
+                // If human player (turn === 0): no speech and no text display
+                if (turn === 0) {
+                    setCurrentCall(null);
+                    window.currentSpeechPromise = Promise.resolve();
+                } else {
+                    // Computer turns: show callout text and speak formula
+                    setCurrentCall({ playerIdx: turn, text: `${multiplier} \u00d7 ${currentStep} = ${callValue}` });
+                    
+                    let speechPromise = Promise.resolve();
+                    if (!isMuted) {
+                        speechPromise = new Promise((resolve) => {
+                            const textToSpeak = `${multiplier} 乘以 ${currentStep} 等於 ${callValue}`;
+                            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+                            utterance.lang = 'zh-TW';
+                            utterance.rate = 1.0;
+                            
+                            let resolved = false;
+                            const done = () => {
+                                if (resolved) return;
+                                resolved = true;
+                                resolve();
+                            };
+                            utterance.onend = done;
+                            utterance.onerror = done;
+                            // 3 seconds safety timeout to prevent getting stuck
+                            setTimeout(done, 3000);
+                            
+                            window.speechSynthesis.speak(utterance);
+                        });
+                    }
+                    window.currentSpeechPromise = speechPromise;
+                }
 
-                // Wait for the card animation (600ms) AND for any ongoing speech to finish
+                setFlyingCard({ value: card.value, fromPlayer: turn });
+                
                 const advanceTurn = () => {
                     if (isFlipResolvedRef.current) return;
                     isFlipResolvedRef.current = true;
@@ -1241,10 +319,11 @@
                     }
                 };
 
+                // Wait for the card animation (600ms) AND for any ongoing speech to finish
                 setTimeout(() => {
                     const speechDone = window.currentSpeechPromise || Promise.resolve();
                     speechDone.then(advanceTurn);
-                }, 600);
+                }, 600); 
             };
 
             const handleSlap = (playerIndex) => {
@@ -1252,7 +331,7 @@
                 const currentCardValue = flyingCard ? flyingCard.value : (centerPile.length > 0 ? centerPile[centerPile.length - 1].value : null);
                 if (currentCardValue === null) return;
                 const isMatch = currentCardValue === multiplier * currentStep;
-
+                
                 if (gameState === 'playing' && isMatch) {
                     if (isFlipResolvedRef.current) return;
                     isFlipResolvedRef.current = true;
@@ -1279,7 +358,7 @@
                         if (prev.includes(playerIndex)) return prev;
                         const newResults = [...prev, playerIndex];
                         playSoundEffect('slap');
-
+                        
                         if (players[playerIndex].cards.length === 0 && newResults.length <= 3) {
                             setWinner(players[playerIndex]);
                             setGameState('gameOver');
@@ -1320,196 +399,38 @@
                     setShowIdleHint(false); if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
                 }
                 return () => clearTimeout(idleTimerRef.current);
-            }, [turn, gameState, isAnimating, punishingCard, centerPile, myIndex]);
+            }, [turn, gameState, isAnimating, punishingCard, centerPile]);
 
-            // Authoritative AI execution triggers
+            // Set myIndex as 0 (local player)
+            const myIndex = 0;
+
             useEffect(() => {
                 if (gameState === 'playing' && players[turn]?.isAI && !isAnimating && !punishingCard) {
-                    if (isOnlineMode && onlineRole !== 'host') return;
                     const isFirstCard = centerPile.length === 0;
-                    const delay = isFirstCard ? 100 : 1200; // Same dealing speed for all levels
-                    timeoutRef.current = setTimeout(() => {
-                        if (isOnlineMode) {
-                            hostExecutePlayTurn();
-                        } else {
-                            playTurn(false);
-                        }
-                    }, delay);
+                    // Unified AI dealing speed to 1200ms across all levels, ensuring voice readout completes first
+                    const delay = isFirstCard ? 100 : 1200;
+                    timeoutRef.current = setTimeout(() => playTurn(false), delay);
                 }
                 return () => clearTimeout(timeoutRef.current);
-            }, [turn, gameState, isAnimating, punishingCard, aiLevel, centerPile.length, isOnlineMode, onlineRole, players]);
+            }, [turn, gameState, isAnimating, punishingCard, aiLevel, centerPile.length]);
 
             useEffect(() => {
                 if (gameState === 'slapping' && !aiSlapScheduledRef.current) {
-                    if (isOnlineMode && onlineRole !== 'host') return;
                     aiSlapScheduledRef.current = true;
                     players.forEach((p, idx) => {
                         if (p.isAI) {
                             const delay = (Math.random() * 800 + 400) * getAiSlapMultiplier();
-                            setTimeout(() => {
-                                if (isOnlineMode) {
-                                    if (onlineRole === 'host') {
-                                        setGameState(curr => { if (curr === 'slapping') hostExecuteSlap(idx); return curr; });
-                                    }
-                                } else {
-                                    setGameState(curr => { if (curr === 'slapping') handleSlap(idx); return curr; });
-                                }
-                            }, delay);
+                            setTimeout(() => { setGameState(curr => { if (curr === 'slapping') handleSlap(idx); return curr; }); }, delay);
                         }
                     });
                 }
-            }, [gameState, aiLevel, isOnlineMode, onlineRole, players]);
+            }, [gameState, aiLevel]);
 
-            // Rendering sub-blocks
-            // 1. Setup Connection Screen (Before creating or joining peer)
-            if (isOnlineMode && !myPeer) {
-                return (
-                    <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center overflow-y-auto bg-slate-900 text-white">
-                        <h1 className="text-4xl md:text-5xl font-black mb-10 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 drop-shadow-md">線上對戰連線大廳</h1>
-                        <div className="flex flex-col gap-6 w-full max-w-md bg-slate-800 p-8 rounded-3xl shadow-2xl border border-slate-700">
-                            <div>
-                                <label className="block text-left text-sm font-bold text-slate-300 mb-2">玩家暱稱：</label>
-                                <input id="online-nickname" type="text" defaultValue="玩家" placeholder="請輸入你的暱稱" className="w-full px-4 py-3 bg-slate-700 rounded-xl text-white font-bold border border-slate-600 focus:outline-none focus:border-blue-500" />
-                            </div>
-                            
-                            <div className="border-t border-slate-700 my-2" />
-                            
-                            <button onClick={createOnlineRoom} className="w-full h-14 bg-emerald-600 text-white text-xl font-bold rounded-xl hover:bg-emerald-500 transition-all active:translate-y-0.5">
-                                ➕ 創建連線房間
-                            </button>
-                            
-                            <div className="flex items-center justify-center gap-4 my-2 text-slate-500 font-bold">
-                                <span>───────</span><span>或</span><span>───────</span>
-                            </div>
-                            
-                            <div className="flex flex-col gap-2">
-                                <label className="block text-left text-sm font-bold text-slate-300 mb-1">輸入 4 位數房號加入：</label>
-                                <div className="flex gap-2">
-                                    <input id="join-room-code" type="text" maxLength="4" placeholder="例如: 1234" className="w-full px-4 py-3 bg-slate-700 text-center font-black text-xl border border-slate-600 focus:outline-none focus:border-blue-500 uppercase rounded-l-xl" />
-                                    <button onClick={() => {
-                                        const code = document.getElementById('join-room-code')?.value.trim();
-                                        joinOnlineRoom(code);
-                                    }} className="px-6 bg-blue-600 text-white font-bold rounded-r-xl hover:bg-blue-500 transition-all active:translate-y-0.5 border border-l-0 border-blue-600">
-                                        加入
-                                    </button>
-                                </div>
-                            </div>
-
-                        {onlineStatusText && (
-                            <div className={`p-4 rounded-xl text-sm font-bold border ${onlineStatusType === 'success' ? 'bg-emerald-950/50 border-emerald-500 text-emerald-300' : onlineStatusType === 'error' ? 'bg-red-950/50 border-red-500 text-red-300' : 'bg-slate-700/50 border-slate-600 text-slate-300'}`}>
-                                {onlineStatusText}
-                            </div>
-                        )}
-                        </div>
-                        
-                        <button onClick={() => { destroyPeer(); setIsOnlineMode(false); }} className="mt-8 px-8 py-3 bg-slate-800 text-slate-400 rounded-xl hover:bg-slate-700 hover:text-white transition-all">
-                            返回單機模式
-                        </button>
-                    </div>
-                );
-            }
-
-            // 2. Game Menu Screen
             if (gameState === 'menu') {
-                if (isOnlineMode) {
-                    // 1. Lobby Waiting Screen
-                    return (
-                        <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center overflow-y-auto bg-slate-900 text-white">
-                            <h1 className="text-4xl md:text-5xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 drop-shadow-md">連線房間：【{roomCode}】</h1>
-                            <p className="text-slate-400 mb-8 font-bold text-sm md:text-base">請將房號告知好友，最多支援 4 人。未滿 4 人開始將安排 AI 玩家。</p>
-                            
-                            <div className="flex flex-col gap-6 w-full max-w-md mb-8">
-                                <div className="bg-slate-800 p-6 rounded-3xl shadow-xl border border-slate-700">
-                                    <h3 className="text-xl font-bold mb-4 text-left border-b border-slate-700 pb-2">👥 房間成員 ({lobbyPlayers.length} / 4)：</h3>
-                                    <ul className="flex flex-col gap-3 text-left">
-                                        {[0, 1, 2, 3].map((idx) => {
-                                            const lp = lobbyPlayers.find(p => p.id === idx);
-                                            return (
-                                                <li key={idx} className="flex items-center justify-between p-3 bg-slate-700/50 rounded-xl border border-slate-600 font-bold">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="text-2xl">{idx === 0 ? "👑" : "🙋"}</span>
-                                                        <span>{lp ? lp.name : `等待玩家加入...`}</span>
-                                                    </div>
-                                                    <span className={`text-xs px-2.5 py-1 rounded-full ${lp ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-600 text-slate-400'}`}>
-                                                        {lp ? '已連線' : '空位 (AI)'}
-                                                    </span>
-                                                </li>
-                                            );
-                                        })}
-                                    </ul>
-                                </div>
-                                
-                                {onlineRole === 'host' ? (
-                                    <div className="flex flex-col gap-6 bg-slate-800 p-6 rounded-3xl shadow-xl border border-slate-700">
-                                        <h3 className="text-xl font-bold text-left border-b border-slate-700 pb-2">⚙️ 遊戲設定 (僅房主可調整)：</h3>
-                                        
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-bold">方向：</span>
-                                            <div className="flex items-center gap-4">
-                                                <span className={`text-sm font-bold transition-colors ${difficulty === 'easy' ? 'text-yellow-400' : 'text-slate-500'}`}>正背</span>
-                                                <div 
-                                                    onClick={() => setDifficulty(d => d === 'easy' ? 'hard' : 'easy')}
-                                                    className="relative w-14 h-7 bg-slate-700 rounded-full p-1 cursor-pointer border-2 border-slate-600 hover:border-white transition-all animate-none"
-                                                >
-                                                    <div className={`absolute top-0.5 left-0.5 bottom-0.5 w-5 flex items-center justify-center rounded-full bg-white transition-all duration-300 transform ${difficulty === 'hard' ? 'translate-x-6 bg-orange-500' : 'bg-yellow-400'}`} />
-                                                </div>
-                                                <span className={`text-sm font-bold transition-colors ${difficulty === 'hard' ? 'text-orange-500' : 'text-slate-500'}`}>倒背</span>
-                                            </div>
-                                        </div>
-                                        
-                                        <div>
-                                            <div className="flex justify-between mb-2 text-sm font-bold">
-                                                <span>電腦反應速度：</span>
-                                                <span className={aiLevel === 'easy' ? 'text-blue-400' : aiLevel === 'normal' ? 'text-yellow-400' : 'text-red-500'}>
-                                                    {aiLevel === 'easy' ? '簡單' : aiLevel === 'normal' ? '普通' : '困難'}
-                                                </span>
-                                            </div>
-                                            <input type="range" min="0" max="2" step="1" value={aiLevel === 'easy' ? 0 : aiLevel === 'normal' ? 1 : 2} onChange={(e) => { const val = e.target.value; setAiLevel(val === "0" ? 'easy' : val === "1" ? 'normal' : 'hard'); }} className="w-full h-2.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500 custom-range" />
-                                        </div>
-                                        
-                                        <div className="border-t border-slate-700 my-2" />
-                                        
-                                        <div className="flex flex-col gap-2">
-                                            <span className="text-sm font-bold text-slate-300 text-left">選擇乘法底數並開始：</span>
-                                            <div className="grid grid-cols-3 gap-3">
-                                                {MULTIPLIERS.map(num => (
-                                                    <button key={num} onClick={() => {
-                                                        setMultiplier(num);
-                                                        startOnlineGame(num);
-                                                    }} className="h-12 bg-white text-slate-900 text-2xl font-black rounded-xl hover:bg-yellow-400 transition-all active:scale-95">
-                                                        {num}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 text-slate-300 font-bold animate-pulse text-lg">
-                                        ⏳ 等待房主開始遊戲及設定...
-                                    </div>
-                                )}
-                            </div>
-
-                            <button onClick={() => { destroyPeer(); }} className="px-8 py-3 bg-red-600/20 text-red-400 border border-red-500/30 rounded-xl hover:bg-red-600 hover:text-white transition-all font-bold">
-                                退出房間
-                            </button>
-                        </div>
-                    );
-                }
-
-                // 2. Main menu (Single player mode with option to open lobby)
                 return (
                     <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center overflow-y-auto bg-slate-900">
-                        <h1 className="text-5xl md:text-6xl font-black mb-10 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 drop-shadow-md">十十乘法心臟病</h1>
-                        
-                        {/* Toggle button to open Multiplayer Lobby */}
+                        <h1 className="text-6xl font-black mb-10 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 drop-shadow-md">十十乘法心臟病</h1>
                         <div className="flex flex-col gap-8 w-full max-w-md mb-8 text-white">
-                            <button onClick={() => { setIsOnlineMode(true); setOnlineRole(null); }} className="w-full h-16 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-2xl font-bold rounded-2xl hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg active:translate-y-0.5">
-                                🌐 線上連線對戰模式
-                            </button>
-
-                            <div className="border-t border-slate-700 my-1" />
-
                             <div className="bg-slate-800 p-6 rounded-3xl shadow-xl border border-slate-700 flex flex-col items-center">
                                 <div className="flex items-center justify-center gap-6">
                                     <span className={`text-lg font-bold transition-colors ${difficulty === 'easy' ? 'text-yellow-400' : 'text-slate-500'}`}>正背</span>
@@ -1543,18 +464,8 @@
                 return (
                     <div className="flex flex-col items-center justify-center min-h-screen bg-yellow-400 p-4 text-center text-slate-900">
                         <Trophy size={120} className="mb-4 animate-bounce mx-auto" />
-                        <h2 className="text-4xl md:text-5xl font-black mb-2">{winner ? `優勝者：${winner.name}` : "平局！牌都用完了"}</h2>
-                        
-                        {isOnlineMode ? (
-                            <div className="flex gap-4 mt-8 flex-wrap justify-center">
-                                {onlineRole === 'host' && (
-                                    <button onClick={returnToLobby} className="px-10 py-5 bg-emerald-600 text-white rounded-2xl text-xl md:text-2xl font-bold hover:scale-105 transition-transform shadow-2xl">返回連線大廳</button>
-                                )}
-                                <button onClick={() => { destroyPeer(); setGameState('menu'); }} className="px-10 py-5 bg-slate-900 text-white rounded-2xl text-xl md:text-2xl font-bold hover:scale-105 transition-transform shadow-2xl">回主選單</button>
-                            </div>
-                        ) : (
-                            <button onClick={() => setGameState('menu')} className="mt-8 px-12 py-5 bg-slate-900 text-white rounded-2xl text-2xl font-bold hover:scale-105 transition-transform shadow-2xl">回主選單</button>
-                        )}
+                        <h2 className="text-5xl font-black mb-2">{winner ? `優勝者：${winner.name}` : "平局！牌都用完了"}</h2>
+                        <button onClick={() => setGameState('menu')} className="mt-8 px-12 py-5 bg-slate-900 text-white rounded-2xl text-2xl font-bold hover:scale-105 transition-transform shadow-2xl">回主選單</button>
                     </div>
                 );
             }
@@ -1564,16 +475,12 @@
                     <div className="absolute top-4 left-4 z-50 flex gap-4">
                         <button onClick={() => { setIsMuted(!isMuted); initAudio(); }} className="p-3 bg-white/20 rounded-full text-white hover:bg-white/40 transition-colors">{isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}</button>
                     </div>
-                    
-                    <button onClick={() => { destroyPeer(); setGameState('menu'); }} className="absolute bottom-6 right-6 z-50 flex items-center gap-2 bg-slate-900/80 text-white px-6 py-3 rounded-full hover:bg-slate-900 transition-all border border-white/20 shadow-xl">
-                        <Home size={20} className="mr-1" />
-                        <span className="font-bold">{isOnlineMode ? "結束連線返回" : "返回主選單"}</span>
-                    </button>
+                    <button onClick={() => setGameState('menu')} className="absolute bottom-6 right-6 z-50 flex items-center gap-2 bg-slate-900/80 text-white px-6 py-3 rounded-full hover:bg-slate-900 transition-all border border-white/20 shadow-xl"><Home size={20} className="mr-1" /><span className="font-bold">返回主選單</span></button>
 
                     {(gameState === 'starting' || errorMsg) && (
                         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 text-center text-slate-900">
-                            <div className="bg-yellow-400 p-8 md:p-12 rounded-[30px] md:rounded-[40px] border-4 md:border-8 border-white shadow-2xl animate-bounce">
-                                <h2 className="text-4xl md:text-6xl font-black">{errorMsg || startPrompt}</h2>
+                            <div className="bg-yellow-400 p-12 rounded-[40px] border-8 border-white shadow-2xl animate-bounce">
+                                <h2 className="text-6xl font-black">{errorMsg || startPrompt}</h2>
                             </div>
                         </div>
                     )}
@@ -1582,45 +489,26 @@
 
                     {players.map((player, idx) => {
                         const layouts = [
-                            // Player 0 (Bottom / Human)
-                            { 
-                                pos: "bottom-4 left-1/2 -translate-x-1/2 md:bottom-8", 
-                                call: "bottom-full mb-2 left-1/2 -translate-x-1/2 md:bottom-auto md:mb-0 md:left-full md:ml-4 md:top-1/2 md:-translate-y-1/2", 
-                                cardAlign: "bottom-full mb-2 left-1/2 -translate-x-1/2 md:bottom-auto md:mb-0 md:left-[110%] md:top-1/2 md:-translate-y-1/2 md:translate-x-0" 
-                            },
-                            // Player 1 (Left)
-                            { 
-                                pos: "left-2 top-1/2 -translate-y-1/2 md:left-12", 
-                                call: "left-full ml-2 top-1/2 -translate-y-1/2 md:ml-4", 
-                                cardAlign: "" 
-                            },
-                            // Player 2 (Top)
-                            { 
-                                pos: "top-4 left-1/2 -translate-x-1/2 md:top-8", 
-                                call: "top-full mt-2 left-1/2 -translate-x-1/2 md:top-1/2 md:-translate-y-1/2 md:left-full md:ml-4 md:mt-0 md:translate-x-0", 
-                                cardAlign: "" 
-                            },
-                            // Player 3 (Right)
-                            { 
-                                pos: "right-2 top-1/2 -translate-y-1/2 md:right-12", 
-                                call: "right-full mr-2 top-1/2 -translate-y-1/2 md:mr-4 md:bottom-auto md:mb-0 md:left-auto md:translate-x-0", 
-                                cardAlign: "" 
-                            }
+                            { pos: "bottom-8 left-1/2 -translate-x-1/2", call: "left-full ml-4 top-1/2 -translate-y-1/2", cardAlign: "left-[110%] top-1/2 -translate-y-1/2" },
+                            { pos: "left-12 top-1/2 -translate-y-1/2", call: "left-full ml-4 top-1/2 -translate-y-1/2", cardAlign: "" }, 
+                            { pos: "top-8 left-1/2 -translate-x-1/2", call: "left-full ml-4 top-1/2 -translate-y-1/2", cardAlign: "" },
+                            { pos: "right-48 top-1/2 -translate-y-1/2", call: "right-full mr-4 top-1/2 -translate-y-1/2", cardAlign: "" } // 電腦3位置：文字在圖像左方，避免畫面右邊緣切掉
                         ];
                         const cfg = layouts[idx];
                         const active = turn === idx;
                         const isCallForMe = currentCall && currentCall.playerIdx === idx;
                         
-                        const unifiedCallBoxClass = "bg-yellow-400 text-slate-900 px-4 py-2 md:px-8 md:py-6 rounded-[20px] md:rounded-[40px] text-2xl md:text-5xl font-black shadow-2xl border-2 md:border-4 border-white whitespace-nowrap";
+                        const unifiedCallBoxClass = "bg-yellow-400 text-slate-900 px-8 py-6 rounded-[40px] text-5xl font-black shadow-2xl border-4 border-white whitespace-nowrap";
 
                         return (
                             <Fragment key={player.id}>
                                 <div className={`absolute ${cfg.pos} flex flex-col items-center z-20`}>
                                     <div className="relative">
-                                        <div className={`w-14 h-14 md:w-20 md:h-20 rounded-full border-2 md:border-4 flex items-center justify-center text-2xl md:text-4xl bg-white shadow-xl transition-all duration-300 ${active ? 'scale-110 md:scale-125 border-yellow-400 ring-2 md:ring-4 ring-yellow-400/30' : 'border-slate-200'}`}>
-                                            {player.isAI ? "🤖" : "🙋"}
+                                        <div className={`w-20 h-20 rounded-full border-4 flex items-center justify-center text-4xl bg-white shadow-xl transition-all duration-300 ${active ? 'scale-125 border-yellow-400 ring-4 ring-yellow-400/30' : 'border-slate-200'}`}>
+                                            {idx === 0 ? "🙋" : "🤖"}
                                         </div>
-                                        {idx !== 0 && isCallForMe && idx !== myIndex && (
+                                        {/* 電腦與玩家公式定位邏輯 */}
+                                        {idx !== 0 && isCallForMe && (
                                             <div className={`absolute ${cfg.call} z-40 pointer-events-none animate-bounce`}>
                                                 <div className={unifiedCallBoxClass}>
                                                     {currentCall.text}
@@ -1628,31 +516,17 @@
                                             </div>
                                         )}
                                     </div>
-                                    <div className="mt-1 bg-slate-900/80 backdrop-blur-sm text-white px-3 py-0.5 md:px-4 md:py-1 rounded-full text-xs md:text-sm font-bold border border-white/20 text-center min-w-[100px] md:min-w-[120px]">
+                                    <div className="mt-2 bg-slate-900/80 backdrop-blur-sm text-white px-4 py-1 rounded-full text-sm font-bold border border-white/20 text-center min-w-[120px]">
                                         {player.name} {player.cards.length === 0 ? "（搶拍奪冠！）" : `(${player.cards.length}張)`}
                                     </div>
-                                    <div className="relative mt-2 md:mt-6 w-16 h-22 md:w-24 md:h-32 flex justify-center items-center">
-                                        <div className={`relative w-full h-full transition-all duration-500 ${idx === myIndex && gameState === 'playing' && player.cards.length > 0 ? 'hover:scale-105 active:scale-95 cursor-pointer' : ''}`} 
-                                             onClick={() => {
-                                                 if (idx !== myIndex) return;
-                                                 if (isOnlineMode) {
-                                                     if (onlineRole === 'host') {
-                                                         if (turn === 0) hostExecutePlayTurn();
-                                                     } else {
-                                                         if (turn === myIndex) {
-                                                             connections[0].send({ type: 'flip_request', playerIdx: myIndex });
-                                                         }
-                                                     }
-                                                 } else {
-                                                     playTurn(true);
-                                                 }
-                                             }}>
+                                    <div className="relative mt-6 w-24 h-32 flex justify-center items-center">
+                                        <div className={`relative w-full h-full transition-all duration-500 ${idx === 0 && gameState === 'playing' && player.cards.length > 0 ? 'hover:scale-105 active:scale-95 cursor-pointer' : ''}`} onClick={() => idx === 0 && playTurn(true)}>
                                             {player.cards.length > 0 ? [...Array(Math.min(Math.ceil(player.cards.length / 1.5), 15))].map((_, i) => {
                                                 const cd = player.cards[player.cards.length - 1 - i] || {};
                                                 return (
-                                                    <div key={i} className="absolute w-full h-full rounded-lg md:rounded-xl border md:border-2 shadow-sm" style={{ 
-                                                        top: isDealing ? cd.dealOy : -i * 1.5, 
-                                                        left: isDealing ? cd.dealOx : i * 0.3, 
+                                                    <div key={i} className="absolute w-full h-full rounded-xl border-2 shadow-sm" style={{ 
+                                                        top: isDealing ? cd.dealOy : -i * 2, 
+                                                        left: isDealing ? cd.dealOx : i * 0.5, 
                                                         transform: `rotate(${isDealing ? cd.dealRot : 0}deg)`, 
                                                         zIndex: 20 - i, 
                                                         backgroundColor: (isDealing || i === 0) ? '#3b82f6' : '#f8fafc', 
@@ -1660,10 +534,10 @@
                                                     }} />
                                                 );
                                             }) : (
-                                                <div className="w-full h-full rounded-lg md:rounded-xl border md:border-2 border-dashed border-white/30 flex items-center justify-center text-white/20 font-black text-xs md:text-base">空</div>
+                                                <div className="w-full h-full rounded-xl border-2 border-dashed border-white/30 flex items-center justify-center text-white/20 font-black">空</div>
                                             )}
                                         </div>
-                                        {idx === 0 && isCallForMe && idx !== myIndex && (
+                                        {idx === 0 && isCallForMe && (
                                             <div className={`absolute ${cfg.cardAlign} z-40 pointer-events-none animate-bounce`}>
                                                 <div className={unifiedCallBoxClass}>
                                                     {currentCall.text}
@@ -1675,41 +549,27 @@
                             </Fragment>
                         );
                     })}
-                    
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-44 h-56 md:w-64 md:h-80">
-                        <div className={`relative w-full h-full bg-emerald-800/40 rounded-[20px] md:rounded-[40px] border-2 md:border-4 border-dashed border-white/20 flex items-center justify-center cursor-pointer transition-colors ${gameState === 'slapping' ? 'bg-red-500/30 border-red-500' : ''}`} 
-                             onClick={() => {
-                                 if (isOnlineMode) {
-                                     if (onlineRole === 'host') {
-                                         hostExecuteSlap(0);
-                                     } else {
-                                         connections[0].send({ type: 'slap_request', playerIdx: myIndex });
-                                     }
-                                 } else {
-                                     handleSlap(0);
-                                 }
-                             }}>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-64 h-80">
+                        <div className={`relative w-full h-full bg-emerald-800/40 rounded-[40px] border-4 border-dashed border-white/20 flex items-center justify-center cursor-pointer transition-colors ${gameState === 'slapping' ? 'bg-red-500/30 border-red-500' : ''}`} onClick={() => handleSlap(0)}>
                             {isDealing ? (
-                                <div className="relative w-32 h-44 md:w-48 md:h-64">
-                                    {[...Array(Math.min(mainDeck.length, 20))].map((_, i) => (<div key={i} className="absolute inset-0 bg-blue-500 rounded-lg md:rounded-2xl shadow-xl border md:border-2 border-blue-600" style={{ top: -i * 1.5, left: i * 0.2, zIndex: 100 - i }} />))}
-                                    {dealingProgress < 60 && (<div className={`fixed top-1/2 left-1/2 w-16 h-22 md:w-24 md:h-32 bg-blue-500 rounded-lg md:rounded-xl border md:border-2 border-blue-600 shadow-lg z-[200] animate-deal-${dealingProgress % 4}`} />)}
+                                <div className="relative w-48 h-64">
+                                    {[...Array(Math.min(mainDeck.length, 20))].map((_, i) => (<div key={i} className="absolute inset-0 bg-blue-500 rounded-2xl shadow-xl border-2 border-blue-600" style={{ top: -i * 1.5, left: i * 0.2, zIndex: 100 - i }} />))}
+                                    {dealingProgress < 60 && (<div className={`fixed top-1/2 left-1/2 w-24 h-32 bg-blue-500 rounded-xl border-2 border-blue-600 shadow-lg z-[200] animate-deal-${dealingProgress % 4}`} />)}
                                 </div>
                             ) : (centerPile.length > 0 || flyingCard) && !punishingCard ? (
-                                <div className="relative w-32 h-44 md:w-48 md:h-64">
-                                    {centerPile.slice(-8).map((card, i) => (<div key={card.id} className="absolute inset-0 bg-white rounded-lg md:rounded-2xl shadow-xl flex items-center justify-center text-4xl md:text-7xl font-black text-slate-900 border-2 md:border-4 border-slate-50" style={{ zIndex: i }}>{i === centerPile.slice(-8).length - 1 ? card.value : ""}</div>))}
+                                <div className="relative w-48 h-64">
+                                    {centerPile.slice(-8).map((card, i) => (<div key={card.id} className="absolute inset-0 bg-white rounded-2xl shadow-xl flex items-center justify-center text-7xl font-black text-slate-900 border-4 border-slate-50" style={{ zIndex: i }}>{i === centerPile.slice(-8).length - 1 ? card.value : ""}</div>))}
                                     {flyingCard && (
-                                        <div className={`absolute inset-0 bg-white rounded-lg md:rounded-2xl shadow-2xl flex items-center justify-center text-4xl md:text-7xl font-black text-slate-900 z-[100] border-2 md:border-4 border-slate-200 pointer-events-none animate-fly-${flyingCard.fromPlayer}`}>
+                                        <div className={`absolute inset-0 bg-white rounded-2xl shadow-2xl flex items-center justify-center text-7xl font-black text-slate-900 z-[100] border-4 border-slate-200 pointer-events-none animate-fly-${flyingCard.fromPlayer}`}>
                                             {flyingCard.value}
                                         </div>
                                     )}
                                 </div>
-                            ) : (!punishingCard && gameState !== 'dealing') && (<div className="text-white/10 font-black text-sm md:text-xl uppercase tracking-widest text-center text-slate-300">拍牌區</div>)}
-                            {errorMsg && (<div className="absolute z-[160] bg-yellow-400 px-4 py-2 md:px-6 md:py-4 rounded-xl border-2 md:border-4 border-white shadow-2xl animate-pulse whitespace-nowrap pointer-events-none text-center text-slate-900"><h3 className="text-lg md:text-2xl font-black">{errorMsg}</h3></div>)}
-                            {punishingCard && (<div className={`fixed top-1/2 left-1/2 z-[150] pointer-events-none animate-return-${punishingCard.toPlayer}`}><div className="relative w-32 h-44 md:w-48 md:h-64">{punishingCard.pileSnapshot.map((card, i) => (<div key={card.id} className="absolute inset-0 bg-white rounded-lg md:rounded-2xl border-2 md:border-4 border-slate-100 shadow-xl flex items-center justify-center text-4xl md:text-7xl font-black text-slate-900" style={{ transform: `rotate(${card.rot}deg) translate(${card.ox}px, ${card.oy}px)`, zIndex: i }}>{i === punishingCard.pileSnapshot.length - 1 ? card.value : ""}</div>))}</div></div>)}
-                            {slapResults.map((pIdx, i) => (<div key={`${pIdx}-${i}`} className={`absolute text-6xl md:text-9xl z-[110] transition-all duration-200 pointer-events-none drop-shadow-2xl ${pIdx === 0 ? 'translate-y-16 md:translate-y-24' : ''} ${pIdx === 1 ? '-translate-x-16 md:-translate-x-24 -rotate-90' : ''} ${pIdx === 2 ? '-translate-y-16 md:-translate-y-24 rotate-180' : ''} ${pIdx === 3 ? 'translate-x-16 md:translate-x-24 rotate-90' : ''}`} style={{ opacity: 1 - (i * 0.1) }}>✋</div>))}
+                            ) : (!punishingCard && gameState !== 'dealing') && (<div className="text-white/10 font-black text-xl uppercase tracking-widest text-center text-slate-300">拍牌區</div>)}
+                            {errorMsg && (<div className="absolute z-[160] bg-yellow-400 px-6 py-4 rounded-xl border-4 border-white shadow-2xl animate-pulse whitespace-nowrap pointer-events-none text-center text-slate-900"><h3 className="text-2xl font-black">{errorMsg}</h3></div>)}
                         </div>
                     </div>
-                    {showIdleHint && (<div className="fixed bottom-32 md:bottom-40 left-1/2 -translate-x-1/2 z-[100] bg-white text-emerald-800 px-4 py-2 md:px-6 md:py-3 rounded-full shadow-2xl border-2 md:border-4 border-yellow-400 font-black text-lg md:text-2xl flex items-center gap-2 animate-pulse text-center"><AlertCircle className="text-yellow-500" /> 輪到你了！</div>)}
+                    {showIdleHint && (<div className="fixed bottom-40 left-1/2 -translate-x-1/2 z-[100] bg-white text-emerald-800 px-6 py-3 rounded-full shadow-2xl border-4 border-yellow-400 font-black text-2xl flex items-center gap-2 animate-pulse text-center"><AlertCircle className="text-yellow-500" /> 輪到你了！</div>)}
                 </div>
             );
         };
