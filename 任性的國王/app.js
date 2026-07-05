@@ -89,18 +89,21 @@ let cardUidCounter = 0;
 document.addEventListener('DOMContentLoaded', () => {
     initDOMElements();
     setupEvents();
-    showDiceModal();
+    showMainMenu();
 });
 
 // DOM 元素快取
 let DOM = {};
 function initDOMElements() {
-    DOM.btnRules = document.getElementById('btn-rules');
     DOM.btnRestart = document.getElementById('btn-restart');
     DOM.btnPlayCard = document.getElementById('btn-play-card');
     DOM.btnPassTurn = document.getElementById('btn-pass-turn');
     DOM.btnUseSkill = document.getElementById('btn-use-skill');
     DOM.btnStartGame = document.getElementById('btn-start-game');
+    
+    DOM.modalMainMenu = document.getElementById('modal-main-menu');
+    DOM.btnMainStart = document.getElementById('btn-main-start');
+    DOM.btnMainRules = document.getElementById('btn-main-rules');
     
     DOM.modalDice = document.getElementById('modal-dice');
     DOM.modalJester = document.getElementById('modal-jester');
@@ -212,13 +215,19 @@ function getPlaySpotDetailHTML(combo) {
 }
 
 function setupEvents() {
-    // 規則按鈕
-    DOM.btnRules.addEventListener('click', () => DOM.modalRules.classList.remove('hidden'));
+    // 主選單按鈕
+    DOM.btnMainStart.addEventListener('click', () => {
+        DOM.modalMainMenu.classList.add('hidden');
+        showDiceModal();
+    });
+    DOM.btnMainRules.addEventListener('click', () => {
+        DOM.modalRules.classList.remove('hidden');
+    });
     document.getElementById('btn-close-rules').addEventListener('click', () => DOM.modalRules.classList.add('hidden'));
     
-    // 重新開始
+    // 回主選單 (原重新開始)
     DOM.btnRestart.addEventListener('click', () => {
-        if(confirm("確定要重新開始遊戲嗎？將會重新洗牌與分配角色！")) {
+        if(confirm("確定要返回主選單嗎？當前遊戲進度將會遺失！")) {
             location.reload();
         }
     });
@@ -254,6 +263,12 @@ function setupEvents() {
     document.getElementById('btn-replay').addEventListener('click', () => {
         location.reload();
     });
+}
+
+function showMainMenu() {
+    if (DOM.modalMainMenu) {
+        DOM.modalMainMenu.classList.remove('hidden');
+    }
 }
 
 // ==================== 4. 擲骰子決定出牌順序 ====================
@@ -304,8 +319,15 @@ function rollAllDice() {
     // 清空贏家高亮
     diceCards.forEach(card => card.classList.remove('winner'));
     
-    // 骰子點數字符對照
-    const dieFaces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+    // 骰子點數圖案對照
+    const dieIcons = [
+        'fa-dice-one',
+        'fa-dice-two',
+        'fa-dice-three',
+        'fa-dice-four',
+        'fa-dice-five',
+        'fa-dice-six'
+    ];
     
     // 啟動滾動動畫
     dieElements.forEach(el => el.classList.add('rolling'));
@@ -314,7 +336,7 @@ function rollAllDice() {
     const interval = setInterval(() => {
         for (let i = 0; i < 4; i++) {
             const randomVal = Math.floor(Math.random() * 6);
-            dieElements[i].textContent = dieFaces[randomVal];
+            dieElements[i].innerHTML = `<i class="fa-solid ${dieIcons[randomVal]}"></i>`;
             scoreElements[i].textContent = `${randomVal + 1} 點`;
         }
         rollCount++;
@@ -324,11 +346,17 @@ function rollAllDice() {
             // 停止動畫，計算最終點數
             dieElements.forEach(el => el.classList.remove('rolling'));
             
-            const rolls = [];
+            // 產生 4 個完全不重複的 1 到 6 點數，確保開局不平手
+            const availableScores = [1, 2, 3, 4, 5, 6];
+            for (let i = availableScores.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [availableScores[i], availableScores[j]] = [availableScores[j], availableScores[i]];
+            }
+            const rolls = availableScores.slice(0, 4);
+
             for (let i = 0; i < 4; i++) {
-                const val = Math.floor(Math.random() * 6) + 1;
-                rolls.push(val);
-                dieElements[i].textContent = dieFaces[val - 1];
+                const val = rolls[i];
+                dieElements[i].innerHTML = `<i class="fa-solid ${dieIcons[val - 1]}"></i>`;
                 scoreElements[i].textContent = `${val} 點`;
             }
             
@@ -830,6 +858,18 @@ function drawFractionPreview() {
 
 // ==================== 7. 出牌驗證與出牌行為 ====================
 function toggleCardSelection(uid) {
+    const myPlayer = gameState.players[0];
+    const clickedCard = myPlayer.cards.find(c => c.uid === uid);
+    
+    if (clickedCard && (clickedCard.type === 'number' || clickedCard.type === 'restrict')) {
+        const selectedCards = getSelectedCards();
+        const firstFraction = selectedCards.find(c => c.type === 'number' || c.type === 'restrict');
+        if (firstFraction && firstFraction.den !== clickedCard.den) {
+            // 不同分母，自動取消選取原本選的卡
+            gameState.selectedCardIds = [];
+        }
+    }
+
     const idx = gameState.selectedCardIds.indexOf(uid);
     if (idx === -1) {
         gameState.selectedCardIds.push(uid);
