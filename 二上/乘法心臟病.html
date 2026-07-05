@@ -48,6 +48,17 @@
         @keyframes slapRipple { 0% { transform: translate(-50%,-50%) scale(0.2); opacity: 0.9; } 100% { transform: translate(-50%,-50%) scale(2.8); opacity: 0; } }
         .slap-ripple { position: absolute; top: 50%; left: 50%; width: 120px; height: 120px; border-radius: 50%; background: rgba(251,191,36,0.7); pointer-events: none; animation: slapRipple 0.5s ease-out forwards; }
 
+        /* 四方向手部落下動畫 */
+        @keyframes handFrom0 { 0% { transform: translateX(-50%) translateY(120px); opacity:1; } 35% { transform: translateX(-50%) translateY(-8px); opacity:1; } 60% { transform: translateX(-50%) translateY(4px); opacity:1; } 100% { transform: translateX(-50%) translateY(120px); opacity:0; } }
+        @keyframes handFrom1 { 0% { transform: translateY(-50%) translateX(-120px) rotate(-90deg); opacity:1; } 35% { transform: translateY(-50%) translateX(8px) rotate(-90deg); opacity:1; } 60% { transform: translateY(-50%) translateX(-4px) rotate(-90deg); opacity:1; } 100% { transform: translateY(-50%) translateX(-120px) rotate(-90deg); opacity:0; } }
+        @keyframes handFrom2 { 0% { transform: translateX(-50%) translateY(-120px) rotate(180deg); opacity:1; } 35% { transform: translateX(-50%) translateY(8px) rotate(180deg); opacity:1; } 60% { transform: translateX(-50%) translateY(-4px) rotate(180deg); opacity:1; } 100% { transform: translateX(-50%) translateY(-120px) rotate(180deg); opacity:0; } }
+        @keyframes handFrom3 { 0% { transform: translateY(-50%) translateX(120px) rotate(90deg); opacity:1; } 35% { transform: translateY(-50%) translateX(-8px) rotate(90deg); opacity:1; } 60% { transform: translateY(-50%) translateX(4px) rotate(90deg); opacity:1; } 100% { transform: translateY(-50%) translateX(120px) rotate(90deg); opacity:0; } }
+        .slap-hand { position: absolute; font-size: 52px; pointer-events: none; z-index: 350; line-height:1; }
+        .slap-hand-0 { bottom: 0; left: 50%; animation: handFrom0 0.75s ease-out forwards; }
+        .slap-hand-1 { left: 0; top: 50%; animation: handFrom1 0.75s ease-out forwards; }
+        .slap-hand-2 { top: 0; left: 50%; animation: handFrom2 0.75s ease-out forwards; }
+        .slap-hand-3 { right: 0; top: 50%; animation: handFrom3 0.75s ease-out forwards; }
+
         * { touch-action: manipulation; }
         .slap-area { touch-action: none !important; }
         body { overflow: hidden; background-color: #0f172a; margin: 0; font-family: system-ui, -apple-system, sans-serif; }
@@ -113,6 +124,13 @@
         const App = () => {
             const [gameState, setGameState] = useState('menu');
             const [slapRipple, setSlapRipple] = useState(false);
+            const [slapHands, setSlapHands] = useState([]);
+
+            const triggerSlapHand = (playerIndex) => {
+                const id = Date.now() + Math.random();
+                setSlapHands(prev => [...prev, { id, playerIndex }]);
+                setTimeout(() => setSlapHands(prev => prev.filter(h => h.id !== id)), 750);
+            };
             const [scale, setScale] = useState(1);
             useEffect(() => {
                 const handleResize = () => {
@@ -382,9 +400,10 @@
                     setIsAnimating(false);
                     setGameState('slapping');
 
-                    // Trigger slap ripple animation
+                    // Trigger slap ripple + hand animation
                     setSlapRipple(true);
                     setTimeout(() => setSlapRipple(false), 500);
+                    triggerSlapHand(playerIndex);
 
                     setSlapResults([playerIndex]);
                     playSoundEffect('slap');
@@ -400,6 +419,7 @@
                     setSlapResults(prev => {
                         if (prev.includes(playerIndex)) return prev;
                         const newResults = [...prev, playerIndex];
+                        triggerSlapHand(playerIndex);
                         playSoundEffect('slap');
                         
                         if (players[playerIndex].cards.length === 0 && newResults.length <= 3) {
@@ -416,7 +436,8 @@
                     });
                 } else if (gameState === 'playing' && !isMatch) {
                     if (slapResults.length === 0) {
-                        playSoundEffect('error'); 
+                        playSoundEffect('error');
+                        triggerSlapHand(playerIndex);
                         setErrorMsg(`${players[playerIndex].name} 拍錯了！`); 
                         setSlapResults([playerIndex]); 
 
@@ -620,6 +641,9 @@
                                 ) : (gameState !== 'dealing') && (<div className="text-white/10 font-black text-lg uppercase tracking-widest text-center text-slate-300">{"\u62cd\u724c\u5340"}</div>)}
                                 {/* 拍牌波紋效果 */}
                                 {slapRipple && <div className="slap-ripple" />}
+                                {slapHands.map(h => (
+                                    <div key={h.id} className={`slap-hand slap-hand-${h.playerIndex}`}>✋</div>
+                                ))}
                                 {errorMsg && (<div className="absolute z-[160] bg-yellow-400 px-4 py-3 rounded-xl border-4 border-white shadow-2xl animate-pulse whitespace-nowrap pointer-events-none text-center text-slate-900"><h3 className="text-xl font-black">{errorMsg}</h3></div>)}
                             </div>
                         </div>
