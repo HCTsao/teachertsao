@@ -570,9 +570,7 @@ function assignRoles() {
     if (DOM.myRoleImgFront) {
         DOM.myRoleImgFront.innerHTML = `<img src="${gameState.players[0].role.img}" alt="${gameState.players[0].role.name}">`;
     }
-    if (DOM.roleCardInner) {
-        bindCardMagnifier(DOM.roleCardInner, gameState.players[0].role.img, gameState.players[0].role.id);
-    }
+    // 角色卡牌不需放大鏡
 }
 
 // 發牌
@@ -1173,7 +1171,6 @@ function renderPlayerSpot(playerId, cards, text) {
             const cardEl = document.createElement('div');
             cardEl.className = 'played-card';
             cardEl.innerHTML = `<img src="${card.img}" alt="${card.display}">`;
-            bindCardMagnifier(cardEl, card.img, card.id);
             container.appendChild(cardEl);
         });
         spot.appendChild(container);
@@ -1971,7 +1968,6 @@ function executeLuckyStarSkill(luckyId) {
             const cardEl = document.createElement('div');
             cardEl.className = 'lucky-card-item';
             cardEl.innerHTML = `<img src="${card.img}">`;
-            bindCardMagnifier(cardEl, card.img, card.id);
             
             cardEl.onclick = () => {
                 const sIdx = selectedUids.indexOf(card.uid);
