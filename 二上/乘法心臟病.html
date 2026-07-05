@@ -881,9 +881,11 @@
                 
                 const newPlayers = [...players];
                 const card = newPlayers[turn].cards.pop();
+                flippedCardRef.current = card;
+                isFlipResolvedRef.current = false;
                 const callValue = multiplier * currentStep;
                 
-                const newCall = { playerIdx: turn, text: `${multiplier} × ${currentStep} = ${callValue}` };
+                const newCall = { playerIdx: turn, text: `${multiplier} \u00d7 ${currentStep} = ${callValue}` };
                 const newFlying = { value: card.value, fromPlayer: turn };
                 
                 setCurrentCall(newCall);
@@ -902,6 +904,8 @@
 
                 setTimeout(() => {
                     const advanceOnlineТurn = () => {
+                        if (isFlipResolvedRef.current) return;
+                        isFlipResolvedRef.current = true;
                         const newPile = [...centerPile, card];
                         setCenterPile(newPile);
                         setFlyingCard(null);
@@ -920,49 +924,44 @@
                                 currentCall: newCall,
                                 flyingCard: null,
                                 gameState: 'slapping',
+                                slapResults: [],
                                 isAnimating: false
                             });
                         } else {
-                            newPlayers.forEach((p, idx) => {
+                            players.forEach((p, idx) => {
                                 if (p.isAI) {
                                     if (isDangerousPair(card.value, callValue)) {
                                         const chance = aiLevel === 'easy' ? 0.5 : aiLevel === 'normal' ? 0.3 : 0.1;
                                         if (Math.random() < chance) {
+                                            const delay = (Math.random() * 500 + 300) * getAiSlapMultiplier();
                                             setTimeout(() => {
-                                                if (onlineRole === 'host') {
-                                                    hostExecuteSlap(idx);
-                                                }
-                                            }, (Math.random() * 500 + 300) * getAiSlapMultiplier());
+                                                setGameState(curr => { if (curr === 'slapping') hostExecuteSlap(idx); return curr; });
+                                            }, delay);
                                         }
                                     }
                                 }
                             });
 
                             const next = findNextPlayerWithCards(turn);
-                            let nextSt = currentStep;
                             if (next !== null) {
-                                if (difficulty === 'easy') nextSt = (currentStep === 10 ? 1 : currentStep + 1);
-                                else nextSt = (currentStep === 1 ? 10 : currentStep - 1);
-                            }
-                            
-                            setTurn(next !== null ? next : turn);
-                            setCurrentStep(nextSt);
-                            
-                            if (next === null) {
-                                setGameState('gameOver');
-                                setWinner(null);
-                                broadcastGameOver(null);
-                            } else {
+                                setTurn(next);
+                                const nextSt = (difficulty === 'easy') ? (currentStep === 10 ? 1 : currentStep + 1) : (currentStep === 1 ? 10 : currentStep - 1);
+                                setCurrentStep(nextSt);
+                                
                                 broadcastStateUpdate({
                                     players: newPlayers,
                                     centerPile: newPile,
                                     turn: next,
                                     currentStep: nextSt,
-                                    currentCall: newCall,
+                                    currentCall: null,
                                     flyingCard: null,
                                     gameState: 'playing',
                                     isAnimating: false
                                 });
+                            } else {
+                                setGameState('gameOver');
+                                setWinner(null);
+                                broadcastGameOver(null);
                             }
                         }
                     };
@@ -1206,13 +1205,17 @@
                 setIsAnimating(true); setShowIdleHint(false); 
                 const newPlayers = [...players];
                 const card = newPlayers[turn].cards.pop();
+                flippedCardRef.current = card;
+                isFlipResolvedRef.current = false;
                 const callValue = multiplier * currentStep;
                 
-                setCurrentCall({ playerIdx: turn, text: `${multiplier} × ${currentStep} = ${callValue}` });
+                setCurrentCall({ playerIdx: turn, text: `${multiplier} \u00d7 ${currentStep} = ${callValue}` });
                 setFlyingCard({ value: card.value, fromPlayer: turn });
 
                 // Wait for the card animation (600ms) AND for any ongoing speech to finish
                 const advanceTurn = () => {
+                    if (isFlipResolvedRef.current) return;
+                    isFlipResolvedRef.current = true;
                     const newPile = [...centerPile, card];
                     setCenterPile(newPile); setFlyingCard(null); setPlayers(newPlayers);
                     
