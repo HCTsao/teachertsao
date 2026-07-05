@@ -1053,9 +1053,14 @@
                             });
 
                             setTimeout(() => {
-                                const newPlayers = [...players];
-                                newPlayers[loserIndex].cards = [...centerPile, ...newPlayers[loserIndex].cards];
-                                setPlayers(newPlayers);
+                                setPlayers(prevPlayers => {
+                                    const newPlayers = [...prevPlayers];
+                                    newPlayers[loserIndex] = {
+                                        ...newPlayers[loserIndex],
+                                        cards: [...centerPile, ...newPlayers[loserIndex].cards]
+                                    };
+                                    return newPlayers;
+                                });
                                 setCenterPile([]);
                                 setSlapResults([]);
                                 setPunishingCard(null);
@@ -1074,16 +1079,17 @@
                         setErrorMsg(`${players[slapPlayerIdx].name} 拍錯了！`);
                         setSlapResults([slapPlayerIdx]);
                         
+                        let activePile = centerPile;
                         if (!isFlipResolvedRef.current) {
                             isFlipResolvedRef.current = true;
                             const card = flippedCardRef.current;
-                            const newPile = [...centerPile, card];
-                            setCenterPile(newPile);
+                            activePile = [...centerPile, card];
+                            setCenterPile(activePile);
                             setFlyingCard(null);
                             setIsAnimating(false);
                         }
                         
-                        const punishing = { toPlayer: slapPlayerIdx, pileSnapshot: centerPile.slice(-8) };
+                        const punishing = { toPlayer: slapPlayerIdx, pileSnapshot: activePile.slice(-8) };
                         setPunishingCard(punishing);
                         setCurrentCall(null);
                         
@@ -1095,7 +1101,7 @@
                                 errorMsg: `${players[slapPlayerIdx].name} 拍錯了！`,
                                 slapPlayerIdx: slapPlayerIdx,
                                 punishingCard: punishing,
-                                players: players.map((p, idx) => idx === slapPlayerIdx ? { ...p, cards: [...centerPile, ...p.cards] } : p),
+                                players: players.map((p, idx) => idx === slapPlayerIdx ? { ...p, cards: [...activePile, ...p.cards] } : p),
                                 centerPile: [],
                                 nextTurn: slapPlayerIdx,
                                 nextStep: nextSt
@@ -1103,9 +1109,14 @@
                         });
 
                         setTimeout(() => {
-                            const newPlayers = [...players];
-                            newPlayers[slapPlayerIdx].cards = [...centerPile, ...newPlayers[slapPlayerIdx].cards];
-                            setPlayers(newPlayers);
+                            setPlayers(prevPlayers => {
+                                const newPlayers = [...prevPlayers];
+                                newPlayers[slapPlayerIdx] = {
+                                    ...newPlayers[slapPlayerIdx],
+                                    cards: [...activePile, ...newPlayers[slapPlayerIdx].cards]
+                                };
+                                return newPlayers;
+                            });
                             setCenterPile([]);
                             setSlapResults([]);
                             setPunishingCard(null);
@@ -1147,17 +1158,22 @@
                 }
             }, [gameState, dealingProgress, mainDeck, players, isOnlineMode, onlineRole]);
 
-            const executePenalty = (loserIndex) => {
+            const executePenalty = (loserIndex, currentPile) => {
                 if (punishingCard) return;
                 playSoundEffect('slap');
-                setPunishingCard({ toPlayer: loserIndex, pileSnapshot: centerPile.slice(-8) });
+                setPunishingCard({ toPlayer: loserIndex, pileSnapshot: currentPile.slice(-8) });
                 setCurrentCall(null); 
                 const nextStep = (difficulty === 'easy') ? (currentStep === 10 ? 1 : currentStep + 1) : (currentStep === 1 ? 10 : currentStep - 1);
 
                 setTimeout(() => {
-                    const newPlayers = [...players];
-                    newPlayers[loserIndex].cards = [...centerPile, ...newPlayers[loserIndex].cards];
-                    setPlayers(newPlayers);
+                    setPlayers(prevPlayers => {
+                        const newPlayers = [...prevPlayers];
+                        newPlayers[loserIndex] = {
+                            ...newPlayers[loserIndex],
+                            cards: [...currentPile, ...newPlayers[loserIndex].cards]
+                        };
+                        return newPlayers;
+                    });
                     setCenterPile([]); setSlapResults([]); setPunishingCard(null); setErrorMsg(""); setGameState('playing');
                     setTurn(loserIndex); setCurrentStep(nextStep); aiSlapScheduledRef.current = false;
                 }, 800);
@@ -1269,7 +1285,7 @@
 
                         if (newResults.length === 3) {
                             const loserIndex = [0, 1, 2, 3].find(idx => !newResults.includes(idx));
-                            executePenalty(loserIndex);
+                            executePenalty(loserIndex, centerPile);
                         }
                         return newResults;
                     });
@@ -1279,16 +1295,17 @@
                         setErrorMsg(`${players[playerIndex].name} 拍錯了！`); 
                         setSlapResults([playerIndex]); 
 
+                        let activePile = centerPile;
                         if (!isFlipResolvedRef.current) {
                             isFlipResolvedRef.current = true;
                             const card = flippedCardRef.current;
-                            const newPile = [...centerPile, card];
-                            setCenterPile(newPile);
+                            activePile = [...centerPile, card];
+                            setCenterPile(activePile);
                             setFlyingCard(null);
                             setIsAnimating(false);
                         }
 
-                        executePenalty(playerIndex);
+                        executePenalty(playerIndex, activePile);
                     }
                 }
             };
