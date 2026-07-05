@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任性的國王 | 紅旗老師的AI教具</title>
+    <!-- SEO 優化 -->
+    <meta name="description" content="《任性的國王》等值分數對戰網頁版，結合國小分數、倍數與策略角色扮演，讓學生在趣味互動中掌握等值分數概念與乘法運算！">
+    <meta name="keywords" content="任性的國王, 等值分數, 數學教具, 數位學習, 分數乘法, 紅旗老師">
+    <meta name="author" content="紅旗老師 (hctsao)">
+    
+    <!-- 引入 Google Fonts & FontAwesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- 遊戲主要容器 -->
+    <div id="game-container">
+        
+        <!-- 頂部導覽列 -->
+        <header class="game-header">
+            <a href="../index.html" class="btn-back"><i class="fa-solid fa-house"></i> 回首頁</a>
+            <button class="btn-control" id="btn-rules"><i class="fa-solid fa-book-open"></i> 遊戲規則</button>
+            <button class="btn-control" id="btn-restart"><i class="fa-solid fa-rotate-left"></i> 重新開始</button>
+        </header>
+
+        <!-- 遊戲主體區域 -->
+        <main class="game-main">
+            
+            <!-- 遊戲桌面區 -->
+            <div class="game-board">
+                
+                <!-- 背景幾何與裝飾 -->
+                <div class="board-pattern"></div>
+
+                <!-- AI 玩家 1 (頂部) -->
+                <div class="player-seat player-top" id="seat-1">
+                    <div class="player-avatar">
+                        <i class="fa-solid fa-robot"></i>
+                        <span class="avatar-glow"></span>
+                    </div>
+                    <div class="player-info">
+                        <div class="player-name">電腦 樂樂</div>
+                        <div class="player-role-badge hidden" id="reveal-role-1">角色: 未知</div>
+                        <div class="card-count"><i class="fa-solid fa-clone"></i> 手牌: <span id="card-count-1">16</span> 張</div>
+                    </div>
+                </div>
+
+                <!-- AI 玩家 2 (左側) -->
+                <div class="player-seat player-left" id="seat-2">
+                    <div class="player-avatar">
+                        <i class="fa-solid fa-microchip"></i>
+                        <span class="avatar-glow"></span>
+                    </div>
+                    <div class="player-info">
+                        <div class="player-name">電腦 奇奇</div>
+                        <div class="player-role-badge hidden" id="reveal-role-2">角色: 未知</div>
+                        <div class="card-count"><i class="fa-solid fa-clone"></i> 手牌: <span id="card-count-2">16</span> 張</div>
+                    </div>
+                </div>
+
+                <!-- AI 玩家 3 (右側) -->
+                <div class="player-seat player-right" id="seat-3">
+                    <div class="player-avatar">
+                        <i class="fa-solid fa-laptop-code"></i>
+                        <span class="avatar-glow"></span>
+                    </div>
+                    <div class="player-info">
+                        <div class="player-name">電腦 糖糖</div>
+                        <div class="player-role-badge hidden" id="reveal-role-3">角色: 未知</div>
+                        <div class="card-count"><i class="fa-solid fa-clone"></i> 手牌: <span id="card-count-3">16</span> 張</div>
+                    </div>
+                </div>
+
+                <!-- 桌面中央區域 (出牌比對與棄牌堆) -->
+                <div class="board-center">
+                    
+                    <!-- 當前回合資訊 -->
+                    <div class="round-status">
+                        <div class="status-title">這輪的目標分數</div>
+                        <div class="target-value" id="current-target-value">無</div>
+                        <div class="target-desc" id="current-target-desc">等待起始玩家出牌...</div>
+                    </div>
+
+                    <!-- 統一中央出牌放置點 -->
+                    <div class="play-spot center-spot" id="center-play-spot"></div>
+
+                    <!-- 棄牌堆與牌庫圖示 (隱藏) -->
+                    <div class="deck-area" style="display: none;">
+                        <div class="deck-pile">
+                            <div class="deck-back"></div>
+                            <span class="pile-label">牌庫</span>
+                        </div>
+                        <div class="discard-pile" id="discard-pile-view" style="display: none;">
+                            <span class="pile-label">棄牌堆</span>
+                        </div>
+                    </div>
+                    
+                </div>
+
+                <!-- 玩家本人出牌位置 (隱藏的座位，已無個別 play-spot，安全保留 DOM) -->
+                <div class="player-seat player-bottom" id="seat-0" style="display: none;"></div>
+
+            </div>
+
+            <!-- 右側控制面板 (遊戲日誌與玩家角色) -->
+        </main>
+
+        <!-- 底部控制與手牌區域 -->
+        <footer class="game-footer">
+            
+            <!-- 玩家控制按鈕與分數分析 -->
+            <div class="player-control-bar">
+                
+                <!-- 玩家身分區 (文字版) -->
+                <div class="role-text-box">
+                    <div class="role-text-label"><i class="fa-solid fa-id-card"></i> 我的角色</div>
+                    <div class="role-text-content" id="my-role-text-display">分配中...</div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-action btn-gold btn-disabled" id="btn-use-skill" disabled>
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> 發動技能
+                    </button>
+                    <button class="btn-game btn-disabled" id="btn-play-card" disabled>
+                        <i class="fa-solid fa-paper-plane"></i> 確定出牌！
+                    </button>
+                    <button class="btn-game" id="btn-pass-turn">
+                        <i class="fa-solid fa-ban"></i> 跳過 (Pass)
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- 下方區：手牌居左，選取分數預覽居右 -->
+            <div class="footer-bottom-row">
+                <!-- 手牌展示區 -->
+                <div class="hand-area">
+                    <div class="hand-title">我的手牌卡 (<span id="my-card-count">0</span> 張)</div>
+                    <div class="hand-cards" id="my-hand-list">
+                        <!-- 卡牌動態生成 -->
+                    </div>
+                </div>
+
+                <!-- 分數預覽區 -->
+                <div class="fraction-preview-box">
+                    <div class="fraction-canvas-container">
+                        <canvas id="fraction-canvas" width="80" height="80"></canvas>
+                    </div>
+                    <div class="fraction-text">
+                        <div class="preview-title">選取的分數</div>
+                        <div class="preview-fraction" id="my-select-value">0</div>
+                        <div class="preview-decimal" id="my-select-decimal" style="display: none;">(0.00)</div>
+                    </div>
+                </div>
+            </div>
+
+        </footer>
+
+    </div>
+
+    <!-- ==================== 彈出視窗與互動層 ==================== -->
+
+    <!-- 1. 擲骰子順序決定 -->
+    <div class="modal-overlay" id="modal-dice">
+        <div class="modal-content">
+            <h2 class="modal-title"><i class="fa-solid fa-dice"></i> 擲骰子決定出牌順序</h2>
+            <p>起始玩家由擲骰子決定。點數最大者優先，順時針出牌。</p>
+            
+            <button class="btn-game" id="btn-roll-dice" style="margin: 1.5rem 0;">
+                <i class="fa-solid fa-dice-d6"></i> 開始擲骰子
+            </button>
+            
+            <div class="dice-results-area hidden" id="dice-results-view">
+                <div class="dice-rollers-grid">
+                    <div class="dice-roller-card" id="dice-card-0">
+                        <span class="dice-player-name">您</span>
+                        <div class="dice-die-icon" id="die-val-0">🎲</div>
+                        <span class="dice-score" id="die-score-0">- 點</span>
+                    </div>
+                    <div class="dice-roller-card" id="dice-card-1">
+                        <span class="dice-player-name">電腦 樂樂</span>
+                        <div class="dice-die-icon" id="die-val-1">🎲</div>
+                        <span class="dice-score" id="die-score-1">- 點</span>
+                    </div>
+                    <div class="dice-roller-card" id="dice-card-2">
+                        <span class="dice-player-name">電腦 奇奇</span>
+                        <div class="dice-die-icon" id="die-val-2">🎲</div>
+                        <span class="dice-score" id="die-score-2">- 點</span>
+                    </div>
+                    <div class="dice-roller-card" id="dice-card-3">
+                        <span class="dice-player-name">電腦 糖糖</span>
+                        <div class="dice-die-icon" id="die-val-3">🎲</div>
+                        <span class="dice-score" id="die-score-3">- 點</span>
+                    </div>
+                </div>
+                <div class="dice-announcement-text" id="dice-announcement" style="font-size: 1rem; font-weight: bold; color: #ff9f43; margin: 1rem 0;"></div>
+                <button class="btn-game hidden" id="btn-dice-start-game" style="width: 100%;">好的，分配角色與開始</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 小丑技能倍數輸入 -->
+    <div class="modal-overlay hidden" id="modal-jester">
+        <div class="modal-content">
+            <h2><i class="fa-solid fa-wand-magic-sparkles"></i> 小丑技能：乘以任意倍數</h2>
+            <p>請輸入您要將當前牌值乘以幾倍？（乘完結果不得大於 1）</p>
+            <div class="jester-input-group">
+                <input type="number" id="jester-multiplier" min="1" max="12" value="2">
+                <button class="btn-game" id="btn-jester-confirm">確定發動</button>
+            </div>
+            <p class="jester-warning" id="jester-error-msg"></p>
+            <button class="btn-control" style="margin-top: 1rem;" id="btn-jester-cancel">取消</button>
+        </div>
+    </div>
+
+    <!-- 3. 幸運星拿牌/遞牌選擇 -->
+    <div class="modal-overlay hidden" id="modal-lucky">
+        <div class="modal-content lucky-modal-content">
+            <h2 id="lucky-modal-title">幸運星：從棄牌堆挑選3張牌</h2>
+            <p id="lucky-modal-desc">請點選 3 張卡牌加入手牌：</p>
+            
+            <div class="lucky-select-area" id="lucky-card-list">
+                <!-- 棄牌堆卡片列出 -->
+            </div>
+            
+            <div class="lucky-actions">
+                <button class="btn-game btn-disabled" id="btn-lucky-confirm" disabled>確認選擇 (<span id="lucky-selected-count">0</span>/3)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. 法師遞牌選擇 -->
+    <div class="modal-overlay hidden" id="modal-mage">
+        <div class="modal-content">
+            <h2>法師：選擇 1 張手牌遞給左邊玩家</h2>
+            <p>請點擊下方手牌中要送給 AI 騎士 的卡牌：</p>
+            <div class="mage-card-select-list" id="mage-hand-list">
+                <!-- 玩家手牌縮小版 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. 遊戲規則說明 -->
+    <div class="modal-overlay hidden" id="modal-rules-overlay">
+        <div class="modal-content rules-content">
+            <h2>《任性的國王》遊戲規則與操作</h2>
+            <div class="rules-scroll-area">
+                <h3>📍 出牌規則</h3>
+                <ol>
+                    <li><strong>出牌順序</strong>：開局由猜拳決定。起始玩家可以出任意牌組合（但必須是相同的單位分數，如單張 <span class="fraction-vertical inline-fraction"><span class="fraction-numerator">1</span><span class="fraction-line"></span><span class="fraction-denominator">3</span></span>，或兩張 <span class="fraction-vertical inline-fraction"><span class="fraction-numerator">1</span><span class="fraction-line"></span><span class="fraction-denominator">3</span></span> 等，可搭配倍數卡）。</li>
+                    <li><strong>等值出牌</strong>：下一家必須打出<strong>「等值」</strong>的分數才算成功出牌。例如：上家出 <span class="fraction-vertical inline-fraction"><span class="fraction-numerator">2</span><span class="fraction-line"></span><span class="fraction-denominator">3</span></span>，你可以出 <span class="fraction-vertical inline-fraction"><span class="fraction-numerator">4</span><span class="fraction-line"></span><span class="fraction-denominator">6</span></span>（4張 <span class="fraction-vertical inline-fraction"><span class="fraction-numerator">1</span><span class="fraction-line"></span><span class="fraction-denominator">6</span></span>）、<span class="fraction-vertical inline-fraction"><span class="fraction-numerator">6</span><span class="fraction-line"></span><span class="fraction-denominator">9</span></span>（6張 <span class="fraction-vertical inline-fraction"><span class="fraction-numerator">1</span><span class="fraction-line"></span><span class="fraction-denominator">9</span></span>）、或 <span class="fraction-vertical inline-fraction"><span class="fraction-numerator">1</span><span class="fraction-line"></span><span class="fraction-denominator">3</span></span> 搭配 2倍卡。</li>
+                    <li><strong>Pass 機制</strong>：沒有等值牌出可以喊 Pass。Pass 之後該輪不得再出牌，當所有人都 Pass 之後，由最後出牌的玩家取得新一輪的出牌權，可重新定義出牌目標。</li>
+                    <li><strong>限制卡限制</strong>：分母為 8, 9, 10, 12 的卡牌為限制卡。擁有出牌權（起手出牌）時，<strong>不能單出限制卡</strong>，除非手牌只剩下限制卡且沒有重複。</li>
+                    <li><strong>倍數卡限制</strong>：倍數卡（2倍、3倍、5倍）可以把手牌值乘以指定倍數。乘完之結果不得大於 1。</li>
+                </ol>
+
+                <h3>🫅 角色技能（每局限發動一次）</h3>
+                <ul>
+                    <li><strong>國王</strong>：當有人手牌剩 3 張或以下時，可將棄牌堆平分給其他 3 人。</li>
+                    <li><strong>皇后</strong>：當國王發牌給自己時，可發動技能拒絕收牌，直接退回棄牌堆。</li>
+                    <li><strong>大臣</strong>：當有人取得出牌權時，強制所有人將手牌往右傳（順時針）。</li>
+                    <li><strong>法師</strong>：當有人取得出牌權時，選 1 張手牌遞給左邊玩家。</li>
+                    <li><strong>小丑</strong>：自己出牌時，可將牌值乘以任意整數倍數（不需要倍數卡）。</li>
+                    <li><strong>騎士</strong>：當他人取得出牌權時，強制搶走該出牌權。</li>
+                    <li><strong>幸運星</strong>：任意時機發動，從棄牌堆拿 3 張牌，並選 3 張手牌遞給「衰鬼」（若在場）。</li>
+                    <li><strong>衰鬼</strong>：被動角色。獲得幸運星給的 3 張牌。</li>
+                </ul>
+            </div>
+            <button class="btn-game" style="margin-top: 1rem;" id="btn-close-rules">我知道了</button>
+        </div>
+    </div>
+
+    <!-- 技能發動詢問彈窗 (騎士、大臣、法師) -->
+    <div class="modal-overlay hidden" id="modal-reaction-prompt" style="z-index: 99999;">
+        <div class="modal-content" style="max-width: 380px; text-align: center;">
+            <h2><i class="fa-solid fa-wand-magic-sparkles"></i> 技能發動詢問</h2>
+            <p id="reaction-prompt-text" style="font-size: 0.95rem; margin: 1.5rem 0; line-height: 1.5; color: var(--text-light);"></p>
+            <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1rem;">
+                <button class="btn-game" id="btn-reaction-yes">發動技能</button>
+                <button class="btn-game btn-danger" style="background: var(--color-danger);" id="btn-reaction-no">不發動</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 7. 遊戲開始分配角色揭曉 -->
+    <div class="modal-overlay hidden" id="modal-role-reveal" style="z-index: 99999;">
+        <div class="modal-content" style="max-width: 380px; text-align: center;">
+            <h2 style="color: #ff9f43; font-size: 1.3rem;"><i class="fa-solid fa-id-card"></i> 您的隱藏身分已分配</h2>
+            <p style="font-size: 0.85rem; color: var(--color-muted); margin-bottom: 0.5rem;">此身分僅您自己可見，請善用技能取得勝利！</p>
+            <div class="role-reveal-card-container" style="margin: 1rem 0;">
+                <img id="reveal-modal-role-img" src="" alt="角色圖片" style="width: 110px; height: 171px; border-radius: 8px; border: 2px solid #ff9f43; box-shadow: 0 0 12px rgba(255, 159, 67, 0.2);">
+            </div>
+            <div id="reveal-modal-role-name" style="font-size: 1.3rem; font-weight: bold; color: #ff9f43; margin-bottom: 0.5rem;"></div>
+            <div id="reveal-modal-role-desc" style="font-size: 0.8rem; color: var(--text-light); max-width: 320px; margin: 0 auto 1.5rem auto; line-height: 1.4; background: #f8fafc; border: 2px solid #e2e8f0; padding: 0.5rem; border-radius: 12px;"></div>
+            <button class="btn-game" id="btn-role-reveal-confirm" style="width: 100%;">好的，開始遊戲</button>
+        </div>
+    </div>
+
+    <!-- 8. 技能發動提示彈窗 -->
+    <div class="modal-overlay hidden" id="modal-skill-notification" style="z-index: 100000;">
+        <div class="modal-content" style="max-width: 380px; text-align: center;">
+            <h2 style="color: #ff9f43; font-size: 1.3rem;"><i class="fa-solid fa-wand-magic-sparkles"></i> 技能發動提示</h2>
+            <div class="skill-reveal-announcement" style="margin: 1.5rem 0;">
+                <div id="skill-notif-player" style="font-size: 1.1rem; font-weight: bold; color: var(--text-light); margin-bottom: 0.5rem;"></div>
+                <div id="skill-notif-role" style="font-size: 1.2rem; font-weight: 900; color: #ff9f43; margin-bottom: 1rem;"></div>
+                <div id="skill-notif-desc" style="font-size: 0.85rem; color: var(--text-light); line-height: 1.5; background: #f8fafc; border: 2px solid #e2e8f0; padding: 0.8rem; border-radius: 12px;"></div>
+            </div>
+            <button class="btn-game" id="btn-skill-notif-confirm" style="width: 100%;">我知道了</button>
+        </div>
+    </div>
+
+    <!-- 6. 遊戲結束 -->
+    <div class="modal-overlay hidden" id="modal-gameover">
+        <div class="modal-content">
+            <h2 class="modal-title" id="gameover-title">遊戲結束！</h2>
+            <p id="gameover-rank-text">排行榜計算中...</p>
+            <div class="rank-list" id="rank-list">
+                <!-- 排行榜清單 -->
+            </div>
+            <button class="btn-game" id="btn-replay">再玩一局</button>
+        </div>
+    </div>
+
+    <!-- 浮動卡牌放大鏡 -->
+    <div id="floating-card-preview" class="floating-preview hidden">
+        <img id="floating-card-img" src="" alt="放大預覽">
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
