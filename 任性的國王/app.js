@@ -2120,9 +2120,12 @@ function showGameOver(winnerId) {
     if (winnerId === 0) {
         title.innerHTML = '🏆 恭喜您贏了！';
         title.style.color = 'var(--color-gold)';
+        // 播放勝利五彩碎紙動畫
+        startConfetti();
     } else {
         title.innerHTML = '💀 AI 贏得了勝利...';
         title.style.color = 'var(--color-danger)';
+        stopConfetti();
     }
 
     document.getElementById('gameover-rank-text').textContent = `排名結果：`;
@@ -2144,6 +2147,97 @@ function showGameOver(winnerId) {
         `;
         rankList.appendChild(item);
     });
+}
+
+let confettiActive = false;
+let confettiAnimationId = null;
+
+function startConfetti() {
+    const canvas = document.getElementById('confetti-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    const overlay = document.getElementById('modal-gameover');
+    canvas.width = overlay.clientWidth;
+    canvas.height = overlay.clientHeight;
+    
+    const resizeHandler = () => {
+        canvas.width = overlay.clientWidth;
+        canvas.height = overlay.clientHeight;
+    };
+    window.addEventListener('resize', resizeHandler);
+    
+    const colors = [
+        '#ffd700', // Gold
+        '#ff9f43', // Orange Gold
+        '#ff5e5e', // Red
+        '#10b981', // Green
+        '#3b82f6', // Blue
+        '#a855f7', // Purple
+        '#f43f5e'  // Pink
+    ];
+    
+    const particles = [];
+    const particleCount = 120;
+    
+    for (let i = 0; i < particleCount; i++) {
+        particles.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height - canvas.height,
+            r: Math.random() * 6 + 4,
+            d: Math.random() * canvas.height,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            tilt: Math.random() * 10 - 5,
+            tiltAngleIncremental: Math.random() * 0.07 + 0.02,
+            tiltAngle: 0
+        });
+    }
+    
+    confettiActive = true;
+    
+    function draw() {
+        if (!confettiActive) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        for (let i = 0; i < particleCount; i++) {
+            const p = particles[i];
+            
+            ctx.beginPath();
+            ctx.lineWidth = p.r;
+            ctx.strokeStyle = p.color;
+            ctx.moveTo(p.x + p.tilt + p.r / 2, p.y);
+            ctx.lineTo(p.x + p.tilt, p.y + p.tilt + p.r / 2);
+            ctx.stroke();
+            
+            p.tiltAngle += p.tiltAngleIncremental;
+            p.y += (Math.cos(p.d) + 3 + p.r / 2) / 2;
+            p.x += Math.sin(p.tiltAngle) * 1;
+            p.tilt = Math.sin(p.tiltAngle - i / 3) * 15;
+            
+            if (p.y > canvas.height) {
+                p.x = Math.random() * canvas.width;
+                p.y = -20;
+                p.tilt = Math.random() * 10 - 5;
+            }
+        }
+        
+        confettiAnimationId = requestAnimationFrame(draw);
+    }
+    
+    draw();
+}
+
+function stopConfetti() {
+    confettiActive = false;
+    if (confettiAnimationId) {
+        cancelAnimationFrame(confettiAnimationId);
+        confettiAnimationId = null;
+    }
+    const canvas = document.getElementById('confetti-canvas');
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
 }
 
 // ==================== 12. 工具與輔助函式 ====================
