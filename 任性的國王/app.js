@@ -241,6 +241,20 @@ function setupEvents() {
     });
     document.getElementById('btn-close-rules').addEventListener('click', () => DOM.modalRules.classList.add('hidden'));
     
+    // 點擊空白處隱藏卡片預覽 (特別優化手機版)
+    document.addEventListener('click', (e) => {
+        const preview = document.getElementById('floating-card-preview');
+        if (preview && !preview.classList.contains('hidden')) {
+            if (!e.target.closest('.game-card') && !e.target.closest('#floating-card-preview')) {
+                preview.classList.add('hidden');
+                const infoContent = document.getElementById('card-info-content');
+                if (infoContent) {
+                    infoContent.innerHTML = `<div class="card-info-placeholder">請將滑鼠移到卡牌上，這裡會顯示卡牌的詳細說明與規則喔！</div>`;
+                }
+            }
+        }
+    });
+
     // 回主選單 (原重新開始)
     DOM.btnRestart.addEventListener('click', () => {
         if(confirm("確定要返回主選單嗎？當前遊戲進度將會遺失！")) {
@@ -836,8 +850,18 @@ function updateRolePanel() {
             DOM.btnUseSkill.classList.add('btn-disabled');
             DOM.btnUseSkill.disabled = true;
             DOM.btnUseSkill.style.animation = 'none';
-        }
         DOM.btnUseSkill.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> 發動技能`;
+    }
+
+    // 更新角色技能詳細說明面板
+    const detailEl = document.getElementById('my-skill-detail-text');
+    if (detailEl && player.role) {
+        const cardDescKey = Object.keys(CARD_DESC).find(k => CARD_DESC[k].name === player.role.name && CARD_DESC[k].type === "role");
+        if (cardDescKey) {
+            detailEl.innerHTML = CARD_DESC[cardDescKey].desc;
+        } else {
+            detailEl.innerHTML = player.role.desc;
+        }
     }
 }
 
