@@ -1252,7 +1252,19 @@ function triggerSkillPending(event, playerId) {
                 skillEffectText = `【${getPlayerName(playerId)}】取得了下一輪出牌權。<br><br>您要發動<b>【騎士技能】</b>強行搶奪此輪的出牌權，由您首發出牌嗎？`;
             } else if (myPlayer.role.id === 3) {
                 skillName = "大臣";
-                skillEffectText = `【${getPlayerName(playerId)}】取得了下一輪出牌權。<br><br>您要發動<b>【大臣技能】</b>將所有玩家手牌順時針（往右）傳遞交換嗎？`;
+                const p0 = gameState.players[0].cards.length;
+                const p1 = gameState.players[1].cards.length;
+                const p2 = gameState.players[2].cards.length;
+                const p3 = gameState.players[3].cards.length;
+                skillEffectText = `【${getPlayerName(playerId)}】取得了下一輪出牌權。<br><br>` +
+                    `您要發動<b>【大臣技能】</b>將所有玩家手牌順時針（往右）傳遞交換嗎？<br><br>` +
+                    `<div style="text-align: left; background: #f8fafc; border: 2px solid #cbd5e1; padding: 0.8rem; border-radius: 12px; font-size: 0.92rem; line-height: 1.5; color: var(--text-light); margin-top: 0.5rem;">` +
+                    `<b style="color: var(--color-gold);">📊 目前各玩家剩餘張數與交換預測：</b><br>` +
+                    `• <b>您</b>：${p0} 張 ➔ 將獲得 <b>電腦3</b> 的 <b>${p3}</b> 張牌<br>` +
+                    `• <b>電腦1</b>：${p1} 張 ➔ 將獲得 <b>您的</b> <b>${p0}</b> 張牌<br>` +
+                    `• <b>電腦2</b>：${p2} 張 ➔ 將獲得 <b>電腦1</b> 的 <b>${p1}</b> 張牌<br>` +
+                    `• <b>電腦3</b>：${p3} 張 ➔ 將獲得 <b>電腦2</b> 的 <b>${p2}</b> 張牌` +
+                    `</div>`;
             } else if (myPlayer.role.id === 4) {
                 skillName = "法師";
                 skillEffectText = `【${getPlayerName(playerId)}】取得了下一輪出牌權。<br><br>您要發動<b>【法師技能】</b>選擇 1 張手牌遞給左邊玩家嗎？`;
