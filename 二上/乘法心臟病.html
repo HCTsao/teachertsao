@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>十十乘法心臟病 - 終極競賽版</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -44,6 +44,8 @@
         .animate-deal-2 { animation: dealTo2 0.5s cubic-bezier(0.1, 0.5, 0.5, 1) forwards; --rot: 45deg; }
         .animate-deal-3 { animation: dealTo3 0.5s cubic-bezier(0.1, 0.5, 0.5, 1) forwards; --rot: -10deg; }
 
+        * { touch-action: manipulation; }
+        .slap-area { touch-action: none !important; }
         body { overflow: hidden; background-color: #0f172a; margin: 0; font-family: system-ui, -apple-system, sans-serif; }
         .custom-range::-webkit-slider-runnable-track { background: #334155; height: 8px; border-radius: 4px; }
         .custom-range::-webkit-slider-thumb { margin-top: -6px; height: 20px; width: 20px; border-radius: 50%; background: #fbbf24; cursor: pointer; -webkit-appearance: none; }
@@ -87,8 +89,49 @@
             return pairs.some(p => p[0] === cardVal && p[1] === targetVal);
         };
 
+        const toChineseNum = (n) => {
+            const mapping = { 
+                0: "\u96f6", 1: "\u4e00", 2: "\u4e8c", 3: "\u4e09", 4: "\u56db", 
+                5: "\u4e94", 6: "\u516d", 7: "\u4e03", 8: "\u516b", 9: "\u4e5d" 
+            };
+            if (n < 10) return mapping[n];
+            if (n === 10) return "\u5341";
+            if (n < 20) return "\u5341" + mapping[n % 10];
+            if (n % 10 === 0) return mapping[Math.floor(n / 10)] + "\u5341";
+            return mapping[Math.floor(n / 10)] + "\u5341" + mapping[n % 10];
+        };
+
+        const getChantText = (m, s, p) => {
+            const chM = toChineseNum(m);
+            const chS = toChineseNum(s);
+            const chP = toChineseNum(p);
+            if (s === 10) {
+                return chM + "\u5341\u5f97" + chP;
+            }
+            if (p < 10) {
+                if (s === 1) {
+                    return chM + "\u4e00" + chP;
+                }
+                return chM + chS + "\u5f97" + chP;
+            }
+            return chM + chS + chP;
+        };
+
         const App = () => {
             const [gameState, setGameState] = useState('menu'); 
+            const [scale, setScale] = useState(1);
+            useEffect(() => {
+                const handleResize = () => {
+                    const baseWidth = 1024;
+                    const baseHeight = 768;
+                    const scaleX = window.innerWidth / baseWidth;
+                    const scaleY = window.innerHeight / baseHeight;
+                    setScale(Math.min(scaleX, scaleY, 1));
+                };
+                window.addEventListener('resize', handleResize);
+                handleResize();
+                return () => window.removeEventListener('resize', handleResize);
+            }, []); 
             const [multiplier, setMultiplier] = useState(2);
             const [difficulty, setDifficulty] = useState('easy'); 
             const [aiLevel, setAiLevel] = useState('normal'); 
@@ -267,7 +310,7 @@
                     let speechPromise = Promise.resolve();
                     if (!isMuted) {
                         speechPromise = new Promise((resolve) => {
-                            const textToSpeak = `${multiplier} 乘以 ${currentStep} 等於 ${callValue}`;
+                            const textToSpeak = getChantText(multiplier, currentStep, callValue);
                             const utterance = new SpeechSynthesisUtterance(textToSpeak);
                             utterance.lang = 'zh-TW';
                             utterance.rate = 1.0;
@@ -456,6 +499,7 @@
                         <div className="grid grid-cols-3 gap-4 max-w-lg w-full text-center">
                             {MULTIPLIERS.map(num => (<button key={num} onClick={() => startGame(num)} className="group relative h-16 bg-white text-slate-900 text-3xl font-black rounded-2xl hover:bg-yellow-400 transition-all shadow-[0_6px_0_0_#cbd5e1] active:shadow-none active:translate-y-1">{num}</button>))}
                         </div>
+                        </div>
                     </div>
                 );
             }
@@ -471,8 +515,9 @@
             }
 
             return (
-                <div className="relative min-h-screen bg-emerald-900 overflow-hidden select-none font-sans">
-                    <div className="absolute top-4 left-4 z-50 flex gap-4">
+                <div className="relative min-h-screen w-screen bg-slate-950 flex items-center justify-center overflow-hidden select-none font-sans">
+                    <div className="w-[1024px] h-[768px] shrink-0 relative bg-emerald-900 rounded-[40px] border-4 border-emerald-800 shadow-2xl overflow-hidden" style={{ transform: `scale(${scale})`, transformOrigin: 'center center' }}>
+                        <div className="absolute top-4 left-4 z-50 flex gap-4">
                         <button onClick={() => { setIsMuted(!isMuted); initAudio(); }} className="p-3 bg-white/20 rounded-full text-white hover:bg-white/40 transition-colors">{isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}</button>
                     </div>
                     <button onClick={() => setGameState('menu')} className="absolute bottom-6 right-6 z-50 flex items-center gap-2 bg-slate-900/80 text-white px-6 py-3 rounded-full hover:bg-slate-900 transition-all border border-white/20 shadow-xl"><Home size={20} className="mr-1" /><span className="font-bold">返回主選單</span></button>
@@ -492,7 +537,7 @@
                             { pos: "bottom-8 left-1/2 -translate-x-1/2", call: "left-full ml-4 top-1/2 -translate-y-1/2", cardAlign: "left-[110%] top-1/2 -translate-y-1/2" },
                             { pos: "left-12 top-1/2 -translate-y-1/2", call: "left-full ml-4 top-1/2 -translate-y-1/2", cardAlign: "" }, 
                             { pos: "top-8 left-1/2 -translate-x-1/2", call: "left-full ml-4 top-1/2 -translate-y-1/2", cardAlign: "" },
-                            { pos: "right-48 top-1/2 -translate-y-1/2", call: "right-full mr-4 top-1/2 -translate-y-1/2", cardAlign: "" } // 電腦3位置：文字在圖像左方，避免畫面右邊緣切掉
+                            { pos: "right-12 top-1/2 -translate-y-1/2", call: "right-full mr-4 top-1/2 -translate-y-1/2", cardAlign: "" }
                         ];
                         const cfg = layouts[idx];
                         const active = turn === idx;
