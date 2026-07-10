@@ -1,0 +1,1481 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>雞兔點點名 | 互動數學教具</title>
+    
+    <!-- 引入 Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome 圖標 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --table-green: #2d5a27;
+            --primary: #f1c40f;
+            --white: #ffffff;
+            --dark: #2c3e50;
+            --secondary: #3498db;
+            --success: #27ae60;
+            --error: #e74c3c;
+            --transition-speed: 0.5s;
+        }
+
+        body {
+            font-family: 'Outfit', 'Noto Sans TC', "Microsoft JhengHei", sans-serif;
+            background-color: #111111;
+            background-image: radial-gradient(circle at center, #243b55 0%, #111111 100%);
+            margin: 0;
+            overflow: hidden;
+            color: var(--white);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* 模式選擇畫面 */
+        .screen-container {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+            text-align: center;
+        }
+
+        #mode-selection-screen h1 {
+            color: var(--primary);
+            font-size: 3rem;
+            margin-bottom: 5px;
+            text-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            font-weight: 900;
+            letter-spacing: 2px;
+        }
+        #mode-selection-screen .subtitle {
+            font-size: 1.15rem;
+            color: #b3c0c9;
+            margin-bottom: 40px;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+        .mode-cards-container {
+            display: flex;
+            gap: 30px;
+            max-width: 950px;
+            width: 90%;
+            justify-content: center;
+        }
+        .mode-card {
+            background: rgba(255, 255, 255, 0.07);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 30px;
+            padding: 40px 30px;
+            flex: 1;
+            max-width: 420px;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+            position: relative;
+            overflow: hidden;
+        }
+        .mode-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(800px circle at var(--x, 0) var(--y, 0), rgba(255,255,255,0.06), transparent 40%);
+            border-radius: 30px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        .mode-card:hover::before {
+            opacity: 1;
+        }
+        .mode-card:hover {
+            transform: translateY(-12px);
+            background: rgba(255, 255, 255, 0.12);
+            border-color: var(--primary);
+            box-shadow: 0 20px 45px rgba(241, 196, 15, 0.15);
+        }
+        .mode-icon {
+            font-size: 3.2rem;
+            margin-bottom: 25px;
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.08);
+            transition: all 0.3s;
+            box-shadow: inset 0 2px 5px rgba(255,255,255,0.1);
+        }
+        .mode-card:hover .mode-icon.basic {
+            background: var(--secondary);
+            color: white;
+            transform: scale(1.1) rotate(-5deg);
+            box-shadow: 0 10px 20px rgba(52, 152, 219, 0.4);
+        }
+        .mode-card:hover .mode-icon.advanced {
+            background: var(--primary);
+            color: #111;
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 10px 20px rgba(241, 196, 15, 0.4);
+        }
+        .mode-card h2 {
+            font-size: 1.6rem;
+            margin: 0 0 15px 0;
+            color: #fff;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+        .mode-desc {
+            font-size: 0.98rem;
+            color: #cbd5e1;
+            line-height: 1.7;
+            margin-bottom: 30px;
+            flex-grow: 1;
+            text-align: justify;
+        }
+        .mode-btn {
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            border: 2px solid rgba(255,255,255,0.4);
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+            letter-spacing: 1px;
+        }
+        .mode-card:hover .basic-theme-btn {
+            background: var(--secondary);
+            border-color: var(--secondary);
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.4);
+        }
+        .mode-card:hover .advanced-theme-btn {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #111;
+            box-shadow: 0 4px 15px rgba(241, 196, 15, 0.4);
+        }
+
+        /* 普通與進階設定框 */
+        .start-box {
+            background: rgba(20, 30, 45, 0.7);
+            padding: 40px;
+            border-radius: 35px;
+            border: 2px solid var(--primary);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            width: 400px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+        .start-box h1 {
+            margin-top: 0;
+            color: var(--primary);
+            font-size: 2.3rem;
+            font-weight: bold;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.4);
+        }
+        .slider-container { margin: 30px 0; }
+        #card-slider { width: 100%; cursor: pointer; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.1); outline: none; }
+        .slider-val { font-size: 3rem; font-weight: 800; margin-bottom: 5px; color: var(--primary); font-family: 'Outfit', sans-serif; }
+
+        /* 牌桌容器 */
+        #table {
+            width: 98vw;
+            height: 95vh;
+            max-width: 1200px;
+            max-height: 850px;
+            background: radial-gradient(circle, var(--table-green) 0%, #1a3517 100%);
+            border: 12px solid #5d4037;
+            border-radius: 120px;
+            position: relative;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.5), 0 20px 50px rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            display: none;
+            visibility: hidden;
+        }
+
+        /* 玩家區域佈局 */
+        .player-area {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: all 0.3s;
+            padding: 10px;
+            border-radius: 15px;
+            z-index: 10;
+        }
+
+        .player-area.active {
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 25px var(--primary);
+        }
+
+        /* 牌桌區別模式樣式 (普通版) */
+        #table.mode-basic .pos-0 { bottom: 10px; width: 90%; }
+        #table.mode-basic .pos-1 { left: 10px; top: 50%; transform: translateY(-50%) rotate(90deg); display: flex; }
+        #table.mode-basic .pos-2 { top: 10px; width: 60%; display: flex; }
+        #table.mode-basic .pos-3 { right: 10px; top: 50%; transform: translateY(-50%) rotate(-90deg); display: flex; }
+
+        /* 牌桌區別模式樣式 (進階版) */
+        #table.mode-advanced .player-area {
+            position: absolute;
+            bottom: 20px;
+            width: 95%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 10;
+        }
+        #table.mode-advanced .pos-1,
+        #table.mode-advanced .pos-2,
+        #table.mode-advanced .pos-3 {
+            display: none !important;
+        }
+        #table.mode-advanced .center-area {
+            margin-bottom: 220px; /* 給手牌預留空間 */
+        }
+
+        /* 重新排序玩家 0 以匹配進階版 */
+        #table.mode-advanced #player-0 {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #table.mode-advanced #player-0 #player-0-avatar,
+        #table.mode-advanced #player-0 #player-0-name {
+            display: none !important;
+        }
+        #table.mode-advanced #player-0 #hand-0 {
+            order: 1;
+        }
+        #table.mode-advanced #player-0 #player-0-info {
+            order: 2;
+        }
+        #table.mode-advanced #player-0 #player-0-adv-label {
+            order: 3;
+            display: block !important;
+        }
+
+        .avatar {
+            width: 45px; height: 45px;
+            background: #eee; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 1.2rem; margin-bottom: 5px; border: 2px solid transparent;
+        }
+
+        .player-info { text-align: center; font-size: 0.85rem; margin-bottom: 5px; }
+        .leg-count { font-weight: bold; color: var(--primary); font-size: 1.25rem; }
+
+        /* 普通版與進階版手牌 CSS */
+        #table.mode-basic .hand {
+            display: flex; 
+            flex-wrap: nowrap; 
+            justify-content: center; 
+            align-items: center;
+            overflow-x: visible;
+            min-height: 110px;
+        }
+        #table.mode-basic .card {
+            width: 60px;
+            height: 85px;
+            background: white;
+            border-radius: 6px;
+            color: black;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            position: relative;
+            transition: transform 0.2s, opacity 0.2s;
+            user-select: none;
+            flex-shrink: 0;
+            padding: 3px;
+            box-sizing: border-box;
+            margin: 0 2px;
+        }
+        #table.mode-basic .compact-hand .card { margin-left: -40px; }
+        #table.mode-basic .compact-hand .card:first-child { margin-left: 0; }
+        #table.mode-basic .pos-0 .card:hover { transform: translateY(-15px); z-index: 100; cursor: pointer; }
+
+        #table.mode-advanced .hand {
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            min-height: 120px;
+            gap: 5px;
+            flex-wrap: wrap; 
+            max-height: 220px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        #table.mode-advanced .card {
+            width: 65px; height: 95px;
+            background: white; border-radius: 8px;
+            color: black; display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            cursor: pointer; transition: transform 0.2s;
+            padding: 5px; box-sizing: border-box;
+        }
+        #table.mode-advanced .card:hover { transform: translateY(-10px); }
+
+        .ai-card { 
+            background: linear-gradient(135deg, #7f8c8d 0%, #34495e 100%); 
+            color: transparent !important; 
+            border: 1px solid rgba(255,255,255,0.2); 
+        }
+
+        .card-val { font-size: 0.75rem; font-weight: bold; margin-top: 2px; color: #666; }
+        .card-svg { width: 100%; height: 45px; }
+
+        /* 卡片禁止更換搖晃動畫 */
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            40% { transform: translateX(6px); }
+            60% { transform: translateX(-6px); }
+            80% { transform: translateX(4px); }
+            100% { transform: translateX(0); }
+        }
+        .card.shake {
+            animation: shake 0.4s ease-in-out;
+            border: 2px solid var(--error) !important;
+        }
+
+        .center-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            z-index: 5;
+            transition: margin-bottom 0.3s;
+        }
+
+        .piles { display: flex; gap: 40px; }
+
+        .pile {
+            width: 70px;
+            height: 100px;
+            border-radius: 8px;
+            border: 2px dashed rgba(255,255,255,0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .draw-pile { 
+            background: rgba(0,0,0,0.15);
+            border: none;
+        }
+
+        .deck-layer {
+            position: absolute;
+            width: 60px;
+            height: 85px;
+            background: linear-gradient(135deg, #7f8c8d 0%, #34495e 100%);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            transition: transform 0.3s, opacity 0.3s;
+        }
+
+        .discard-pile { background: rgba(0,0,0,0.15); }
+
+        .target-box {
+            background: rgba(0,0,0,0.75);
+            padding: 12px 25px;
+            border-radius: 15px;
+            border: 2px solid var(--primary);
+            text-align: center;
+        }
+
+        .target-box h3 { margin: 0; font-size: 0.85rem; color: #aaa; letter-spacing: 1px; }
+        .target-stats { font-size: 1.6rem; font-weight: bold; color: var(--primary); }
+
+        /* 進階狀態顯示 */
+        .status-container { display: flex; gap: 10px; margin-top: 10px; justify-content: center; }
+        .status-tag {
+            padding: 5px 15px; border-radius: 20px; font-size: 0.85rem; font-weight: bold;
+        }
+        .tag-prediction { background: var(--secondary); color: white; }
+        .tag-swaps { background: var(--error); color: white; }
+
+        #table.mode-basic .status-container {
+            display: none !important;
+        }
+
+        .flying-card {
+            position: fixed;
+            z-index: 2000;
+            pointer-events: none;
+            transition: all var(--transition-speed) cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        #game-msg {
+            position: absolute;
+            top: 140px;
+            font-size: 1.1rem;
+            background: rgba(0,0,0,0.7);
+            padding: 8px 25px;
+            border-radius: 30px;
+            z-index: 100;
+            color: var(--primary);
+            font-weight: bold;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        #modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 4000;
+        }
+
+        .modal {
+            background: white;
+            color: #333;
+            padding: 30px;
+            border-radius: 25px;
+            max-width: 580px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 15px 45px rgba(0,0,0,0.6);
+            max-height: 95vh;
+            overflow-y: auto;
+        }
+
+        .quiz-container { text-align: left; margin: 20px 0; padding: 20px; background: #f1f2f6; border-radius: 15px; }
+        .quiz-option {
+            display: block; width: 100%; padding: 14px; margin: 10px 0;
+            background: white; border: 2px solid #ddd; border-radius: 12px;
+            cursor: pointer; text-align: left; transition: all 0.2s; font-size: 1.1rem;
+            box-sizing: border-box;
+        }
+        .quiz-option:hover { border-color: #3498db; background: #f0f7ff; }
+        .quiz-option.correct { border-color: #27ae60; background: #eafaf1; color: #27ae60; font-weight: bold; }
+        .quiz-option.wrong { border-color: #e74c3c; background: #fdedec; color: #e74c3c; }
+
+        button.primary-btn {
+            background: #27ae60; color: white; border: none; padding: 14px 40px; border-radius: 40px; font-size: 1.2rem; cursor: pointer; margin-top: 15px; box-shadow: 0 4px 0 #1e8449;
+            transition: all 0.1s;
+            font-weight: bold;
+            font-family: inherit;
+        }
+        button.primary-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #1e8449; }
+        button.secondary-btn { background: #7f8c8d; box-shadow: 0 4px 0 #5f6c6d; }
+        button.secondary-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #5f6c6d; }
+        
+        .explanation { text-align: left; background: #fffde7; padding: 15px; border-radius: 10px; margin: 15px 0; line-height: 1.8; border-left: 5px solid #f1c40f; }
+        
+        .table-menu-btn {
+            position: absolute;
+            top: 25px;
+            left: 45px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.7);
+            color: var(--primary);
+            border: 2px solid var(--primary);
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            outline: none;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .table-menu-btn:hover {
+            background: var(--primary);
+            color: #000;
+        }
+
+        /* 5步數學引導 CSS */
+        .completed-equations { text-align: left; margin-bottom: 15px; }
+        .equation-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        .equation-item { 
+            background: #e8f5e9; padding: 10px 14px; border-radius: 8px;
+            font-size: 1.1rem; font-weight: bold; color: var(--success);
+            border-left: 5px solid var(--success); flex: 1;
+            white-space: nowrap;
+            text-align: center;
+        }
+        .equation-desc {
+            font-size: 0.92rem; color: #444; font-weight: bold; flex: 1.8;
+            line-height: 1.4;
+            text-align: left;
+        }
+
+        .math-display {
+            background: #f1f1f1; padding: 15px; border-radius: 10px;
+            font-size: 1.8rem; min-height: 2.2rem; margin-bottom: 15px;
+            font-weight: bold; border: 2px solid #ccc; display: flex;
+            justify-content: center; align-items: center; color: #222;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .math-keypad {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+        }
+
+        .key {
+            padding: 15px 0; background: #fff; border: 1px solid #ddd;
+            border-radius: 10px; font-size: 1.4rem; font-weight: bold;
+            cursor: pointer; box-shadow: 0 3px 0 #ccc; user-select: none;
+            color: #333; transition: all 0.1s;
+            font-family: 'Outfit', sans-serif;
+        }
+        .key:active { transform: translateY(2px); box-shadow: 0 1px 0 #ccc; }
+        .key.op { background: #e3f2fd; color: var(--secondary); }
+        .key.action { background: #ffebee; color: var(--error); }
+        .key.submit { background: var(--success); color: white; grid-column: span 2; box-shadow: 0 4px 0 #1e8449; }
+
+        .guide-hint { 
+            font-size: 1.05rem; color: #444; margin-bottom: 15px; 
+            background: #fffde7; padding: 12px; border-radius: 10px; 
+            border-left: 5px solid var(--primary); text-align: left;
+            line-height: 1.5;
+            font-weight: 500;
+        }
+
+        .radio-group { display: flex; gap: 10px; margin: 15px 0; }
+        .radio-btn {
+            flex: 1; padding: 12px; border: 2px solid rgba(255,255,255,0.2); border-radius: 12px;
+            cursor: pointer; font-weight: bold; background: rgba(255,255,255,0.05);
+            display: flex; justify-content: center; align-items: center;
+            color: #cbd5e1; transition: all 0.2s;
+        }
+        .radio-btn.selected { border-color: var(--secondary); background: rgba(52, 152, 219, 0.2); color: #fff; }
+
+        /* 回首頁按鈕 */
+        .home-btn {
+            position: fixed; top: 12px; left: 12px; z-index: 999999; 
+            background: rgba(30, 41, 59, 0.85); color: #ffffff; 
+            padding: 8px 16px; border-radius: 20px; text-decoration: none; 
+            font-family: system-ui, -apple-system, sans-serif; font-size: 14px; 
+            font-weight: bold; backdrop-filter: blur(4px); 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
+            display: flex; align-items: center; gap: 6px; 
+            border: 1px solid rgba(255,255,255,0.1); 
+            transition: all 0.2s ease;
+        }
+        .home-btn:hover {
+            background: rgba(79, 70, 229, 0.9);
+        }
+    </style>
+</head>
+<body onclick="resumeAudio()">
+    <img src="https://api.visitorbadge.io/api/visitors?path=hctsao.teachertsao&label=Views&labelColor=%23475569&countColor=%23ea580c" alt="Visitor Counter" style="display: none;">
+    
+    <a href="../index.html" class="home-btn">🏠 回首頁</a>
+    
+    <!-- responsive viewport helper -->
+    <script>(function() { function adjustViewport() { var targetWidth = 1024; var screenWidth = window.innerWidth || document.documentElement.clientWidth || window.screen.width; if (screenWidth > 0 && screenWidth < targetWidth) { var scale = screenWidth / targetWidth; var meta = document.querySelector('meta[name="viewport"]'); if (!meta) { meta = document.createElement('meta'); meta.setAttribute('name', 'viewport'); document.head.appendChild(meta); } meta.setAttribute('content', 'width=' + targetWidth + ', initial-scale=' + scale + ', minimum-scale=' + scale + ', maximum-scale=2.0, user-scalable=yes'); } else { var meta = document.querySelector('meta[name="viewport"]'); if (meta) { meta.setAttribute('content', 'width=device-width, initial-scale=1.0'); } } } adjustViewport(); var timer = null; window.addEventListener('resize', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); window.addEventListener('orientationchange', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); })();</script>
+
+    <!-- 1. 模式選擇畫面 -->
+    <div id="mode-selection-screen" class="screen-container">
+        <div class="portal-header">
+            <h1>🐤 雞兔點點名 🐰</h1>
+            <p class="subtitle">請選擇遊戲模式以開始學習</p>
+        </div>
+        <div class="mode-cards-container">
+            <div class="mode-card" onclick="selectMode('basic')">
+                <div class="mode-icon basic"><i class="fa-solid fa-gamepad"></i></div>
+                <h2>雞兔點點名 (普通版)</h2>
+                <p class="mode-desc">根據題目給定的動物、腳的總數，在雞兔混合的牌型中，決定要把｢雞換兔｣或者｢兔換雞｣，並從中觀察腳的數量變化。</p>
+                <button class="mode-btn basic-theme-btn">進入遊戲</button>
+            </div>
+            <div class="mode-card" onclick="selectMode('advanced')">
+                <div class="mode-icon advanced"><i class="fa-solid fa-crown"></i></div>
+                <h2>雞兔點點名 (進階版)</h2>
+                <p class="mode-desc">學生需從「全雞」或「全兔」的配置出發，預測並用最少次數的替換操作來達成目標的腳的數量。</p>
+                <button class="mode-btn advanced-theme-btn">進入挑戰</button>
+            </div>
+        </div>
+        <div style="margin-top: 40px; font-size: 0.9rem; color: #7f8c8d; font-weight: 500;">康軒六年級上學期第五單元</div>
+    </div>
+
+    <!-- 2. 普通版設定畫面 -->
+    <div id="basic-start-screen" class="screen-container" style="display: none;">
+        <div class="start-box">
+            <h1>🐤 雞兔點點名 🐰</h1>
+            <p style="color: #cbd5e1; font-weight: 500;">請選擇動物數量：</p>
+            <div class="slider-container">
+                <div class="slider-val" id="heads-val">6</div>
+                <input type="range" id="card-slider" min="4" max="15" value="6" oninput="updateSlider(this.value)">
+            </div>
+            <button class="primary-btn" onclick="startBasicGame()" style="width: 100%; margin-top: 10px;">開始競賽</button>
+            <button class="primary-btn secondary-btn" onclick="backToMenu()" style="width: 100%; margin-top: 10px;">返回主選單</button>
+            <div style="margin-top: 20px; font-size: 0.8rem; color: #7f8c8d; font-weight: 500;">康軒六年級上學期第五單元</div>
+        </div>
+    </div>
+
+    <!-- 3. 進階版設定畫面 -->
+    <div id="advanced-start-screen" class="screen-container" style="display: none;">
+        <div class="start-box">
+            <h1>🐤 雞兔點點名：挑戰 🐰</h1>
+            <div id="target-setup-info">題目載入中...</div>
+            
+            <div style="text-align:left; color:#fff;">
+                <label style="font-weight: bold; color: #e2e8f0; font-size: 0.95rem;">1. 選擇起始手牌：</label>
+                <div class="radio-group">
+                    <div class="radio-btn selected" id="opt-chicken" onclick="setAdvancedType('chicken')">全部都是雞</div>
+                    <div class="radio-btn" id="opt-rabbit" onclick="setAdvancedType('rabbit')">全部都是兔</div>
+                </div>
+                
+                <label style="font-weight: bold; color: #e2e8f0; font-size: 0.95rem;">2. 預測需更換幾張牌能達成目標？</label>
+                <input type="number" id="predict-input" style="width:100%; padding:12px; margin-top:8px; border-radius:10px; border:none; font-size:1.1rem; color:#333; box-sizing: border-box; outline: none; font-weight: bold;" placeholder="請輸入交換次數">
+            </div>
+
+            <button class="primary-btn" style="margin-top:25px; width: 100%;" onclick="startAdvancedGame()">開始挑戰</button>
+            <button class="primary-btn secondary-btn" onclick="backToMenu()" style="margin-top:10px; width: 100%;">返回主選單</button>
+        </div>
+    </div>
+
+    <!-- 4. 遊戲桌檯 -->
+    <div id="table">
+        <button class="table-menu-btn" onclick="backToMenu()">📋 回主選單</button>
+        <div id="game-msg">正在準備牌局...</div>
+
+        <div class="center-area">
+            <div class="target-box">
+                <h3>目標任務</h3>
+                <div id="target-info" class="target-stats">-- 隻，-- 腳</div>
+                <div class="status-container">
+                    <div class="status-tag tag-prediction">預測：<span id="display-prediction">0</span> 次</div>
+                    <div class="status-tag tag-swaps">已換：<span id="swap-count">0</span> 次</div>
+                </div>
+            </div>
+
+            <div class="piles">
+                <div class="pile draw-pile" id="draw-pile-ui">
+                    <!-- 牌堆厚度層 -->
+                </div>
+                <div class="pile discard-pile" id="discard-pile-ui">
+                    <div id="last-discard-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 玩家區 (普通版為 4 人環繞佈局，進階版僅顯示 player-0 且為置中手牌) -->
+        <div id="player-0" class="player-area pos-0">
+            <div class="avatar" id="player-0-avatar">👦</div>
+            <div class="player-info" id="player-0-info">
+                <div id="player-0-name">你 (玩家)</div>
+                <div class="leg-count" id="leg-0">0 腳</div>
+            </div>
+            <div class="hand" id="hand-0"></div>
+            <div id="player-0-adv-label" style="font-size: 0.95rem; color: #cbd5e1; margin-top: 8px; display: none; font-weight: bold;">你的目前手牌</div>
+        </div>
+
+        <div id="player-1" class="player-area pos-1">
+            <div class="hand compact-hand" id="hand-1"></div>
+            <div class="player-info" style="margin-top: 10px; transform: rotate(-90deg);">
+                <div class="avatar">🤖</div>
+                <div>學霸 AI</div>
+                <div class="leg-count" id="leg-1">? 腳</div>
+            </div>
+        </div>
+
+        <div id="player-2" class="player-area pos-2">
+            <div class="avatar">🦾</div>
+            <div class="player-info">
+                <div>計算機 AI</div>
+                <div class="leg-count" id="leg-2">? 腳</div>
+            </div>
+            <div class="hand compact-hand" id="hand-2"></div>
+        </div>
+
+        <div id="player-3" class="player-area pos-3">
+            <div class="hand compact-hand" id="hand-3"></div>
+            <div class="player-info" style="margin-top: 10px; transform: rotate(90deg);">
+                <div class="avatar">👾</div>
+                <div>神秘對手</div>
+                <div class="leg-count" id="leg-3">? 腳</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. 對話框/引導 overlay -->
+    <div id="modal-overlay">
+        <div class="modal" id="modal-content"></div>
+    </div>
+
+    <script>
+        // --- 音效管理系統 ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function resumeAudio() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'deal') {
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(400, now + 0.1);
+                gain.gain.setValueAtTime(0.08, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            } else if (type === 'fly') {
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.exponentialRampToValueAtTime(1200, now + 0.3);
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.1, now + 0.1);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now); osc.stop(now + 0.3);
+            } else if (type === 'draw') {
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(800, now + 0.2);
+                gain.gain.setValueAtTime(0.08, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now); osc.stop(now + 0.2);
+            } else if (type === 'correct') {
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.setValueAtTime(659.25, now + 0.1);
+                osc.frequency.setValueAtTime(783.99, now + 0.2);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                osc.start(now); osc.stop(now + 0.4);
+            } else if (type === 'wrong') {
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.linearRampToValueAtTime(110, now + 0.3);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now); osc.stop(now + 0.3);
+            }
+        }
+
+        const CHICKEN_SVG = `<svg class="card-svg" viewBox="0 0 100 100"><circle cx="50" cy="45" r="25" fill="#FFEB3B"/><path d="M75,40 L85,45 L75,50 Z" fill="#FF9800"/><circle cx="60" cy="38" r="3" fill="black"/><path d="M40,70 L40,85 M60,70 L60,85 M35,85 L45,85 M55,85 L65,85" stroke="#FF9800" stroke-width="4" stroke-linecap="round"/><path d="M30,45 Q20,35 30,25" fill="none" stroke="#FFEB3B" stroke-width="4"/></svg>`;
+        const RABBIT_SVG = `<svg class="card-svg" viewBox="0 0 100 100"><ellipse cx="50" cy="55" r="30" rx="35" ry="25" fill="#f0f0f0"/><circle cx="70" cy="45" r="18" fill="#f0f0f0"/><ellipse cx="65" cy="20" rx="6" ry="15" fill="#f0f0f0" transform="rotate(-10, 65, 20)"/><ellipse cx="75" cy="20" rx="6" ry="15" fill="#f0f0f0" transform="rotate(10, 75, 20)"/><circle cx="80" cy="42" r="2" fill="black"/><path d="M30,75 L30,90 M45,75 L45,90 M60,75 L60,90 M75,75 L75,90" stroke="#d0d0d0" stroke-width="4" stroke-linecap="round"/><circle cx="20" cy="55" r="8" fill="#f0f0f0"/></svg>`;
+
+        const CHICKEN = { id: 'chicken', name: '雞', legs: 2, svg: CHICKEN_SVG };
+        const RABBIT = { id: 'rabbit', name: '兔', legs: 4, svg: RABBIT_SVG };
+
+        let gameMode = 'basic'; // 'basic' or 'advanced'
+
+        let state = {
+            // --- 共享狀態 ---
+            target: { heads: 0, legs: 0, chickens: 0, rabbits: 0 },
+            isAnimating: false,
+            isGameOver: false,
+            
+            // --- 普通版狀態 ---
+            players: [],
+            currentTurn: 0,
+            initialPlayerLegs: 0,
+            lastQuizChoice: null,
+            numHeads: 6,
+            deckCards: [],
+
+            // --- 進階版狀態 ---
+            hand: [],
+            swapsCount: 0,
+            prediction: 0,
+            advancedStartType: 'chicken',
+            guideStep: 1,
+            currentMathInput: "",
+            correctEquations: []
+        };
+
+        // --- 模式控制與入口 ---
+        function checkUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            const mode = params.get('mode');
+            if (mode === 'basic') {
+                selectMode('basic');
+            } else if (mode === 'advanced') {
+                selectMode('advanced');
+            } else {
+                showScreen('mode-selection-screen');
+            }
+        }
+
+        function selectMode(mode) {
+            gameMode = mode;
+            if (mode === 'basic') {
+                showScreen('basic-start-screen');
+            } else {
+                initAdvancedProblem();
+                showScreen('advanced-start-screen');
+            }
+        }
+
+        function showScreen(screenId) {
+            document.getElementById('mode-selection-screen').style.display = 'none';
+            document.getElementById('basic-start-screen').style.display = 'none';
+            document.getElementById('advanced-start-screen').style.display = 'none';
+            document.getElementById('table').style.visibility = 'hidden';
+            document.getElementById('table').style.display = 'none';
+            
+            if (screenId === 'table') {
+                const table = document.getElementById('table');
+                table.className = gameMode === 'basic' ? 'mode-basic' : 'mode-advanced';
+                table.style.visibility = 'visible';
+                table.style.display = 'flex';
+            } else {
+                const el = document.getElementById(screenId);
+                if (el) el.style.display = 'flex';
+            }
+        }
+
+        function backToMenu() {
+            if (window.history.pushState) {
+                const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                window.history.pushState({path:newUrl}, '', newUrl);
+            }
+            // 清理桌面狀態
+            document.getElementById('modal-overlay').style.display = 'none';
+            for(let i=0; i<4; i++) document.getElementById(`hand-${i}`).innerHTML = '';
+            document.getElementById('last-discard-container').innerHTML = '';
+            showScreen('mode-selection-screen');
+        }
+
+        // --- 普通版邏輯 ---
+        function updateSlider(val) {
+            state.numHeads = parseInt(val);
+            document.getElementById('heads-val').innerText = val;
+        }
+
+        function startBasicGame() {
+            showScreen('table');
+            initBasic();
+        }
+
+        function createDeckPool() {
+            const drawPileUI = document.getElementById('draw-pile-ui');
+            drawPileUI.innerHTML = '';
+            state.deckCards = [];
+            
+            const thickness = state.target.heads * 4 + 5;
+            for (let i = 0; i < thickness; i++) {
+                const layer = document.createElement('div');
+                layer.className = 'deck-layer';
+                layer.style.transform = `translate(${-i/2}px, ${-i/2}px)`;
+                layer.style.zIndex = thickness - i;
+                drawPileUI.appendChild(layer);
+                state.deckCards.push(layer);
+            }
+        }
+
+        function initBasic() {
+            state.isGameOver = false;
+            state.currentTurn = 0;
+            state.isAnimating = false;
+            state.lastQuizChoice = null;
+            document.getElementById('modal-overlay').style.display = 'none';
+            document.getElementById('last-discard-container').innerHTML = '';
+            
+            // 隱藏進階版專用 Label，顯示基本版 Label
+            document.getElementById('player-0-adv-label').style.display = 'none';
+            document.getElementById('player-0-avatar').style.display = 'flex';
+            document.getElementById('player-0-name').style.display = 'block';
+
+            const heads = state.numHeads;
+            let rabbits = Math.floor(Math.random() * (heads - 1)) + 1; 
+            const chickens = heads - rabbits;
+            const legs = chickens * CHICKEN.legs + rabbits * RABBIT.legs;
+
+            state.target = { heads, legs, chickens, rabbits };
+            document.getElementById('target-info').innerText = `${heads} 隻，${legs} 隻腳`;
+
+            state.players = [];
+            for(let i=0; i<4; i++) state.players.push({ id: i, hand: [], isAI: i !== 0 });
+
+            createDeckPool();
+            startDealing();
+        }
+
+        async function startDealing() {
+            state.isAnimating = true;
+            updateMsg("正在派發動物牌...");
+            for(let i=0; i<4; i++) document.getElementById(`hand-${i}`).innerHTML = '';
+
+            for(let step = 0; step < state.target.heads; step++) {
+                for(let p = 0; p < 4; p++) {
+                    const type = Math.random() > 0.5 ? CHICKEN : RABBIT;
+                    state.players[p].hand.push(type);
+                    
+                    if (state.deckCards.length > 0) {
+                        const removed = state.deckCards.pop();
+                        removed.style.opacity = '0';
+                        removed.style.transform += ' translate(-20px, -20px)';
+                        setTimeout(() => removed.remove(), 300);
+                    }
+
+                    renderHand(p);
+                    playSound('deal');
+                    await new Promise(r => setTimeout(r, 60));
+                }
+            }
+            
+            state.players.forEach(p => {
+                const sum = p.hand.reduce((s, i) => s + i.legs, 0);
+                if (sum === state.target.legs) {
+                    const idx = 0;
+                    p.hand[idx] = p.hand[idx].id === 'chicken' ? RABBIT : CHICKEN;
+                    renderHand(p.id);
+                }
+            });
+
+            state.initialPlayerLegs = state.players[0].hand.reduce((s, i) => s + i.legs, 0);
+            state.isAnimating = false;
+            startTurn();
+        }
+
+        function renderHand(pIdx) {
+            const handEl = document.getElementById(`hand-${pIdx}`);
+            const player = state.players[pIdx];
+            player.hand.sort((a, b) => a.legs - b.legs);
+            handEl.innerHTML = '';
+            const totalLegs = player.hand.reduce((sum, item) => sum + item.legs, 0);
+            
+            player.hand.forEach((card, cIdx) => {
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'card' + (player.isAI ? ' ai-card' : '');
+                cardDiv.id = `card-${pIdx}-${cIdx}`;
+                if(!player.isAI) {
+                    cardDiv.innerHTML = `${card.svg}<div class="card-val">${card.legs} 隻腳</div>`;
+                    cardDiv.onclick = () => handlePlayerAction(cIdx);
+                } else { cardDiv.innerHTML = `?`; }
+                handEl.appendChild(cardDiv);
+            });
+
+            const legDisplay = document.getElementById(`leg-${pIdx}`);
+            if(pIdx === 0) {
+                legDisplay.innerText = `${totalLegs} 隻腳`;
+                legDisplay.style.color = totalLegs === state.target.legs ? '#2ecc71' : 'var(--primary)';
+            }
+        }
+
+        function updateMsg(text) { document.getElementById('game-msg').innerText = text; }
+
+        function startTurn() {
+            if (state.isGameOver) return;
+            const p = state.players[state.currentTurn];
+            document.querySelectorAll('.player-area').forEach(el => el.classList.remove('active'));
+            document.getElementById(`player-${state.currentTurn}`).classList.add('active');
+            if(p.id === 0) updateMsg("該你了！請換掉一張牌。");
+            else {
+                updateMsg(`${p.id} 號對手正在思考中...`);
+                setTimeout(() => aiAction(p), 1200);
+            }
+        }
+
+        function handlePlayerAction(cardIdx) {
+            if(state.currentTurn !== 0 || state.isGameOver || state.isAnimating) return;
+            discardAndDraw(0, cardIdx);
+        }
+
+        async function discardAndDraw(pIdx, cardIdx) {
+            state.isAnimating = true;
+            const player = state.players[pIdx];
+            const cardEl = document.getElementById(`card-${pIdx}-${cardIdx}`);
+            const discardPile = document.getElementById('discard-pile-ui');
+            const drawPile = document.getElementById('draw-pile-ui');
+            const discarded = player.hand[cardIdx];
+
+            await flyCard(cardEl, discardPile, false, discarded);
+            document.getElementById('last-discard-container').innerHTML = `<div class="card">${discarded.svg}<div class="card-val">${discarded.legs} 隻腳</div></div>`;
+
+            const newType = Math.random() > 0.5 ? CHICKEN : RABBIT;
+            player.hand[cardIdx] = newType;
+            renderHand(pIdx);
+            
+            const newCardIdx = player.hand.indexOf(newType);
+            const targetEl = document.getElementById(`card-${pIdx}-${newCardIdx}`);
+            targetEl.style.opacity = '0';
+            
+            playSound('draw');
+            await flyCard(drawPile, targetEl, true, newType, pIdx !== 0);
+            targetEl.style.opacity = '1';
+
+            state.isAnimating = false;
+            if(checkWinner()) return;
+            state.currentTurn = (state.currentTurn + 1) % 4;
+            startTurn();
+        }
+
+        function flyCard(fromEl, toEl, isDraw, type = null, isAiBack = false) {
+            return new Promise(resolve => {
+                const fromRect = fromEl.getBoundingClientRect();
+                const toRect = toEl.getBoundingClientRect();
+                const flyer = document.createElement('div');
+                flyer.className = 'card flying-card';
+                
+                if (isDraw) {
+                    if (isAiBack) flyer.classList.add('ai-card');
+                    else if (type) flyer.innerHTML = `${type.svg}<div class="card-val">${type.legs} 隻腳</div>`;
+                } else {
+                    if (type) flyer.innerHTML = `${type.svg}<div class="card-val">${type.legs} 隻腳</div>`;
+                    else flyer.innerHTML = fromEl.innerHTML;
+                }
+
+                flyer.style.left = fromRect.left + 'px';
+                flyer.style.top = fromRect.top + 'px';
+                
+                const fromArea = fromEl.closest('.player-area');
+                if (fromArea) {
+                    if (fromArea.classList.contains('pos-1')) flyer.style.transform = 'rotate(90deg)';
+                    if (fromArea.classList.contains('pos-3')) flyer.style.transform = 'rotate(-90deg)';
+                }
+
+                document.body.appendChild(flyer);
+                flyer.offsetHeight; 
+
+                flyer.style.left = toRect.left + 'px';
+                flyer.style.top = toRect.top + 'px';
+                
+                const toArea = toEl.closest('.player-area');
+                if (toArea) {
+                    if (toArea.classList.contains('pos-1')) flyer.style.transform = 'rotate(90deg)';
+                    else if (toArea.classList.contains('pos-3')) flyer.style.transform = 'rotate(-90deg)';
+                    else flyer.style.transform = 'rotate(0deg)';
+                } else {
+                    flyer.style.transform = 'rotate(0deg)';
+                }
+
+                setTimeout(() => {
+                    flyer.remove();
+                    resolve();
+                }, 500);
+            });
+        }
+
+        function aiAction(player) {
+            const currentLegs = player.hand.reduce((sum, item) => sum + item.legs, 0);
+            let idx = -1;
+            if(currentLegs < state.target.legs) idx = player.hand.findIndex(c => c.legs === 2);
+            else if(currentLegs > state.target.legs) idx = player.hand.findIndex(c => c.legs === 4);
+            if(idx === -1) idx = Math.floor(Math.random() * player.hand.length);
+            discardAndDraw(player.id, idx);
+        }
+
+        function checkWinner() {
+            if (gameMode === 'basic') {
+                for(let p of state.players) {
+                    const sum = p.hand.reduce((s, i) => s + i.legs, 0);
+                    if(sum === state.target.legs) { startReflecting(p); return true; }
+                }
+                return false;
+            } else {
+                const curLegs = state.hand.reduce((s, c) => s + c.legs, 0);
+                if (curLegs === state.target.legs) {
+                    state.isGameOver = true;
+                    setTimeout(showResult, 600);
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        function startReflecting(winner) {
+            state.isGameOver = true;
+            const modal = document.getElementById('modal-overlay');
+            modal.style.display = 'flex';
+            showQuiz(1, winner);
+        }
+
+        function showQuiz(step, winner) {
+            const content = document.getElementById('modal-content');
+            const targetLegs = state.target.legs;
+            const initLegs = state.initialPlayerLegs;
+            const diff = initLegs - targetLegs;
+            const isWinner = winner.id === 0;
+            let html = `<h2>🎉 競賽結果：${isWinner ? '你贏了！' : '對手贏了'}</h2><p>目標任務：<b>${targetLegs}</b> 隻腳 | 你的開局：<b>${initLegs}</b> 隻腳</p><hr>`;
+
+            if (step === 1) {
+                html += `<h3>思考題 1：回想開局</h3><p>剛發完牌時，你的腳數比目標...</p><div class="quiz-container">
+                    <div class="quiz-option" onclick="handleQuiz(1, 'more', ${diff > 0}, '${winner.id}')">多了</div>
+                    <div class="quiz-option" onclick="handleQuiz(1, 'less', ${diff < 0}, '${winner.id}')">少了</div></div>`;
+            } else if (step === 2) {
+                const correctAction = diff > 0 ? "RtoC" : "CtoR"; 
+                html += `<h3>思考題 2：調整策略</h3><p>為了接近目標，你應該採取什麼動作？</p><div class="quiz-container">
+                    <div class="quiz-option" onclick="handleQuiz(2, 'CtoR', ${correctAction === 'CtoR'}, '${winner.id}')">把雞換成兔子</div>
+                    <div class="quiz-option" onclick="handleQuiz(2, 'RtoC', ${correctAction === 'RtoC'}, '${winner.id}')">把兔子換成雞</div></div>`;
+            } else if (step === 3) {
+                const isIncrease = state.lastQuizChoice === 'CtoR';
+                html += `<h3>思考題 3：數量變化</h3><p>每次${isIncrease ? '把雞換成兔子' : '把兔子換成雞'}，腳的數量就會？</p><div class="quiz-container">
+                    <div class="quiz-option" onclick="handleQuiz(3, 'inc', ${isIncrease}, '${winner.id}')">增加 2 隻</div>
+                    <div class="quiz-option" onclick="handleQuiz(3, 'dec', ${!isIncrease}, '${winner.id}')">減少 2 隻</div></div>`;
+            } else {
+                html += `<h3>💡 學習小結</h3><div class="explanation"><b>雞兔同籠的心法：</b><br>1. 雞(2腳)換成兔(4腳) 腳數 +2<br>2. 兔(4腳)換成雞(2腳) 腳數 -2<br>這就是調整腳數、找到正確組合的關鍵原因！</div>
+                        <button class="primary-btn" onclick="resetBasicGameUI()" style="width: 100%;">再玩一局</button>`;
+            }
+            content.innerHTML = html;
+        }
+
+        function handleQuiz(step, choice, isCorrect, winnerId) {
+            if (isCorrect) {
+                playSound('correct');
+                if (step === 2) state.lastQuizChoice = choice; 
+                setTimeout(() => showQuiz(step + 1, {id: parseInt(winnerId)}), 600);
+            } else {
+                playSound('wrong');
+                const target = event.currentTarget;
+                target.classList.add('wrong');
+                setTimeout(() => target.classList.remove('wrong'), 800);
+            }
+        }
+
+        // --- 進階版邏輯 ---
+        function initAdvancedProblem() {
+            const heads = Math.floor(Math.random() * 12) + 5; 
+            let rabbits;
+            if (Math.random() < 0.75) {
+                const minW = Math.max(1, 4);
+                const maxW = Math.min(heads - 1, 8);
+                rabbits = (maxW >= minW) ? Math.floor(Math.random() * (maxW - minW + 1)) + minW : Math.floor(Math.random() * (heads - 1)) + 1;
+            } else {
+                rabbits = Math.floor(Math.random() * (heads - 1)) + 1;
+            }
+            state.target = { heads, legs: rabbits * 4 + (heads - rabbits) * 2 };
+            document.getElementById('target-setup-info').innerHTML = `目標：共 <b>${state.target.heads}</b> 隻，<b>${state.target.legs}</b> 隻腳`;
+        }
+
+        function setAdvancedType(type) {
+            state.advancedStartType = type;
+            document.getElementById('opt-chicken').classList.toggle('selected', type === 'chicken');
+            document.getElementById('opt-rabbit').classList.toggle('selected', type === 'rabbit');
+        }
+
+        function startAdvancedGame() {
+            const predInput = document.getElementById('predict-input');
+            const pred = parseInt(predInput.value);
+            if (isNaN(pred) || pred < 0) {
+                alert("請輸入預測次數！");
+                return;
+            }
+            state.prediction = pred;
+            state.swapsCount = 0;
+            state.isGameOver = false;
+            state.correctEquations = [];
+            document.getElementById('swap-count').innerText = "0";
+            document.getElementById('display-prediction').innerText = pred;
+            
+            showScreen('table');
+            
+            // 設定標題與說明文字
+            document.getElementById('target-info').innerText = `${state.target.heads} 隻，${state.target.legs} 隻腳`;
+            document.getElementById('last-discard-container').innerHTML = '';
+            
+            // 隱藏普通版專用元素，顯示進階版 Label
+            document.getElementById('player-0-avatar').style.display = 'none';
+            document.getElementById('player-0-name').style.display = 'none';
+            document.getElementById('player-0-adv-label').style.display = 'block';
+
+            // 設置牌堆厚度
+            const drawPileUI = document.getElementById('draw-pile-ui');
+            drawPileUI.innerHTML = '';
+            const thickness = 10;
+            for (let i = 0; i < thickness; i++) {
+                const layer = document.createElement('div');
+                layer.className = 'deck-layer';
+                layer.style.transform = `translate(${-i/2}px, ${-i/2}px)`;
+                layer.style.zIndex = thickness - i;
+                drawPileUI.appendChild(layer);
+            }
+
+            state.hand = [];
+            const type = state.advancedStartType === 'chicken' ? CHICKEN : RABBIT;
+            for(let i=0; i<state.target.heads; i++) state.hand.push({...type});
+            
+            updateMsg("請點擊卡片更換動物");
+            renderAdvancedHand();
+        }
+
+        function renderAdvancedHand() {
+            const handEl = document.getElementById('hand-0');
+            handEl.innerHTML = '';
+            state.hand.forEach((card, idx) => {
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'card';
+                cardDiv.id = `card-0-${idx}`;
+                cardDiv.innerHTML = `${card.svg}<div class="card-val">${card.legs} 隻腳</div>`;
+                cardDiv.onclick = () => handleAdvancedSwap(idx);
+                handEl.appendChild(cardDiv);
+            });
+            const curLegs = state.hand.reduce((s, c) => s + c.legs, 0);
+            const legDisplay = document.getElementById('leg-0');
+            legDisplay.innerText = `${curLegs} 隻腳`;
+            legDisplay.style.color = curLegs === state.target.legs ? 'var(--success)' : 'var(--primary)';
+        }
+
+        async function handleAdvancedSwap(idx) {
+            if (state.isAnimating || state.isGameOver) return;
+            state.isAnimating = true;
+            
+            const cardEl = document.getElementById(`card-0-${idx}`);
+            const discarded = state.hand[idx];
+
+            // --- 全新限制規則檢查 ---
+            if (state.advancedStartType === 'chicken' && discarded.id === 'rabbit') {
+                playSound('wrong');
+                cardEl.classList.add('shake');
+                updateMsg("❌ 一開始全雞，不能把兔子換回雞！");
+                setTimeout(() => {
+                    cardEl.classList.remove('shake');
+                }, 400);
+                state.isAnimating = false;
+                return;
+            }
+            if (state.advancedStartType === 'rabbit' && discarded.id === 'chicken') {
+                playSound('wrong');
+                cardEl.classList.add('shake');
+                updateMsg("❌ 一開始全兔，不能把雞換回兔子！");
+                setTimeout(() => {
+                    cardEl.classList.remove('shake');
+                }, 400);
+                state.isAnimating = false;
+                return;
+            }
+
+            const discardPile = document.getElementById('discard-pile-ui');
+            const drawPile = document.getElementById('draw-pile-ui');
+
+            // 動畫
+            await flyCardSimple(cardEl, discardPile);
+            document.getElementById('last-discard-container').innerHTML = `<div class="card" style="cursor:default">${discarded.svg}<div class="card-val">${discarded.legs} 隻腳</div></div>`;
+
+            const newType = discarded.id === 'chicken' ? {...RABBIT} : {...CHICKEN};
+            state.hand[idx] = newType;
+            state.swapsCount++;
+            document.getElementById('swap-count').innerText = state.swapsCount;
+
+            cardEl.style.visibility = 'hidden';
+            renderAdvancedHand();
+            const newCardEl = document.getElementById(`card-0-${idx}`);
+            newCardEl.style.visibility = 'hidden';
+            
+            playSound('deal');
+            await flyCardSimple(drawPile, newCardEl, newType);
+            newCardEl.style.visibility = 'visible';
+
+            state.isAnimating = false;
+            checkWinner();
+        }
+
+        function flyCardSimple(fromEl, toEl, cardData = null) {
+            return new Promise(resolve => {
+                const fromRect = fromEl.getBoundingClientRect();
+                const toRect = toEl.getBoundingClientRect();
+                const flyer = document.createElement('div');
+                flyer.className = 'card flying-card';
+                flyer.innerHTML = cardData ? `${cardData.svg}` : fromEl.innerHTML;
+                flyer.style.left = fromRect.left + 'px';
+                flyer.style.top = fromRect.top + 'px';
+                document.body.appendChild(flyer);
+                flyer.offsetHeight;
+                flyer.style.left = toRect.left + 'px';
+                flyer.style.top = toRect.top + 'px';
+                setTimeout(() => { flyer.remove(); resolve(); }, 500);
+            });
+        }
+
+        function showResult() {
+            const modal = document.getElementById('modal-overlay');
+            const content = document.getElementById('modal-content');
+            modal.style.display = 'flex';
+            
+            if (state.swapsCount === state.prediction) {
+                playSound('correct');
+                content.innerHTML = `<h2>🎉 預測成功！</h2><p>你預測換 <b>${state.prediction}</b> 次，實際也是 <b>${state.swapsCount}</b> 次！<br>現在讓我們來用算式記錄解題邏輯。</p><button class="primary-btn" onclick="startGuidance()" style="width: 100%;">進入算式引導</button>`;
+            } else {
+                playSound('wrong');
+                content.innerHTML = `<h2>❌ 預測不符</h2><p>你預測換 <b>${state.prediction}</b> 次，但實際更換了 <b>${state.swapsCount}</b> 次。<br>請重新挑戰！</p><button class="primary-btn" style="width: 100%;" onclick="resetAdvancedGameUI()">重新挑戰</button>`;
+            }
+        }
+
+        function resetAdvancedGameUI() {
+            document.getElementById('modal-overlay').style.display = 'none';
+            showScreen('advanced-start-screen');
+            document.getElementById('predict-input').value = "";
+            initAdvancedProblem();
+        }
+
+        // --- 5步數學引導邏輯 ---
+        function startGuidance() {
+            state.guideStep = 1;
+            state.currentMathInput = "";
+            state.correctEquations = [];
+            updateGuidanceUI();
+        }
+
+        function addKey(val) {
+            state.currentMathInput += val;
+            document.getElementById('math-display').innerText = state.currentMathInput;
+        }
+
+        function backspaceKey() {
+            state.currentMathInput = state.currentMathInput.slice(0, -1);
+            document.getElementById('math-display').innerText = state.currentMathInput;
+        }
+
+        function updateGuidanceUI() {
+            const content = document.getElementById('modal-content');
+            const isStartChicken = (state.advancedStartType === 'chicken');
+            const sType = isStartChicken ? '雞' : '兔';
+            const sLegs = isStartChicken ? 2 : 4;
+            const tType = isStartChicken ? '兔' : '雞';
+            const tLegs = isStartChicken ? 4 : 2;
+            
+            let hint = "";
+            let stepDesc = "";
+            let validationData = {};
+
+            if (state.guideStep === 1) {
+                hint = `假設全部都是${sType}，${state.target.heads} 隻共有幾隻腳？`;
+                validationData = { op: '×', operands: [sLegs, state.target.heads], result: sLegs * state.target.heads };
+                stepDesc = `假設 ${state.target.heads} 隻全部都是${sType}，會有 ${sLegs * state.target.heads} 隻腳`;
+            } else if (state.guideStep === 2) {
+                const startTotal = sLegs * state.target.heads;
+                const big = Math.max(state.target.legs, startTotal);
+                const small = Math.min(state.target.legs, startTotal);
+                const diff = big - small;
+                hint = `這和目標(${state.target.legs} 隻腳)的總腳數相差多少？`;
+                validationData = { op: '-', operands: [big, small], result: diff };
+                stepDesc = `跟目標腳數相差 ${diff} 隻腳`;
+            } else if (state.guideStep === 3) {
+                const diffTypeWord = isStartChicken ? "多" : "少";
+                hint = `每把一隻${sType}換成一隻${tType}，總腳數會${diffTypeWord}幾隻腳？`;
+                validationData = { op: '-', operands: [Math.max(tLegs, sLegs), Math.min(tLegs, sLegs)], result: 2 };
+                stepDesc = `每把一隻${sType}換成一隻${tType}會${diffTypeWord} 2 隻腳`;
+            } else if (state.guideStep === 4) {
+                const diff = Math.abs(state.target.legs - (sLegs * state.target.heads));
+                const resultSwaps = diff / 2;
+                hint = `算算看總共要把幾隻${sType}換成幾隻${tType}？`;
+                validationData = { op: '÷', operands: [diff, 2], result: resultSwaps };
+                stepDesc = `總共要把 ${resultSwaps} 隻${sType}換成${tType}`;
+            } else if (state.guideStep === 5) {
+                const diff = Math.abs(state.target.legs - (sLegs * state.target.heads));
+                const swappedCount = diff / 2;
+                const remainingCount = state.target.heads - swappedCount;
+                hint = `現在還剩下幾隻${sType}？`;
+                validationData = { op: '-', operands: [state.target.heads, swappedCount], result: remainingCount };
+                stepDesc = `最後剩下 ${remainingCount} 隻${sType}`;
+            }
+
+            let completedHtml = state.correctEquations.map(item => `
+                <div class="equation-row">
+                    <div class="equation-item">${item.eq}</div>
+                    <div class="equation-desc">「${item.desc}」</div>
+                </div>
+            `).join('');
+
+            content.innerHTML = `
+                <h3>解題紀錄 (${state.guideStep}/5)</h3>
+                <div class="completed-equations">${completedHtml}</div>
+                <div class="guide-hint">${hint}</div>
+                <div class="math-display" id="math-display">${state.currentMathInput}</div>
+                <div class="math-keypad">
+                    <div class="key" onclick="addKey('1')">1</div><div class="key" onclick="addKey('2')">2</div><div class="key" onclick="addKey('3')">3</div><div class="key op" onclick="addKey('+')">+</div>
+                    <div class="key" onclick="addKey('4')">4</div><div class="key" onclick="addKey('5')">5</div><div class="key" onclick="addKey('6')">6</div><div class="key op" onclick="addKey('-')">-</div>
+                    <div class="key" onclick="addKey('7')">7</div><div class="key" onclick="addKey('8')">8</div><div class="key" onclick="addKey('9')">9</div><div class="key op" onclick="addKey('×')">×</div>
+                    <div class="key action" onclick="backspaceKey()">⌫</div><div class="key" onclick="addKey('0')">0</div><div class="key op" onclick="addKey('=')">=</div><div class="key op" onclick="addKey('÷')">÷</div>
+                    <button class="key submit" id="check-btn" style="grid-column: span 4; font-family:inherit;">送出檢查</button>
+                </div>
+            `;
+            document.getElementById('check-btn').onclick = () => validateStep(validationData, stepDesc);
+        }
+
+        function validateStep(data, stepDesc) {
+            const input = state.currentMathInput;
+            const parts = input.split(/[=×÷\-+]/);
+            if (parts.length < 3) { failFeedback(); return; }
+            if (!input.includes(data.op) || !input.includes('=')) { failFeedback(); return; }
+
+            const inputResult = parseInt(parts[parts.length - 1]);
+            const inputOperands = parts.slice(0, parts.length - 1).map(p => parseInt(p));
+            if (inputResult !== data.result) { failFeedback(); return; }
+
+            if (data.op === '×' || data.op === '+') {
+                const sortedInput = [...inputOperands].sort((a,b)=>a-b);
+                const sortedTarget = [...data.operands].sort((a,b)=>a-b);
+                if (JSON.stringify(sortedInput) !== JSON.stringify(sortedTarget)) { failFeedback(); return; }
+            } else {
+                if (inputOperands[0] !== data.operands[0] || inputOperands[1] !== data.operands[1]) { failFeedback(); return; }
+            }
+
+            playSound('correct');
+            state.correctEquations.push({ eq: input, desc: stepDesc });
+            state.guideStep++;
+            state.currentMathInput = "";
+            if (state.guideStep > 5) { finishGuidance(); } else { updateGuidanceUI(); }
+        }
+
+        function failFeedback() {
+            playSound('wrong');
+            const display = document.getElementById('math-display');
+            display.style.borderColor = "var(--error)";
+            setTimeout(() => display.style.borderColor = "#ccc", 500);
+        }
+
+        function finishGuidance() {
+            document.getElementById('modal-content').innerHTML = `
+                <h2>🌟 邏輯解密完成！</h2>
+                <div class="completed-equations">
+                    ${state.correctEquations.map(item => `
+                         <div class="equation-row">
+                            <div class="equation-item">${item.eq}</div>
+                            <div class="equation-desc">「${item.desc}」</div>
+                        </div>
+                    `).join('')}
+                </div>
+                <p>你已經完全掌握如何透過假設法推導答案了！</p>
+                <button class="primary-btn" style="width: 100%;" onclick="resetAdvancedGameUI()">再挑戰一題</button>
+            `;
+        }
+
+        // --- 滑鼠懸浮發光特效 ---
+        document.querySelectorAll('.mode-card').forEach(card => {
+            card.addEventListener('mousemove', e => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                card.style.setProperty('--x', `${x}px`);
+                card.style.setProperty('--y', `${y}px`);
+            });
+        });
+
+        // --- 初始化綁定 ---
+        window.onload = function() {
+            checkUrlParams();
+        };
+    </script>
+</body>
+</html>
