@@ -1,0 +1,2191 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>寶可夢訓練師 - 集點卡</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    :root {
+      --bg-color: #f8fafc;
+      --card-bg: rgba(255, 255, 255, 0.9);
+      --primary-color: #3b82f6;
+      --primary-hover: #2563eb;
+      --fire-color: #ef4444;
+      --water-color: #3b82f6;
+      --grass-color: #22c55e;
+      --text-dark: #1e293b;
+      --text-muted: #64748b;
+      --shadow-sm: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+      --radius: 20px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Fredoka', 'Noto Sans TC', sans-serif;
+      background: linear-gradient(135deg, #e0e7ff 0%, #fef08a 50%, #dcfce7 100%);
+      background-attachment: fixed;
+      color: var(--text-dark);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .header-title {
+      font-size: 2.5rem;
+      font-weight: 900;
+      color: #1e40af;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-align: center;
+    }
+
+    .main-container {
+      width: 100%;
+      max-width: 800px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+
+    /* Tabs */
+    .tabs-container {
+      display: flex;
+      gap: 4px;
+      justify-content: flex-start;
+      margin-bottom: 0;
+      padding-left: 20px;
+      width: 100%;
+    }
+
+    .tab-btn {
+      background: rgba(255, 255, 255, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-bottom: none;
+      padding: 12px 24px;
+      border-radius: 12px 12px 0 0;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(8px);
+      position: relative;
+      top: 1px;
+    }
+
+    .tab-btn:hover {
+      background: rgba(255, 255, 255, 0.8);
+      color: var(--text-dark);
+    }
+
+    .tab-btn.active {
+      background: var(--card-bg);
+      color: var(--primary-color);
+      z-index: 2;
+      border-bottom: 1px solid var(--card-bg);
+    }
+
+    /* Glass Card */
+    .glass-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 0 12px 12px 12px;
+      padding: 30px;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      overflow: hidden;
+      margin-top: 0;
+    }
+
+    /* Pokemon View */
+    .pokemon-view {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      animation: fadeIn 0.5s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .level-badge {
+      background: #f59e0b;
+      color: white;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-size: 1.2rem;
+      font-weight: 900;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-sm);
+      letter-spacing: 1px;
+    }
+
+    .pokemon-image-container {
+      width: 250px;
+      height: 250px;
+      background: radial-gradient(circle at center, rgba(255,255,255,1) 0%, rgba(241,245,249,0) 70%);
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .pokemon-image {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      filter: drop-shadow(0 10px 15px rgba(0,0,0,0.2));
+      transition: transform 0.3s ease;
+    }
+
+    .pokemon-image:hover {
+      transform: scale(1.05) translateY(-5px);
+    }
+
+    .evolve-anim {
+      animation: bouncePulse 1s ease;
+    }
+
+    @keyframes bouncePulse {
+      0% { transform: scale(1); filter: brightness(1); }
+      50% { transform: scale(1.2); filter: brightness(1.5) drop-shadow(0 0 20px gold); }
+      100% { transform: scale(1); filter: brightness(1); }
+    }
+
+    .pokemon-name {
+      font-size: 2rem;
+      font-weight: 900;
+      margin-bottom: 10px;
+      color: var(--text-dark);
+    }
+
+    .points-info {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+    }
+
+    .progress-container {
+      width: 100%;
+      max-width: 400px;
+      height: 24px;
+      background: #e2e8f0;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 10px;
+      position: relative;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #34d399 0%, #10b981 100%);
+      width: 0%;
+      transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .progress-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #334155;
+      text-shadow: 0 0 2px white;
+    }
+
+    /* Selection Screen */
+    .selection-screen {
+      text-align: center;
+    }
+    
+    .selection-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: #0f172a;
+    }
+
+    .starters-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    @media (max-width: 600px) {
+      .starters-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .starter-card {
+      background: white;
+      border: 2px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 20px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .starter-card:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .starter-card.fire:hover { border-color: var(--fire-color); }
+    .starter-card.water:hover { border-color: var(--water-color); }
+    .starter-card.grass:hover { border-color: var(--grass-color); }
+
+    .starter-img {
+      width: 120px;
+      height: 120px;
+      object-fit: contain;
+      margin-bottom: 10px;
+    }
+
+    .starter-name {
+      font-weight: 700;
+      font-size: 1.2rem;
+    }
+
+    /* Return button */
+    .btn-return {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: white;
+      color: #475569;
+      text-decoration: none;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-weight: 700;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.2s;
+    }
+    .btn-return:hover {
+      transform: translateX(-5px);
+    }
+    
+    .evo-scanlines {
+      display: none;
+    }
+
+    /* Collection Gallery */
+    .collection-section {
+      margin-top: 30px;
+      border-top: 1px dashed rgba(0, 0, 0, 0.15);
+      padding-top: 20px;
+      width: 100%;
+    }
+    .collection-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #475569;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .collection-grid {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .collection-item {
+      background: rgba(255, 255, 255, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      border-radius: 12px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100px;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
+    }
+    .collection-img {
+      width: 60px;
+      height: 60px;
+      object-fit: contain;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+    }
+    .collection-name {
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-top: 5px;
+      color: var(--text-dark);
+    }
+
+    /* Stamp Card Styles */
+    .stamp-card-section {
+      margin-top: 20px;
+      background: rgba(255, 255, 255, 0.45);
+      border: 2px dashed rgba(239, 68, 68, 0.25);
+      border-radius: 16px;
+      padding: 15px 20px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: var(--shadow-sm);
+      backdrop-filter: blur(8px);
+    }
+    .stamp-card-title {
+      font-size: 1rem;
+      font-weight: 800;
+      color: #1e293b;
+      margin-bottom: 15px;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .stamp-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      justify-items: center;
+    }
+    .stamp-slot {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.6);
+      border: 2px dashed #cbd5e1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .stamp-slot.active {
+      background: white;
+      border: 2.5px solid #ef4444;
+      box-shadow: 0 6px 10px rgba(239, 68, 68, 0.25);
+      transform: scale(1.05);
+    }
+    .stamp-ball {
+      width: 82%;
+      height: 82%;
+      object-fit: contain;
+      animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+    @keyframes popIn {
+      0% { transform: scale(0) rotate(-45deg); }
+      100% { transform: scale(1) rotate(0deg); }
+    }
+    .stamp-number {
+      position: absolute;
+      bottom: -3px;
+      right: -3px;
+      background: #64748b;
+      color: white;
+      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      font-size: 0.7rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      border: 1px solid white;
+    }
+    .stamp-slot.active .stamp-number {
+      background: #ef4444;
+    }
+
+    /* Battle Mode Styles */
+    .btn-battle-move {
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      border-radius: 6px;
+      padding: 8px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-battle-move:hover:not(:disabled) {
+      background: white;
+      color: #1e293b;
+      border-color: white;
+      transform: scale(1.03);
+    }
+    .btn-battle-move:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    #battle-img-p1, #battle-img-p2 {
+      image-rendering: pixelated;
+    }
+
+    /* Battle Visual Effects */
+    .effect-particle {
+      position: absolute;
+      pointer-events: none;
+      z-index: 40;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- GBA Evolution Overlay -->
+  <div id="evolution-overlay" style="display: none; position: fixed; inset: 0; background: #000; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; font-family: 'Fredoka', 'Noto Sans TC', monospace; color: white; overflow: hidden; user-select: none;">
+    <!-- Retro scanlines disabled -->
+    
+    <!-- Retro flashing background -->
+    <div id="evo-bg" style="position: absolute; inset: 0; background: radial-gradient(circle, #334155 0%, #020617 100%); transition: background 0.5s;"></div>
+    
+    <!-- Sparkles/Stars container -->
+    <div id="evo-particles" style="position: absolute; inset: 0; pointer-events: none; z-index: 12;"></div>
+
+    <!-- Pokemon Display Area -->
+    <div style="position: relative; width: 300px; height: 300px; display: flex; justify-content: center; align-items: center; z-index: 10; margin-bottom: 80px;">
+      <img id="evo-img-old" src="" style="position: absolute; width: 250px; height: 250px; object-fit: contain; filter: drop-shadow(0 0 20px rgba(255,255,255,0.4)); transition: transform 0.1s;" />
+      <img id="evo-img-new" src="" style="position: absolute; width: 250px; height: 250px; object-fit: contain; filter: drop-shadow(0 0 20px rgba(255,255,255,0.4)); opacity: 0; transition: transform 0.1s;" />
+      <!-- White flash mask overlay -->
+      <div id="evo-flash" style="position: absolute; width: 250px; height: 250px; border-radius: 50%; background: white; opacity: 0; mix-blend-mode: overlay; pointer-events: none; transition: transform 0.3s ease-out, opacity 0.3s; transform: scale(0);"></div>
+    </div>
+
+    <!-- Retro Dialogue Box -->
+    <div style="position: absolute; bottom: 5%; left: 50%; transform: translateX(-50%); width: 90%; max-width: 600px; background: #1e293b; border: 4px solid #f8fafc; border-radius: 8px; padding: 20px; box-shadow: 0 0 0 4px #1e293b, 0 10px 25px rgba(0,0,0,0.5); z-index: 20;">
+      <div id="evo-text" style="font-size: 1.3rem; line-height: 1.6; min-height: 60px; font-weight: 700; letter-spacing: 2px;">
+        咦？[學生姓名]的[舊寶可夢]的樣子怪怪の...！
+      </div>
+      <div id="evo-btn-container" style="display: none; justify-content: flex-end; margin-top: 10px;">
+        <button id="evo-ok-btn" style="background: #eab308; color: #0f172a; border: none; padding: 8px 24px; font-weight: 900; font-size: 1.1rem; border-radius: 4px; cursor: pointer; box-shadow: 0 4px 0 #ca8a04; transition: transform 0.1s;" onclick="closeEvolution()">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GBA Move Learn / Replace Overlay -->
+  <div id="move-learn-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; font-family: 'Fredoka', 'Noto Sans TC', monospace; color: white; padding: 20px; user-select: none;">
+    <div style="width: 90%; max-width: 500px; background: #1e293b; border: 4px solid #f8fafc; border-radius: 8px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+      <div id="move-learn-text" style="font-size: 1.2rem; line-height: 1.6; margin-bottom: 25px; font-weight: 700; letter-spacing: 1px; white-space: pre-line;">
+        學習新招式中...
+      </div>
+      <!-- Decision choices -->
+      <div id="move-learn-choices" style="display: flex; justify-content: flex-end; gap: 15px;">
+        <!-- Generated dynamically -->
+      </div>
+      <!-- Replace selections -->
+      <div id="move-replace-list" style="display: none; flex-direction: column; gap: 12px;">
+        <div style="font-size: 0.95rem; color: #94a3b8; font-weight: 700; margin-bottom: 5px;">請選擇要遺忘的招式：</div>
+        <div id="move-replace-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <!-- Generated moves buttons -->
+        </div>
+        <button onclick="cancelMoveReplace()" style="background: #475569; color: white; border: none; padding: 8px; margin-top: 10px; border-radius: 6px; font-weight: 700; cursor: pointer; font-family: inherit;">返回</button>
+      </div>
+    </div>
+  </div>
+
+  <a href="二年甲班電子聯絡簿.html" class="btn-return"><i class="fa-solid fa-arrow-left"></i> 回聯絡簿</a>
+
+  <button onclick="toggleBattleView(true)" style="position: absolute; top: 20px; right: 20px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: 700; box-shadow: var(--shadow-sm); display: flex; align-items: center; gap: 8px; cursor: pointer; transition: transform 0.2s; z-index: 100;" id="btn-goto-battle">
+    <i class="fa-solid fa-gamepad"></i> 寶可夢對戰
+  </button>
+
+  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v2.5</span></h1>
+
+  <!-- Student Card Container -->
+  <div class="main-container" id="student-container">
+    <!-- Tabs -->
+    <div class="tabs-container" id="tabs">
+      <!-- Generated via JS -->
+    </div>
+
+    <!-- Main Card -->
+    <div class="glass-card" id="main-content">
+      <!-- Content generated via JS -->
+    </div>
+  </div>
+
+  <!-- Battle Arena Container -->
+  <div class="main-container" id="battle-container" style="display: none;">
+    
+    <!-- Battle Lobby -->
+    <div class="glass-card" id="battle-lobby" style="max-width: 600px; margin: 0 auto; padding: 25px; text-align: center;">
+      <div class="selection-title" style="margin-bottom: 20px;"><i class="fa-solid fa-trophy" style="color: #eab308;"></i> 寶可夢對戰競技場</div>
+      
+      <div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 25px; flex-wrap: wrap;">
+        <!-- Challenger 1 -->
+        <div style="flex: 1; min-width: 150px; background: rgba(255,255,255,0.4); border-radius: 12px; padding: 15px; border: 1px solid rgba(255,255,255,0.5);">
+          <label style="font-weight: 700; color: #ef4444; display: block; margin-bottom: 8px;"><i class="fa-solid fa-shield-halved"></i> 紅方挑戰者 (P1)</label>
+          <select id="battle-p1-select" onchange="updateLobbyDetails()" style="width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; outline: none; background: white; font-weight: 700; color: #1e293b;">
+            <option value="1">1號 陳洪福</option>
+            <option value="2">2號 蕭廷恩</option>
+            <option value="3">3號 江岳泰</option>
+          </select>
+          <div id="lobby-poke-p1" style="margin-top: 15px; font-weight: 700; color: #334155; display: flex; flex-direction: column; align-items: center; gap: 5px;"></div>
+        </div>
+        
+        <!-- VS -->
+        <div style="display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 900; color: #64748b; font-style: italic;">VS</div>
+
+        <!-- Challenger 2 -->
+        <div style="flex: 1; min-width: 150px; background: rgba(255,255,255,0.4); border-radius: 12px; padding: 15px; border: 1px solid rgba(255,255,255,0.5);">
+          <label style="font-weight: 700; color: #3b82f6; display: block; margin-bottom: 8px;"><i class="fa-solid fa-shield-halved"></i> 藍方挑戰者 (P2)</label>
+          <select id="battle-p2-select" onchange="updateLobbyDetails()" style="width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; outline: none; background: white; font-weight: 700; color: #1e293b;">
+            <option value="2" selected>2號 蕭廷恩</option>
+            <option value="1">1號 陳洪福</option>
+            <option value="3">3號 江岳泰</option>
+          </select>
+          <div id="lobby-poke-p2" style="margin-top: 15px; font-weight: 700; color: #334155; display: flex; flex-direction: column; align-items: center; gap: 5px;"></div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px; max-width: 300px; margin: 0 auto;">
+        <button class="btn-add" onclick="startBattle('auto')" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px; border-radius: 10px; font-weight: 800; font-size: 1.1rem; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;"><i class="fa-solid fa-robot"></i> 開始對戰 (自動觀戰)</button>
+        <button class="btn-add" onclick="startBattle('manual')" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: 12px; border-radius: 10px; font-weight: 800; font-size: 1.1rem; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;"><i class="fa-solid fa-gamepad"></i> 開始對戰 (雙人手動)</button>
+        <button class="btn-reset" onclick="toggleBattleView(false)" style="margin: 0 auto; width: auto; padding: 10px 20px; font-weight: 700; cursor: pointer; border-radius: 8px; border: none;"><i class="fa-solid fa-circle-xmark"></i> 退出對戰</button>
+      </div>
+    </div>
+
+    <!-- Battle Arena Screen -->
+    <div class="glass-card" id="battle-arena-card" style="display: none; padding: 0; background: #000; overflow: hidden; position: relative; aspect-ratio: 4/3; max-width: 600px; margin: 0 auto; border: 4px solid #1e293b; border-radius: 16px;">
+      
+      <!-- Arena Background -->
+      <div style="position: absolute; inset: 0; background: linear-gradient(#bae6fd 0%, #bae6fd 50%, #4ade80 50%, #22c55e 100%);">
+        <!-- flash overlay -->
+        <div id="battle-flash-overlay" style="position: absolute; inset: 0; background: white; opacity: 0; pointer-events: none; z-index: 50; transition: opacity 0.1s;"></div>
+      </div>
+
+      <!-- Enemy (Top Right) Platform & Pokemon (Anchored exactly on the turf patch) -->
+      <div style="position: absolute; right: 10%; top: 12%; width: 170px; height: 80px; z-index: 5;">
+        <!-- 3D turf platform with brown GBA dirt rim -->
+        <div style="width: 170px; height: 35px; background: radial-gradient(ellipse, #bbf7d0 0%, #4ade80 70%, #15803d 100%); border: 2.5px solid #78350f; border-bottom: 6px solid #451a03; border-radius: 50%; position: absolute; bottom: 0px; left: 0px; z-index: 3; box-shadow: 0 4px 8px rgba(0,0,0,0.35);"></div>
+        <!-- Sprite -->
+        <img id="battle-img-p2" src="" style="width: 200px; height: 200px; object-fit: contain; z-index: 5; position: absolute; bottom: -40px; left: -15px; transition: transform 0.1s;" />
+      </div>
+
+      <!-- Enemy Status Info Box (Top Left) -->
+      <div style="position: absolute; left: 5%; top: 12%; background: #f8fafc; border: 3px solid #475569; border-radius: 8px; padding: 8px 12px; width: 220px; color: #1e293b; font-family: monospace; z-index: 20; box-shadow: 0 4px 6px rgba(0,0,0,0.15);">
+        <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 1rem;">
+          <span id="battle-name-p2">卡咪龜</span>
+          <span id="battle-lv-p2">Lv.12</span>
+        </div>
+        <!-- HP Bar -->
+        <div style="width: 100%; height: 10px; background: #e2e8f0; border-radius: 5px; margin-top: 4px; overflow: hidden; border: 1px solid #94a3b8; position: relative;">
+          <div id="battle-hp-p2" style="height: 100%; width: 100%; background: #22c55e; transition: width 0.3s;"></div>
+        </div>
+        <div style="font-size: 0.75rem; text-align: right; margin-top: 2px; color: #475569; font-weight: 700;" id="battle-hp-text-p2">50 / 50</div>
+      </div>
+
+      <!-- Player (Bottom Left) Platform & Pokemon (Anchored exactly on the turf patch) -->
+      <div style="position: absolute; left: 10%; bottom: 27%; width: 240px; height: 180px; z-index: 5;">
+        <!-- 3D turf platform with brown GBA dirt rim -->
+        <div style="width: 240px; height: 50px; background: radial-gradient(ellipse, #bbf7d0 0%, #4ade80 70%, #15803d 100%); border: 3px solid #78350f; border-bottom: 8px solid #451a03; border-radius: 50%; position: absolute; bottom: 0px; left: 0px; z-index: 3; box-shadow: 0 6px 12px rgba(0,0,0,0.45);"></div>
+        <!-- Sprite -->
+        <img id="battle-img-p1" src="" style="width: 220px; height: 220px; object-fit: contain; z-index: 5; position: absolute; bottom: -45px; left: 10px; transition: transform 0.1s;" />
+      </div>
+
+      <!-- Player Status Info Box (Bottom Right) -->
+      <div style="position: absolute; right: 5%; bottom: 30%; background: #f8fafc; border: 3px solid #475569; border-radius: 8px; padding: 8px 12px; width: 220px; color: #1e293b; font-family: monospace; z-index: 20; box-shadow: 0 4px 6px rgba(0,0,0,0.15);">
+        <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 1rem;">
+          <span id="battle-name-p1">火恐龍</span>
+          <span id="battle-lv-p1">Lv.15</span>
+        </div>
+        <!-- HP Bar -->
+        <div style="width: 100%; height: 10px; background: #e2e8f0; border-radius: 5px; margin-top: 4px; overflow: hidden; border: 1px solid #94a3b8; position: relative;">
+          <div id="battle-hp-p1" style="height: 100%; width: 100%; background: #22c55e; transition: width 0.3s;"></div>
+        </div>
+        <div style="font-size: 0.75rem; text-align: right; margin-top: 2px; color: #475569; font-weight: 700;" id="battle-hp-text-p1">50 / 50</div>
+      </div>
+
+      <!-- Action Panel (Bottom) -->
+      <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 26%; background: #1e293b; border-top: 4px solid #f8fafc; padding: 10px 15px; display: grid; grid-template-columns: 1.6fr 1fr; z-index: 30; box-sizing: border-box; color: white;">
+        <!-- Log text box -->
+        <div id="battle-log" style="font-size: 1.05rem; line-height: 1.4; font-weight: 700; display: flex; align-items: center; padding-right: 10px; letter-spacing: 1px; border-right: 2px solid rgba(255,255,255,0.1); word-break: break-all;">
+          載入對戰中...
+        </div>
+        
+        <!-- Controls area -->
+        <div id="battle-controls" style="display: flex; align-items: center; justify-content: center; padding-left: 10px;">
+          <!-- Move options (Manual Mode) -->
+          <div id="battle-moves-grid" style="display: none; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; height: 100%;">
+            <button class="btn-battle-move" id="move-btn-0" onclick="playerSelectMove(0)"></button>
+            <button class="btn-battle-move" id="move-btn-1" onclick="playerSelectMove(1)"></button>
+            <button class="btn-battle-move" id="move-btn-2" onclick="playerSelectMove(2)"></button>
+            <button class="btn-battle-move" id="move-btn-3" onclick="playerSelectMove(3)"></button>
+          </div>
+          <!-- Auto Battle indicator -->
+          <div id="battle-auto-indicator" style="font-weight: 800; color: #eab308; display: none; text-align: center; font-size: 1.1rem; width: 100%;">
+            <i class="fa-solid fa-bolt" style="animation: flash 1s infinite;"></i> 自動戰鬥中...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Pokedex Configuration
+    const POKEMON_DATA = {
+      fire: [
+        { id: 4, name: '小火龍', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png' },
+        { id: 5, name: '火恐龍', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/5.png' },
+        { id: 6, name: '噴火龍', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/6.png' }
+      ],
+      water: [
+        { id: 7, name: '傑尼龜', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png' },
+        { id: 8, name: '卡咪龜', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/8.png' },
+        { id: 9, name: '水箭龜', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/9.png' }
+      ],
+      grass: [
+        { id: 1, name: '妙蛙種子', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png' },
+        { id: 2, name: '妙蛙草', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/2.png' },
+        { id: 3, name: '妙蛙花', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/3.png' }
+      ]
+    };
+
+    // Moves learning configurations (Pool includes level unlocked moves)
+    const MOVES_POOL = {
+      fire: [
+        { name: "撞擊", level: 0, power: 10, type: "normal", status: "none" },
+        { name: "叫聲", level: 1, power: 0, type: "status", status: "atk-down" },
+        { name: "火花", level: 2, power: 18, type: "fire", status: "none" },
+        { name: "煙幕", level: 3, power: 0, type: "status", status: "atk-down" },
+        { name: "噴射火焰", level: 10, power: 25, type: "fire", status: "none" },
+        { name: "咬碎", level: 15, power: 20, type: "normal", status: "none" },
+        { name: "大字爆炎", level: 20, power: 38, type: "fire", status: "none" }
+      ],
+      water: [
+        { name: "撞擊", level: 0, power: 10, type: "normal", status: "none" },
+        { name: "縮入殼中", level: 1, power: 0, type: "status", status: "def-up" },
+        { name: "水槍", level: 2, power: 16, type: "water", status: "none" },
+        { name: "搖尾巴", level: 3, power: 0, type: "status", status: "atk-down" },
+        { name: "水之波動", level: 10, power: 22, type: "water", status: "none" },
+        { name: "咬住", level: 15, power: 18, type: "normal", status: "none" },
+        { name: "水炮", level: 20, power: 38, type: "water", status: "none" }
+      ],
+      grass: [
+        { name: "撞擊", level: 0, power: 10, type: "normal", status: "none" },
+        { name: "生長", level: 1, power: 0, type: "status", status: "def-up" },
+        { name: "藤鞭", level: 2, power: 16, type: "grass", status: "none" },
+        { name: "寄生種子", level: 3, power: 0, type: "status", status: "atk-down" },
+        { name: "葉片快刀", level: 10, power: 22, type: "grass", status: "none" },
+        { name: "光合作用", level: 15, power: 0, type: "status", status: "heal" },
+        { name: "陽光烈焰", level: 20, power: 42, type: "grass", status: "none" }
+      ]
+    };
+
+    // Flatten helper map for battle lookups
+    const MOVES_DETAILS_MAP = {};
+    Object.values(MOVES_POOL).forEach(familyMoves => {
+      familyMoves.forEach(m => {
+        MOVES_DETAILS_MAP[m.name] = m;
+      });
+    });
+
+    // Initial Data Structure
+    const defaultStudents = {
+      "1": { name: "陳洪福", pokemons: [] },
+      "2": { name: "蕭廷恩", pokemons: [] },
+      "3": { name: "江岳泰", pokemons: [] }
+    };
+
+    // State Management
+    let currentStudentId = "1";
+    let students = null;
+
+    function loadData() {
+      try {
+        const rawData = localStorage.getItem('pokemon_trainer_data');
+        if (rawData) {
+          students = JSON.parse(rawData);
+        }
+        // Validate data structure
+        if (!students || typeof students !== 'object' || Array.isArray(students) || !students["1"]) {
+          students = JSON.parse(JSON.stringify(defaultStudents));
+        } else {
+          // Upgrade schema if migrating from older single-pokemon version
+          for(let id in defaultStudents) {
+            if(!students[id]) {
+              students[id] = JSON.parse(JSON.stringify(defaultStudents[id]));
+            }
+            if(!students[id].pokemons) {
+              students[id].pokemons = [];
+            }
+            // Ensure moves are initialized if not exist on active pokemon
+            students[id].pokemons.forEach(poke => {
+              if (poke.points < 200 && (!poke.moves || poke.moves.length === 0)) {
+                initializeDefaultMoves(poke);
+              }
+            });
+          }
+        }
+      } catch (e) {
+        console.error("載入資料時發生錯誤：", e);
+        students = JSON.parse(JSON.stringify(defaultStudents));
+      }
+    }
+
+    // Default moves initializer based on current level points
+    function initializeDefaultMoves(poke) {
+      const level = Math.floor(poke.points / 10);
+      const pool = MOVES_POOL[poke.family];
+      const unlocked = pool.filter(m => level >= m.level);
+      const chosen = unlocked.slice(-4).map(m => m.name);
+      poke.moves = chosen;
+      return chosen;
+    }
+
+    // Save Data
+    function saveData() {
+      try {
+        localStorage.setItem('pokemon_trainer_data', JSON.stringify(students));
+        // Trigger storage event for same-window updates
+        window.dispatchEvent(new Event('storage'));
+      } catch (e) {
+        console.error("儲存資料時發生錯誤：", e);
+      }
+    }
+
+    // Sync moves dynamically based on level to prevent offline sync bugs
+    function syncMovesAndCheckPending(studentId) {
+      const student = students[studentId];
+      if (!student || !student.pokemons || student.pokemons.length === 0) return;
+      const poke = student.pokemons[student.pokemons.length - 1];
+      if (poke.points >= 200) return;
+
+      const level = Math.floor(poke.points / 10);
+      const pool = MOVES_POOL[poke.family];
+      
+      if (!poke.moves) {
+        poke.moves = ["撞擊"];
+      }
+
+      // 1. Auto-learn unlocked moves if slots are empty (< 4)
+      let changed = false;
+      const unlocked = pool.filter(m => m.level <= level);
+      
+      for (let m of unlocked) {
+        if (!poke.moves.includes(m.name) && poke.moves.length < 4) {
+          poke.moves.push(m.name);
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        saveData();
+      }
+
+      // 2. If moveset is full (4 moves) and there are still unlearned unlocked moves, prompt GBA learning
+      const unlearned = unlocked.filter(m => !poke.moves.includes(m.name));
+      if (unlearned.length > 0) {
+        learningState = {
+          studentId: studentId,
+          poke: poke,
+          pendingMoves: unlearned,
+          currentNewMove: null,
+          callback: () => {
+            renderTabs();
+            renderContent();
+          }
+        };
+        processNextMoveLearning();
+      }
+    }
+
+    loadData();
+
+    // Initialize UI
+    function init() {
+      syncMovesAndCheckPending(currentStudentId);
+      renderTabs();
+      renderContent();
+    }
+
+    // Render Tabs
+    function renderTabs() {
+      const tabsContainer = document.getElementById('tabs');
+      tabsContainer.innerHTML = '';
+      for (let id in students) {
+        const btn = document.createElement('button');
+        btn.className = `tab-btn ${id === currentStudentId ? 'active' : ''}`;
+        btn.textContent = `${id}號 ${students[id].name}`;
+        btn.onclick = () => {
+          currentStudentId = id;
+          syncMovesAndCheckPending(currentStudentId);
+          renderTabs();
+          renderContent();
+        };
+        tabsContainer.appendChild(btn);
+      }
+    }
+
+    // Get current Pokemon stage index based on points
+    function getStage(level) {
+      if (level < 10) return 0;
+      if (level < 20) return 1;
+      return 2;
+    }
+
+    function getCurrentPokemon(poke) {
+      if (!poke || !poke.family) return null;
+      const familyArr = POKEMON_DATA[poke.family];
+      const level = Math.floor(poke.points / 10);
+      const stageIndex = getStage(level);
+      return familyArr[stageIndex];
+    }
+
+    // Render Content (Selection screen, Active Pokemon view, and Collection list)
+    function renderContent() {
+      const student = students[currentStudentId];
+      const content = document.getElementById('main-content');
+      const pokes = student.pokemons;
+      
+      const activePoke = pokes.length > 0 ? pokes[pokes.length - 1] : null;
+      const needsNewSelection = !activePoke || activePoke.points >= 200;
+
+      if (needsNewSelection) {
+        // Show Selection Screen
+        let titleText = "請選擇你的初始寶可夢夥伴！";
+        let descText = "";
+        if (activePoke && activePoke.points >= 200) {
+          const activePokeName = getCurrentPokemon(activePoke).name;
+          titleText = `恭喜你的夥伴 ${activePokeName} 達到滿級 (Lv.20)！`;
+          descText = `<p style="color: #475569; font-weight: 600; margin-bottom: 20px;">請選擇你的下一隻寶可夢夥伴，開始新的冒險之旅：</p>`;
+        }
+
+        content.innerHTML = `
+          <div class="selection-screen">
+            <div class="selection-title" style="margin-bottom:10px;">${titleText}</div>
+            ${descText}
+            <div class="starters-grid">
+              <div class="starter-card fire" onclick="selectStarter('fire')">
+                <img src="${POKEMON_DATA.fire[0].url}" alt="小火龍" class="starter-img">
+                <div class="starter-name">小火龍</div>
+              </div>
+              <div class="starter-card water" onclick="selectStarter('water')">
+                <img src="${POKEMON_DATA.water[0].url}" alt="傑尼龜" class="starter-img">
+                <div class="starter-name">傑尼龜</div>
+              </div>
+              <div class="starter-card grass" onclick="selectStarter('grass')">
+                <img src="${POKEMON_DATA.grass[0].url}" alt="妙蛙種子" class="starter-img">
+                <div class="starter-name">妙蛙種子</div>
+              </div>
+            </div>
+            ${renderCollectionHTML(student)}
+          </div>
+        `;
+      } else {
+        // Show Pokemon View
+        const pokemon = getCurrentPokemon(activePoke);
+        const level = Math.floor(activePoke.points / 10);
+        const currentStagePoints = activePoke.points % 10;
+        const progressPercent = (currentStagePoints / 10) * 100;
+        
+        let nextEvolutionText = '';
+        if (level < 10) {
+          nextEvolutionText = `距離進化成 ${POKEMON_DATA[activePoke.family][1].name} 還有 ${100 - activePoke.points} 分`;
+        } else if (level < 20) {
+          nextEvolutionText = `距離進化成 ${POKEMON_DATA[activePoke.family][2].name} 還有 ${200 - activePoke.points} 分`;
+        } else {
+          nextEvolutionText = '已經達到最終進化階段！已達滿級 (20等)';
+        }
+
+        // Generate 10-grid stamp card HTML
+        let stampGridHTML = '';
+        for (let i = 1; i <= 10; i++) {
+          const isActive = i <= currentStagePoints;
+          const slotClass = isActive ? 'stamp-slot active' : 'stamp-slot';
+          const ballImg = isActive 
+            ? `<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" class="stamp-ball" alt="Pokeball">`
+            : '';
+          stampGridHTML += `
+            <div class="${slotClass}">
+              ${ballImg}
+              <div class="stamp-number">${i}</div>
+            </div>
+          `;
+        }
+
+        const stampCardHTML = `
+          <div class="stamp-card-section" style="margin-bottom: 25px;">
+            <div class="stamp-card-title">
+              <i class="fa-solid fa-circle-check" style="color: #ef4444;"></i> 
+              升級集點卡 (目前進度: ${currentStagePoints} / 10)
+            </div>
+            <div class="stamp-grid">
+              ${stampGridHTML}
+            </div>
+          </div>
+        `;
+
+        // Display current moves learned
+        const typeLabels = {
+          fire: '<span style="font-size: 0.7rem; background: #ef4444; color: white; padding: 1px 4px; border-radius: 3px; margin-left: 4px; font-weight: bold;">🔥火</span>',
+          water: '<span style="font-size: 0.7rem; background: #3b82f6; color: white; padding: 1px 4px; border-radius: 3px; margin-left: 4px; font-weight: bold;">💧水</span>',
+          grass: '<span style="font-size: 0.7rem; background: #22c55e; color: white; padding: 1px 4px; border-radius: 3px; margin-left: 4px; font-weight: bold;">🍃草</span>',
+          normal: '<span style="font-size: 0.7rem; background: #94a3b8; color: white; padding: 1px 4px; border-radius: 3px; margin-left: 4px; font-weight: bold;">⚪普</span>',
+          status: '<span style="font-size: 0.7rem; background: #eab308; color: #1e293b; padding: 1px 4px; border-radius: 3px; margin-left: 4px; font-weight: bold;">✨變</span>'
+        };
+
+        const currentMoves = activePoke.moves || initializeDefaultMoves(activePoke);
+        let movesListHTML = currentMoves.map(m => {
+          const move = MOVES_DETAILS_MAP[m];
+          return `
+            <span style="background: rgba(255,255,255,0.6); border: 1px solid rgba(0,0,0,0.15); padding: 5px 12px; border-radius: 12px; font-weight: 700; font-size: 0.85rem; color: #334155; display: inline-flex; align-items: center; gap: 4px;">
+              ${m} ${typeLabels[move.type]}
+            </span>
+          `;
+        }).join('');
+
+        content.innerHTML = `
+          <div class="pokemon-view">
+            <div class="level-badge">Lv. ${level}</div>
+            
+            <div class="pokemon-image-container">
+              <img src="${pokemon.url}" alt="${pokemon.name}" class="pokemon-image" id="current-pokemon-img">
+            </div>
+            
+            <div class="pokemon-name">${pokemon.name}</div>
+            <div class="points-info">目前分數：${activePoke.points} / 200 分 (Lv. ${level})</div>
+            
+            <div class="progress-container">
+              <div class="progress-bar" style="width: ${progressPercent}%;"></div>
+              <div class="progress-text">${currentStagePoints} / 10 (下個等級)</div>
+            </div>
+            
+            <div style="font-size: 0.9rem; color: #94a3b8; font-weight: 600; margin-top: 5px; margin-bottom: 15px;">
+              ${nextEvolutionText}
+            </div>
+
+            <!-- Current Moves Grid -->
+            <div style="margin-bottom: 20px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; max-width: 400px;">
+              <div style="font-size: 0.85rem; font-weight: 800; color: #64748b; width: 100%; margin-bottom: 5px;"><i class="fa-solid fa-gamepad"></i> 當前學會的招式</div>
+              ${movesListHTML}
+            </div>
+
+            ${stampCardHTML}
+
+            ${renderCollectionHTML(student)}
+          </div>
+        `;
+      }
+    }
+
+    // Helper to render already earned pokemon collection
+    function renderCollectionHTML(student) {
+      const pokes = student.pokemons;
+      const collectionPokes = pokes.filter((p, index) => {
+        return index < pokes.length - 1 || p.points >= 200;
+      });
+
+      if (collectionPokes.length === 0) return '';
+
+      let gridItems = '';
+      collectionPokes.forEach(p => {
+        const currentPoke = getCurrentPokemon(p);
+        const level = Math.floor(p.points / 10);
+        gridItems += `
+          <div class="collection-item">
+            <img src="${currentPoke.url}" class="collection-img" alt="${currentPoke.name}" />
+            <div class="collection-name">${currentPoke.name}</div>
+            <div style="font-size:0.75rem; color: #64748b; font-weight:700;">Lv.${level}</div>
+          </div>
+        `;
+      });
+
+      return `
+        <div class="collection-section">
+          <div class="collection-title"><i class="fa-solid fa-box-archive"></i> 我的寶可夢倉庫</div>
+          <div class="collection-grid">
+            ${gridItems}
+          </div>
+        </div>
+      `;
+    }
+
+    // Select Starter
+    function selectStarter(family) {
+      const student = students[currentStudentId];
+      student.pokemons.push({ family: family, points: 0, moves: ["撞擊"] });
+      saveData();
+      syncMovesAndCheckPending(currentStudentId);
+      renderContent();
+    }
+
+    // GBA Evolution logic
+    let evoCallback = null;
+
+    function triggerEvolution(studentName, oldPoke, newPoke, callback) {
+      evoCallback = callback;
+      const overlay = document.getElementById('evolution-overlay');
+      const imgOld = document.getElementById('evo-img-old');
+      const imgNew = document.getElementById('evo-img-new');
+      const txt = document.getElementById('evo-text');
+      const btnGroup = document.getElementById('evo-btn-container');
+      const flash = document.getElementById('evo-flash');
+      const particles = document.getElementById('evo-particles');
+      
+      overlay.style.display = 'flex';
+      btnGroup.style.display = 'none';
+      imgOld.src = oldPoke.url;
+      imgNew.src = newPoke.url;
+      imgOld.style.opacity = '1';
+      imgOld.style.transform = 'scale(1)';
+      imgOld.style.filter = 'drop-shadow(0 0 20px rgba(255,255,255,0.4))';
+      imgNew.style.opacity = '0';
+      imgNew.style.transform = 'scale(1)';
+      imgNew.style.filter = 'drop-shadow(0 0 20px rgba(255,255,255,0.4))';
+      flash.style.opacity = '0';
+      flash.style.transform = 'scale(0)';
+      particles.innerHTML = '';
+      
+      txt.textContent = `咦？${studentName}的 ${oldPoke.name} 樣子怪怪的...！`;
+      
+      // Flashing animation
+      setTimeout(() => {
+        let flashCount = 0;
+        let delay = 400;
+        
+        function flashStep() {
+          if (delay > 50) {
+            const showNew = flashCount % 2 === 1;
+            if (showNew) {
+              imgOld.style.opacity = '0';
+              imgNew.style.opacity = '1';
+              imgNew.style.filter = 'brightness(0) invert(1) drop-shadow(0 0 20px white)';
+            } else {
+              imgOld.style.opacity = '1';
+              imgNew.style.opacity = '0';
+              imgOld.style.filter = 'brightness(0) invert(1) drop-shadow(0 0 20px white)';
+            }
+            
+            flashCount++;
+            delay = Math.max(50, delay * 0.85);
+            setTimeout(flashStep, delay);
+          } else {
+            let rapidCount = 0;
+            function rapidFlash() {
+              if (rapidCount < 12) {
+                const showNew = rapidCount % 2 === 1;
+                imgOld.style.opacity = showNew ? '0' : '1';
+                imgNew.style.opacity = showNew ? '1' : '0';
+                imgOld.style.filter = 'brightness(0) invert(1) drop-shadow(0 0 20px white)';
+                imgNew.style.filter = 'brightness(0) invert(1) drop-shadow(0 0 20px white)';
+                rapidCount++;
+                setTimeout(rapidFlash, 60);
+              } else {
+                triggerBurst();
+              }
+            }
+            rapidFlash();
+          }
+        }
+        flashStep();
+      }, 2000);
+
+      function triggerBurst() {
+        imgOld.style.opacity = '0';
+        imgNew.style.opacity = '1';
+        imgNew.style.filter = 'brightness(0) invert(1) drop-shadow(0 0 30px white)';
+        imgNew.style.transform = 'scale(1.3)';
+        
+        flash.style.transform = 'scale(2.5)';
+        flash.style.opacity = '1';
+        
+        setTimeout(() => {
+          imgNew.style.transform = 'scale(1)';
+          imgNew.style.filter = 'drop-shadow(0 10px 20px rgba(0,0,0,0.5))';
+          flash.style.opacity = '0';
+          
+          createSparkles();
+          
+          txt.textContent = `恭喜！${studentName}的 ${oldPoke.name} 進化成 ${newPoke.name} 了！`;
+          btnGroup.style.display = 'flex';
+        }, 300);
+      }
+
+      function createSparkles() {
+        for(let i=0; i<50; i++) {
+          const p = document.createElement('div');
+          const size = Math.random() * 8 + 4;
+          p.style.position = 'absolute';
+          p.style.left = '50%';
+          p.style.top = '50%';
+          p.style.width = `${size}px`;
+          p.style.height = `${size}px`;
+          p.style.background = `hsl(${Math.random()*360}, 100%, 75%)`;
+          p.style.borderRadius = '50%';
+          p.style.boxShadow = '0 0 10px white';
+          
+          const angle = Math.random() * Math.PI * 2;
+          const velocity = Math.random() * 250 + 100;
+          const vx = Math.cos(angle) * velocity;
+          const vy = Math.sin(angle) * velocity;
+          
+          p.style.transform = 'translate(-50%, -50%)';
+          particles.appendChild(p);
+          
+          let start = null;
+          function animParticle(timestamp) {
+            if(!start) start = timestamp;
+            const progress = (timestamp - start) / 1000;
+            if(progress < 1.2) {
+              const x = vx * progress;
+              const y = vy * progress + 0.5 * 180 * progress * progress;
+              p.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+              p.style.opacity = 1.2 - progress;
+              requestAnimationFrame(animParticle);
+            } else {
+              p.remove();
+            }
+          }
+          requestAnimationFrame(animParticle);
+        }
+      }
+    }
+
+    function closeEvolution() {
+      document.getElementById('evolution-overlay').style.display = 'none';
+      if(evoCallback) {
+        evoCallback();
+        evoCallback = null;
+      }
+    }
+
+    // Dynamic Move Learning Decision State
+    let learningState = {
+      studentId: null,
+      poke: null,
+      pendingMoves: [],
+      currentNewMove: null,
+      callback: null
+    };
+
+    function checkAndPromptMoveLearning(studentId, oldLevel, newLevel, callback) {
+      const student = students[studentId];
+      if (!student || student.pokemons.length === 0) {
+        callback();
+        return;
+      }
+      const poke = student.pokemons[student.pokemons.length - 1];
+      if (poke.points >= 200) {
+        callback();
+        return;
+      }
+
+      // Initialize moves array if missing
+      if (!poke.moves) {
+        initializeDefaultMoves(poke);
+        saveData();
+      }
+
+      const pool = MOVES_POOL[poke.family];
+      // Find all moves unlocked in level range (oldLevel < level <= newLevel)
+      const newUnlocked = pool.filter(m => m.level > oldLevel && m.level <= newLevel);
+      
+      // Filter out moves they already know
+      const pending = newUnlocked.filter(m => !poke.moves.includes(m.name));
+
+      if (pending.length === 0) {
+        callback();
+        return;
+      }
+
+      learningState = {
+        studentId: studentId,
+        poke: poke,
+        pendingMoves: pending,
+        currentNewMove: null,
+        callback: callback
+      };
+
+      processNextMoveLearning();
+    }
+
+    function processNextMoveLearning() {
+      if (learningState.pendingMoves.length === 0) {
+        saveData();
+        learningState.callback();
+        return;
+      }
+
+      const newMove = learningState.pendingMoves.shift();
+      learningState.currentNewMove = newMove;
+      
+      const poke = learningState.poke;
+      const pokeData = getCurrentPokemon(poke);
+
+      if (poke.moves.length < 4) {
+        // Automatically learn if slots are not full
+        poke.moves.push(newMove.name);
+        
+        const overlay = document.getElementById('move-learn-overlay');
+        const txt = document.getElementById('move-learn-text');
+        const choices = document.getElementById('move-learn-choices');
+        const replaceList = document.getElementById('move-replace-list');
+
+        overlay.style.display = 'flex';
+        choices.style.display = 'flex';
+        replaceList.style.display = 'none';
+        
+        choices.innerHTML = `
+          <button onclick="acknowledgeAutoLearn()" style="background: #eab308; color: #0f172a; border: none; padding: 8px 24px; font-weight: 900; border-radius: 4px; cursor: pointer; font-family: inherit;">確定</button>
+        `;
+        
+        txt.textContent = `${students[learningState.studentId].name}的 ${pokeData.name} 升到了 Lv.${newMove.level}！\n學會了新招式「${newMove.name}」！`;
+      } else {
+        // Prompt forget decision if slots are full (4 moves)
+        const overlay = document.getElementById('move-learn-overlay');
+        const txt = document.getElementById('move-learn-text');
+        const choices = document.getElementById('move-learn-choices');
+        const replaceList = document.getElementById('move-replace-list');
+
+        overlay.style.display = 'flex';
+        choices.style.display = 'flex';
+        replaceList.style.display = 'none';
+
+        choices.innerHTML = `
+          <button onclick="rejectNewMove()" style="background: #64748b; color: white; border: none; padding: 8px 20px; font-weight: 700; border-radius: 4px; cursor: pointer; margin-right: 10px; font-family: inherit;">放棄</button>
+          <button onclick="promptForgetSelection()" style="background: #eab308; color: #0f172a; border: none; padding: 8px 20px; font-weight: 900; border-radius: 4px; cursor: pointer; font-family: inherit;">遺忘舊招式</button>
+        `;
+
+        txt.textContent = `${students[learningState.studentId].name}的 ${pokeData.name} 想要學習新招式「${newMove.name}」。\n但是，它最多只能記住4個招式。要遺忘一個招式來學習「${newMove.name}」嗎？`;
+      }
+    }
+
+    function acknowledgeAutoLearn() {
+      const overlay = document.getElementById('move-learn-overlay');
+      overlay.style.display = 'none';
+      processNextMoveLearning();
+    }
+
+    function rejectNewMove() {
+      const overlay = document.getElementById('move-learn-overlay');
+      const txt = document.getElementById('move-learn-text');
+      const choices = document.getElementById('move-learn-choices');
+      
+      const poke = learningState.poke;
+      const pokeData = getCurrentPokemon(poke);
+
+      choices.innerHTML = `
+        <button onclick="acknowledgeReject()" style="background: #eab308; color: #0f172a; border: none; padding: 8px 24px; font-weight: 900; border-radius: 4px; cursor: pointer; font-family: inherit;">確定</button>
+      `;
+      txt.textContent = `${pokeData.name} 放棄學習「${learningState.currentNewMove.name}」。`;
+    }
+
+    function acknowledgeReject() {
+      const overlay = document.getElementById('move-learn-overlay');
+      overlay.style.display = 'none';
+      processNextMoveLearning();
+    }
+
+    function promptForgetSelection() {
+      const choices = document.getElementById('move-learn-choices');
+      const replaceList = document.getElementById('move-replace-list');
+      const grid = document.getElementById('move-replace-grid');
+      
+      choices.style.display = 'none';
+      replaceList.style.display = 'flex';
+      grid.innerHTML = "";
+
+      const typeLabels = {
+        fire: '<span style="font-size: 0.7rem; background: #ef4444; color: white; padding: 1px 4px; border-radius: 3px; margin-left: 4px; font-weight: bold;">🔥火</span>',
+        water: '<span style="font-size: 0.7rem; background: #3b82f6; color: white; padding: 1px 4px; border-radius: 3px; margin-left: 4px; font-weight: bold;">💧水</span>',
+        grass: '<span style="font-size: 0.7rem; background: #22c55e; color: white; padding: 1px 4px; border-radius: 3px; margin-left: 4px; font-weight: bold;">🍃草</span>',
+        normal: '<span style="font-size: 0.7rem; background: #94a3b8; color: white; padding: 1px 4px; border-radius: 3px; margin-left: 4px; font-weight: bold;">⚪普</span>',
+        status: '<span style="font-size: 0.7rem; background: #eab308; color: #1e293b; padding: 1px 4px; border-radius: 3px; margin-left: 4px; font-weight: bold;">✨變</span>'
+      };
+
+      const poke = learningState.poke;
+      poke.moves.forEach((moveName, index) => {
+        const move = MOVES_DETAILS_MAP[moveName];
+        const btn = document.createElement('button');
+        btn.className = 'btn-battle-move';
+        btn.style.color = '#ef4444';
+        btn.style.borderColor = '#ef4444';
+        btn.style.padding = '12px';
+        btn.innerHTML = `${moveName} ${typeLabels[move.type]}`;
+        btn.onclick = () => replaceMoveWith(index);
+        grid.appendChild(btn);
+      });
+    }
+
+    function cancelMoveReplace() {
+      const choices = document.getElementById('move-learn-choices');
+      const replaceList = document.getElementById('move-replace-list');
+      choices.style.display = 'flex';
+      replaceList.style.display = 'none';
+    }
+
+    function replaceMoveWith(index) {
+      const poke = learningState.poke;
+      const pokeData = getCurrentPokemon(poke);
+      const oldMove = poke.moves[index];
+      const newMove = learningState.currentNewMove.name;
+
+      poke.moves[index] = newMove;
+
+      const overlay = document.getElementById('move-learn-overlay');
+      const txt = document.getElementById('move-learn-text');
+      const choices = document.getElementById('move-learn-choices');
+      const replaceList = document.getElementById('move-replace-list');
+
+      replaceList.style.display = 'none';
+      choices.style.display = 'flex';
+      choices.innerHTML = `
+        <button onclick="acknowledgeReplaceSuccess()" style="background: #eab308; color: #0f172a; border: none; padding: 8px 24px; font-weight: 900; border-radius: 4px; cursor: pointer; font-family: inherit;">確定</button>
+      `;
+
+      txt.innerHTML = `噠噠噠！<br>${pokeData.name} 忘記了「${oldMove}」...<br>並且，學會了「${newMove}」！`;
+    }
+
+    function acknowledgeReplaceSuccess() {
+      const overlay = document.getElementById('move-learn-overlay');
+      overlay.style.display = 'none';
+      processNextMoveLearning();
+    }
+
+
+    // GBA Battle System Logic
+    let battleState = {
+      active: false,
+      mode: 'auto',
+      p1: { name: "", activePoke: null, hp: 100, maxHp: 100, level: 1, family: "fire", atkMod: 1, defMod: 1, moves: [] },
+      p2: { name: "", activePoke: null, hp: 100, maxHp: 100, level: 1, family: "water", atkMod: 1, defMod: 1, moves: [] },
+      currentTurn: "p1",
+      logQueue: [],
+      isNarrating: false
+    };
+
+    function toggleBattleView(active) {
+      const studentContainer = document.getElementById('student-container');
+      const battleContainer = document.getElementById('battle-container');
+      const btnGotoBattle = document.getElementById('btn-goto-battle');
+
+      if (active) {
+        studentContainer.style.display = 'none';
+        battleContainer.style.display = 'block';
+        btnGotoBattle.style.display = 'none';
+        initBattleLobby();
+      } else {
+        studentContainer.style.display = 'block';
+        battleContainer.style.display = 'none';
+        btnGotoBattle.style.display = 'flex';
+        renderContent();
+      }
+    }
+
+    function initBattleLobby() {
+      updateLobbyDetails();
+    }
+
+    function updateLobbyDetails() {
+      const p1Id = document.getElementById('battle-p1-select').value;
+      const p2Id = document.getElementById('battle-p2-select').value;
+      const s1 = students[p1Id];
+      const s2 = students[p2Id];
+      const active1 = s1.pokemons.length > 0 ? s1.pokemons[s1.pokemons.length - 1] : null;
+      const active2 = s2.pokemons.length > 0 ? s2.pokemons[s2.pokemons.length - 1] : null;
+      const lobbyPokeP1 = document.getElementById('lobby-poke-p1');
+      const lobbyPokeP2 = document.getElementById('lobby-poke-p2');
+      
+      let p1Valid = false;
+      let p2Valid = false;
+
+      if (active1) {
+        const pokeData = getCurrentPokemon(active1);
+        const level = Math.floor(active1.points / 10);
+        lobbyPokeP1.innerHTML = `
+          <img src="${pokeData.url}" style="width: 70px; height: 70px; object-fit: contain;">
+          <div>${pokeData.name} (Lv.${level})</div>
+        `;
+        p1Valid = true;
+      } else {
+        lobbyPokeP1.innerHTML = `<div style="color: #ef4444; font-size:0.85rem;"><i class="fa-solid fa-triangle-exclamation"></i> 尚未選擇初始寶可夢</div>`;
+      }
+
+      if (active2) {
+        const pokeData = getCurrentPokemon(active2);
+        const level = Math.floor(active2.points / 10);
+        lobbyPokeP2.innerHTML = `
+          <img src="${pokeData.url}" style="width: 70px; height: 70px; object-fit: contain;">
+          <div>${pokeData.name} (Lv.${level})</div>
+        `;
+        p2Valid = true;
+      } else {
+        lobbyPokeP2.innerHTML = `<div style="color: #ef4444; font-size:0.85rem;"><i class="fa-solid fa-triangle-exclamation"></i> 尚未選擇初始寶可夢</div>`;
+      }
+
+      const startButtons = document.querySelectorAll('#battle-lobby button.btn-add');
+      
+      if (p1Id === p2Id) {
+        startButtons.forEach(btn => btn.disabled = true);
+        lobbyPokeP1.innerHTML += `<div style="color: #f59e0b; font-size:0.75rem;">對戰雙方不能為同一人</div>`;
+      } else if (!p1Valid || !p2Valid) {
+        startButtons.forEach(btn => btn.disabled = true);
+      } else {
+        startButtons.forEach(btn => btn.disabled = false);
+      }
+    }
+
+    function startBattle(mode) {
+      const p1Id = document.getElementById('battle-p1-select').value;
+      const p2Id = document.getElementById('battle-p2-select').value;
+      const s1 = students[p1Id];
+      const s2 = students[p2Id];
+      const active1 = s1.pokemons[s1.pokemons.length - 1];
+      const active2 = s2.pokemons[s2.pokemons.length - 1];
+      const lv1 = Math.floor(active1.points / 10);
+      const lv2 = Math.floor(active2.points / 10);
+
+      // Fetch movesets from active pokemons or load defaults
+      const p1Moves = active1.moves || initializeDefaultMoves(active1);
+      const p2Moves = active2.moves || initializeDefaultMoves(active2);
+
+      battleState.active = true;
+      battleState.mode = mode;
+      battleState.logQueue = [];
+      battleState.isNarrating = false;
+      
+      battleState.p1 = {
+        id: p1Id,
+        name: s1.name,
+        activePoke: active1,
+        pokeDetails: getCurrentPokemon(active1),
+        maxHp: lv1 * 5 + 50,
+        hp: lv1 * 5 + 50,
+        level: lv1,
+        family: active1.family,
+        baseSpeed: active1.family === 'fire' ? 100 : (active1.family === 'grass' ? 80 : 60),
+        atkMod: 1,
+        defMod: 1,
+        moves: p1Moves
+      };
+      
+      battleState.p2 = {
+        id: p2Id,
+        name: s2.name,
+        activePoke: active2,
+        pokeDetails: getCurrentPokemon(active2),
+        maxHp: lv2 * 5 + 50,
+        hp: lv2 * 5 + 50,
+        level: lv2,
+        family: active2.family,
+        baseSpeed: active2.family === 'fire' ? 100 : (active2.family === 'grass' ? 80 : 60),
+        atkMod: 1,
+        defMod: 1,
+        moves: p2Moves
+      };
+
+      document.getElementById('battle-lobby').style.display = 'none';
+      document.getElementById('battle-arena-card').style.display = 'block';
+
+      // Load back sprite for Player 1, front sprite for Player 2
+      document.getElementById('battle-img-p1').src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/${battleState.p1.pokeDetails.id}.png`;
+      document.getElementById('battle-img-p2').src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${battleState.p2.pokeDetails.id}.png`;
+      
+      // Reset image animations
+      document.getElementById('battle-img-p1').style.transform = 'scale(1)';
+      document.getElementById('battle-img-p1').style.opacity = '1';
+      document.getElementById('battle-img-p2').style.transform = 'scale(1)';
+      document.getElementById('battle-img-p2').style.opacity = '1';
+
+      document.getElementById('battle-name-p1').textContent = `${battleState.p1.name}的${battleState.p1.pokeDetails.name}`;
+      document.getElementById('battle-name-p2').textContent = `${battleState.p2.name}的${battleState.p2.pokeDetails.name}`;
+      document.getElementById('battle-lv-p1').textContent = `Lv.${battleState.p1.level}`;
+      document.getElementById('battle-lv-p2').textContent = `Lv.${battleState.p2.level}`;
+
+      updateBattleUI();
+
+      queueLog(`對戰開始！由 ${battleState.p1.name}的${battleState.p1.pokeDetails.name} 對決 ${battleState.p2.name}的${battleState.p2.pokeDetails.name}！`, () => {
+        const speed1 = battleState.p1.baseSpeed + battleState.p1.level * 2;
+        const speed2 = battleState.p2.baseSpeed + battleState.p2.level * 2;
+        battleState.currentTurn = speed1 >= speed2 ? 'p1' : 'p2';
+        startTurn();
+      });
+    }
+
+    // Coordinates mapping updated to center Pokemon body exactly on 3D platform shadows
+    function queueLog(text, callback) {
+      battleState.logQueue.push({ text, callback });
+      processLogQueue();
+    }
+
+    function processLogQueue() {
+      if (battleState.isNarrating || battleState.logQueue.length === 0) return;
+      battleState.isNarrating = true;
+      
+      const logEl = document.getElementById('battle-log');
+      const item = battleState.logQueue.shift();
+      
+      logEl.textContent = "";
+      let index = 0;
+      const text = item.text;
+      
+      function printChar() {
+        if (index < text.length) {
+          logEl.textContent += text.charAt(index);
+          index++;
+          setTimeout(printChar, 35);
+        } else {
+          setTimeout(() => {
+            battleState.isNarrating = false;
+            if (item.callback) item.callback();
+            processLogQueue();
+          }, 1000);
+        }
+      }
+      printChar();
+    }
+
+    function startTurn() {
+      if (!battleState.active) return;
+      const activeFighter = battleState.currentTurn === 'p1' ? battleState.p1 : battleState.p2;
+      
+      if (battleState.mode === 'auto') {
+        document.getElementById('battle-moves-grid').style.display = 'none';
+        document.getElementById('battle-auto-indicator').style.display = 'block';
+        
+        setTimeout(() => {
+          const unlockedMoves = getUnlockedMoves(activeFighter);
+          const move = unlockedMoves[Math.floor(Math.random() * unlockedMoves.length)];
+          executeMove(activeFighter, move);
+        }, 600);
+      } else {
+        document.getElementById('battle-auto-indicator').style.display = 'none';
+        document.getElementById('battle-moves-grid').style.display = 'grid';
+        document.getElementById('battle-log').textContent = `請選擇 ${activeFighter.name}的${activeFighter.pokeDetails.name} 要使用的招式...`;
+        
+        const typeLabels = {
+          fire: '<span style="font-size: 0.75rem; background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: bold;">🔥火</span>',
+          water: '<span style="font-size: 0.75rem; background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: bold;">💧水</span>',
+          grass: '<span style="font-size: 0.75rem; background: #22c55e; color: white; padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: bold;">🍃草</span>',
+          normal: '<span style="font-size: 0.75rem; background: #94a3b8; color: white; padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: bold;">⚪普</span>',
+          status: '<span style="font-size: 0.75rem; background: #eab308; color: #1e293b; padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: bold;">✨變</span>'
+        };
+
+        const fighterMoves = activeFighter.moves;
+        for (let i = 0; i < 4; i++) {
+          const btn = document.getElementById(`move-btn-${i}`);
+          const moveName = fighterMoves[i];
+          if (moveName) {
+            const move = MOVES_DETAILS_MAP[moveName];
+            btn.innerHTML = `${moveName} ${typeLabels[move.type]}`;
+            btn.disabled = false;
+            btn.style.borderColor = move.type === 'normal' ? '#94a3b8' : (move.type === 'status' ? '#eab308' : '#ef4444');
+          } else {
+            btn.innerHTML = "-";
+            btn.disabled = true;
+            btn.style.borderColor = 'rgba(255,255,255,0.1)';
+          }
+        }
+      }
+    }
+
+    function getUnlockedMoves(fighter) {
+      return fighter.moves.map(name => MOVES_DETAILS_MAP[name]);
+    }
+
+    function playerSelectMove(index) {
+      if (battleState.isNarrating) return;
+      const fighter = battleState.currentTurn === 'p1' ? battleState.p1 : battleState.p2;
+      const moveName = fighter.moves[index];
+      const move = MOVES_DETAILS_MAP[moveName];
+      executeMove(fighter, move);
+    }
+
+    function getTypeEffectiveness(moveType, defenderFamily) {
+      if (moveType === 'normal' || moveType === 'status') return { multiplier: 1.0, text: "" };
+      
+      if (moveType === 'fire') {
+        if (defenderFamily === 'grass') return { multiplier: 2.0, text: "效果超群！" };
+        if (defenderFamily === 'water' || defenderFamily === 'fire') return { multiplier: 0.5, text: "效果不佳..." };
+      }
+      if (moveType === 'water') {
+        if (defenderFamily === 'fire') return { multiplier: 2.0, text: "效果超群！" };
+        if (defenderFamily === 'grass' || defenderFamily === 'water') return { multiplier: 0.5, text: "效果不佳..." };
+      }
+      if (moveType === 'grass') {
+        if (defenderFamily === 'water') return { multiplier: 2.0, text: "效果超群！" };
+        if (defenderFamily === 'fire' || defenderFamily === 'grass') return { multiplier: 0.5, text: "效果不佳..." };
+      }
+      
+      return { multiplier: 1.0, text: "" };
+    }
+
+    function executeMove(attacker, move) {
+      document.getElementById('battle-moves-grid').style.display = 'none';
+      const defender = battleState.currentTurn === 'p1' ? battleState.p2 : battleState.p1;
+      const attackerSide = battleState.currentTurn;
+      const defenderSide = attackerSide === 'p1' ? 'p2' : 'p1';
+
+      queueLog(`${attacker.name}的${attacker.pokeDetails.name} 使用了 ${move.name}！`, () => {
+        animateAttack(attackerSide, defenderSide, () => {
+          playMoveEffect(move, attackerSide, defenderSide, () => {
+            
+            if (move.type === 'status') {
+              if (move.status === 'atk-down') {
+                defender.atkMod *= 0.7;
+                queueLog(`${defender.name}的${defender.pokeDetails.name} 攻擊力降低了！`, () => endTurn());
+              } else if (move.status === 'def-up') {
+                attacker.defMod *= 1.3;
+                queueLog(`${attacker.name}的${attacker.pokeDetails.name} 防禦力提升了！`, () => endTurn());
+              } else if (move.status === 'heal') {
+                const healAmt = Math.floor(attacker.maxHp * 0.45);
+                attacker.hp = Math.min(attacker.maxHp, attacker.hp + healAmt);
+                updateBattleUI();
+                queueLog(`${attacker.name}的${attacker.pokeDetails.name} 恢復了生命值！`, () => endTurn());
+              }
+            } else {
+              const eff = getTypeEffectiveness(move.type, defender.family);
+              let damage = Math.floor((move.power * attacker.level / 2.5) + Math.random() * 6 + 5);
+              damage = Math.floor(damage * attacker.atkMod);
+              damage = Math.max(4, Math.floor(damage / defender.defMod));
+              damage = Math.floor(damage * eff.multiplier);
+              
+              const isCrit = Math.random() < 0.12;
+              if (isCrit) damage = Math.floor(damage * 1.5);
+
+              defender.hp = Math.max(0, defender.hp - damage);
+              updateBattleUI();
+
+              const nextStep = () => {
+                if (defender.hp <= 0) {
+                  animateFaint(defenderSide, () => {
+                    queueLog(`${defender.name}的${defender.pokeDetails.name} 倒下了！`, () => {
+                      endBattle(attacker.name);
+                    });
+                  });
+                } else {
+                  endTurn();
+                }
+              };
+
+              let resultText = `造成了 ${damage} 點傷害！`;
+              if (isCrit) {
+                resultText = `擊中要害！造成了 ${damage} 點傷害！`;
+              }
+              if (eff.text) {
+                queueLog(`${eff.text} ${resultText}`, nextStep);
+              } else {
+                queueLog(resultText, nextStep);
+              }
+            }
+          });
+        });
+      });
+    }
+
+    function animateFaint(side, callback) {
+      const img = document.getElementById(side === 'p1' ? 'battle-img-p1' : 'battle-img-p2');
+      img.style.transition = 'transform 0.6s ease-in, opacity 0.6s';
+      img.style.transform = 'translateY(120px)';
+      img.style.opacity = '0';
+      setTimeout(callback, 700);
+    }
+
+    function animateAttack(attackerSide, defenderSide, callback) {
+      const attackerImg = document.getElementById(attackerSide === 'p1' ? 'battle-img-p1' : 'battle-img-p2');
+      const directionX = attackerSide === 'p1' ? 25 : -25;
+      const directionY = attackerSide === 'p1' ? -15 : 15;
+      
+      attackerImg.style.transform = `translate(${directionX}px, ${directionY}px)`;
+      setTimeout(() => {
+        attackerImg.style.transform = 'translate(0, 0)';
+        callback();
+      }, 150);
+    }
+
+    function flashDefender(defenderSide) {
+      const defenderImg = document.getElementById(defenderSide === 'p1' ? 'battle-img-p1' : 'battle-img-p2');
+      const flashOverlay = document.getElementById('battle-flash-overlay');
+      
+      let flashCount = 0;
+      const flashInterval = setInterval(() => {
+        defenderImg.style.opacity = flashCount % 2 === 0 ? '0.2' : '1';
+        flashCount++;
+        if (flashCount >= 6) {
+          clearInterval(flashInterval);
+          defenderImg.style.opacity = '1';
+        }
+      }, 60);
+
+      flashOverlay.style.opacity = '0.3';
+      setTimeout(() => { flashOverlay.style.opacity = '0'; }, 80);
+    }
+
+    // Spawn custom visual effects based on move (coords updated to align with P1/P2 center)
+    function playMoveEffect(move, attackerSide, defenderSide, callback) {
+      const arena = document.getElementById('battle-arena-card');
+      const startX = attackerSide === 'p1' ? 180 : 455;
+      const startY = attackerSide === 'p1' ? 230 : 110;
+      const endX = defenderSide === 'p1' ? 180 : 455;
+      const endY = defenderSide === 'p1' ? 230 : 110;
+
+      if (move.status === 'heal') {
+        // Synthesis Green sparkles rising
+        for (let i = 0; i < 25; i++) {
+          createParticle({
+            x: startX + (Math.random() * 60 - 30),
+            y: startY + 40,
+            vx: Math.random() * 2 - 1,
+            vy: -(Math.random() * 3 + 2),
+            color: '#22c55e',
+            size: Math.random() * 6 + 4,
+            gravity: -0.05,
+            duration: 800,
+            glow: true
+          });
+        }
+        setTimeout(callback, 800);
+      } else if (move.status === 'atk-down' || move.status === 'def-up') {
+        // Growl or Withdraw status rings
+        const color = move.status === 'atk-down' ? '#eab308' : '#3b82f6';
+        const ringTargetX = move.status === 'atk-down' ? endX : startX;
+        const ringTargetY = move.status === 'atk-down' ? endY : startY;
+
+        for (let i = 0; i < 3; i++) {
+          setTimeout(() => {
+            const ring = document.createElement('div');
+            ring.style.position = 'absolute';
+            ring.style.left = `${ringTargetX}px`;
+            ring.style.top = `${ringTargetY}px`;
+            ring.style.width = '30px';
+            ring.style.height = '30px';
+            ring.style.border = `4px solid ${color}`;
+            ring.style.borderRadius = '50%';
+            ring.style.transform = 'translate(-50%, -50%)';
+            ring.style.transition = 'all 0.5s ease-out';
+            ring.style.pointerEvents = 'none';
+            ring.style.zIndex = '40';
+            arena.appendChild(ring);
+
+            requestAnimationFrame(() => {
+              ring.style.width = '100px';
+              ring.style.height = '100px';
+              ring.style.opacity = '0';
+            });
+            setTimeout(() => ring.remove(), 500);
+          }, i * 200);
+        }
+        setTimeout(callback, 900);
+      } else if (move.name === '火花' || move.name === '噴射火焰') {
+        // Flamethrower fireballs
+        const count = move.name === '火花' ? 10 : 20;
+        let delay = 0;
+        for (let i = 0; i < count; i++) {
+          setTimeout(() => {
+            createParticle({
+              x: startX,
+              y: startY,
+              vx: (endX - startX) / 15 + (Math.random() * 4 - 2),
+              vy: (endY - startY) / 15 + (Math.random() * 4 - 2),
+              color: `hsl(${Math.random() * 25 + 15}, 100%, 55%)`,
+              size: Math.random() * 8 + 6,
+              duration: 400,
+              glow: true
+            });
+          }, delay);
+          delay += 30;
+        }
+        
+        setTimeout(() => {
+          flashDefender(defenderSide);
+          for (let k = 0; k < 15; k++) {
+            createParticle({
+              x: endX + (Math.random() * 40 - 20),
+              y: endY + (Math.random() * 40 - 20),
+              vx: Math.random() * 6 - 3,
+              vy: Math.random() * 6 - 3,
+              color: '#ef4444',
+              size: Math.random() * 6 + 4,
+              duration: 500
+            });
+          }
+        }, delay + 250);
+        setTimeout(callback, delay + 700);
+      } else if (move.name === '大字爆炎') {
+        // Giant "大" fire blast!
+        const kanji = document.createElement('div');
+        kanji.textContent = "大";
+        kanji.style.position = 'absolute';
+        kanji.style.left = `${endX}px`;
+        kanji.style.top = `${endY}px`;
+        kanji.style.transform = 'translate(-50%, -50%) scale(0)';
+        kanji.style.color = '#f97316';
+        kanji.style.fontSize = '8rem';
+        kanji.style.fontWeight = '900';
+        kanji.style.textShadow = '0 0 20px #ef4444, 0 0 40px #f97316';
+        kanji.style.pointerEvents = 'none';
+        kanji.style.transition = 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+        kanji.style.zIndex = '45';
+        kanji.style.opacity = '0';
+        arena.appendChild(kanji);
+
+        requestAnimationFrame(() => {
+          kanji.style.transform = 'translate(-50%, -50%) scale(1)';
+          kanji.style.opacity = '1';
+        });
+
+        const interval = setInterval(() => {
+          createParticle({
+            x: endX + (Math.random() * 60 - 30),
+            y: endY + (Math.random() * 60 - 30),
+            vx: Math.random() * 3 - 1.5,
+            vy: -Math.random() * 4,
+            color: '#ef4444',
+            size: Math.random() * 10 + 6,
+            duration: 400
+          });
+        }, 40);
+
+        setTimeout(() => {
+          clearInterval(interval);
+          flashDefender(defenderSide);
+          kanji.style.transform = 'translate(-50%, -50%) scale(1.5)';
+          kanji.style.opacity = '0';
+          setTimeout(() => kanji.remove(), 300);
+          callback();
+        }, 900);
+      } else if (move.name === '水槍' || move.name === '水炮' || move.name === '水之波動') {
+        // Water bubbles
+        const count = move.name === '水槍' ? 12 : 28;
+        let delay = 0;
+        for (let i = 0; i < count; i++) {
+          setTimeout(() => {
+            createParticle({
+              x: startX,
+              y: startY,
+              vx: (endX - startX) / 18 + (Math.random() * 3 - 1.5),
+              vy: (endY - startY) / 18 + (Math.random() * 3 - 1.5),
+              color: '#3b82f6',
+              size: Math.random() * 6 + 4,
+              duration: 500,
+              isBubble: true
+            });
+          }, delay);
+          delay += 25;
+        }
+
+        setTimeout(() => {
+          flashDefender(defenderSide);
+        }, delay + 250);
+
+        setTimeout(callback, delay + 600);
+      } else if (move.name === '藤鞭') {
+        // Draw green whip slash lines
+        for (let i = 0; i < 2; i++) {
+          setTimeout(() => {
+            const whip = document.createElement('div');
+            whip.style.position = 'absolute';
+            whip.style.left = `${endX}px`;
+            whip.style.top = `${endY}px`;
+            whip.style.width = '120px';
+            whip.style.height = '6px';
+            whip.style.background = '#22c55e';
+            whip.style.boxShadow = '0 0 10px #4ade80';
+            whip.style.borderRadius = '3px';
+            whip.style.pointerEvents = 'none';
+            whip.style.zIndex = '40';
+            whip.style.transform = `translate(-50%, -50%) rotate(${i === 0 ? -30 : 45}deg) scaleX(0)`;
+            whip.style.transition = 'transform 0.15s ease-out, opacity 0.15s';
+            arena.appendChild(whip);
+
+            requestAnimationFrame(() => {
+              whip.style.transform = `translate(-50%, -50%) rotate(${i === 0 ? -30 : 45}deg) scaleX(1)`;
+            });
+            
+            setTimeout(() => {
+              flashDefender(defenderSide);
+              whip.style.opacity = '0';
+              setTimeout(() => whip.remove(), 150);
+            }, 180);
+          }, i * 200);
+        }
+        setTimeout(callback, 600);
+      } else if (move.name === '葉片快刀') {
+        // Razor Leaf particles
+        let delay = 0;
+        for (let i = 0; i < 8; i++) {
+          setTimeout(() => {
+            createParticle({
+              x: startX,
+              y: startY,
+              vx: (endX - startX) / 16 + (Math.random() * 4 - 2),
+              vy: (endY - startY) / 16 + (Math.random() * 4 - 2),
+              color: '#10b981',
+              size: Math.random() * 8 + 6,
+              duration: 450,
+              isLeaf: true
+            });
+          }, delay);
+          delay += 60;
+        }
+
+        setTimeout(() => {
+          flashDefender(defenderSide);
+        }, delay + 250);
+
+        setTimeout(callback, delay + 600);
+      } else if (move.name === '陽光烈焰') {
+        // Solar Beam
+        const beam = document.createElement('div');
+        beam.style.position = 'absolute';
+        beam.style.left = `${startX}px`;
+        beam.style.top = `${startY}px`;
+        beam.style.width = '0px';
+        beam.style.height = '0px';
+        beam.style.background = 'white';
+        beam.style.boxShadow = '0 0 20px #eab308, 0 0 40px white';
+        beam.style.borderRadius = '50%';
+        beam.style.pointerEvents = 'none';
+        beam.style.zIndex = '45';
+        beam.style.transform = 'translate(-50%, -50%)';
+        beam.style.transition = 'all 0.5s ease-in';
+        arena.appendChild(beam);
+
+        requestAnimationFrame(() => {
+          beam.style.width = '50px';
+          beam.style.height = '50px';
+        });
+
+        setTimeout(() => {
+          beam.style.transition = 'all 0.2s ease-out';
+          const dx = endX - startX;
+          const dy = endY - startY;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+          beam.style.left = `${startX + dx/2}px`;
+          beam.style.top = `${startY + dy/2}px`;
+          beam.style.width = `${dist}px`;
+          beam.style.height = '35px';
+          beam.style.borderRadius = '10px';
+          beam.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+
+          flashDefender(defenderSide);
+
+          setTimeout(() => {
+            beam.style.opacity = '0';
+            setTimeout(() => beam.remove(), 200);
+            callback();
+          }, 450);
+        }, 600);
+      } else {
+        // Default physical attack hit spark
+        const star = document.createElement('div');
+        star.style.position = 'absolute';
+        star.style.left = `${endX}px`;
+        star.style.top = `${endY}px`;
+        star.style.width = '10px';
+        star.style.height = '10px';
+        star.style.background = '#fef08a';
+        star.style.border = '3px solid #eab308';
+        star.style.borderRadius = '50%';
+        star.style.transform = 'translate(-50%, -50%) scale(0)';
+        star.style.pointerEvents = 'none';
+        star.style.zIndex = '40';
+        star.style.transition = 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+        arena.appendChild(star);
+
+        requestAnimationFrame(() => {
+          star.style.transform = 'translate(-50%, -50%) scale(5)';
+        });
+        
+        setTimeout(() => {
+          flashDefender(defenderSide);
+          star.style.opacity = '0';
+          setTimeout(() => star.remove(), 100);
+          callback();
+        }, 250);
+      }
+    }
+
+    // Generic Particle Factory Helper
+    function createParticle(config) {
+      const arena = document.getElementById('battle-arena-card');
+      const el = document.createElement('div');
+      el.className = 'effect-particle';
+      el.style.left = `${config.x}px`;
+      el.style.top = `${config.y}px`;
+      el.style.width = `${config.size}px`;
+      el.style.height = `${config.size}px`;
+      el.style.background = config.color;
+      el.style.borderRadius = config.isLeaf ? '0 50% 0 50%' : '50%';
+      el.style.transform = 'translate(-50%, -50%)';
+      el.style.pointerEvents = 'none';
+      el.style.zIndex = '40';
+      
+      if (config.glow) {
+        el.style.boxShadow = `0 0 10px ${config.color}, 0 0 20px ${config.color}`;
+      }
+      if (config.isBubble) {
+        el.style.border = '1px solid rgba(255,255,255,0.6)';
+        el.style.background = 'rgba(59, 130, 246, 0.4)';
+      }
+      arena.appendChild(el);
+
+      let x = config.x;
+      let y = config.y;
+      let vx = config.vx;
+      let vy = config.vy;
+      let start = null;
+
+      function step(timestamp) {
+        if (!start) start = timestamp;
+        const progress = timestamp - start;
+        if (progress < config.duration) {
+          x += vx;
+          y += vy;
+          if (config.gravity) vy += config.gravity;
+          
+          el.style.left = `${x}px`;
+          el.style.top = `${y}px`;
+          
+          if (config.isLeaf) {
+            const deg = progress * 1.5;
+            el.style.transform = `translate(-50%, -50%) rotate(${deg}deg)`;
+          }
+
+          requestAnimationFrame(step);
+        } else {
+          el.remove();
+        }
+      }
+      requestAnimationFrame(step);
+    }
+
+    function endTurn() {
+      battleState.currentTurn = battleState.currentTurn === 'p1' ? 'p2' : 'p1';
+      startTurn();
+    }
+
+    function updateBattleUI() {
+      const hpPercent1 = (battleState.p1.hp / battleState.p1.maxHp) * 100;
+      const hpPercent2 = (battleState.p2.hp / battleState.p2.maxHp) * 100;
+      
+      const bar1 = document.getElementById('battle-hp-p1');
+      const bar2 = document.getElementById('battle-hp-p2');
+      
+      bar1.style.width = `${hpPercent1}%`;
+      bar2.style.width = `${hpPercent2}%`;
+
+      const getHpColor = (pct) => pct > 50 ? '#22c55e' : (pct > 20 ? '#eab308' : '#ef4444');
+      bar1.style.backgroundColor = getHpColor(hpPercent1);
+      bar2.style.backgroundColor = getHpColor(hpPercent2);
+
+      document.getElementById('battle-hp-text-p1').textContent = `${battleState.p1.hp} / ${battleState.p1.maxHp}`;
+      document.getElementById('battle-hp-text-p2').textContent = `${battleState.p2.hp} / ${battleState.p2.maxHp}`;
+    }
+
+    function endBattle(winnerName) {
+      battleState.active = false;
+      document.getElementById('battle-moves-grid').style.display = 'none';
+      document.getElementById('battle-auto-indicator').style.display = 'none';
+      
+      queueLog(`對戰結束！恭喜 ${winnerName} 獲得了勝利！`, () => {
+        document.getElementById('battle-img-p1').style.transition = '';
+        document.getElementById('battle-img-p2').style.transition = '';
+        document.getElementById('battle-img-p1').style.opacity = '1';
+        document.getElementById('battle-img-p2').style.opacity = '1';
+        
+        document.getElementById('battle-lobby').style.display = 'block';
+        document.getElementById('battle-arena-card').style.display = 'none';
+        initBattleLobby();
+      });
+    }
+
+    // Storage Event Listener - Crucial for Real-Time synchronization with teacher actions
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'pokemon_trainer_data') {
+        const oldData = JSON.parse(JSON.stringify(students));
+        loadData();
+        
+        if (document.getElementById('battle-container').style.display === 'block') {
+          updateLobbyDetails();
+        }
+
+        const oldStudent = oldData[currentStudentId];
+        const newStudent = students[currentStudentId];
+        
+        if (oldStudent && newStudent && oldStudent.pokemons.length > 0 && newStudent.pokemons.length > 0) {
+          const oldActive = oldStudent.pokemons[oldStudent.pokemons.length - 1];
+          const newActive = newStudent.pokemons[newStudent.pokemons.length - 1];
+          
+          if (oldActive.family === newActive.family) {
+            const oldLevel = Math.floor(oldActive.points / 10);
+            const oldStage = getStage(oldLevel);
+            const newLevel = Math.floor(newActive.points / 10);
+            const newStage = getStage(newLevel);
+            
+            // 1. Check for evolution overlays
+            if (newStage > oldStage) {
+              const familyArr = POKEMON_DATA[newActive.family];
+              const oldPoke = familyArr[oldStage];
+              const newPoke = familyArr[newStage];
+              
+              triggerEvolution(newStudent.name, oldPoke, newPoke, () => {
+                // After evolution completes, check for new moves
+                syncMovesAndCheckPending(currentStudentId);
+                renderTabs();
+                renderContent();
+              });
+              return;
+            }
+            
+            // 2. Check for move learning overlays (no evolution, e.g. Lv.1, 2, 3, 15)
+            if (newLevel > oldLevel) {
+              syncMovesAndCheckPending(currentStudentId);
+              renderTabs();
+              renderContent();
+              return;
+            }
+          }
+        }
+        
+        syncMovesAndCheckPending(currentStudentId);
+        renderTabs();
+        renderContent();
+      }
+    });
+
+    // Start App
+    init();
+  </script>
+</body>
+</html>

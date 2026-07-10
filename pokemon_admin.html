@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>寶可夢訓練師 - 老師控制台</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --primary-color: #3b82f6;
+      --primary-hover: #2563eb;
+      --success-color: #10b981;
+      --danger-color: #ef4444;
+      --text-light: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Fredoka', 'Noto Sans TC', sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #020617 100%);
+      color: var(--text-light);
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 900;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .glass-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 30px;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);
+      margin-bottom: 30px;
+    }
+
+    .card-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #38bdf8;
+    }
+
+    /* Grid Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1.8fr;
+      gap: 25px;
+    }
+
+    @media (max-width: 768px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Form Styles */
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--text-light);
+    }
+
+    select, input[type="number"] {
+      width: 100%;
+      padding: 12px;
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-light);
+      font-size: 1rem;
+      font-family: inherit;
+      outline: none;
+    }
+
+    select:focus, input[type="number"]:focus {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--primary-color);
+      color: white;
+    }
+    .btn-primary:hover { background: var(--primary-hover); }
+
+    .btn-danger {
+      background: var(--danger-color);
+      color: white;
+    }
+    .btn-danger:hover { background: #dc2626; }
+
+    /* Student List Overview */
+    .student-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 15px;
+      background: rgba(15, 23, 42, 0.4);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      margin-bottom: 12px;
+    }
+
+    .student-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .avatar {
+      width: 48px;
+      height: 48px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .avatar img {
+      width: 80%;
+      height: 80%;
+      object-fit: contain;
+    }
+
+    .student-name {
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    .student-pokemon-desc {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .student-badge {
+      background: #0369a1;
+      color: #e0f2fe;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1><i class="fa-solid fa-gear"></i> 寶可夢訓練師 - 老師控制台</h1>
+      <span style="color: var(--text-muted); font-size: 0.9rem;">後台管理系統</span>
+    </header>
+
+    <div class="dashboard-grid">
+      <!-- Left Side: Controls -->
+      <div class="glass-card">
+        <div class="card-title"><i class="fa-solid fa-wand-magic-sparkles"></i> 點數操作</div>
+        
+        <div class="form-group">
+          <label for="student-select">選擇學生</label>
+          <select id="student-select" onchange="updateSelectedInfo()">
+            <option value="1">1號 陳洪福</option>
+            <option value="2">2號 蕭廷恩</option>
+            <option value="3">3號 江岳泰</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="points-group">
+          <label for="points-input">給予分數 (可輸入負數扣分)</label>
+          <input type="number" id="points-input" value="1" min="-200" max="200">
+        </div>
+
+        <div class="form-group">
+          <button class="btn btn-primary" onclick="modifyPoints()"><i class="fa-solid fa-plus-minus"></i> 送出增減分</button>
+        </div>
+
+        <div style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+          <button class="btn btn-danger" onclick="resetStudent()"><i class="fa-solid fa-trash-can"></i> 重設該學生資料</button>
+        </div>
+      </div>
+
+      <!-- Right Side: Overview -->
+      <div class="glass-card">
+        <div class="card-title"><i class="fa-solid fa-list"></i> 學生狀態總覽</div>
+        <div id="students-list">
+          <!-- Rendered via JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Pokedex Configuration
+    const POKEMON_DATA = {
+      fire: [
+        { id: 4, name: '小火龍', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png' },
+        { id: 5, name: '火恐龍', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/5.png' },
+        { id: 6, name: '噴火龍', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/6.png' }
+      ],
+      water: [
+        { id: 7, name: '傑尼龜', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png' },
+        { id: 8, name: '卡咪龜', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/8.png' },
+        { id: 9, name: '水箭龜', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/9.png' }
+      ],
+      grass: [
+        { id: 1, name: '妙蛙種子', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png' },
+        { id: 2, name: '妙蛙草', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/2.png' },
+        { id: 3, name: '妙蛙花', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/3.png' }
+      ]
+    };
+
+    const defaultStudents = {
+      "1": { name: "陳洪福", pokemons: [] },
+      "2": { name: "蕭廷恩", pokemons: [] },
+      "3": { name: "江岳泰", pokemons: [] }
+    };
+
+    let students = null;
+
+    function loadData() {
+      try {
+        const rawData = localStorage.getItem('pokemon_trainer_data');
+        if (rawData) {
+          students = JSON.parse(rawData);
+        }
+        if (!students || typeof students !== 'object' || Array.isArray(students) || !students["1"]) {
+          students = JSON.parse(JSON.stringify(defaultStudents));
+        } else {
+          // Upgrade old schema if any
+          for(let id in defaultStudents) {
+            if(!students[id]) {
+              students[id] = JSON.parse(JSON.stringify(defaultStudents[id]));
+            }
+            if(!students[id].pokemons) {
+              students[id].pokemons = [];
+              if(students[id].family) {
+                // Migrate old single pokemon schema
+                students[id].pokemons.push({
+                  family: students[id].family,
+                  points: students[id].points || 0
+                });
+                delete students[id].family;
+                delete students[id].points;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        students = JSON.parse(JSON.stringify(defaultStudents));
+      }
+      saveData();
+    }
+
+    function saveData() {
+      localStorage.setItem('pokemon_trainer_data', JSON.stringify(students));
+    }
+
+    function getStage(level) {
+      if (level < 10) return 0;
+      if (level < 20) return 1;
+      return 2;
+    }
+
+    function getCurrentPokemon(poke) {
+      if (!poke || !poke.family) return null;
+      const familyArr = POKEMON_DATA[poke.family];
+      const level = Math.floor(poke.points / 10);
+      const stageIndex = getStage(level);
+      return familyArr[stageIndex];
+    }
+
+    function renderOverview() {
+      const container = document.getElementById('students-list');
+      container.innerHTML = '';
+
+      for(let id in students) {
+        const student = students[id];
+        const pokes = student.pokemons;
+        const activePoke = pokes.length > 0 ? pokes[pokes.length - 1] : null;
+        
+        let pName = "尚未選擇";
+        let pLv = 0;
+        let pPoints = 0;
+        let imgUrl = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png";
+
+        if(activePoke) {
+          const currentPoke = getCurrentPokemon(activePoke);
+          if (currentPoke) {
+            pName = currentPoke.name;
+            pLv = Math.floor(activePoke.points / 10);
+            pPoints = activePoke.points;
+            imgUrl = currentPoke.url;
+          }
+        }
+
+        const item = document.createElement('div');
+        item.className = 'student-item';
+        item.innerHTML = `
+          <div class="student-info">
+            <div class="avatar">
+              <img src="${imgUrl}" alt="${pName}">
+            </div>
+            <div>
+              <div class="student-name">${id}號 ${student.name}</div>
+              <div class="student-pokemon-desc">
+                寶可夢數量: ${pokes.length} 隻 | 目前夥伴: ${pName}
+              </div>
+            </div>
+          </div>
+          <div>
+            <span class="student-badge" style="background: ${activePoke && activePoke.points >= 200 ? '#10b981' : '#0369a1'}">
+              Lv. ${pLv} (${pPoints}分)
+            </span>
+          </div>
+        `;
+        container.appendChild(item);
+      }
+    }
+
+    function modifyPoints() {
+      const selectedId = document.getElementById('student-select').value;
+      const pointsToAdd = parseInt(document.getElementById('points-input').value) || 0;
+      const student = students[selectedId];
+
+      if (!student.pokemons || student.pokemons.length === 0) {
+        alert("這位學生還沒有在學生端網頁上選擇初始寶可夢夥伴喔！無法進行加分。");
+        return;
+      }
+
+      const activePoke = student.pokemons[student.pokemons.length - 1];
+
+      if (activePoke.points >= 200 && pointsToAdd > 0) {
+        alert("該寶可夢已達滿級 (20等)！請請學生先到網頁端選擇下一隻寶可夢！");
+        return;
+      }
+
+      activePoke.points += pointsToAdd;
+      if (activePoke.points > 200) activePoke.points = 200;
+      if (activePoke.points < 0) activePoke.points = 0;
+
+      saveData();
+      renderOverview();
+      alert(`已成功為 ${student.name} 送出增減分！`);
+    }
+
+    function resetStudent() {
+      const selectedId = document.getElementById('student-select').value;
+      const student = students[selectedId];
+      if (confirm(`確定要清除 ${student.name} 的所有寶可夢歷程與分數嗎？清除後將需重新選擇初始寶可夢！`)) {
+        student.pokemons = [];
+        saveData();
+        renderOverview();
+        alert(`已成功重設 ${student.name} 的資料。`);
+      }
+    }
+
+    function updateSelectedInfo() {
+      // Custom sync if needed
+    }
+
+    // Window storage listener to sync admin overview with student pages in real-time
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'pokemon_trainer_data') {
+        loadData();
+        renderOverview();
+      }
+    });
+
+    // Init
+    loadData();
+    renderOverview();
+  </script>
+</body>
+</html>
