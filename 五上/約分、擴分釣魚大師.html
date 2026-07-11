@@ -513,6 +513,7 @@
                 const targetDenominator = baseDenominator / div;
                 const targetNumerator = baseNumerator / div;
 
+                const qType = Math.random() < 0.5 ? 'numerator' : 'denominator';
                 const pool = [];
                 // 正確答案魚
                 pool.push({
@@ -522,31 +523,48 @@
                     val: targetNumerator / targetDenominator
                 });
 
-                // 錯誤干擾魚 (相同分母但分子不同)
-                for (let i = 1; i <= 8; i++) {
-                    const noiseNumerator = targetNumerator + (i % 2 === 0 ? Math.ceil(i/2) : -Math.ceil(i/2));
-                    if (noiseNumerator > 0 && noiseNumerator < targetDenominator && noiseNumerator !== targetNumerator) {
-                        pool.push({
-                            n: noiseNumerator,
-                            d: targetDenominator,
-                            isCorrect: false,
-                            val: noiseNumerator / targetDenominator
-                        });
-                    }
-                }
-                
-                // 依據分數難度，增加干擾魚數量
                 let extraFish = Math.floor(score / 100) * 2;
-                while (pool.length < (10 + extraFish)) {
-                    const randomD = targetDenominator * this.randomInt(2, 4);
-                    const randomN = this.randomInt(1, randomD - 1);
-                    if (randomN / randomD !== targetNumerator / targetDenominator) {
-                        pool.push({
-                            n: randomN,
-                            d: randomD,
-                            isCorrect: false,
-                            val: randomN / randomD
+                const targetPoolSize = 10 + extraFish;
+
+                if (qType === 'numerator') {
+                    // 分子未知：所有魚的分母必須固定為 targetDenominator！只有分子不同。
+                    let offset = 1;
+                    while (pool.length < targetPoolSize && offset < 30) {
+                        const noiseN1 = targetNumerator + offset;
+                        const noiseN2 = targetNumerator - offset;
+                        [noiseN1, noiseN2].forEach(n => {
+                            if (n > 0 && n < targetDenominator && n !== targetNumerator && pool.length < targetPoolSize) {
+                                if (!pool.some(p => p.n === n)) {
+                                    pool.push({
+                                        n: n,
+                                        d: targetDenominator,
+                                        isCorrect: false,
+                                        val: n / targetDenominator
+                                    });
+                                }
+                            }
                         });
+                        offset++;
+                    }
+                } else {
+                    // 分母未知：所有魚的分子必須固定為 targetNumerator！只有分母不同。
+                    let offset = 1;
+                    while (pool.length < targetPoolSize && offset < 50) {
+                        const noiseD1 = targetDenominator + offset;
+                        const noiseD2 = targetDenominator - offset;
+                        [noiseD1, noiseD2].forEach(d => {
+                            if (d > targetNumerator && d !== targetDenominator && pool.length < targetPoolSize) {
+                                if (!pool.some(p => p.d === d)) {
+                                    pool.push({
+                                        n: targetNumerator,
+                                        d: d,
+                                        isCorrect: false,
+                                        val: targetNumerator / d
+                                    });
+                                }
+                            }
+                        });
+                        offset++;
                     }
                 }
 
@@ -558,7 +576,7 @@
                     simplestFraction: target,
                     multiplier: multiplier,
                     divisor: div,
-                    questionType: Math.random() < 0.5 ? 'numerator' : 'denominator'
+                    questionType: qType
                 };
             },
 
@@ -575,6 +593,7 @@
                 const expandedDenominator = target.d * multiplier;
                 const expandedNumerator = target.n * multiplier;
                 
+                const qType = Math.random() < 0.5 ? 'numerator' : 'denominator';
                 const pool = [];
                 // 正確答案魚
                 pool.push({
@@ -584,31 +603,49 @@
                     val: expandedNumerator / expandedDenominator
                 });
 
-                // 錯誤干擾魚 (相同分母但分子不同，或隨機分數)
-                for (let i = 1; i <= 8; i++) {
-                    const noiseNumerator = expandedNumerator + (i % 2 === 0 ? Math.ceil(i/2) : -Math.ceil(i/2));
-                    if (noiseNumerator > 0 && noiseNumerator < expandedDenominator && noiseNumerator !== expandedNumerator) {
-                        pool.push({
-                            n: noiseNumerator,
-                            d: expandedDenominator,
-                            isCorrect: false,
-                            val: noiseNumerator / expandedDenominator
-                        });
-                    }
-                }
-                
-                // 依據分數難度，增加干擾魚數量
+                // 生成干擾魚
                 let extraFish = Math.floor(score / 100) * 2;
-                while (pool.length < (10 + extraFish)) {
-                    const randomD = target.d * this.randomInt(2, 6);
-                    const randomN = this.randomInt(1, randomD - 1);
-                    if (randomN / randomD !== target.n / target.d) {
-                        pool.push({
-                            n: randomN,
-                            d: randomD,
-                            isCorrect: false,
-                            val: randomN / randomD
+                const targetPoolSize = 10 + extraFish;
+
+                if (qType === 'numerator') {
+                    // 分子未知：所有魚的分母必須固定為 expandedDenominator！只有分子不同。
+                    let offset = 1;
+                    while (pool.length < targetPoolSize && offset < 30) {
+                        const noiseN1 = expandedNumerator + offset;
+                        const noiseN2 = expandedNumerator - offset;
+                        [noiseN1, noiseN2].forEach(n => {
+                            if (n > 0 && n < expandedDenominator && n !== expandedNumerator && pool.length < targetPoolSize) {
+                                if (!pool.some(p => p.n === n)) {
+                                    pool.push({
+                                        n: n,
+                                        d: expandedDenominator,
+                                        isCorrect: false,
+                                        val: n / expandedDenominator
+                                    });
+                                }
+                            }
                         });
+                        offset++;
+                    }
+                } else {
+                    // 分母未知：所有魚的分子必須固定為 expandedNumerator！只有分母不同。
+                    let offset = 1;
+                    while (pool.length < targetPoolSize && offset < 50) {
+                        const noiseD1 = expandedDenominator + offset;
+                        const noiseD2 = expandedDenominator - offset;
+                        [noiseD1, noiseD2].forEach(d => {
+                            if (d > expandedNumerator && d !== expandedDenominator && pool.length < targetPoolSize) {
+                                if (!pool.some(p => p.d === d)) {
+                                    pool.push({
+                                        n: expandedNumerator,
+                                        d: d,
+                                        isCorrect: false,
+                                        val: expandedNumerator / d
+                                    });
+                                }
+                            }
+                        });
+                        offset++;
                     }
                 }
 
@@ -618,7 +655,7 @@
                     targetD: expandedDenominator, // e.g. 12
                     correctFraction: { n: expandedNumerator, d: expandedDenominator }, // e.g. 8/12
                     optionsPool: pool,
-                    questionType: Math.random() < 0.5 ? 'numerator' : 'denominator'
+                    questionType: qType
                 };
             },
 
