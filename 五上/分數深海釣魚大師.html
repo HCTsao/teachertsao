@@ -874,6 +874,8 @@
                 this.bobSpeed = Math.random() * 0.03 + 0.01;
                 this.isCaught = false;
                 this.fractionGroup = null;
+                this.isLeaving = false; // 是否正在退場快速游走
+                this.isGone = false; // 是否已完全游出畫面
             }
 
             update(time) {
@@ -891,9 +893,17 @@
 
                 // 邊界檢查 (超出邊界自動回頭或回收重置)
                 if (this.dir === 1 && this.x > canvas.width + 120) {
-                    this.resetPosition();
+                    if (this.isLeaving) {
+                        this.isGone = true;
+                    } else {
+                        this.resetPosition();
+                    }
                 } else if (this.dir === -1 && this.x < -120) {
-                    this.resetPosition();
+                    if (this.isLeaving) {
+                        this.isGone = true;
+                    } else {
+                        this.resetPosition();
+                    }
                 }
             }
 
@@ -1166,8 +1176,16 @@
         function nextQuestion(changeStem = true) {
             const initialSpawn = (fishes.length === 0);
             
-            // 移除已釣起的魚，對其他魚隻不作為，讓它們繼續游動
-            fishes = fishes.filter(fish => !fish.isCaught);
+            // 移除已釣起的魚與已離開的魚
+            fishes = fishes.filter(fish => !fish.isCaught && !fish.isGone);
+            
+            // 若要更換題幹，讓用不到的既存魚群加速游走
+            if (changeStem) {
+                fishes.forEach(fish => {
+                    fish.isLeaving = true;
+                    fish.speed = Math.max(4.5, fish.speed * 4);
+                });
+            }
             
             const spawnX = initialSpawn ? null : 'side';
             hook.caughtFish = null;
@@ -1275,7 +1293,7 @@
                     currentBaseFraction = mathData;
                     level3Stage = 1;
                     level3ConvertedGroup = 0;
-                } else if (level3Stage === 1) {
+                } else {
                     // 保持同題幹，就算 changeStem=false 也不變更 mathData
                     mathData = currentBaseFraction;
                 }
@@ -1735,7 +1753,11 @@
 
                         // 通分成功，直接停留 5 秒讓同學觀察，之後換下兩個數字
                         level3Delaying = true;
-                        fishes = []; // 清空魚群
+                        // 讓所有用不到的既存魚快速游走退場，營造動態感
+                        fishes.forEach(fish => {
+                            fish.isLeaving = true;
+                            fish.speed = Math.max(4.5, fish.speed * 4);
+                        });
                         renderStemForStage(); // 讓題幹即時更新為兩個通分完的高亮分數
                         questionLabel.innerHTML = `<span class="text-emerald-400 font-bold">✓ 通分完成！停留 5 秒讓同學觀察，之後換題</span>`;
                         
@@ -2123,6 +2145,7 @@
                 
                 // 魚隻更新
                 fishes.forEach(fish => fish.update(timestamp));
+                fishes = fishes.filter(fish => !fish.isGone);
                 sharks.forEach(shark => shark.update(timestamp));
 
                 // 特效粒子與文字更新
