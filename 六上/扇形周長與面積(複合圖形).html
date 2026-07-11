@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>扇形周長與面積(複合圖形)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
+    
+    <style>
+        @keyframes dash-move { to { stroke-dashoffset: -100; } }
+        .animate-dash-move { animation: dash-move 2s linear infinite; }
+        .animate-bounce-short { animation: bounce 0.5s ease-in-out 1; }
+        .animate-shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        .animate-fade-in-up { animation: fadeInUp 0.5s ease-out; }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(-5%); }
+            50% { transform: translateY(0); }
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translate3d(0, 20px, 0); }
+            to { opacity: 1; transform: translate3d(0, 0, 0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        /* Fraction Styles */
+        .frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; font-size: 0.8em; margin: 0 0.2em; }
+        .frac-n { border-bottom: 1px solid currentColor; padding: 0 2px; line-height: 1; }
+        .frac-d { padding: 0 2px; line-height: 1; }
+
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+        /* Area Specific Animations */
+        @keyframes pulse-opacity {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        /* Digging effect: Visible -> Disappears */
+        @keyframes dig-effect {
+            0%, 20% { opacity: 0; }   /* Start invisible (Full Shape) */
+            50%, 80% { opacity: 1; }  /* Appear (The Cut) */
+            100% { opacity: 0; }      /* Fade out */
+        }
+        /* Reveal effect: Invisible -> Visible */
+        @keyframes reveal-effect {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+        /* Rotate Reveal Loop for Problem 5 */
+        @keyframes rotate-reveal-loop {
+            0% { transform: rotate(0deg); opacity: 0; }
+            20% { opacity: 1; } 
+            40%, 80% { transform: rotate(180deg); opacity: 1; } 
+            100% { transform: rotate(180deg); opacity: 0; }
+        }
+
+        /* Cycle Highlight for 2 items */
+        @keyframes cycle-highlight-2 {
+            0%, 45% { opacity: 1; } 
+            50%, 100% { opacity: 0.3; } 
+        }
+
+        /* Accumulate Highlight for 4 items */
+        @keyframes acc-4-1 {
+            0%, 90% { opacity: 1; fill: #fbbf24; } 
+            95%, 100% { opacity: 0; fill: #fbbf24; }
+        }
+        @keyframes acc-4-2 {
+            0%, 24% { opacity: 0; fill: #fbbf24; }
+            25%, 90% { opacity: 1; fill: #fbbf24; } 
+            95%, 100% { opacity: 0; fill: #fbbf24; }
+        }
+        @keyframes acc-4-3 {
+            0%, 49% { opacity: 0; fill: #fbbf24; }
+            50%, 90% { opacity: 1; fill: #fbbf24; } 
+            95%, 100% { opacity: 0; fill: #fbbf24; }
+        }
+        @keyframes acc-4-4 {
+            0%, 74% { opacity: 0; fill: #fbbf24; }
+            75%, 90% { opacity: 1; fill: #fbbf24; } 
+            95%, 100% { opacity: 0; fill: #fbbf24; }
+        }
+
+        /* Accumulate Highlight for 8 items */
+        @keyframes acc-8-1 { 0%, 90% { opacity: 1; fill: #ef4444; } 95%, 100% { opacity: 0.2; fill: #fca5a5; } }
+        @keyframes acc-8-2 { 0%, 10% { opacity: 0.2; fill: #fca5a5; } 11%, 90% { opacity: 1; fill: #ef4444; } 95%, 100% { opacity: 0.2; fill: #fca5a5; } }
+        @keyframes acc-8-3 { 0%, 21% { opacity: 0.2; fill: #fca5a5; } 22%, 90% { opacity: 1; fill: #ef4444; } 95%, 100% { opacity: 0.2; fill: #fca5a5; } }
+        @keyframes acc-8-4 { 0%, 32% { opacity: 0.2; fill: #fca5a5; } 33%, 90% { opacity: 1; fill: #ef4444; } 95%, 100% { opacity: 0.2; fill: #fca5a5; } }
+        @keyframes acc-8-5 { 0%, 43% { opacity: 0.2; fill: #fca5a5; } 44%, 90% { opacity: 1; fill: #ef4444; } 95%, 100% { opacity: 0.2; fill: #fca5a5; } }
+        @keyframes acc-8-6 { 0%, 54% { opacity: 0.2; fill: #fca5a5; } 55%, 90% { opacity: 1; fill: #ef4444; } 95%, 100% { opacity: 0.2; fill: #fca5a5; } }
+        @keyframes acc-8-7 { 0%, 65% { opacity: 0.2; fill: #fca5a5; } 66%, 90% { opacity: 1; fill: #ef4444; } 95%, 100% { opacity: 0.2; fill: #fca5a5; } }
+        @keyframes acc-8-8 { 0%, 76% { opacity: 0.2; fill: #fca5a5; } 77%, 90% { opacity: 1; fill: #ef4444; } 95%, 100% { opacity: 0.2; fill: #fca5a5; } }
+
+        .animate-pulse-slow { animation: pulse-opacity 2s infinite; }
+        .animate-dig { animation: dig-effect 3s infinite; }
+        .animate-reveal { animation: reveal-effect 1s forwards; }
+        .animate-rotate-loop { animation: rotate-reveal-loop 4s infinite; }
+    </style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-800">
+    <img src="https://api.visitorbadge.io/api/visitors?path=hctsao.teachertsao&label=Views&labelColor=%23475569&countColor=%23ea580c" alt="Visitor Counter" style="display: none;">
+<!-- HOME_BUTTON_START -->
+<a href="../index.html" style="position: fixed; top: 12px; left: 12px; z-index: 999999; background: rgba(30, 41, 59, 0.85); color: #ffffff; padding: 8px 16px; border-radius: 20px; text-decoration: none; font-family: system-ui, -apple-system, sans-serif; font-size: 14px; font-weight: bold; backdrop-filter: blur(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.1); transition: all 0.2s ease;" onmouseover="this.style.background='rgba(79, 70, 229, 0.9)'" onmouseout="this.style.background='rgba(30, 41, 59, 0.85)'">&#127969; &#22238;&#39318;&#38913;</a>
+<script>(function() { function adjustViewport() { var targetWidth = 1024; var screenWidth = window.innerWidth || document.documentElement.clientWidth || window.screen.width; if (screenWidth > 0 && screenWidth < targetWidth) { var scale = screenWidth / targetWidth; var meta = document.querySelector('meta[name="viewport"]'); if (!meta) { meta = document.createElement('meta'); meta.setAttribute('name', 'viewport'); document.head.appendChild(meta); } meta.setAttribute('content', 'width=' + targetWidth + ', initial-scale=' + scale + ', minimum-scale=' + scale + ', maximum-scale=2.0, user-scalable=yes'); } else { var meta = document.querySelector('meta[name="viewport"]'); if (meta) { meta.setAttribute('content', 'width=device-width, initial-scale=1.0'); } } } adjustViewport(); var timer = null; window.addEventListener('resize', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); window.addEventListener('orientationchange', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); })();</script>
+<!-- HOME_BUTTON_END -->
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        const { useState, useEffect, useRef } = React;
+        const formatNum = (num) => parseFloat(num.toFixed(2));
+
+        // Shared Icons
+        const Play = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>);
+        const RotateCcw = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>);
+        const Check = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"></polyline></svg>);
+        const ArrowRight = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>);
+        const HelpCircle = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>);
+        const Calculator = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="16" y1="14" x2="16" y2="18"></line><path d="M16 10h.01"></path><path d="M12 10h.01"></path><path d="M8 10h.01"></path><path d="M12 14h.01"></path><path d="M8 14h.01"></path><path d="M12 18h.01"></path><path d="M8 18h.01"></path></svg>);
+        const Move = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="5 9 2 12 5 15"></polyline><polyline points="9 5 12 2 15 5"></polyline><polyline points="15 19 12 22 9 19"></polyline><polyline points="19 9 22 12 19 15"></polyline><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="12" y2="22"></line></svg>);
+        const Scissors = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><line x1="20" y1="4" x2="8.12" y2="15.88"></line><line x1="14.47" y1="14.48" x2="20" y2="20"></line><line x1="8.12" y1="8.12" x2="12" y2="12"></line></svg>);
+
+        // Fraction Component
+        const Frac = ({ n, d }) => (
+            <span className="frac">
+                <span className="frac-n">{n}</span>
+                <span className="frac-d">{d}</span>
+            </span>
+        );
+
+        // ==================== PERIMETER DATA & TUTOR ====================
+        const PERIMETER_PROBLEMS = [
+            {
+                id: 0,
+                name: "課本第1題 (p.90)",
+                params: { DIAMETER: 20, HEIGHT: 16, PI: 3.14 },
+                getValues: (p) => ({ curve: formatNum(p.DIAMETER * p.PI), straight: p.HEIGHT * 2, total: formatNum((p.HEIGHT * 2) + (p.DIAMETER * p.PI)) }),
+                steps: (vals, p) => [
+                    { title: "單元開始：認識周長", instruction: "請仔細觀察圖形。\n紅點正在沿著邊緣移動，這一圈就是「周長」。", action: "next", hint: "周長 = 輪廓線總長度。", mode: "trace" },
+                    { title: "第一步：計算直線", instruction: "先算直線部分。\n請觀察左右兩邊亮起來的紅線。", subInstruction: `左邊 (${p.HEIGHT}cm) + 右邊 (${p.HEIGHT}cm) = ?`, action: "input", correctAnswer: vals.straight.toString(), hint: "左右兩邊都是 16cm。", mode: "straight" },
+                    { title: "第二步：計算曲線 (觀察)", instruction: "上面有凸出的半圓，下面有凹入的半圓。\n\n點擊「看動畫」觀察它們的關係！", action: "animate_demo", hint: "下方的弧線移上去會變成什麼？", mode: "curve_observe" },
+                    { title: "第二步：計算曲線 (計算)", instruction: "這兩個半圓弧，剛好拼成一個完整的圓！", subInstruction: `直徑 ${p.DIAMETER}cm 的圓周長 = ?\n(圓周率用 ${p.PI})`, action: "input", correctAnswer: vals.curve.toString(), validate: (val) => Math.abs(parseFloat(val) - vals.curve) < 0.1, hint: `圓周長 = 直徑 × ${p.PI}`, mode: "curve_calc" },
+                    { title: "第三步：總結", instruction: "圖形周長 = 直線總長 + 圓周長。\n把剛剛算出的數字加起來！", subInstruction: `${vals.straight} + ${vals.curve} = ?`, action: "input", correctAnswer: vals.total.toString(), hint: `直線是 ${vals.straight}，曲線是 ${vals.curve}。`, mode: "total" },
+                    { title: "恭喜完成！", instruction: "", action: "reset", mode: "trace" }
+                ]
+            },
+            {
+                id: 1,
+                name: "課本第2題 (p.90)",
+                params: { WIDTH: 30, PI: 3.14 },
+                getValues: (p) => ({ 
+                    total: formatNum(p.WIDTH * p.PI) 
+                }),
+                steps: (vals, p) => [
+                    { title: "單元開始：認識周長", instruction: "請觀察這個圖形。\n它有 2 條凸出來的弧線，和 2 條凹進去的弧線。", action: "next", hint: "紅點移動的路徑就是周長。", mode: "trace" },
+                    { 
+                        title: "第一步：分析圖形", 
+                        instruction: (
+                            <>這 4 條弧線長度其實都是一樣的！<br/><br/>它們都是半徑 15cm 的 <Frac n="1" d="4" /> 圓弧。</>
+                        ), 
+                        subInstruction: "注意看：兩邊凸出，兩邊凹入。", 
+                        action: "next", 
+                        hint: "雖然方向不同，但彎曲程度都一樣喔。", 
+                        mode: "analyze" 
+                    },
+                    { title: "第二步：神奇的變化", instruction: "如果不計算，我們要怎麼知道總長度呢？\n\n點擊「看動畫」把凹進去的弧線翻出來！", action: "animate_demo", hint: "注意看藍色的線條就好，原本的形狀不會變喔！", mode: "curve_observe" },
+                    { 
+                        title: "第三步：計算圓周長", 
+                        instruction: "把弧線翻出來，剛好圍成一個圓！\n\n所以周長就是一個圓的長度。", 
+                        subInstruction: `直徑 ${p.WIDTH}cm 的圓周長 = ?\n(圓周率用${p.PI}計算)`, 
+                        action: "input", 
+                        correctAnswer: vals.total.toString(), 
+                        validate: (val) => Math.abs(parseFloat(val) - vals.total) < 0.1, 
+                        hint: `圓周長 = 直徑 × ${p.PI}`, 
+                        mode: "curve_calc" 
+                    },
+                    { title: "恭喜完成！", instruction: "", action: "reset", mode: "trace" }
+                ]
+            },
+            {
+                id: 2,
+                name: "課本做做看 (p.90)",
+                params: { D_SMALL: 10, D_BIG: 20, PI: 3.14 },
+                getValues: (p) => ({
+                    smallCircle: formatNum(p.D_SMALL * p.PI),
+                    bigArc: formatNum(p.D_BIG * p.PI / 2),
+                    total: formatNum((p.D_BIG * p.PI / 2) + (p.D_SMALL * p.PI))
+                }),
+                steps: (vals, p) => [
+                    { title: "單元開始：認識周長", instruction: "請仔細觀察這個圖形。\n它像一個太極圖，由三個半圓組成。", action: "next", hint: "注意看有大半圓和小半圓喔。", mode: "trace" },
+                    { title: "第一步：分析圖形", instruction: "圖形下方是一個大半圓 (直徑20cm)。\n上方有兩個小半圓 (直徑10cm)，左邊凸出來，右邊凹進去。", subInstruction: "我們把它們分開來看。", action: "next", hint: "凹進去的線也是周長的一部分喔！", mode: "analyze" },
+                    { title: "第二步：神奇的變化", instruction: "點擊「看動畫」，把凸出來的半圓移到右邊去", action: "animate_demo", hint: "平移過去後，剛好跟凹進去的半圓拼成一個完整的圓。", mode: "curve_observe" },
+                    { title: "第三步：計算小圓周長", instruction: "太棒了！兩個小弧線剛好拼成一個直徑 10cm 的圓。\n\n請先算出這個小圓的周長。", subInstruction: `小圓直徑 ${p.D_SMALL}cm 的周長 = ?\n(圓周率用3.14計算)`, action: "input", correctAnswer: vals.smallCircle.toString(), validate: (val) => Math.abs(parseFloat(val) - vals.smallCircle) < 0.1, hint: `圓周長 = 直徑 × ${p.PI}`, mode: "curve_calc_small" },
+                    { title: "第四步：計算大半圓弧長", instruction: "接著，我們算下方的大半圓 (直徑 20cm)。\n\n請算出它的弧長。", subInstruction: `直徑 ${p.D_BIG}cm 的半圓弧長 = ?\n(圓周率用3.14計算)`, action: "input", correctAnswer: vals.bigArc.toString(), validate: (val) => Math.abs(parseFloat(val) - vals.bigArc) < 0.1, hint: `半圓弧長 = 直徑 × ${p.PI} ÷ 2`, mode: "curve_calc_big" },
+                    { title: "第五步：計算總周長", instruction: "最後，把剛剛算出來的兩個答案加起來。\n\n總周長是多少呢？", subInstruction: `大半圓(${vals.bigArc}) + 小圓(${vals.smallCircle}) = ?`, action: "input", correctAnswer: vals.total.toString(), validate: (val) => Math.abs(parseFloat(val) - vals.total) < 0.1, hint: `把剛剛算出來的小圓周長，加上大半圓弧長。`, mode: "curve_calc_total" },
+                    { title: "恭喜完成！", instruction: "", action: "reset", mode: "trace" }
+                ]
+            }
+        ];
+
+        const PerimeterTutor = ({ onBack }) => {
+          const [currentProbId, setCurrentProbId] = useState(0);
+          const [step, setStep] = useState(0);
+          const [feedback, setFeedback] = useState("");
+          const [inputValue, setInputValue] = useState("");
+          const [showHint, setShowHint] = useState(false);
+          const [animState, setAnimState] = useState("none"); 
+          const [isAnimDone, setIsAnimDone] = useState(false);
+          const inputRef = useRef(null);
+
+          const currentProb = PERIMETER_PROBLEMS[currentProbId];
+          const vals = currentProb.getValues(currentProb.params);
+          const steps = currentProb.steps(vals, currentProb.params);
+          const currentStep = steps[step];
+
+          useEffect(() => {
+            setInputValue("");
+            setFeedback("");
+            setShowHint(false);
+            setIsAnimDone(false);
+            const mode = currentStep.mode;
+            
+            if (currentStep.action === 'input' && inputRef.current) {
+                setTimeout(() => inputRef.current.focus(), 100);
+            }
+
+            if (mode === "trace") setAnimState("trace");
+            else if (mode === "straight") setAnimState("straight");
+            else if (mode === "analyze") setAnimState("analyze");
+            else if (mode === "curve_observe") setAnimState("none"); 
+            else if (mode === "curve_calc") setAnimState("curve_done");
+            else if (mode === "curve_calc_small") setAnimState("trace_small");
+            else if (mode === "curve_calc_big") setAnimState("trace_big");
+            else if (mode === "curve_calc_total") setAnimState("trace"); 
+            else if (mode === "total") setAnimState("trace");
+          }, [step, currentProbId]);
+
+          const handleTabChange = (id) => { setCurrentProbId(id); setStep(0); setAnimState("trace"); }
+          const handleNext = () => setStep(prev => Math.min(prev + 1, steps.length - 1));
+          const handleReset = () => setStep(0);
+          
+          const checkAnswer = () => {
+            if (!inputValue) return;
+            const val = parseFloat(inputValue);
+            const correct = currentStep.validate ? currentStep.validate(inputValue) : Math.abs(val - parseFloat(currentStep.correctAnswer)) < 0.1;
+            setFeedback(correct ? "correct" : "incorrect");
+          };
+
+          const renderQ1 = () => {
+              const shapePath = `M 50,310 L 50,150 A 100,100 0 0,1 250,150 L 250,310 A 100,100 0 0,0 50,310 Z`;
+              const mergeCurves = animState === "curve_demo" || animState === "curve_done" || animState === "trace_small" || animState === "trace_big";
+              const showTrace = animState === "trace";
+              const highlightStraight = animState === "straight" || animState === "total";
+              
+              return (
+                <svg viewBox="0 0 350 400" className="w-full h-full drop-shadow-md">
+                    <defs>
+                        <pattern id="grid1" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" strokeWidth="1"/></pattern>
+                        <linearGradient id="q1Grad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="#dbeafe" /><stop offset="100%" stopColor="#bfdbfe" /></linearGradient>
+                    </defs>
+                    <rect width="350" height="400" fill="url(#grid1)" opacity="0.4" />
+                    <g transform="translate(25, 0)">
+                        <path d={shapePath} fill="url(#q1Grad)" stroke="none" />
+                        <line x1="50" y1="150" x2="250" y2="150" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4,4" />
+                        <line x1="50" y1="310" x2="250" y2="310" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4,4" />
+                        <g style={{ opacity: highlightStraight ? 1 : 0.1, transition: 'opacity 0.5s' }}>
+                            <line x1="50" y1="310" x2="50" y2="150" stroke="#ef4444" strokeWidth="6" strokeLinecap="round" />
+                            <line x1="250" y1="310" x2="250" y2="150" stroke="#ef4444" strokeWidth="6" strokeLinecap="round" />
+                            <text x="260" y="230" className="text-xl font-bold fill-red-500 select-none">16cm</text>
+                        </g>
+                        <g style={{ opacity: (currentStep.mode.includes('curve') || animState === 'trace' || step===4) ? 1 : 0.1, transition: 'opacity 0.5s' }}>
+                            <path d="M 50,150 A 100,100 0 0,1 250,150" fill="none" stroke="#3b82f6" strokeWidth="6" strokeLinecap="round" />
+                            <path d="M 250,310 A 100,100 0 0,0 50,310" fill="none" stroke="#3b82f6" strokeWidth="6" strokeLinecap="round" style={{ opacity: mergeCurves ? 0 : 1, transition: 'opacity 0.3s' }} />
+                        </g>
+                        <path d="M 250,310 A 100,100 0 0,0 50,310" fill="none" stroke="#3b82f6" strokeWidth="6" strokeLinecap="round" strokeDasharray="10,5" className="transition-all duration-1000 ease-in-out" style={{ transform: mergeCurves ? 'translateY(-160px) rotate(180deg)' : 'translateY(0px) rotate(0deg)', transformOrigin: '150px 310px', opacity: mergeCurves ? 1 : 0 }} />
+                         <g style={{ opacity: mergeCurves ? 1 : 0, transition: 'opacity 0.5s 0.5s' }}><text x="150" y="230" textAnchor="middle" className="text-sm font-bold fill-blue-600 bg-white select-none">拼成一個圓！</text></g>
+                        {showTrace && (
+                            <>
+                                <path d={shapePath} fill="none" stroke="#ef4444" strokeWidth="4" strokeLinecap="round" strokeDasharray="15, 10" className="animate-dash-move" />
+                                <circle r="6" fill="#ef4444"><animateMotion dur="4s" repeatCount="indefinite" path={shapePath} rotate="auto" /></circle>
+                            </>
+                        )}
+                        <line x1="50" y1="350" x2="250" y2="350" stroke="#64748b" strokeWidth="1" />
+                        <line x1="50" y1="345" x2="50" y2="355" stroke="#64748b" strokeWidth="1" />
+                        <line x1="250" y1="345" x2="250" y2="355" stroke="#64748b" strokeWidth="1" />
+                        <text x="150" y="375" textAnchor="middle" className="text-lg font-bold fill-slate-600 select-none">20cm</text>
+                    </g>
+                </svg>
+              );
+          };
+
+          const renderQ2 = () => {
+              const mergeCurves = animState === "curve_demo" || animState === "curve_done" || animState === "trace_small" || animState === "trace_big";
+              const showTrace = animState === "trace";
+              const highlightCurves = animState === "analyze" || currentStep.mode.includes('curve') || animState === "trace";
+
+              const pathTL = `M 75,175 A 100,100 0 0,1 175,75`; 
+              const pathTR = `M 175,75 A 100,100 0 0,0 275,175`; 
+              const pathBR = `M 275,175 A 100,100 0 0,1 175,275`; 
+              const pathBL = `M 175,275 A 100,100 0 0,0 75,175`; 
+
+              const fullShapeClean = `M 75,175 A 100,100 0 0,1 175,75 A 100,100 0 0,0 275,175 A 100,100 0 0,1 175,275 A 100,100 0 0,0 75,175 Z`;
+              const ghostCircle = `M 175,175 m -100,0 a 100,100 0 1,0 200,0 a 100,100 0 1,0 -200,0`;
+
+              return (
+                <svg viewBox="0 0 350 400" className="w-full h-full drop-shadow-md">
+                    <defs>
+                        <pattern id="grid2" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" strokeWidth="1"/></pattern>
+                        <linearGradient id="q2Grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#fed7aa" /><stop offset="100%" stopColor="#fb923c" /></linearGradient>
+                    </defs>
+                    <rect width="350" height="400" fill="url(#grid2)" opacity="0.4" />
+                    
+                    <rect x="75" y="75" width="200" height="200" fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4,4" />
+                    <path d={ghostCircle} fill="none" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="6,4" style={{ opacity: mergeCurves ? 1 : 0, transition: 'opacity 1s' }} />
+                    <path d={fullShapeClean} fill="url(#q2Grad)" stroke="none" style={{ opacity: 1 }} />
+
+                    <line x1="175" y1="75" x2="175" y2="275" stroke="#94a3b8" strokeWidth="1" strokeDasharray="4,4" />
+                    <line x1="75" y1="175" x2="275" y2="175" stroke="#94a3b8" strokeWidth="1" strokeDasharray="4,4" />
+
+                    <g style={{ transform: mergeCurves ? 'rotate(180deg)' : 'rotate(0deg)', transformOrigin: '225px 125px', transition: 'transform 1.5s ease-in-out' }}>
+                        <path d={pathTR} fill="none" stroke="#3b82f6" strokeWidth={highlightCurves ? 6 : 0} strokeLinecap="round" />
+                    </g>
+                    <g style={{ transform: mergeCurves ? 'rotate(180deg)' : 'rotate(0deg)', transformOrigin: '125px 225px', transition: 'transform 1.5s ease-in-out' }}>
+                        <path d={pathBL} fill="none" stroke="#3b82f6" strokeWidth={highlightCurves ? 6 : 0} strokeLinecap="round" />
+                    </g>
+                    <path d={pathTL} fill="none" stroke="#3b82f6" strokeWidth={highlightCurves ? 6 : 0} strokeLinecap="round" />
+                    <path d={pathBR} fill="none" stroke="#3b82f6" strokeWidth={highlightCurves ? 6 : 0} strokeLinecap="round" />
+                    
+                    <g style={{ opacity: mergeCurves ? 1 : 0, transition: 'opacity 0.5s 1.5s' }}>
+                        <text x="175" y="175" textAnchor="middle" dominantBaseline="middle" className="text-xl font-bold fill-blue-600 select-none bg-white/50 px-2">線條變成圓了！</text>
+                    </g>
+
+                    {showTrace && (
+                        <>
+                            <path d={fullShapeClean} fill="none" stroke="#ef4444" strokeWidth="4" strokeLinecap="round" strokeDasharray="15, 10" className="animate-dash-move" />
+                            <circle r="6" fill="#ef4444"><animateMotion dur="6s" repeatCount="indefinite" path={fullShapeClean} /></circle>
+                        </>
+                    )}
+
+                    <text x="175" y="60" textAnchor="middle" className="text-xl font-bold fill-slate-600 select-none">30cm</text>
+                    <text x="290" y="175" textAnchor="middle" className="text-xl font-bold fill-slate-600 select-none" style={{writingMode: 'vertical-rl'}}>30cm</text>
+                </svg>
+              );
+          };
+
+          const renderQ3 = () => {
+              const mergeCurves = animState === "curve_demo" || animState === "curve_done" || animState === "trace_small" || animState === "trace_big";
+              const showTrace = animState === "trace";
+              const showTraceSmall = animState === "trace_small";
+              const showTraceBig = animState === "trace_big";
+              
+              const pathFull = `M 75,200 A 50,50 0 0,1 175,200 A 50,50 0 0,0 275,200 A 100,100 0 0,1 75,200 Z`;
+              const pathBig = `M 275,200 A 100,100 0 0,1 75,200`; 
+              const pathSmallLeft = `M 75,200 A 50,50 0 0,1 175,200`; 
+              const pathSmallRight = `M 175,200 A 50,50 0 0,0 275,200`; 
+
+              const tracePathSmall = `M 175,200 A 50,50 0 0,0 275,200 A 50,50 0 0,0 175,200`;
+              
+              return (
+                <svg viewBox="0 0 350 400" className="w-full h-full drop-shadow-md">
+                    <defs>
+                        <pattern id="grid3" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" strokeWidth="1"/></pattern>
+                        <linearGradient id="q3Grad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="#d9f99d" /><stop offset="100%" stopColor="#bef264" /></linearGradient>
+                    </defs>
+                    <rect width="350" height="400" fill="url(#grid3)" opacity="0.4" />
+                    
+                    <circle cx="125" cy="200" r="3" fill="#64748b" />
+                    <circle cx="225" cy="200" r="3" fill="#64748b" />
+
+                    <path d={pathFull} fill="url(#q3Grad)" stroke="none" />
+                    <path d={pathBig} fill="none" stroke="#3b82f6" strokeWidth={6} strokeLinecap="round" />
+                    <path d={pathSmallRight} fill="none" stroke="#3b82f6" strokeWidth={6} strokeLinecap="round" />
+                    
+                    <g style={{ 
+                        transform: mergeCurves ? 'translateX(100px)' : 'translateX(0px)', 
+                        transition: 'transform 1.5s ease-in-out'
+                    }}>
+                         <path d={pathSmallLeft} fill="none" stroke="#3b82f6" strokeWidth={6} strokeLinecap="round" />
+                    </g>
+                    
+                    <path d={pathSmallLeft} fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4,4" style={{ opacity: mergeCurves ? 0.5 : 0 }} />
+                    <g style={{ opacity: mergeCurves ? 1 : 0, transition: 'opacity 0.5s 1.5s' }}><text x="225" y="280" textAnchor="middle" className="text-sm font-bold fill-blue-600 bg-white select-none">拼成一個圓！</text></g>
+
+                    {showTrace && (
+                        <>
+                            <path d={pathFull} fill="none" stroke="#ef4444" strokeWidth="4" strokeLinecap="round" strokeDasharray="15, 10" className="animate-dash-move" />
+                            <circle r="6" fill="#ef4444"><animateMotion dur="6s" repeatCount="indefinite" path={pathFull} /></circle>
+                        </>
+                    )}
+                    {showTraceSmall && (
+                        <>
+                            <path d={tracePathSmall} fill="none" stroke="#ef4444" strokeWidth="4" strokeLinecap="round" strokeDasharray="15, 10" className="animate-dash-move" />
+                            <circle r="6" fill="#ef4444"><animateMotion dur="2s" repeatCount="indefinite" path={tracePathSmall} /></circle>
+                        </>
+                    )}
+                    {showTraceBig && (
+                        <>
+                            <path d={pathBig} fill="none" stroke="#ef4444" strokeWidth="4" strokeLinecap="round" strokeDasharray="15, 10" className="animate-dash-move" />
+                            <circle r="6" fill="#ef4444"><animateMotion dur="4s" repeatCount="indefinite" path={pathBig} /></circle>
+                        </>
+                    )}
+
+                    <line x1="50" y1="200" x2="300" y2="200" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4,4" />
+                    <line x1="75" y1="180" x2="75" y2="220" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4,4" />
+                    <line x1="175" y1="180" x2="175" y2="220" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4,4" />
+                    <line x1="275" y1="180" x2="275" y2="220" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4,4" />
+
+                    <text x="125" y="215" textAnchor="middle" className="text-sm font-bold fill-slate-500 bg-white/50 px-1">10cm</text>
+                    <text x="225" y="215" textAnchor="middle" className="text-sm font-bold fill-slate-500 bg-white/50 px-1">10cm</text>
+                </svg>
+              );
+          }
+
+          return (
+            <div className="flex flex-col items-center min-h-screen p-4 font-sans bg-gray-50">
+              {/* Fixed back to main menu button styled identically to global back home button */}
+              <button onClick={onBack} style={{
+                  position: 'fixed',
+                  top: '52px',
+                  left: '12px',
+                  zIndex: 999999,
+                  background: 'rgba(30, 41, 59, 0.85)',
+                  color: '#ffffff',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  backdropFilter: 'blur(4px)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  transition: 'all 0.2s ease',
+              }}
+              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(79, 70, 229, 0.9)'}
+              onMouseOut={(e) => e.currentTarget.style.background = 'rgba(30, 41, 59, 0.85)'}>
+                  ⬅️ 回主選單
+              </button>
+
+              {/* Custom Header Nav */}
+              <div className="w-full max-w-5xl flex items-center justify-between mb-6 mt-12 md:mt-4">
+                  <h2 className="text-xl md:text-2xl font-black text-slate-700">
+                      扇形周長 (複合圖形)
+                  </h2>
+                  <div className="text-xs bg-indigo-100 text-indigo-800 px-3 py-1.5 rounded-full font-black shadow-sm">
+                      康軒第11冊 p.90
+                  </div>
+              </div>
+
+              <div className="w-full max-w-5xl flex gap-2 mb-4">
+                  {PERIMETER_PROBLEMS.map(p => (
+                      <button key={p.id} onClick={() => handleTabChange(p.id)} className={`flex-1 py-3 px-4 rounded-xl font-bold text-base md:text-lg transition-all shadow-sm ${currentProbId === p.id ? 'bg-indigo-600 text-white shadow-md transform scale-105' : 'bg-white text-gray-500 hover:bg-indigo-50'}`}>
+                          {p.name}
+                      </button>
+                  ))}
+              </div>
+
+              <div className="max-w-5xl w-full bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row border-4 border-white min-h-[500px]">
+                <div className="w-full md:w-1/2 bg-slate-50 p-6 flex flex-col items-center justify-center border-r border-slate-200 relative overflow-hidden">
+                  <div className="absolute top-4 left-4 bg-white/80 backdrop-blur px-3 py-1 rounded-full text-slate-500 font-bold text-sm flex items-center gap-2 shadow-sm z-10"><Calculator className="w-4 h-4" /> 互動教學板</div>
+                  <div className="relative w-full max-w-[350px] aspect-[3.5/4] select-none">
+                      {currentProbId === 0 && renderQ1()}
+                      {currentProbId === 1 && renderQ2()}
+                      {currentProbId === 2 && renderQ3()}
+                  </div>
+                  <div className="mt-2 bg-yellow-50 border border-yellow-200 p-3 rounded-lg text-xs text-yellow-800 flex gap-2 max-w-[90%]"><HelpCircle className="w-4 h-4 flex-shrink-0" /><span>小提示：圓周率我們使用 3.14 來計算喔！</span></div>
+                </div>
+                <div className="w-full md:w-1/2 p-8 flex flex-col relative bg-white">
+                  <div className="flex gap-2 mb-8 justify-center">{steps.map((s, idx) => (<div key={idx} className={`h-2 rounded-full transition-all duration-300 ${idx === step ? 'w-8 bg-indigo-600' : 'w-2 bg-indigo-100'}`} />))}</div>
+                  <div className="flex-1 flex flex-col justify-center">
+                    <h1 className="text-2xl font-extrabold text-slate-800 mb-4">{currentStep.title}</h1>
+                    <div className="text-lg text-slate-600 mb-8 leading-relaxed font-medium whitespace-pre-line">{currentStep.instruction}</div>
+                    <div className="min-h-[160px]">
+                      {currentStep.action === 'next' && (
+                        <button onClick={handleNext} className="w-full group bg-indigo-600 hover:bg-indigo-700 text-white text-xl py-4 rounded-2xl font-bold transition-all shadow-lg hover:shadow-indigo-200 flex items-center justify-center gap-3"><Play className="w-6 h-6 fill-current group-hover:scale-110 transition-transform" /> 開始學習</button>
+                      )}
+                      {currentStep.action === 'animate_demo' && (
+                        !isAnimDone ? (
+                            <button onClick={() => { 
+                                setAnimState("curve_demo"); 
+                                setTimeout(() => { 
+                                    setAnimState("curve_done"); 
+                                    setIsAnimDone(true); 
+                                    setStep(prev => prev + 1); 
+                                }, 2000); 
+                            }} className="w-full bg-blue-500 hover:bg-blue-600 text-white text-xl py-4 rounded-2xl font-bold transition-all shadow-lg hover:shadow-blue-200 flex items-center justify-center gap-3 animate-pulse">
+                                <Move className="w-6 h-6" /> 看動畫 (變形)
+                            </button>
+                        ) : (
+                            <button onClick={handleNext} className="w-full bg-green-600 hover:bg-green-700 text-white text-xl py-4 rounded-2xl font-bold transition-all shadow-lg hover:shadow-green-200 flex items-center justify-center gap-3 animate-bounce-short">
+                                下一步 <ArrowRight className="w-6 h-6" />
+                            </button>
+                        )
+                      )}
+                      {currentStep.action === 'input' && (
+                        <div className="space-y-6 animate-fade-in-up">
+                          <div className="bg-slate-50 border-2 border-indigo-100 p-6 rounded-2xl">
+                            <p className="font-bold text-indigo-900 mb-2 text-sm uppercase tracking-wider">計算題</p>
+                            <p className="text-xl text-slate-700 font-mono mb-4 whitespace-pre-line text-center">{currentStep.subInstruction}</p>
+                            
+                            <div className="flex gap-3 items-stretch">
+                                <div className="relative flex-1 group">
+                                    <input 
+                                        ref={inputRef}
+                                        type="number" 
+                                        value={inputValue} 
+                                        onChange={(e) => { setInputValue(e.target.value); setFeedback(""); }} 
+                                        placeholder="輸入答案..." 
+                                        className="w-full h-full border-2 border-slate-200 rounded-xl pl-5 pr-14 py-3 text-xl focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 text-right font-bold text-slate-700 transition-all placeholder:text-slate-300" 
+                                        onKeyDown={(e) => e.key === 'Enter' && checkAnswer()} 
+                                    />
+                                    <div className="absolute right-0 top-0 bottom-0 flex items-center px-4 bg-slate-100 rounded-r-xl border-l border-slate-200 text-slate-500 font-bold select-none pointer-events-none group-focus-within:bg-indigo-50 group-focus-within:text-indigo-600 transition-colors">
+                                        cm
+                                    </div>
+                                </div>
+                                <button onClick={checkAnswer} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 rounded-xl font-bold text-lg shadow-md transition-colors whitespace-nowrap">檢查</button>
+                            </div>
+
+                          </div>
+                          {feedback === 'correct' && (
+                            <div className="bg-green-100 text-green-800 p-4 rounded-xl flex items-center gap-4 animate-bounce-short border border-green-200 shadow-sm">
+                                <div className="bg-green-500 text-white p-1 rounded-full"><Check className="w-5 h-5" /></div>
+                                <div>
+                                    <p className="text-xs text-green-600 font-bold uppercase">Great Job</p>
+                                    <span className="font-bold text-lg">完全正確！</span>
+                                </div>
+                                <button onClick={handleNext} className="ml-auto bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold text-sm flex items-center gap-1 shadow-sm transition-transform hover:scale-105">下一步 <ArrowRight className="w-4 h-4" /></button>
+                            </div>
+                          )}
+                          {feedback === 'incorrect' && (
+                            <div className="bg-red-50 text-red-800 p-4 rounded-xl flex items-center gap-4 animate-shake border border-red-100 shadow-sm">
+                                <div>
+                                    <p className="font-bold">答案不太對喔...</p>
+                                    <p className="text-sm opacity-80">{currentStep.hint ? '不妨參考一下提示看看！' : '再試一次看看！'}</p>
+                                </div>
+                                <button onClick={() => setShowHint(true)} className="ml-auto text-sm font-bold underline hover:text-red-900 bg-white/50 px-3 py-1 rounded">看提示</button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {currentStep.action === 'reset' && (
+                        <div className="text-center py-4"><div className="inline-block p-4 bg-green-100 rounded-full mb-4"><Check className="w-12 h-12 text-green-600" /></div><h3 className="text-2xl font-bold text-slate-800 mb-2">太厲害了！</h3><p className="text-slate-600 mb-8">你已經學會了這一題的算法。</p><button onClick={handleReset} className="bg-slate-800 hover:bg-slate-900 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center justify-center gap-2 mx-auto"><RotateCcw className="w-5 h-5" /> 再玩一次</button></div>
+                      )}
+                    </div>
+                  </div>
+                  {showHint && currentStep.hint && (<div className="absolute bottom-24 left-8 right-8 bg-yellow-100 border-l-4 border-yellow-500 p-4 rounded shadow-lg animate-fade-in z-20"><div className="flex justify-between items-start"><p className="text-yellow-800 font-medium">{currentStep.hint}</p><button onClick={() => setShowHint(false)} className="text-yellow-600 hover:text-yellow-800 font-bold px-2">✕</button></div></div>)}
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        // ==================== AREA DATA & TUTOR ====================
+        const AREA_PROBLEMS = [
+            {
+                id: 0,
+                name: "課本第3題 (p.102)",
+                params: { SIDE: 20, PI: 3.14 },
+                getValues: (p) => ({ 
+                    squareArea: p.SIDE * p.SIDE,
+                    sectorArea: formatNum(p.SIDE * p.SIDE * p.PI / 4),
+                    finalArea: formatNum((p.SIDE * p.SIDE) - (p.SIDE * p.SIDE * p.PI / 4))
+                }),
+                steps: (vals, p) => [
+                    { title: "觀察圖形", instruction: "請問藍色區域的面積怎麼算？\n\n仔細觀察，它是一個正方形，被挖掉了一個白色的扇形。", action: "next", hint: "藍色面積 = 正方形面積 - 空白扇形面積", mode: "intro" },
+                    { title: "第一步：計算正方形面積", instruction: "我們先算出整個大正方形的面積。", subInstruction: `邊長 ${p.SIDE}cm 的正方形面積 = ?`, action: "input", correctAnswer: vals.squareArea.toString(), hint: "正方形面積 = 邊長 × 邊長", mode: "calc_square" },
+                    { 
+                        title: "第二步：計算空白扇形面積", 
+                        instruction: (
+                            <>接著，算出被挖掉的白色扇形面積。<br/>這是一個半徑 {p.SIDE}cm 的 <Frac n="1" d="4" /> 圓。</>
+                        ), 
+                        subInstruction: `半徑 ${p.SIDE}cm 的 <span class="frac"><span class="frac-n">1</span><span class="frac-d">4</span></span> 圓面積 = ?\n(圓周率用${p.PI}計算)`, 
+                        action: "input", 
+                        correctAnswer: vals.sectorArea.toString(), 
+                        validate: (val) => Math.abs(parseFloat(val) - vals.sectorArea) < 0.5,
+                        hint: `圓面積 = 半徑 × 半徑 × ${p.PI}\n扇形是圓的 1/4`, 
+                        mode: "calc_sector" 
+                    },
+                    { title: "第三步：計算藍色區域面積", instruction: "最後，用正方形面積減去空白扇形面積，就是答案囉！", subInstruction: `正方形(${vals.squareArea}) - 扇形(${vals.sectorArea}) = ?`, action: "input", correctAnswer: vals.finalArea.toString(), validate: (val) => Math.abs(parseFloat(val) - vals.finalArea) < 0.5, hint: "把剛剛算出來的兩個數字相減。", mode: "calc_final" },
+                    { title: "恭喜完成！", instruction: "", action: "reset", mode: "done" }
+                ]
+            },
+            {
+                id: 1,
+                name: "課本第4題 (p.102)",
+                params: { R: 10, PI: 3.14 },
+                getValues: (p) => ({ 
+                    sectorArea: formatNum(p.R * p.R * p.PI / 4),
+                    triArea: formatNum(p.R * p.R / 2),
+                    finalArea: formatNum((p.R * p.R * p.PI / 4) - (p.R * p.R / 2))
+                }),
+                steps: (vals, p) => [
+                    { title: "觀察圖形", instruction: "請問橘色區域的面積怎麼算？\n\n它是一個扇形，被剪掉了一個白色的直角三角形。", action: "next", hint: "橘色面積 = 扇形面積 - 三角形面積", mode: "intro" },
+                    { 
+                        title: "第一步：計算扇形面積", 
+                        instruction: (
+                            <>我們先算整個 <Frac n="1" d="4" /> 圓（扇形）的面積。<br/>半徑是 {p.R}cm。</>
+                        ), 
+                        subInstruction: `半徑 ${p.R}cm 的 <span class="frac"><span class="frac-n">1</span><span class="frac-d">4</span></span> 圓面積 = ?\n(圓周率用${p.PI}計算)`, 
+                        action: "input", 
+                        correctAnswer: vals.sectorArea.toString(), 
+                        validate: (val) => Math.abs(parseFloat(val) - vals.sectorArea) < 0.5,
+                        hint: `扇形面積 = 半徑 × 半徑 × ${p.PI} ÷ 4`, 
+                        mode: "calc_sector" 
+                    },
+                    { title: "第二步：計算三角形面積", instruction: "接著，算出要被剪掉的直角三角形面積。\n它的底和高都是半徑。", subInstruction: `底 ${p.R}cm、高 ${p.R}cm 的三角形面積 = ?`, action: "input", correctAnswer: vals.triArea.toString(), hint: "三角形面積 = 底 × 高 ÷ 2", mode: "calc_tri" },
+                    { title: "第三步：計算塗色面積", instruction: "最後，用扇形面積減去三角形面積，就是答案囉！", subInstruction: `扇形(${vals.sectorArea}) - 三角形(${vals.triArea}) = ?`, action: "input", correctAnswer: vals.finalArea.toString(), validate: (val) => Math.abs(parseFloat(val) - vals.finalArea) < 0.5, hint: "把剛剛算出來的兩個數字相減。", mode: "calc_final" },
+                    { title: "恭喜完成！", instruction: "", action: "reset", mode: "done" }
+                ]
+            },
+            {
+                id: 2,
+                name: "課本第5題 (p.103)",
+                params: { R: 10, PI: 3.14 },
+                getValues: (p) => ({ 
+                    sectorArea: formatNum(p.R * p.R * p.PI / 4),
+                    triArea: formatNum(p.R * p.R / 2),
+                    halfLeaf: formatNum((p.R * p.R * p.PI / 4) - (p.R * p.R / 2)),
+                    totalLeaf: formatNum(((p.R * p.R * p.PI / 4) - (p.R * p.R / 2)) * 2)
+                }),
+                steps: (vals, p) => [
+                    { title: "觀察圖形", instruction: "請問中間綠色葉子形狀的面積怎麼算？", action: "next", hint: "畫一條對角線，你就會看到兩個一樣的形狀。", mode: "intro" },
+                    { title: "第一步：分析圖形", instruction: "這是一個葉形，它其實是由「兩個半片葉子」組成的！\n(就像是把第4題的形狀重複兩次)\n\n我們畫出粉紅色的對角線。\n看到了嗎？葉形被分成了上下兩個一樣的形狀。", subInstruction: "我們只要算出一半的面積，再乘以 2 就好了。", action: "next", hint: "先專注算其中一半。", mode: "analyze" },
+                    { 
+                        title: "第二步：計算扇形面積", 
+                        instruction: (
+                            <>我們先算一半的「扇形」面積。<br/>這是一個半徑 {p.R}cm 的 <Frac n="1" d="4" /> 圓。</>
+                        ), 
+                        subInstruction: `半徑 ${p.R}cm 的 <span class="frac"><span class="frac-n">1</span><span class="frac-d">4</span></span> 圓面積 = ?\n(圓周率用${p.PI}計算)`, 
+                        action: "input", 
+                        correctAnswer: vals.sectorArea.toString(), 
+                        validate: (val) => Math.abs(parseFloat(val) - vals.sectorArea) < 0.5,
+                        hint: `扇形面積 = 半徑 × 半徑 × ${p.PI} ÷ 4`, 
+                        mode: "calc_sector_only" 
+                    },
+                    { title: "第三步：計算三角形面積", instruction: "接著，我們算要減掉的「直角三角形」面積。\n\n(注意：只算黃色部分)", subInstruction: `底 ${p.R}cm、高 ${p.R}cm 的三角形面積 = ?`, action: "input", correctAnswer: vals.triArea.toString(), hint: "三角形面積 = 底 × 高 ÷ 2", mode: "calc_tri_only" },
+                    { title: "第四步：計算半片葉子面積", instruction: "半片葉子 = 扇形 - 三角形。\n\n(看動畫：用扇形挖掉三角形，就是半片葉子)", subInstruction: `扇形(${vals.sectorArea}) - 三角形(${vals.triArea}) = ?`, action: "input", correctAnswer: vals.halfLeaf.toString(), validate: (val) => Math.abs(parseFloat(val) - vals.halfLeaf) < 0.5, hint: "相減算出半邊的面積。", mode: "calc_half" },
+                    { title: "第五步：計算總面積", instruction: "半片葉子是 28.5。\n因為有兩個一模一樣的形狀，所以總面積是...？\n\n(看動畫：上下兩片葉子正在輪流閃爍)", subInstruction: `半片葉子(${vals.halfLeaf}) × 2 = ?`, action: "input", correctAnswer: vals.totalLeaf.toString(), validate: (val) => Math.abs(parseFloat(val) - vals.totalLeaf) < 0.5, hint: "把剛剛算出來的答案乘以 2。", mode: "calc_total" },
+                    { title: "恭喜完成！", instruction: "", action: "reset", mode: "done" }
+                ]
+            },
+            {
+                id: 3,
+                name: "課本第6題 (p.103)",
+                params: { BIG_SIDE: 4, SMALL_SIDE: 2, PI: 3.14 },
+                getValues: (p) => ({ 
+                    sectorArea: formatNum(p.SMALL_SIDE * p.SMALL_SIDE * p.PI / 4), 
+                    triArea: formatNum(p.SMALL_SIDE * p.SMALL_SIDE / 2), 
+                    oneLeaf: formatNum(((p.SMALL_SIDE * p.SMALL_SIDE * p.PI / 4) - (p.SMALL_SIDE * p.SMALL_SIDE / 2)) * 2), 
+                    halfLeafUnit: formatNum((p.SMALL_SIDE * p.SMALL_SIDE * p.PI / 4) - (p.SMALL_SIDE * p.SMALL_SIDE / 2)),
+                    totalArea: formatNum(((p.SMALL_SIDE * p.SMALL_SIDE * p.PI / 4) - (p.SMALL_SIDE * p.SMALL_SIDE / 2)) * 8) 
+                }),
+                steps: (vals, p) => [
+                    { title: "觀察圖形", instruction: "這朵花由 4 片葉子組成，請問塗色面積是多少？\n\n正方形邊長是 4cm。", action: "next", hint: "我們可以把它切成 4 個小正方形來看。", mode: "intro" },
+                    { title: "第一步：分析圖形", instruction: "畫出十字虛線，把大正方形分成 4 個小正方形。\n每個小正方形的邊長是 2cm。\n\n看到了嗎？每個小正方形裡都有一片葉子。", subInstruction: "我們先專注算左上角那片葉子的「一半」。", action: "next", hint: "目標：算出半片葉子。", mode: "analyze" },
+                    { 
+                        title: "第二步：計算扇形面積", 
+                        instruction: (
+                            <>我們先算左上角小正方形裡的「扇形」面積。<br/>半徑是 2cm 的 <Frac n="1" d="4" /> 圓。</>
+                        ), 
+                        subInstruction: `半徑 2cm 的 <span class="frac"><span class="frac-n">1</span><span class="frac-d">4</span></span> 圓面積 = ?\n(圓周率用${p.PI}計算)`, 
+                        action: "input", 
+                        correctAnswer: vals.sectorArea.toString(), 
+                        validate: (val) => Math.abs(parseFloat(val) - vals.sectorArea) < 0.1,
+                        hint: `扇形面積 = 半徑 × 半徑 × ${p.PI} ÷ 4`, 
+                        mode: "calc_sector_only" 
+                    },
+                    { title: "第三步：計算三角形面積", instruction: "接著，算要減掉的「直角三角形」面積。\n\n(注意：只算黃色部分)", subInstruction: `底 2cm、高 2cm 的三角形面積 = ?`, action: "input", correctAnswer: vals.triArea.toString(), hint: "三角形面積 = 底 × 高 ÷ 2", mode: "calc_tri_only" },
+                    { title: "第四步：計算半片葉子面積", instruction: "半片葉子 = 扇形 - 三角形。\n(看動畫：挖掉三角形，剩下半片葉子)\n\n請輸入半片葉子的面積。", subInstruction: `${vals.sectorArea} - ${vals.triArea} = ?`, action: "input", correctAnswer: vals.halfLeafUnit.toString(), validate: (val) => Math.abs(parseFloat(val) - vals.halfLeafUnit) < 0.1, hint: "相減算出半片葉子。", mode: "calc_half_leaf" },
+                    { title: "第五步：計算總面積", instruction: "一片葉子有 2 個半片，總共有 4 片葉子。\n所以這朵花總共有 8 個半片！\n\n(看動畫：8 個半片葉子累積點數中...)", subInstruction: `半片葉子(${vals.halfLeafUnit}) × 8 = ?`, action: "input", correctAnswer: vals.totalArea.toString(), validate: (val) => Math.abs(parseFloat(val) - vals.totalArea) < 0.1, hint: "把半片葉子面積乘以 8。", mode: "calc_total" },
+                    { title: "恭喜完成！", instruction: "", action: "reset", mode: "done" }
+                ]
+            },
+            {
+                id: 4,
+                name: "課本做做看 (p.102)",
+                params: { R: 5, PI: 3.14 },
+                getValues: (p) => ({ 
+                    circleArea: formatNum(p.R * p.R * p.PI), 
+                    oneTriArea: formatNum(p.R * p.R / 2), 
+                    squareArea: formatNum(p.R * p.R / 2 * 4), 
+                    finalArea: formatNum((p.R * p.R * p.PI) - 50) 
+                }),
+                steps: (vals, p) => [
+                    { title: "觀察圖形", instruction: "請問紫色區域的面積是多少？\n\n這是一個圓形，中間挖掉了一個白色的正方形。", action: "next", hint: "紫色面積 = 圓面積 - 正方形面積", mode: "intro" },
+                    { title: "第一步：計算圓面積", instruction: "我們先算出外面大圓的面積。\n半徑是 5cm。", subInstruction: `半徑 5cm 的圓面積 = ?\n(圓周率用${p.PI}計算)`, action: "input", correctAnswer: vals.circleArea.toString(), hint: "圓面積 = 半徑 × 半徑 × 圓周率", mode: "calc_circle" },
+                    { title: "第二步：計算一個等腰直角三角形", instruction: "中間的正方形，其實可以切成 4 個等腰直角三角形。\n我們先算其中一個。\n\n底和高都是圓的半徑(5cm)。", subInstruction: `底 5cm、高 5cm 的三角形面積 = ?`, action: "input", correctAnswer: vals.oneTriArea.toString(), hint: "三角形面積 = 底 × 高 ÷ 2", mode: "calc_one_tri" },
+                    { title: "第三步：計算正方形面積", instruction: "一個三角形是 12.5。\n正方形由 4 個三角形組成，所以面積是？\n\n(看動畫：4 個三角形依序累積點數)", subInstruction: `三角形(${vals.oneTriArea}) × 4 = ?`, action: "input", correctAnswer: vals.squareArea.toString(), hint: "乘以 4 就是正方形面積。", mode: "calc_four_tri" },
+                    { title: "第四步：計算塗色面積", instruction: "最後，用圓面積減去正方形面積，就是答案囉！\n\n(看動畫：圓形挖掉正方形)", subInstruction: `圓形(${vals.circleArea}) - 正方形(${vals.squareArea}) = ?`, action: "input", correctAnswer: vals.finalArea.toString(), validate: (val) => Math.abs(parseFloat(val) - vals.finalArea) < 0.5, hint: "把剛剛算出來的兩個數字相減。", mode: "calc_final" },
+                    { title: "恭喜完成！", instruction: "", action: "reset", mode: "done" }
+                ]
+            }
+        ];
+
+        const AreaTutor = ({ onBack }) => {
+          const [currentProbId, setCurrentProbId] = useState(0);
+          const [step, setStep] = useState(0);
+          const [feedback, setFeedback] = useState("");
+          const [inputValue, setInputValue] = useState("");
+          const [showHint, setShowHint] = useState(false);
+          const [displayMode, setDisplayMode] = useState("intro"); 
+          const [isAnimDone, setIsAnimDone] = useState(false);
+
+          const currentProb = AREA_PROBLEMS[currentProbId];
+          const vals = currentProb.getValues(currentProb.params);
+          const steps = currentProb.steps(vals, currentProb.params);
+          const currentStep = steps[step];
+
+          useEffect(() => {
+            setInputValue("");
+            setFeedback("");
+            setShowHint(false);
+            setIsAnimDone(false); 
+            setDisplayMode(currentStep.mode);
+          }, [step, currentProbId]);
+
+          const handleTabChange = (id) => { setCurrentProbId(id); setStep(0); setDisplayMode("intro"); }
+          const handleNext = () => setStep(prev => Math.min(prev + 1, steps.length - 1));
+          const handleReset = () => setStep(0);
+          const checkAnswer = () => {
+            const val = parseFloat(inputValue);
+            const correct = currentStep.validate 
+                ? currentStep.validate(inputValue) 
+                : Math.abs(val - parseFloat(currentStep.correctAnswer)) < 0.1;
+            setFeedback(correct ? "correct" : "incorrect");
+          };
+
+          const renderProblem3 = () => {
+              const sqX = 75;
+              const sqY = 100;
+              const sqSize = 200;
+              
+              let sectorOpacity = 1;
+              let sectorFill = "white";
+              let sectorClass = "";
+
+              if (displayMode === 'calc_square') {
+                  sectorOpacity = 0; 
+              } else if (displayMode === 'calc_sector') {
+                  sectorFill = "#fef08a"; 
+                  sectorClass = "animate-pulse-slow";
+              } else if (displayMode === 'calc_final') {
+                  sectorClass = "animate-dig"; 
+              } 
+
+              const pathSquare = `M ${sqX},${sqY} h ${sqSize} v ${sqSize} h -${sqSize} Z`;
+              const pathSector = `M ${sqX},${sqY+sqSize} L ${sqX+sqSize},${sqY+sqSize} A ${sqSize},${sqSize} 0 0,0 ${sqX},${sqY} Z`;
+              const pathBlueBorder = `M ${sqX},${sqY} L ${sqX+sqSize},${sqY} L ${sqX+sqSize},${sqY+sqSize} A ${sqSize},${sqSize} 0 0,0 ${sqX},${sqY} Z`;
+
+              return (
+                <svg viewBox="0 0 350 400" className="w-full h-full drop-shadow-md">
+                    <defs>
+                        <pattern id="grida1" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" strokeWidth="1"/></pattern>
+                        <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#67e8f9" /><stop offset="100%" stopColor="#22d3ee" /></linearGradient>
+                    </defs>
+                    <rect width="350" height="400" fill="url(#grida1)" opacity="0.4" />
+
+                    <path d={pathSquare} 
+                          fill={displayMode === 'calc_square' ? "url(#blueGrad)" : (displayMode === 'calc_sector' ? "#f1f5f9" : "url(#blueGrad)")} 
+                          stroke="#94a3b8" strokeWidth="2" 
+                          style={{ transition: 'fill 0.5s' }} />
+
+                    <path d={pathSector} 
+                          fill={sectorFill} 
+                          stroke="#cbd5e1" strokeWidth="2" strokeDasharray="4,4"
+                          style={{ opacity: sectorOpacity, transition: 'opacity 0.5s' }} 
+                          className={sectorClass} />
+
+                    {(displayMode === 'intro' || displayMode === 'calc_final' || displayMode === 'done') && (
+                        <path d={pathBlueBorder} fill="none" stroke="#0891b2" strokeWidth="2" />
+                    )}
+
+                    <line x1={sqX-10} y1={sqY} x2={sqX-10} y2={sqY+sqSize} stroke="#64748b" strokeWidth="2" />
+                    <line x1={sqX-15} y1={sqY} x2={sqX-5} y2={sqY} stroke="#64748b" strokeWidth="2" />
+                    <line x1={sqX-15} y1={sqY+sqSize} x2={sqX-5} y2={sqY+sqSize} stroke="#64748b" strokeWidth="2" />
+                    <text x={sqX-25} y={sqY + sqSize/2} textAnchor="end" dominantBaseline="middle" className="text-lg font-bold fill-slate-600">20cm</text>
+
+                    <line x1={sqX} y1={sqY+sqSize+10} x2={sqX+sqSize} y2={sqY+sqSize+10} stroke="#64748b" strokeWidth="2" />
+                    <line x1={sqX} y1={sqY+sqSize+5} x2={sqX} y2={sqY+sqSize+15} stroke="#64748b" strokeWidth="2" />
+                    <line x1={sqX+sqSize} y1={sqY+sqSize+5} x2={sqX+sqSize} y2={sqY+sqSize+15} stroke="#64748b" strokeWidth="2" />
+                    <text x={sqX + sqSize/2} y={sqY+sqSize+35} textAnchor="middle" className="text-lg font-bold fill-slate-600">20cm</text>
+
+                    <path d={`M ${sqX},${sqY+20} L ${sqX+20},${sqY+20} L ${sqX+20},${sqY}`} fill="none" stroke="#64748b" strokeWidth="2" />
+                </svg>
+              );
+          };
+
+          const renderProblem4 = () => {
+              const cx = 75;
+              const cy = 300;
+              const r = 200; 
+              
+              const pathSector = `M ${cx},${cy} L ${cx+r},${cy} A ${r},${r} 0 0,0 ${cx},${cy-r} Z`;
+              const pathTriangle = `M ${cx},${cy} L ${cx+r},${cy} L ${cx},${cy-r} Z`;
+              
+              let triOpacity = 0;
+              let triClass = "";
+              let sectorFill = "url(#orangeGrad)"; 
+              
+              if (displayMode === 'calc_sector') {
+              } else if (displayMode === 'calc_tri') {
+                  triOpacity = 0.5;
+                  sectorFill = "url(#orangeGrad)";
+                  triClass = "animate-pulse-slow";
+              } else if (displayMode === 'calc_final') {
+                  triOpacity = 1;
+                  triClass = "animate-dig"; 
+              } else if (displayMode === 'done' || displayMode === 'intro') {
+                  triOpacity = 1;
+              }
+
+              return (
+                <svg viewBox="0 0 350 400" className="w-full h-full drop-shadow-md">
+                    <defs>
+                        <pattern id="grida2" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" strokeWidth="1"/></pattern>
+                        <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#fdba74" /><stop offset="100%" stopColor="#fb923c" /></linearGradient>
+                    </defs>
+                    <rect width="350" height="400" fill="url(#grida2)" opacity="0.4" />
+
+                    <path d={pathSector} fill={sectorFill} stroke="#f97316" strokeWidth="2" />
+
+                    <path d={pathTriangle} 
+                          fill="white" 
+                          stroke={displayMode === 'calc_tri' ? "#f97316" : "white"} 
+                          strokeWidth="2"
+                          strokeDasharray={displayMode === 'calc_tri' ? "4,4" : "0"}
+                          style={{ opacity: triOpacity, transition: 'opacity 0.5s' }}
+                          className={triClass} />
+                    
+                    {displayMode === 'calc_final' && (
+                        <g className="animate-bounce-short" style={{ transformBox: 'fill-box', transformOrigin: 'center', transform: 'translate(150px, 200px)' }}>
+                             <Scissors className="w-8 h-8 text-slate-500" />
+                        </g>
+                    )}
+
+                    <line x1={cx-10} y1={cy} x2={cx-10} y2={cy-r} stroke="#64748b" strokeWidth="2" />
+                    <line x1={cx-15} y1={cy} x2={cx-5} y2={cy} stroke="#64748b" strokeWidth="2" />
+                    <line x1={cx-15} y1={cy-r} x2={cx-5} y2={cy-r} stroke="#64748b" strokeWidth="2" />
+                    <text x={cx-25} y={cy - r/2} textAnchor="end" dominantBaseline="middle" className="text-lg font-bold fill-slate-600">10cm</text>
+
+                    <line x1={cx} y1={cy+10} x2={cx+r} y2={cy+10} stroke="#64748b" strokeWidth="2" />
+                    <line x1={cx} y1={cy+5} x2={cx} y2={cy+15} stroke="#64748b" strokeWidth="2" />
+                    <line x1={cx+r} y1={cy+5} x2={cx+r} y2={cy+15} stroke="#64748b" strokeWidth="2" />
+                    <text x={cx + r/2} y={cy+35} textAnchor="middle" className="text-lg font-bold fill-slate-600">10cm</text>
+
+                    <rect x={cx} y={cy-20} width="20" height="20" fill="none" stroke="#64748b" strokeWidth="2" />
+                </svg>
+              );
+          };
+
+          const renderProblem5 = () => {
+              const sqX = 75;
+              const sqY = 100;
+              const sqSize = 200;
+              
+              const pathTriangle = `M 75,300 L 75,100 L 275,300 Z`;
+              const pathSectorFull = `M 75,300 L 75,100 A 200,200 0 0,1 275,300 Z`;
+              
+              let bow1Opacity = 1;
+              let bow2Opacity = 1;
+              let showDiagonal = false;
+              let showTriangleCut = false;
+              let showSectorOnly = false;
+              let showTriOnly = false;
+              let animateBlink = false;
+
+              if (displayMode === 'intro') {
+                  showDiagonal = false;
+              } else if (displayMode === 'analyze') {
+                  showDiagonal = true;
+                  bow2Opacity = 0.3; 
+              } else if (displayMode === 'calc_sector_only') {
+                  showSectorOnly = true;
+              } else if (displayMode === 'calc_tri_only') {
+                  showTriOnly = true;
+              } else if (displayMode === 'calc_half') {
+                  bow2Opacity = 0; 
+                  showSectorOnly = true; 
+                  showTriangleCut = true; 
+              } else if (displayMode === 'calc_total' || displayMode === 'done') {
+                  bow2Opacity = 1;
+                  if(displayMode === 'calc_total') animateBlink = true;
+              }
+
+              return (
+                <svg viewBox="0 0 350 400" className="w-full h-full drop-shadow-md">
+                    <defs>
+                        <pattern id="grida3" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" strokeWidth="1"/></pattern>
+                        <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#bef264" /><stop offset="100%" stopColor="#84cc16" /></linearGradient>
+                    </defs>
+                    <rect width="350" height="400" fill="url(#grida3)" opacity="0.4" />
+                    
+                    <rect x={sqX} y={sqY} width={sqSize} height={sqSize} fill="none" stroke="#94a3b8" strokeWidth="2" />
+
+                    {showSectorOnly && (
+                        <path d={pathSectorFull} fill="url(#greenGrad)" stroke="#84cc16" strokeWidth="2" />
+                    )}
+
+                    {showTriOnly && (
+                        <path d={pathTriangle} fill="#fef08a" stroke="#eab308" strokeWidth="2" />
+                    )}
+
+                    {!showSectorOnly && !showTriOnly && (
+                        <>
+                            {/* Bow 2 Fill */}
+                            <path d={`M 275,300 A 200,200 0 0,1 75,100 Z`} 
+                                  fill="url(#greenGrad)" stroke="none" 
+                                  style={animateBlink ? {animation: 'cycle-highlight-2 2s infinite', animationDelay: '1s'} : {opacity: bow2Opacity}} />
+                            {/* Bow 2 Curve Stroke */}
+                            <path d={`M 275,300 A 200,200 0 0,1 75,100`} 
+                                  fill="none" stroke="#84cc16" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'cycle-highlight-2 2s infinite', animationDelay: '1s'} : {opacity: bow2Opacity}} />
+
+                            {/* Bow 1 Fill */}
+                            <path d={`M 75,100 A 200,200 0 0,1 275,300 Z`} 
+                                  fill="url(#greenGrad)" stroke="none" 
+                                  style={animateBlink ? {animation: 'cycle-highlight-2 2s infinite', animationDelay: '0s'} : {opacity: bow1Opacity}} />
+                            {/* Bow 1 Curve Stroke */}
+                            <path d={`M 75,100 A 200,200 0 0,1 275,300`} 
+                                  fill="none" stroke="#84cc16" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'cycle-highlight-2 2s infinite', animationDelay: '0s'} : {opacity: bow1Opacity}} />
+                        </>
+                    )}
+
+                    {showTriangleCut && (
+                        <path d={pathTriangle} fill="white" stroke="none" className="animate-dig" />
+                    )}
+
+                    {showDiagonal && (
+                        <line x1={sqX} y1={sqY} x2={sqX+sqSize} y2={sqY+sqSize} stroke="#f472b6" strokeWidth="3" strokeDasharray="6,4" />
+                    )}
+
+                    {displayMode === 'calc_half' && (
+                        <g className="animate-bounce-short" style={{ transformBox: 'fill-box', transformOrigin: 'center', transform: 'translate(120px, 200px)' }}>
+                             <Scissors className="w-8 h-8 text-slate-500" />
+                        </g>
+                    )}
+
+                    <text x={sqX + sqSize/2} y={sqY - 10} textAnchor="middle" className="text-lg font-bold fill-slate-600">10cm</text>
+                    <line x1={sqX} y1={sqY-5} x2={sqX+sqSize} y2={sqY-5} stroke="#64748b" strokeWidth="2" />
+                    <line x1={sqX} y1={sqY-10} x2={sqX} y2={sqY} stroke="#64748b" strokeWidth="2" />
+                    <line x1={sqX+sqSize} y1={sqY-10} x2={sqX+sqSize} y2={sqY} stroke="#64748b" strokeWidth="2" />
+
+                    <text x={sqX - 25} y={sqY + sqSize/2} textAnchor="end" dominantBaseline="middle" className="text-lg font-bold fill-slate-600">10cm</text>
+                    <line x1={sqX-10} y1={sqY} x2={sqX-10} y2={sqY+sqSize} stroke="#64748b" strokeWidth="2" />
+                    <line x1={sqX-15} y1={sqY} x2={sqX-5} y2={sqY} stroke="#64748b" strokeWidth="2" />
+                    <line x1={sqX-15} y1={sqY+sqSize} x2={sqX-5} y2={sqY+sqSize} stroke="#64748b" strokeWidth="2" />
+                </svg>
+              );
+          };
+
+          const renderProblem6 = () => {
+              const r = 100; 
+
+              const pathSectorTL = `M 175,100 L 75,100 A 100,100 0 0,0 175,200 Z`; 
+              const pathTriangleTL = `M 175,100 L 75,100 L 175,200 Z`;
+              
+              let opacityOther = 1;
+              let showGrid = false;
+              let showSectorOnly = false;
+              let showTriOnly = false;
+              let showDigging = false;
+              let animateBlink = false;
+
+              if (displayMode === 'intro') {
+              } else if (displayMode === 'analyze') {
+                  showGrid = true;
+                  opacityOther = 0.3; 
+              } else if (displayMode === 'calc_sector_only') {
+                  showSectorOnly = true;
+                  showGrid = true;
+                  opacityOther = 0;
+              } else if (displayMode === 'calc_tri_only') {
+                  showTriOnly = true;
+                  showGrid = true;
+                  opacityOther = 0;
+              } else if (displayMode === 'calc_half_leaf') {
+                  showSectorOnly = true; 
+                  showDigging = true;    
+                  showGrid = true;
+                  opacityOther = 0;
+              } else if (displayMode === 'calc_total' || displayMode === 'done') {
+                  showGrid = true;
+                  opacityOther = 1; 
+                  if(displayMode === 'calc_total') animateBlink = true;
+              }
+
+              return (
+                <svg viewBox="0 0 350 400" className="w-full h-full drop-shadow-md">
+                    <defs>
+                        <pattern id="grida4" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" strokeWidth="1"/></pattern>
+                        <linearGradient id="redGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#fca5a5" /><stop offset="100%" stopColor="#ef4444" /></linearGradient>
+                    </defs>
+                    <rect width="350" height="400" fill="url(#grida4)" opacity="0.4" />
+                    
+                    <rect x={75} y={100} width={200} height={200} fill="none" stroke="#94a3b8" strokeWidth="2" />
+
+                    {showSectorOnly && (
+                        <path d={pathSectorTL} fill={showTriOnly ? "#f1f5f9" : "url(#redGrad)"} stroke="#ef4444" strokeWidth="2" />
+                    )}
+                    {showTriOnly && (
+                        <path d={pathTriangleTL} fill="#fef08a" stroke="#eab308" strokeWidth="2" />
+                    )}
+                    {showDigging && (
+                        <path d={pathTriangleTL} fill="white" stroke="none" className="animate-dig" />
+                    )}
+
+                    {!showSectorOnly && !showTriOnly && !showDigging && (
+                        <g>
+                            {/* TL */}
+                            <path d={`M 75,100 A 100,100 0 0,0 175,200 Z`} fill="url(#redGrad)" stroke="none" 
+                                  style={animateBlink ? {animation: 'acc-8-1 9s infinite'} : {}} />
+                            <path d={`M 175,200 A 100,100 0 0,0 75,100 Z`} fill="url(#redGrad)" stroke="none" 
+                                  style={animateBlink ? {animation: 'acc-8-8 9s infinite'} : {opacity: opacityOther}} />
+                            <path d={`M 75,100 A 100,100 0 0,0 175,200`} fill="none" stroke="#ef4444" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'acc-8-1 9s infinite'} : {}} />
+                            <path d={`M 175,200 A 100,100 0 0,0 75,100`} fill="none" stroke="#ef4444" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'acc-8-8 9s infinite'} : {opacity: opacityOther}} />
+
+                            {/* TR */}
+                            <path d={`M 275,100 A 100,100 0 0,1 175,200 Z`} fill="url(#redGrad)" stroke="none" 
+                                  style={animateBlink ? {animation: 'acc-8-2 9s infinite'} : {opacity: opacityOther}} />
+                            <path d={`M 175,200 A 100,100 0 0,1 275,100 Z`} fill="url(#redGrad)" stroke="none" 
+                                  style={animateBlink ? {animation: 'acc-8-3 9s infinite'} : {opacity: opacityOther}} />
+                            <path d={`M 275,100 A 100,100 0 0,1 175,200`} fill="none" stroke="#ef4444" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'acc-8-2 9s infinite'} : {opacity: opacityOther}} />
+                            <path d={`M 175,200 A 100,100 0 0,1 275,100`} fill="none" stroke="#ef4444" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'acc-8-3 9s infinite'} : {opacity: opacityOther}} />
+                            
+                            {/* BR */}
+                            <path d={`M 175,200 A 100,100 0 0,0 275,300 Z`} fill="url(#redGrad)" stroke="none" 
+                                  style={animateBlink ? {animation: 'acc-8-4 9s infinite'} : {opacity: opacityOther}} />
+                            <path d={`M 275,300 A 100,100 0 0,0 175,200 Z`} fill="url(#redGrad)" stroke="none" 
+                                  style={animateBlink ? {animation: 'acc-8-5 9s infinite'} : {opacity: opacityOther}} />
+                            <path d={`M 175,200 A 100,100 0 0,0 275,300`} fill="none" stroke="#ef4444" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'acc-8-4 9s infinite'} : {opacity: opacityOther}} />
+                            <path d={`M 275,300 A 100,100 0 0,0 175,200`} fill="none" stroke="#ef4444" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'acc-8-5 9s infinite'} : {opacity: opacityOther}} />
+                            
+                            {/* BL */}
+                            <path d={`M 175,200 A 100,100 0 0,1 75,300 Z`} fill="url(#redGrad)" stroke="none" 
+                                  style={animateBlink ? {animation: 'acc-8-7 9s infinite'} : {opacity: opacityOther}} />
+                            <path d={`M 75,300 A 100,100 0 0,1 175,200 Z`} fill="url(#redGrad)" stroke="none" 
+                                  style={animateBlink ? {animation: 'acc-8-6 9s infinite'} : {opacity: opacityOther}} />
+                            <path d={`M 175,200 A 100,100 0 0,1 75,300`} fill="none" stroke="#ef4444" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'acc-8-7 9s infinite'} : {opacity: opacityOther}} />
+                            <path d={`M 75,300 A 100,100 0 0,1 175,200`} fill="none" stroke="#ef4444" strokeWidth="2" 
+                                  style={animateBlink ? {animation: 'acc-8-6 9s infinite'} : {opacity: opacityOther}} />
+                        </g>
+                    )}
+
+                    {showGrid && (
+                        <>
+                            <line x1={175} y1={100} x2={175} y2={300} stroke="#f472b6" strokeWidth="2" strokeDasharray="6,4" />
+                            <line x1={75} y1={200} x2={275} y2={200} stroke="#f472b6" strokeWidth="2" strokeDasharray="6,4" />
+                        </>
+                    )}
+
+                    <text x={175} y={90} textAnchor="middle" className="text-lg font-bold fill-slate-600">4cm</text>
+                    <line x1={75} y1={95} x2={275} y2={95} stroke="#64748b" strokeWidth="2" />
+                    <line x1={75} y1={90} x2={75} y2={100} stroke="#64748b" strokeWidth="2" />
+                    <line x1={275} y1={90} x2={275} y2={100} stroke="#64748b" strokeWidth="2" />
+
+                    <text x={285} y={200} textAnchor="start" dominantBaseline="middle" className="text-lg font-bold fill-slate-600">4cm</text>
+                    <line x1={280} y1={100} x2={280} y2={300} stroke="#64748b" strokeWidth="2" />
+                    <line x1={275} y1={100} x2={285} y2={100} stroke="#64748b" strokeWidth="2" />
+                    <line x1={275} y1={300} x2={285} y2={300} stroke="#64748b" strokeWidth="2" />
+                </svg>
+              );
+          };
+
+          const renderPractice = () => {
+              const cx = 175;
+              const cy = 200;
+              const r = 100; 
+              
+              const pathCircle = `M ${cx-r},${cy} a ${r},${r} 0 1,0 ${2*r},0 a ${r},${r} 0 1,0 -${2*r},0`;
+              const pathSquare = `M ${cx},${cy-r} L ${cx+r},${cy} L ${cx},${cy+r} L ${cx-r},${cy} Z`;
+              
+              const pathT1 = `M ${cx},${cy} L ${cx-r},${cy} L ${cx},${cy-r} Z`; 
+              const pathT2 = `M ${cx},${cy} L ${cx},${cy-r} L ${cx+r},${cy} Z`; 
+              const pathT3 = `M ${cx},${cy} L ${cx+r},${cy} L ${cx},${cy+r} Z`; 
+              const pathT4 = `M ${cx},${cy} L ${cx},${cy+r} L ${cx-r},${cy} Z`; 
+
+              let circleFill = "url(#purpleGrad)";
+              let squareOpacity = 1;
+              let squareClass = "";
+              let animateTri = false;
+              let animateOneTri = false;
+              let showIntroHelper = false;
+
+              if (displayMode === 'intro') {
+                showIntroHelper = true; 
+                squareOpacity = 1;
+              } else if (displayMode === 'calc_circle') {
+                  squareOpacity = 0; 
+              } else if (displayMode === 'calc_one_tri') {
+                  circleFill = "transparent";
+                  animateOneTri = true;
+                  squareOpacity = 0; 
+              } else if (displayMode === 'calc_four_tri') {
+                  circleFill = "transparent";
+                  animateTri = true;
+                  squareOpacity = 0;
+              } else if (displayMode === 'calc_final') {
+                  squareClass = "animate-dig";
+              }
+
+              return (
+                <svg viewBox="0 0 350 400" className="w-full h-full drop-shadow-md">
+                    <defs>
+                        <pattern id="grida5" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" strokeWidth="1"/></pattern>
+                        <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#d8b4fe" /><stop offset="100%" stopColor="#a855f7" /></linearGradient>
+                    </defs>
+                    <rect width="350" height="400" fill="url(#grida5)" opacity="0.4" />
+
+                    <circle cx={cx} cy={cy} r={r} fill={circleFill} stroke="#9333ea" strokeWidth="2" />
+
+                    {!animateTri && !animateOneTri && (
+                        <path d={pathSquare} fill="white" stroke="#94a3b8" strokeWidth="2" 
+                              style={{ opacity: squareOpacity }} className={squareClass} />
+                    )}
+
+                    {showIntroHelper && (
+                        <>
+                            <line x1={cx} y1={cy-r} x2={cx} y2={cy+r} stroke="#64748b" strokeWidth="2" strokeDasharray="4,4" />
+                            <line x1={cx-r} y1={cy} x2={cx+r} y2={cy} stroke="#64748b" strokeWidth="2" strokeDasharray="4,4" />
+                            <path d={`M ${cx},${cy+15} L ${cx+15},${cy+15} L ${cx+15},${cy}`} fill="none" stroke="#64748b" strokeWidth="2" />
+                        </>
+                    )}
+
+                    {animateOneTri && (
+                         <>
+                            <path d={pathT1} fill="#fbbf24" stroke="#d97706" strokeWidth="2" />
+                            <path d={`M ${cx},${cy-15} L ${cx-15},${cy-15} L ${cx-15},${cy}`} fill="none" stroke="#64748b" strokeWidth="2" />
+                         </>
+                    )}
+
+                    {animateTri && (
+                        <g>
+                            <path d={pathT1} fill="#fbbf24" stroke="#d97706" strokeWidth="2" style={{animation: 'acc-4-1 4s infinite'}} />
+                            <path d={pathT2} fill="#fbbf24" stroke="#d97706" strokeWidth="2" style={{animation: 'acc-4-2 4s infinite'}} />
+                            <path d={pathT3} fill="#fbbf24" stroke="#d97706" strokeWidth="2" style={{animation: 'acc-4-3 4s infinite'}} />
+                            <path d={pathT4} fill="#fbbf24" stroke="#d97706" strokeWidth="2" style={{animation: 'acc-4-4 4s infinite'}} />
+                        </g>
+                    )}
+
+                    {(showIntroHelper || displayMode === 'calc_circle' || displayMode === 'calc_one_tri') && (
+                        <g>
+                            <line x1={cx} y1={cy} x2={cx} y2={cy-r} stroke="#475569" strokeWidth="2" />
+                            <circle cx={cx} cy={cy} r={3} fill="#475569" />
+                            <text x={cx+5} y={cy-50} className="text-lg font-bold fill-slate-700 bg-white/60">5cm</text>
+                        </g>
+                    )}
+                </svg>
+              );
+          };
+
+          return (
+            <div className="flex flex-col items-center min-h-screen p-4 font-sans bg-gray-50">
+              {/* Fixed back to main menu button styled identically to global back home button */}
+              <button onClick={onBack} style={{
+                  position: 'fixed',
+                  top: '52px',
+                  left: '12px',
+                  zIndex: 999999,
+                  background: 'rgba(30, 41, 59, 0.85)',
+                  color: '#ffffff',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  backdropFilter: 'blur(4px)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  transition: 'all 0.2s ease',
+              }}
+              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(79, 70, 229, 0.9)'}
+              onMouseOut={(e) => e.currentTarget.style.background = 'rgba(30, 41, 59, 0.85)'}>
+                  ⬅️ 回主選單
+              </button>
+
+              {/* Custom Header Nav */}
+              <div className="w-full max-w-5xl flex items-center justify-between mb-6 mt-12 md:mt-4">
+                  <h2 className="text-xl md:text-2xl font-black text-slate-700">
+                      扇形面積 (複合圖形)
+                  </h2>
+                  <div className="text-xs bg-emerald-100 text-emerald-800 px-3 py-1.5 rounded-full font-black shadow-sm">
+                      康軒第11冊 p.102-103
+                  </div>
+              </div>
+
+              <div className="w-full max-w-5xl flex gap-2 mb-4">
+                  {AREA_PROBLEMS.map(p => (
+                      <button key={p.id} onClick={() => handleTabChange(p.id)} className={`flex-1 py-3 px-4 rounded-xl font-bold text-base md:text-lg transition-all shadow-sm ${currentProbId === p.id ? 'bg-indigo-600 text-white shadow-md transform scale-105' : 'bg-white text-gray-500 hover:bg-indigo-50'}`}>
+                          {p.name}
+                      </button>
+                  ))}
+              </div>
+
+              <div className="max-w-5xl w-full bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row border-4 border-white min-h-[500px]">
+                <div className="w-full md:w-1/2 bg-slate-50 p-6 flex flex-col items-center justify-center border-r border-slate-200 relative overflow-hidden">
+                  <div className="absolute top-4 left-4 bg-white/80 backdrop-blur px-3 py-1 rounded-full text-slate-500 font-bold text-sm flex items-center gap-2 shadow-sm z-10"><Calculator className="w-4 h-4" /> 互動教學板</div>
+                  <div className="relative w-full max-w-[350px] aspect-[3.5/4] select-none">
+                      {currentProbId === 0 && renderProblem3()}
+                      {currentProbId === 1 && renderProblem4()}
+                      {currentProbId === 2 && renderProblem5()}
+                      {currentProbId === 3 && renderProblem6()}
+                      {currentProbId === 4 && renderPractice()}
+                  </div>
+                  <div className="mt-2 bg-yellow-50 border border-yellow-200 p-3 rounded-lg text-xs text-yellow-800 flex gap-2 max-w-[90%]"><HelpCircle className="w-4 h-4 flex-shrink-0" /><span>小提示：圓周率我們使用 3.14 來計算喔！</span></div>
+                </div>
+                <div className="w-full md:w-1/2 p-8 flex flex-col relative bg-white">
+                  <div className="flex gap-2 mb-8 justify-center">{steps.map((s, idx) => (<div key={idx} className={`h-2 rounded-full transition-all duration-300 ${idx === step ? 'w-8 bg-indigo-600' : 'w-2 bg-indigo-100'}`} />))}</div>
+                  <div className="flex-1 flex flex-col justify-center">
+                    <h1 className="text-2xl font-extrabold text-slate-800 mb-4">{currentStep.title}</h1>
+                    <div className="text-lg text-slate-600 mb-8 leading-relaxed font-medium whitespace-pre-line">
+                        {typeof currentStep.instruction === 'string' ? currentStep.instruction : currentStep.instruction}
+                    </div>
+                    <div className="min-h-[160px]">
+                      {currentStep.action === 'next' && (
+                        <button onClick={handleNext} className="w-full group bg-indigo-600 hover:bg-indigo-700 text-white text-xl py-4 rounded-2xl font-bold transition-all shadow-lg hover:shadow-indigo-200 flex items-center justify-center gap-3"><Play className="w-6 h-6 fill-current group-hover:scale-110 transition-transform" /> 開始學習</button>
+                      )}
+                      
+                      {currentStep.action === 'input' && (
+                        <div className="space-y-6 animate-fade-in-up">
+                          <div className="bg-slate-50 border-2 border-indigo-100 p-6 rounded-2xl">
+                            <p className="font-bold text-indigo-900 mb-2 text-sm uppercase tracking-wider">計算題</p>
+                            <p className="text-xl text-slate-700 font-mono mb-4 whitespace-pre-line text-center" dangerouslySetInnerHTML={{__html: currentStep.subInstruction}}></p>
+                            
+                            <div className="flex flex-col gap-4">
+                                <div className="flex items-center gap-2">
+                                    <input 
+                                        type="number" 
+                                        value={inputValue} 
+                                        onChange={(e) => { setInputValue(e.target.value); setFeedback(""); }} 
+                                        placeholder="?" 
+                                        className="flex-1 border-2 border-slate-200 rounded-xl px-5 py-3 text-xl focus:outline-none focus:border-indigo-500 text-center font-bold text-slate-700" 
+                                        onKeyDown={(e) => e.key === 'Enter' && checkAnswer()} 
+                                    />
+                                    <span className="text-xl font-bold text-slate-600 shrink-0">cm<sup className="text-xs">2</sup></span>
+                                </div>
+                                <button onClick={checkAnswer} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold text-lg shadow-md transition-all">檢查</button>
+                            </div>
+
+                          </div>
+                          {feedback === 'correct' && (<div className="bg-green-100 text-green-800 p-4 rounded-xl flex items-center gap-4 animate-bounce-short border border-green-200"><div className="bg-green-500 text-white p-1 rounded-full"><Check className="w-5 h-5" /></div><span className="font-bold text-lg">完全正確！</span><button onClick={handleNext} className="ml-auto bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold text-sm flex items-center gap-1 shadow-sm">下一步 <ArrowRight className="w-4 h-4" /></button></div>)}
+                          {feedback === 'incorrect' && (<div className="bg-red-50 text-red-800 p-4 rounded-xl flex items-center gap-4 animate-shake border border-red-100"><span className="font-bold">答案不太對喔...</span><button onClick={() => setShowHint(true)} className="ml-auto text-sm font-bold underline hover:text-red-900">看提示</button></div>)}
+                        </div>
+                      )}
+                      {currentStep.action === 'reset' && (
+                        <div className="text-center py-4"><div className="inline-block p-4 bg-green-100 rounded-full mb-4"><Check className="w-12 h-12 text-green-600" /></div><h3 className="text-2xl font-bold text-slate-800 mb-2">太厲害了！</h3><p className="text-slate-600 mb-8">你已經學會了這一題的算法。</p><button onClick={handleReset} className="bg-slate-800 hover:bg-slate-900 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center justify-center gap-2 mx-auto"><RotateCcw className="w-5 h-5" /> 再玩一次</button></div>
+                      )}
+                    </div>
+                  </div>
+                  {showHint && currentStep.hint && (<div className="absolute bottom-24 left-8 right-8 bg-yellow-100 border-l-4 border-yellow-500 p-4 rounded shadow-lg animate-fade-in z-20"><div className="flex justify-between items-start"><p className="text-yellow-800 font-medium whitespace-pre-line">{currentStep.hint}</p><button onClick={() => setShowHint(false)} className="text-yellow-600 hover:text-yellow-800">✕</button></div></div>)}
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        // ==================== MAIN PORTAL / MENU ====================
+        const MainMenu = ({ setMode }) => {
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-slate-50 to-emerald-50 flex flex-col items-center justify-center p-6 md:p-12 relative overflow-hidden">
+                    {/* Floating background decorative vectors */}
+                    <div className="absolute -top-24 -left-24 w-96 h-96 bg-indigo-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse-slow"></div>
+                    <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-emerald-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse-slow" style={{ animationDelay: '2s' }}></div>
+
+
+
+                    <div className="max-w-4xl w-full text-center mb-12 relative z-10">
+                        <h1 className="text-4xl md:text-5xl font-black text-slate-800 tracking-tight drop-shadow-sm leading-tight">
+                            扇形周長與面積 <span className="text-indigo-600 block md:inline">(複合圖形)</span>
+                        </h1>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full relative z-10">
+                        {/* Perimeter Card */}
+                        <div onClick={() => setMode('perimeter')} className="group cursor-pointer bg-white rounded-3xl p-8 border-2 border-slate-100 shadow-xl hover:shadow-2xl hover:border-indigo-400 transition-all duration-300 transform hover:-translate-y-2 flex flex-col items-center text-center">
+                            <div className="w-20 h-20 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                                <svg className="w-12 h-12 text-indigo-500" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="4">
+                                  <path d="M20,80 L20,35 A30,30 0 0,1 80,35 L80,80 A30,30 0 0,0 20,80 Z" fill="none"/>
+                                  <circle cx="20" cy="80" r="5" fill="#ef4444" />
+                                  <circle cx="80" cy="80" r="5" fill="#ef4444" />
+                                </svg>
+                            </div>
+                            <h2 className="text-2xl font-black text-slate-800 group-hover:text-indigo-600 transition-colors mb-3">
+                                扇形周長 (複合圖形)
+                            </h2>
+                            <p className="text-slate-500 mb-6 font-semibold text-sm leading-relaxed flex-1 flex flex-col justify-center items-center">
+                                <span className="text-indigo-600 font-black text-xs bg-indigo-50 py-1.5 px-3 rounded-full mt-2">
+                                    📌 課本 p.90 (共3題)
+                                </span>
+                            </p>
+                            <button className="mt-auto px-6 py-3.5 bg-indigo-600 text-white font-bold rounded-xl shadow-md group-hover:bg-indigo-700 transition-colors w-full flex items-center justify-center gap-2">
+                                開始學習 <ArrowRight className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {/* Area Card */}
+                        <div onClick={() => setMode('area')} className="group cursor-pointer bg-white rounded-3xl p-8 border-2 border-slate-100 shadow-xl hover:shadow-2xl hover:border-emerald-400 transition-all duration-300 transform hover:-translate-y-2 flex flex-col items-center text-center">
+                            <div className="w-20 h-20 bg-emerald-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                                <svg className="w-12 h-12 text-emerald-500" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="4">
+                                  <rect x="18" y="18" width="64" height="64" strokeDasharray="4,4" />
+                                  <path d="M18,82 A64,64 0 0,1 82,18 A64,64 0 0,1 18,82 Z" fill="rgba(16, 185, 129, 0.2)" />
+                                </svg>
+                            </div>
+                            <h2 className="text-2xl font-black text-slate-800 group-hover:text-emerald-600 transition-colors mb-3">
+                                扇形面積 (複合圖形)
+                            </h2>
+                            <p className="text-slate-500 mb-6 font-semibold text-sm leading-relaxed flex-1 flex flex-col justify-center items-center">
+                                <span className="text-emerald-600 font-black text-xs bg-emerald-50 py-1.5 px-3 rounded-full mt-2">
+                                    📌 課本 p.102-103 (共5題)
+                                </span>
+                            </p>
+                            <button className="mt-auto px-6 py-3.5 bg-emerald-600 text-white font-bold rounded-xl shadow-md group-hover:bg-emerald-700 transition-colors w-full flex items-center justify-center gap-2">
+                                開始學習 <ArrowRight className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="mt-16 text-slate-400 text-xs font-semibold text-center border-t border-slate-200/60 pt-6 w-full max-w-4xl relative z-10">
+                        <p className="mb-1.5">本單元題目與題幹數據皆引用自康軒版國小數學第11冊（六年級上學期）課本內容</p>
+                        <p>© 2026 紅旗老師的AI教具 · 數位學習與智慧課堂整合門戶</p>
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [mode, setMode] = useState("menu");
+
+            return (
+                <div>
+                    {mode === "menu" && <MainMenu setMode={setMode} />}
+                    {mode === "perimeter" && <PerimeterTutor onBack={() => setMode("menu")} />}
+                    {mode === "area" && <AreaTutor onBack={() => setMode("menu")} />}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
