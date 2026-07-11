@@ -261,6 +261,8 @@
             phase: 'moving' 
         };
 
+        let flyingItems = new Set();
+
         const childEmojis = ['🧒', '👧', '👦', '🧒🏻', '👧🏼', '👦🏽', '🧒🏾', '👧🏿', '🧒🏼', '👦🏻'];
 
         function toChineseNum(num) {
@@ -276,6 +278,7 @@
             state.mode = mode;
             state.showSettings = false;
             state.itemsInitialized = false;
+            flyingItems.clear();
             if (mode === 'exact') {
                 state.activeTab = 'incl_minus';
                 state.total = 12;
@@ -296,6 +299,7 @@
 
         function goBackToMenu() {
             state.mode = 'menu';
+            flyingItems.clear();
             render();
         }
 
@@ -305,6 +309,7 @@
             state.explStep = 0;
             state.showSettings = false;
             state.itemsInitialized = false;
+            flyingItems.clear();
             if (state.mode === 'exact') {
                 if (tab.startsWith('incl')) {
                     if (state.total > 20) state.total = 12;
@@ -377,31 +382,105 @@
             }
         }
 
+        function triggerFlyAnimation(startIdx, endIdx) {
+            const isExact = state.mode === 'exact';
+            const isIncl = isExact ? state.activeTab.startsWith('incl') : state.activeTab === 'inclusion';
+            const itemEmoji = isExact ? (isIncl ? '🍰' : '🍪') : (isIncl ? '🍓' : '🎈');
+
+            for (let i = startIdx; i < endIdx; i++) {
+                const srcEl = document.getElementById('item-stable-' + i);
+                let targetPlateId = '';
+                if (isIncl) {
+                    // 對於分裝，目標是當前新增的那一盤（其索引為 state.step - 1，因為 step 已經增加）
+                    targetPlateId = 'plate-body-' + (state.step - 1);
+                } else {
+                    // 對於平分，目標是與除數取餘數對應的盤子
+                    targetPlateId = 'plate-body-' + (i % state.divisor);
+                }
+                const dstEl = document.getElementById(targetPlateId);
+
+                if (srcEl && dstEl) {
+                    const srcRect = srcEl.getBoundingClientRect();
+                    const dstRect = dstEl.getBoundingClientRect();
+
+                    const flyer = document.createElement('div');
+                    flyer.innerText = itemEmoji;
+                    flyer.className = 'animate-zoom-in';
+                    flyer.style.position = 'fixed';
+                    flyer.style.left = `${srcRect.left}px`;
+                    flyer.style.top = `${srcRect.top}px`;
+                    flyer.style.width = `${srcRect.width}px`;
+                    flyer.style.height = `${srcRect.height}px`;
+                    flyer.style.fontSize = '32px';
+                    flyer.style.display = 'flex';
+                    flyer.style.alignItems = 'center';
+                    flyer.style.justifyContent = 'center';
+                    flyer.style.zIndex = '9999';
+                    flyer.style.transition = 'all 0.6s cubic-bezier(0.25, 1, 0.5, 1)';
+                    document.body.appendChild(flyer);
+
+                    // 強制重繪並開始動畫
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            flyer.style.left = `${dstRect.left + dstRect.width / 2 - srcRect.width / 2}px`;
+                            flyer.style.top = `${dstRect.top + dstRect.height / 2 - srcRect.height / 2}px`;
+                            flyer.style.transform = 'scale(0.5)';
+                            flyer.style.opacity = '0.7';
+                        });
+                    });
+
+                    const currentIdx = i;
+                    setTimeout(() => {
+                        flyer.remove();
+                        flyingItems.delete(currentIdx);
+                        render();
+                    }, 600);
+                } else {
+                    flyingItems.delete(i);
+                }
+            }
+        }
+
         function handleAction() {
             if (state.mode === 'exact') {
                 const maxStep = state.total / state.divisor;
                 if (state.step < maxStep) {
+                    const movingStart = state.step * state.divisor;
+                    const movingEnd = (state.step + 1) * state.divisor;
+                    for (let i = movingStart; i < movingEnd; i++) {
+                        flyingItems.add(i);
+                    }
                     state.step++;
                     state.explStep = 0;
                     render();
+                    triggerFlyAnimation(movingStart, movingEnd);
                 }
             } else {
                 const quotient = Math.floor(state.total / state.divisor);
                 if (state.phase === 'moving') {
                     if (state.step < quotient) {
+                        const movingStart = state.step * state.divisor;
+                        const movingEnd = (state.step + 1) * state.divisor;
+                        for (let i = movingStart; i < movingEnd; i++) {
+                            flyingItems.add(i);
+                        }
                         state.step++;
                         if (state.step === quotient) {
                             state.phase = 'multi';
                         }
+                        render();
+                        triggerFlyAnimation(movingStart, movingEnd);
                     }
                 } else if (state.phase === 'multi') {
                     state.phase = 'minus';
+                    render();
                 } else if (state.phase === 'minus') {
                     state.phase = 'formula';
+                    render();
                 } else if (state.phase === 'formula') {
                     state.phase = 'finished';
+                    render();
                 }
-                render();
             }
         }
 
@@ -409,6 +488,7 @@
             state.step = 0;
             state.explStep = 0;
             state.showSettings = false;
+            flyingItems.clear();
             if (state.mode === 'exact') {
                 document.getElementById('exact-history-list').innerHTML = '';
             } else {
@@ -548,7 +628,23 @@
                 const isActive = isIncl ? (i < state.step) : (state.step > 0);
                 plateBody.className = `relative w-24 h-24 rounded-full border-2 transition-all flex items-center justify-center ${isActive ? 'bg-white border-orange-400 shadow-md scale-105' : 'bg-slate-50/50 border-slate-100 opacity-20'} ${!isIncl ? 'border-blue-200' : ''}`;
 
-                const countShouldBe = isIncl ? (i < state.step ? state.divisor : 0) : state.step;
+                let countShouldBe = 0;
+                if (isIncl) {
+                    if (i < state.step) {
+                        for (let idx = i * state.divisor; idx < (i + 1) * state.divisor; idx++) {
+                            if (!flyingItems.has(idx)) {
+                                countShouldBe++;
+                            }
+                        }
+                    }
+                } else {
+                    for (let idx = i; idx < state.step * state.divisor; idx += state.divisor) {
+                        if (!flyingItems.has(idx)) {
+                            countShouldBe++;
+                        }
+                    }
+                }
+
                 const countCurrent = plateGrid.children.length;
 
                 if (countCurrent < countShouldBe) {
