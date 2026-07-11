@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>數字小精靈比大小</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & Babel CDN -->
+    <script src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Noto+Sans+TC:wght@400;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', 'Noto Sans TC', sans-serif;
+            background-color: #050508;
+            margin: 0;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        .arcade-font {
+            font-family: 'Press Start 2P', monospace;
+        }
+
+        /* Arcade retro grid background */
+        .arcade-grid {
+            background-image: linear-gradient(rgba(18, 24, 38, 0.4) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(18, 24, 38, 0.4) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
+        /* Screen shake on error */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+        .shake-effect {
+            animation: shake 0.35s ease-in-out;
+        }
+
+        /* Neon Glow effects */
+        .glow-blue {
+            box-shadow: 0 0 25px rgba(56, 189, 248, 0.6), inset 0 0 10px rgba(56, 189, 248, 0.3);
+        }
+        .glow-rose {
+            box-shadow: 0 0 25px rgba(244, 63, 94, 0.6), inset 0 0 10px rgba(244, 63, 94, 0.3);
+        }
+        .neon-border-blue {
+            box-shadow: 0 0 15px #06b6d4, inset 0 0 10px #06b6d4;
+            border-color: #06b6d4;
+        }
+
+        /* Flashing animation for power pellets */
+        @keyframes pulse-gold {
+            0%, 100% { transform: scale(1); opacity: 1; filter: drop-shadow(0 0 8px #fbbf24); }
+            50% { transform: scale(1.3); opacity: 0.4; filter: drop-shadow(0 0 2px #fbbf24); }
+        }
+        .animate-power-pellet {
+            animation: pulse-gold 0.6s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="text-slate-100 select-none arcade-grid">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Custom Web Audio API synthesizer for 8-bit retro arcade SFX
+        const playSfx = (type) => {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if (ctx.state === 'suspended') ctx.resume();
+                
+                const now = ctx.currentTime;
+
+                if (type === 'chomp') {
+                    // Waka-Waka chew sound (Frequency sweeps)
+                    const durations = [0, 0.12, 0.24];
+                    durations.forEach(d => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(450, now + d);
+                        osc.frequency.exponentialRampToValueAtTime(750, now + d + 0.08);
+                        gain.gain.setValueAtTime(0.12, now + d);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + d + 0.1);
+                        osc.start(now + d);
+                        osc.stop(now + d + 0.11);
+                    });
+                } else if (type === 'correct') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(587.33, now); // D5
+                    osc.frequency.setValueAtTime(880.00, now + 0.08); // A5
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.005, now + 0.25);
+                    osc.start(now);
+                    osc.stop(now + 0.26);
+                } else if (type === 'wrong') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(200, now);
+                    osc.frequency.linearRampToValueAtTime(50, now + 0.45);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+                    osc.start(now);
+                    osc.stop(now + 0.47);
+                } else if (type === 'pacman-eat') {
+                    // Small retro dot sound
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600, now);
+                    osc.frequency.exponentialRampToValueAtTime(900, now + 0.05);
+                    gain.gain.setValueAtTime(0.05, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+                    osc.start(now);
+                    osc.stop(now + 0.07);
+                } else if (type === 'power-pellet') {
+                    // Low to high laser chime
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(1200, now + 0.3);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.32);
+                } else if (type === 'ghost-eat') {
+                    // Rising sweep
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(1600, now + 0.4);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                    osc.start(now);
+                    osc.stop(now + 0.42);
+                } else if (type === 'ghost-hit') {
+                    // Meltdown sound
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(600, now);
+                    osc.frequency.linearRampToValueAtTime(80, now + 0.8);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+                    osc.start(now);
+                    osc.stop(now + 0.82);
+                }
+            } catch(e) {
+                console.warn("Audio Context blocked: ", e);
+            }
+        };
+
+        // Text-to-Speech equation announcer
+        const speakEquation = (left, symbol, right, isMuted) => {
+            if (isMuted) return;
+            try {
+                window.speechSynthesis.cancel();
+                const sign = symbol === '>' ? '大於' : '小於';
+                const text = `${left} ${sign} ${right}`;
+                const utter = new SpeechSynthesisUtterance(text);
+                utter.lang = 'zh-TW';
+                utter.rate = 0.95;
+                window.speechSynthesis.speak(utter);
+            } catch(e) {
+                console.warn("Speech Synthesis blocked: ", e);
+            }
+        };
+
+        // Pac-man Character component
+        // Uses a single right-facing path + SVG rotation to avoid triangle artifacts
+        const PacmanChar = ({ facing = 'right', isOpen = false, size = 115 }) => {
+            const rotationMap = { right: 0, left: 180, up: 270, down: 90 };
+            const deg = rotationMap[facing] ?? 0;
+            const mouthPath = isOpen
+                ? "M 50 50 L 85 22 A 35 35 0 1 0 85 78 Z"   // wide open
+                : "M 50 50 L 83 36 A 35 35 0 1 0 83 64 Z";  // slightly open
+            // Eye is placed OUTSIDE the rotation group so it never flips to the bottom.
+            // Position is calculated per direction to stay near the top of the face.
+            const eye = {
+                right: { cx: 63, cy: 28 },
+                left:  { cx: 37, cy: 28 },
+                up:    { cx: 65, cy: 40 },
+                down:  { cx: 35, cy: 60 },
+            }[facing] || { cx: 63, cy: 28 };
+            return (
+                <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-[0_0_15px_rgba(234,179,8,0.75)]">
+                    <g transform={`rotate(${deg}, 50, 50)`}>
+                        <path d={mouthPath} fill="#FBBF24" stroke="#D97706" strokeWidth="2" />
+                    </g>
+                    <circle cx={eye.cx} cy={eye.cy} r="5" fill="#111827" />
+                </svg>
+            );
+        };
+
+        // Mini Pac-man Maze Map definitions
+        // 1 = Wall, 0 = Dot, 2 = Empty, 3 = Power Pellet
+        const INITIAL_MAZE = [
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 3, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 3, 1],
+            [1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 1],
+            [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+            [1, 1, 1, 1, 0, 1, 0, 1, 2, 1, 0, 1, 0, 1, 1, 1, 1],
+            [1, 0, 0, 0, 0, 0, 0, 1, 2, 1, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1],
+            [1, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 3, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        ];
+
+        // Main App
+        const App = () => {
+            const [gameState, setGameState] = useState('menu'); // menu, playing, reward_ready, playing_reward, reward_gameover
+            const [isMuted, setIsMuted] = useState(false);
+
+            // Correct answers in math stage → become mini-game lives (max 5)
+            const [correctCount, setCorrectCount] = useState(0);
+            // Total attempts (correct + wrong), max 5 before entering mini-game
+            const [totalAttempts, setTotalAttempts] = useState(0);
+            // Per-slot result: null | 'correct' | 'wrong'
+            const [slotResults, setSlotResults] = useState([null, null, null, null, null]);
+            // Sequence of operators to guarantee a mix of > and <
+            const [questionSequence, setQuestionSequence] = useState([]);
+
+            // Left / Right values
+            const [leftValue, setLeftValue] = useState(100);
+            const [rightValue, setRightValue] = useState(100);
+            const [correctChoice, setCorrectChoice] = useState('');
+            const [isShaking, setIsShaking] = useState(false);
+            const [canAnswer, setCanAnswer] = useState(true);
+
+            // Animation states
+            const [pacmanFacing, setPacmanFacing] = useState('right');
+            const [pacmanMouthOpen, setPacmanMouthOpen] = useState(false);
+            const [leftFoodEaten, setLeftFoodEaten] = useState(false);
+            const [rightFoodEaten, setRightFoodEaten] = useState(false);
+            const [spinAngle, setSpinAngle] = useState(0);
+            const [isPacmanVisible, setIsPacmanVisible] = useState(true);
+
+            // ── Canvas-based mini-game ─────────────────────────────────────
+            const [rewardScore, setRewardScore] = useState(0);
+            const [rewardLives, setRewardLives] = useState(3);
+            const [pacmanHighScore, setPacmanHighScore] = useState(() => parseInt(localStorage.getItem('pacman_highscore') || '0', 10));
+            const canvasRef   = useRef(null);
+            const animRef     = useRef(null);
+            const gRef        = useRef(null);   // mutable game-state object
+            const touchStartRef = useRef(null);
+            const rewardIntervalRef = useRef(null);
+            const gameTickRef       = useRef(null);
+
+
+            // ─── Canvas game loop ──────────────────────────────────────────
+            useEffect(() => {
+                if (gameState !== 'playing_reward') return;
+
+                const TILE  = 36;         // px per grid cell (enlarged map)
+                const COLS  = 17;
+                const ROWS  = 9;
+                const SPEED = 2.8;        // px per frame (pac-man)
+                const GSPEED = 1.5;       // ghost speed
+
+                // Set canvas dimensions dynamically
+                const canvasEl = canvasRef.current;
+                if (canvasEl) {
+                    canvasEl.width = COLS * TILE;
+                    canvasEl.height = ROWS * TILE;
+                }
+
+                // Deep-copy maze
+                const maze = INITIAL_MAZE.map(r => [...r]);
+
+                // Game object stored in ref to avoid re-render overhead
+                const g = {
+                    maze,
+                    pac: {
+                        x: 1 * TILE + TILE / 2,  // pixel center
+                        y: 1 * TILE + TILE / 2,
+                        dir:  { dx: 0, dy: 0 },
+                        next: { dx: 0, dy: 0 },
+                        mouth: 0.15,
+                        mouthDir: 1,
+                        alive: true,
+                        deathAng: 0,
+                    },
+                    ghosts: [
+                        // Aggressive ghosts starting on the right half of the horizontal map (away from Pac-man spawn at 1,1)
+                        { x: 13*TILE+TILE/2, y: 3*TILE+TILE/2, color:'#EF4444', sx:13, sy:3, dx: -1, dy: 0, frightened:false },
+                        { x: 13*TILE+TILE/2, y: 5*TILE+TILE/2, color:'#EC4899', sx:13, sy:5, dx: -1, dy: 0, frightened:false },
+                        { x: 15*TILE+TILE/2, y: 1*TILE+TILE/2, color:'#06B6D4', sx:15, sy:1, dx: -1, dy: 0, frightened:false },
+                        { x: 15*TILE+TILE/2, y: 7*TILE+TILE/2, color:'#F97316', sx:15, sy:7, dx: -1, dy: 0, frightened:false },
+                    ],
+                    score: 0,
+                    lives: correctCount,
+                    frightTimer: 0,
+                    running: true,
+                    wakaTick: 0,
+                    wakaHigh: true,
+                };
+                gRef.current = g;
+                setRewardScore(0);
+                setRewardLives(correctCount);
+
+                // ── helpers ──────────────────────────────────────────────────
+                const canWalk = (px, py) => {
+                    const col = Math.floor(px / TILE);
+                    const row = Math.floor(py / TILE);
+                    if (row < 0 || row >= ROWS || col < 0 || col >= COLS) return false;
+                    const cell = maze[row][col];
+                    return cell !== 1;   // wall
+                };
+
+                const ghostTargetDir = (ghost, pacX, pacY) => {
+                    const ops = [
+                        { dx: 1, dy: 0, dir: 'right' },
+                        { dx: -1, dy: 0, dir: 'left' },
+                        { dx: 0, dy: 1, dir: 'down' },
+                        { dx: 0, dy: -1, dir: 'up' }
+                    ];
+                    const opposite = { up: 'down', down: 'up', left: 'right', right: 'left' };
+
+                    let curDirStr = 'right';
+                    if (ghost.dx === -1) curDirStr = 'left';
+                    else if (ghost.dy === 1) curDirStr = 'down';
+                    else if (ghost.dy === -1) curDirStr = 'up';
+
+                    // Prevent immediate U-turn to avoid jittering back and forth
+                    const noU = ops.filter(d => d.dir !== opposite[curDirStr]);
+                    const valid = noU.filter(d => canWalk(
+                        ghost.x + d.dx * (TILE * 0.6),
+                        ghost.y + d.dy * (TILE * 0.6)
+                    ));
+                    const pool = valid.length ? valid : ops.filter(d => canWalk(
+                        ghost.x + d.dx * (TILE * 0.6),
+                        ghost.y + d.dy * (TILE * 0.6)
+                    ));
+
+                    if (!pool.length) return { dx: -ghost.dx, dy: -ghost.dy };
+
+                    // Aggressive chase targeting Pac-man's grid coordinates
+                    let bestMove = pool[0];
+                    let bestDist = ghost.frightened ? -1 : Infinity;
+
+                    const pacCol = Math.floor(pacX / TILE);
+                    const pacRow = Math.floor(pacY / TILE);
+
+                    pool.forEach(move => {
+                        const nextCol = Math.floor((ghost.x + move.dx * TILE) / TILE);
+                        const nextRow = Math.floor((ghost.y + move.dy * TILE) / TILE);
+                        const dist = Math.hypot(nextCol - pacCol, nextRow - pacRow);
+
+                        if (ghost.frightened) {
+                            if (dist > bestDist) {
+                                bestDist = dist;
+                                bestMove = move;
+                            }
+                        } else {
+                            if (dist < bestDist) {
+                                bestDist = dist;
+                                bestMove = move;
+                            }
+                        }
+                    });
+
+                    return bestMove;
+                };
+
+                // ── render ───────────────────────────────────────────────────
+                const render = () => {
+                    const canvas = canvasRef.current;
+                    if (!canvas) return;
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    // Background
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    const now = performance.now();
+
+                    // Draw maze
+                    for (let row = 0; row < ROWS; row++) {
+                        for (let col = 0; col < COLS; col++) {
+                            const cell = g.maze[row][col];
+                            const cx = col * TILE;
+                            const cy = row * TILE;
+
+                            if (cell === 1) {
+                                // Neon blue wall with inner glow
+                                ctx.fillStyle = '#1e3a5f';
+                                ctx.fillRect(cx, cy, TILE, TILE);
+                                ctx.strokeStyle = 'rgba(56,189,248,0.95)';
+                                ctx.lineWidth = 2;
+                                ctx.strokeRect(cx + 2, cy + 2, TILE - 4, TILE - 4);
+                                ctx.shadowColor = '#38bdf8';
+                                ctx.shadowBlur = 8;
+                                ctx.strokeRect(cx + 2, cy + 2, TILE - 4, TILE - 4);
+                                ctx.shadowBlur = 0;
+                            } else if (cell === 0) {
+                                // Small dot
+                                ctx.fillStyle = '#fef9c3';
+                                ctx.beginPath();
+                                ctx.arc(cx + TILE/2, cy + TILE/2, 2.5, 0, Math.PI*2);
+                                ctx.fill();
+                            } else if (cell === 3) {
+                                // Pulsing power pellet
+                                const pulse = 1 + 0.2 * Math.sin(now / 200);
+                                ctx.fillStyle = '#facc15';
+                                ctx.shadowColor = '#facc15';
+                                ctx.shadowBlur = 14;
+                                ctx.beginPath();
+                                ctx.arc(cx + TILE/2, cy + TILE/2, 5.5 * pulse, 0, Math.PI*2);
+                                ctx.fill();
+                                ctx.shadowBlur = 0;
+                            } else if (cell === 2) {
+                                // Ghost house interior — subtle pink line
+                                ctx.fillStyle = 'rgba(244,114,182,0.15)';
+                                ctx.fillRect(cx, cy + TILE/2 - 1, TILE, 2);
+                            }
+                        }
+                    }
+
+                    // Ghost house door
+                    ctx.fillStyle = 'rgba(244,114,182,0.5)';
+                    ctx.fillRect(8 * TILE, 4 * TILE - 3, TILE, 3);
+
+                    // Draw ghosts
+                    g.ghosts.forEach(gh => {
+                        const x = gh.x, y = gh.y;
+                        const r = TILE / 2 - 2;
+                        const isFlicker = g.frightTimer < 60 && Math.floor(now / 120) % 2 === 0;
+                        const bodyColor = gh.frightened ? (isFlicker ? '#fff' : '#3b82f6') : gh.color;
+
+                        ctx.fillStyle = bodyColor;
+                        ctx.shadowColor = bodyColor;
+                        ctx.shadowBlur = 8;
+
+                        // Ghost body: half-circle top + rectangular body + wavy skirt
+                        ctx.beginPath();
+                        ctx.arc(x, y - 2, r, Math.PI, 0, false);
+                        ctx.lineTo(x + r, y + r);
+                        // Wavy skirt (3 bumps)
+                        const bw = r * 2 / 3;
+                        ctx.lineTo(x + r  - bw * 0, y + r - 4);
+                        ctx.lineTo(x + r  - bw * 1, y + r + 1);
+                        ctx.lineTo(x + r  - bw * 2, y + r - 4);
+                        ctx.lineTo(x - r, y + r);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+
+                        // Eyes
+                        if (gh.frightened) {
+                            // Scared wavy eyes
+                            ctx.fillStyle = isFlicker ? '#ef4444' : '#facc15';
+                            ctx.beginPath();
+                            ctx.arc(x - 3, y - 2, 2, 0, Math.PI * 2);
+                            ctx.arc(x + 3, y - 2, 2, 0, Math.PI * 2);
+                            ctx.fill();
+                        } else {
+                            // White eyeballs
+                            ctx.fillStyle = '#fff';
+                            ctx.beginPath();
+                            ctx.arc(x - 3.5, y - 3, 3, 0, Math.PI * 2);
+                            ctx.arc(x + 3.5, y - 3, 3, 0, Math.PI * 2);
+                            ctx.fill();
+                            // Pupils follow direction
+                            ctx.fillStyle = '#1e40af';
+                            ctx.beginPath();
+                            ctx.arc(x - 3.5 + gh.dx * 1.5, y - 3 + gh.dy * 1.5, 1.5, 0, Math.PI * 2);
+                            ctx.arc(x + 3.5 + gh.dx * 1.5, y - 3 + gh.dy * 1.5, 1.5, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    });
+
+                    // Draw Pac-Man
+                    const p = g.pac;
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    // Rotation based on direction
+                    let rot = 0;
+                    if (p.dir.dx === 1)  rot = 0;
+                    else if (p.dir.dx === -1) rot = Math.PI;
+                    else if (p.dir.dy === -1) rot = -Math.PI / 2;
+                    else if (p.dir.dy === 1)  rot = Math.PI / 2;
+                    ctx.rotate(rot);
+
+                    if (!p.alive) {
+                        // Death animation
+                        const ang = p.deathAng;
+                        ctx.fillStyle = '#facc15';
+                        ctx.shadowColor = '#facc15';
+                        ctx.shadowBlur = 14;
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        ctx.arc(0, 0, TILE / 2 - 2, ang, Math.PI * 2 - ang);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                    } else {
+                        const mAngle = p.mouth * Math.PI;
+                        ctx.fillStyle = '#facc15';
+                        ctx.shadowColor = '#facc15';
+                        ctx.shadowBlur = 14;
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        ctx.arc(0, 0, TILE / 2 - 2, mAngle, Math.PI * 2 - mAngle);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                        // Eye (always upper-right before rotation)
+                        ctx.fillStyle = '#111827';
+                        ctx.beginPath();
+                        ctx.arc(2, -(TILE / 2 - 5), 1.8, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.restore();
+                };
+
+                // ── update ───────────────────────────────────────────────────
+                const update = () => {
+                    const p = g.pac;
+
+                    // ── Death animation ──
+                    if (!p.alive) {
+                        p.deathAng += 0.06;
+                        if (p.deathAng >= Math.PI) {
+                            // Use a life
+                            g.lives -= 1;
+                            setRewardLives(g.lives);
+                            if (g.lives <= 0) {
+                                g.running = false;
+                                playSfx('wrong');
+                                if (g.score > pacmanHighScore) {
+                                    localStorage.setItem('pacman_highscore', g.score.toString());
+                                    setPacmanHighScore(g.score);
+                                }
+                                setTimeout(() => setGameState('reward_gameover'), 800);
+                            } else {
+                                // Respawn
+                                p.x = 1 * TILE + TILE / 2;
+                                p.y = 1 * TILE + TILE / 2;
+                                p.dir  = { dx: 0, dy: 0 };
+                                p.next = { dx: 0, dy: 0 };
+                                p.alive = true;
+                                p.deathAng = 0;
+                                g.frightTimer = 0;
+                                g.ghosts.forEach((gh, i) => {
+                                    gh.x = gh.sx * TILE + TILE / 2;
+                                    gh.y = gh.sy * TILE + TILE / 2;
+                                    gh.frightened = false;
+                                    gh.dx = i % 2 === 0 ? 1 : -1;
+                                    gh.dy = 0;
+                                });
+                            }
+                        }
+                        return;
+                    }
+
+                    // ── Frightened timer ──
+                    if (g.frightTimer > 0) {
+                        g.frightTimer--;
+                        if (g.frightTimer === 0) {
+                            g.ghosts.forEach(gh => gh.frightened = false);
+                        }
+                    }
+
+                    // ── Move Pac-Man ──
+                    const px = p.x, py = p.y;
+                    const col = Math.floor(px / TILE);
+                    const row = Math.floor(py / TILE);
+                    const cx  = col * TILE + TILE / 2;
+                    const cy  = row * TILE + TILE / 2;
+                    const near = Math.abs(px - cx) < SPEED + 0.5 && Math.abs(py - cy) < SPEED + 0.5;
+
+                    if (near) {
+                        // Try queued direction first
+                        const nd = p.next;
+                        if ((nd.dx !== 0 || nd.dy !== 0) && canWalk(cx + nd.dx * TILE, cy + nd.dy * TILE)) {
+                            p.dir = { ...nd };
+                            p.x = cx; p.y = cy;
+                            p.next = { dx: 0, dy: 0 };  // consume the queued input
+                        } else if ((p.dir.dx !== 0 || p.dir.dy !== 0) &&
+                                   !canWalk(cx + p.dir.dx * TILE, cy + p.dir.dy * TILE)) {
+                            p.dir = { dx: 0, dy: 0 };  // hit wall — stop
+                            p.x = cx; p.y = cy;
+                        }
+                    }
+
+                    p.x += p.dir.dx * SPEED;
+                    p.y += p.dir.dy * SPEED;
+
+                    // Warp tunnel
+                    if (p.x < 0) p.x = COLS * TILE;
+                    if (p.x > COLS * TILE) p.x = 0;
+
+                    // Mouth animation
+                    if (p.dir.dx !== 0 || p.dir.dy !== 0) {
+                        p.mouth += 0.05 * p.mouthDir;
+                        if (p.mouth > 0.35 || p.mouth < 0.02) p.mouthDir *= -1;
+                        // Waka sound
+                        g.wakaTick++;
+                        if (g.wakaTick >= 12) {
+                            g.wakaTick = 0;
+                            playSfx('pacman-eat');
+                        }
+                    }
+
+                    // Dot / power pellet collection
+                    const pcol = Math.floor(p.x / TILE);
+                    const prow = Math.floor(p.y / TILE);
+                    if (prow >= 0 && prow < ROWS && pcol >= 0 && pcol < COLS) {
+                        const cell = g.maze[prow][pcol];
+                        if (cell === 0) {
+                            g.maze[prow][pcol] = 2;
+                            g.score += 10;
+                            setRewardScore(g.score);
+                        } else if (cell === 3) {
+                            g.maze[prow][pcol] = 2;
+                            g.score += 50;
+                            setRewardScore(g.score);
+                            g.frightTimer = 280;  // ~4.5s at 60fps
+                            g.ghosts.forEach(gh => gh.frightened = true);
+                            playSfx('power-pellet');
+                        }
+                    }
+
+                    // All dots eaten → exit game to summary
+                    const hasDots = g.maze.some(r => r.includes(0) || r.includes(3));
+                    if (!hasDots) {
+                        g.running = false;
+                        playSfx('correct');
+                        if (g.score > pacmanHighScore) {
+                            localStorage.setItem('pacman_highscore', g.score.toString());
+                            setPacmanHighScore(g.score);
+                        }
+                        setTimeout(() => {
+                            setGameState('reward_gameover');
+                        }, 1200);
+                    }
+
+                    // ── Move Ghosts ──
+                    g.ghosts.forEach(gh => {
+                        // Move first
+                        gh.x += gh.dx * GSPEED;
+                        gh.y += gh.dy * GSPEED;
+
+                        // Warp tunnel
+                        if (gh.x < 0) gh.x = COLS * TILE;
+                        if (gh.x > COLS * TILE) gh.x = 0;
+
+                        // Check if ghost just passed through a cell center — choose new direction
+                        // Use hypot < GSPEED so this fires at most ONCE per cell crossing
+                        const gcol = Math.floor(gh.x / TILE);
+                        const grow = Math.floor(gh.y / TILE);
+                        const gcx  = gcol * TILE + TILE / 2;
+                        const gcy  = grow * TILE + TILE / 2;
+
+                        if (Math.hypot(gh.x - gcx, gh.y - gcy) < GSPEED) {
+                            gh.x = gcx; gh.y = gcy;  // snap to center
+                            const { dx, dy } = ghostTargetDir(gh, p.x, p.y);
+                            gh.dx = dx; gh.dy = dy;
+                            // Take one step away from center immediately so hypot ≥ GSPEED next frame
+                            gh.x += gh.dx * GSPEED;
+                            gh.y += gh.dy * GSPEED;
+                        }
+                    });
+
+                    // ── Collision: Pac-Man vs Ghosts ──
+                    g.ghosts.forEach(gh => {
+                        const dist = Math.hypot(p.x - gh.x, p.y - gh.y);
+                        if (dist < TILE - 6) {
+                            if (gh.frightened) {
+                                // Eat ghost
+                                gh.frightened = false;
+                                gh.x = gh.sx * TILE + TILE / 2;
+                                gh.y = gh.sy * TILE + TILE / 2;
+                                gh.dx = 0; gh.dy = -1;
+                                g.score += 200;
+                                setRewardScore(g.score);
+                                playSfx('ghost-eat');
+                            } else {
+                                // Pac-Man hit
+                                p.alive = false;
+                                p.deathAng = 0.15;
+                                playSfx('ghost-hit');
+                            }
+                        }
+                    });
+                };
+
+                // ── Game loop ─────────────────────────────────────────────────
+                const loop = () => {
+                    if (!gRef.current || !gRef.current.running) return;
+                    update();
+                    render();
+                    animRef.current = requestAnimationFrame(loop);
+                };
+                animRef.current = requestAnimationFrame(loop);
+
+                // ── Keyboard controls ─────────────────────────────────────────
+                const onKey = (e) => {
+                    const map = { ArrowUp:{dx:0,dy:-1}, ArrowDown:{dx:0,dy:1}, ArrowLeft:{dx:-1,dy:0}, ArrowRight:{dx:1,dy:0} };
+                    if (map[e.key]) { e.preventDefault(); if (gRef.current) gRef.current.pac.next = map[e.key]; }
+                };
+                window.addEventListener('keydown', onKey);
+
+                return () => {
+                    if (gRef.current) gRef.current.running = false;
+                    cancelAnimationFrame(animRef.current);
+                    window.removeEventListener('keydown', onKey);
+                };
+            }, [gameState]);
+
+            const randRange = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+            // Generate numbers mixing all comparison types (strictly within 200)
+            const generateNumbers = (targetOp) => {
+                let left = 0, right = 0;
+                while (left === right) {
+                    const type = randRange(1, 7);
+                    switch (type) {
+                        case 1: // Digits (3-digit vs 2-digit)
+                            if (Math.random() > 0.5) {
+                                left = randRange(100, 150);
+                                right = randRange(60, 99);
+                            } else {
+                                left = randRange(60, 99);
+                                right = randRange(100, 150);
+                            }
+                            break;
+                        case 2: // Comparing Hundreds (1xx vs 200)
+                            left = randRange(120, 199);
+                            right = 200;
+                            if (Math.random() > 0.5) {
+                                const tmp = left; left = right; right = tmp;
+                            }
+                            break;
+                        case 3: // Comparing Tens Place (hundreds same)
+                            const t1 = randRange(1, 9);
+                            let t2 = randRange(1, 9);
+                            while (t1 === t2) t2 = randRange(1, 9);
+                            left = 100 + t1 * 10 + randRange(0, 9);
+                            right = 100 + t2 * 10 + randRange(0, 9);
+                            break;
+                        case 4: // Comparing Ones Place (hundreds and tens same)
+                            const commonTen = randRange(1, 9);
+                            const o1 = randRange(0, 9);
+                            let o2 = randRange(0, 9);
+                            while (o1 === o2) o2 = randRange(0, 9);
+                            left = 100 + commonTen * 10 + o1;
+                            right = 100 + commonTen * 10 + o2;
+                            break;
+                        case 5: // Zero in tens or ones place
+                            if (Math.random() > 0.5) {
+                                left = 150; right = 105;
+                            } else {
+                                left = 108; right = 180;
+                            }
+                            if (Math.random() > 0.5) {
+                                const tmp = left; left = right; right = tmp;
+                            }
+                            break;
+                        case 6: // Mirror numbers (same digits rearranged, within 200)
+                            const pairs = [
+                                [139, 193], [128, 182], [109, 190], 
+                                [152, 125], [147, 174], [102, 120], 
+                                [135, 153], [162, 126], [189, 198]
+                            ];
+                            const selectedPair = pairs[randRange(0, pairs.length - 1)];
+                            left = selectedPair[0];
+                            right = selectedPair[1];
+                            if (Math.random() > 0.5) {
+                                const tmp = left; left = right; right = tmp;
+                            }
+                            break;
+                        case 7: // Decade boundaries (ends in 9 or 0, e.g. 109 vs 110)
+                            const border = randRange(8, 18) * 10;
+                            left = border - 1;
+                            right = border;
+                            if (Math.random() > 0.5) {
+                                const tmp = left; left = right; right = tmp;
+                            }
+                            break;
+                    }
+                }
+                
+                // Enforce the target comparison operator by swapping values if they don't match
+                const isGreater = left > right;
+                if ((targetOp === '>' && !isGreater) || (targetOp === '<' && isGreater)) {
+                    const tmp = left; left = right; right = tmp;
+                }
+                return { left, right };
+            };
+
+            const startQuestion = (attemptIndex, seq, repeatLast = false) => {
+                setCanAnswer(true);
+                setPacmanMouthOpen(false);
+                setSpinAngle(0);
+                setIsPacmanVisible(true);
+                setLeftFoodEaten(false);
+                setRightFoodEaten(false);
+
+                if (repeatLast) {
+                    // Answered wrong: repeat exactly the last question, do not generate new values
+                    return;
+                }
+
+                const activeSeq = seq || questionSequence;
+                const index = attemptIndex !== undefined ? attemptIndex : totalAttempts;
+                const targetOp = (activeSeq && activeSeq[index]) ? activeSeq[index] : (Math.random() > 0.5 ? '>' : '<');
+
+                const { left, right } = generateNumbers(targetOp);
+                setLeftValue(left);
+                setRightValue(right);
+                setCorrectChoice(targetOp);
+            };
+
+            // Choice verification
+            const handleChoice = (symbol) => {
+                if (!canAnswer) return;
+                setCanAnswer(false);
+
+                const correct = symbol === correctChoice;
+                const nextAttempts = totalAttempts + 1;
+                setTotalAttempts(nextAttempts);
+
+                if (correct) {
+                    setPacmanFacing(symbol === '>' ? 'left' : 'right');
+                    setPacmanMouthOpen(true);
+
+                    const nextCount = correctCount + 1;
+                    setCorrectCount(nextCount);
+                    setSlotResults(prev => {
+                        const next = [...prev];
+                        next[totalAttempts] = 'correct';
+                        return next;
+                    });
+
+                    const triggerEatAnimation = () => {
+                        if (symbol === '>') {
+                            setLeftFoodEaten(true);
+                        } else {
+                            setRightFoodEaten(true);
+                        }
+
+                        setTimeout(() => {
+                            playSfx('chomp');
+                            playSfx('correct');
+                            setPacmanMouthOpen(false);
+
+                            if (nextAttempts >= 5) {
+                                setTimeout(() => setGameState('reward_ready'), 800);
+                            } else {
+                                setTimeout(startQuestion, 900);
+                            }
+                        }, 500);
+                    };
+
+                    // Play speech readout first, then eat
+                    if (!isMuted) {
+                        try {
+                            window.speechSynthesis.cancel();
+                            const sign = correctChoice === '>' ? '大於' : '小於';
+                            const text = `${leftValue} ${sign} ${rightValue}`;
+                            const utter = new SpeechSynthesisUtterance(text);
+                            utter.lang = 'zh-TW';
+                            utter.rate = 0.95;
+                            let ended = false;
+                            const fire = () => { if (!ended) { ended = true; triggerEatAnimation(); } };
+                            utter.onend = fire;
+                            utter.onerror = fire;
+                            window.speechSynthesis.speak(utter);
+                            setTimeout(fire, 3500);
+                        } catch(e) { triggerEatAnimation(); }
+                    } else {
+                        triggerEatAnimation();
+                    }
+                } else {
+                    handleFail(symbol, nextAttempts);
+                }
+            };
+
+            const handleFail = (selectedSymbol, nextAttempts) => {
+                playSfx('wrong');
+                setIsShaking(true);
+                setTimeout(() => setIsShaking(false), 350);
+
+                setSlotResults(prev => {
+                    const next = [...prev];
+                    next[totalAttempts] = 'wrong';
+                    return next;
+                });
+
+                const newFacing = selectedSymbol === '>' ? 'left' : 'right';
+                setPacmanFacing(newFacing);
+                setPacmanMouthOpen(true);
+
+                setTimeout(() => {
+                    setSpinAngle(360);
+                    setIsPacmanVisible(false);
+                }, 400);
+
+                // After animation, go to next question or mini-game
+                setTimeout(() => {
+                    if (nextAttempts >= 5) {
+                        setGameState('reward_ready');
+                    } else {
+                        startQuestion(undefined, undefined, true); // repeatLast = true
+                    }
+                }, 1500);
+            };
+
+            const startRewardGame = () => setGameState('playing_reward');
+
+            const handlePacmanControl = (dir) => {
+                const dirMap = { up:{dx:0,dy:-1}, down:{dx:0,dy:1}, left:{dx:-1,dy:0}, right:{dx:1,dy:0} };
+                if (gRef.current && dirMap[dir]) gRef.current.pac.next = dirMap[dir];
+            };
+
+            const initGame = () => {
+                setCorrectCount(0);
+                setTotalAttempts(0);
+                setSlotResults([null, null, null, null, null]);
+                setPacmanFacing('right');
+                
+                // Pre-generate a list containing exactly at least two '>' and two '<' symbols
+                const seq = ['>', '>', '<', '<', Math.random() > 0.5 ? '>' : '<'];
+                // Shuffle sequence
+                for (let i = seq.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [seq[i], seq[j]] = [seq[j], seq[i]];
+                }
+                setQuestionSequence(seq);
+
+                setGameState('playing');
+                setTimeout(() => startQuestion(0, seq), 50);
+            };
+
+            return (
+                <div className="min-h-screen bg-[#050508] flex flex-col items-center justify-between p-4 overflow-hidden relative">
+                    
+                    {/* HEADER STATUS */}
+                    <header className="w-full max-w-4xl flex items-center justify-between bg-slate-900/60 backdrop-blur-md px-6 py-3 rounded-2xl border border-slate-800 z-10">
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => { window.location.href = '../index.html'; }}
+                                className="px-3 py-2 bg-slate-800/40 border border-slate-700/50 rounded-xl hover:bg-slate-700 transition-all font-bold text-sm flex items-center gap-1"
+                            >
+                                🏠 回首頁
+                            </button>
+                            <button
+                                onClick={() => { playSfx('chomp'); setGameState('menu'); }}
+                                className="px-3 py-2 bg-slate-800/40 border border-slate-700/50 rounded-xl hover:bg-slate-700 transition-all font-bold text-sm flex items-center gap-1"
+                            >
+                                ⬅️ 回主選單
+                            </button>
+                        </div>
+                        
+                        <div className="flex items-center gap-6">
+                            <button onClick={() => { playSfx('chomp'); setIsMuted(!isMuted); }} className="p-2 bg-slate-800/80 hover:bg-slate-700/80 rounded-xl border border-slate-700/50 transition-all text-lg">
+                                {isMuted ? '🔇' : '🔊'}
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* MENU SCREEN */}
+                    {gameState === 'menu' && (
+                        <main className="flex-1 w-full max-w-4xl flex flex-col items-center justify-center gap-8 py-8 z-10">
+                            <div className="text-center space-y-4">
+                                <h1 className="text-5xl md:text-6xl font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-b from-yellow-300 via-amber-400 to-orange-500 drop-shadow-[0_4px_12px_rgba(245,158,11,0.3)] animate-pulse">
+                                    數字小精靈比大小
+                                </h1>
+                            </div>
+
+                            {/* Retro Pac-man Demo Animation */}
+                            <div className="w-80 h-32 flex items-center justify-between relative px-8 bg-slate-900/40 border border-slate-900 rounded-3xl">
+                                <div className="w-12 h-12 rounded-full bg-sky-500/20 border border-sky-400 flex items-center justify-center font-bold text-sky-300">105</div>
+                                <div className="animate-bounce"><PacmanChar direction="idle" size={60} /></div>
+                                <div className="w-12 h-12 rounded-full bg-rose-500/20 border border-rose-400 flex items-center justify-center font-bold text-rose-300">150</div>
+                            </div>
+
+                            <div className="text-center space-y-6">
+
+                                <button onClick={initGame} className="w-64 py-4 px-8 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black text-2xl shadow-lg shadow-orange-500/20 hover:scale-105 active:scale-95 transition-all text-center">
+                                    開始挑戰
+                                </button>
+                            </div>
+                        </main>
+                    )}
+
+                    {/* PLAYING ARENA (MATH STAGE) */}
+                    {gameState === 'playing' && (
+                        <main className="flex-1 w-full max-w-4xl flex flex-col items-center justify-between py-2 z-10">
+                            {/* PROGRESS HEADER — 5 attempt slots: green=correct, red=wrong, gray=remaining */}
+                            <div className="w-full flex items-center justify-center px-6 py-3 bg-slate-900/80 border border-slate-800 rounded-2xl gap-3">
+                                <span className="text-xs text-slate-400 font-bold shrink-0">答題進度</span>
+                                <div className="flex gap-2">
+                                    {Array.from({ length: 5 }).map((_, i) => {
+                                        const result = slotResults[i];
+                                        return (
+                                            <div key={i} className={`w-9 h-9 rounded-full border-2 flex items-center justify-center text-lg font-black transition-all duration-300 ${
+                                                result === 'correct'
+                                                    ? 'bg-yellow-400 border-amber-500 scale-110 drop-shadow-[0_0_8px_rgba(251,191,36,0.9)]'
+                                                    : result === 'wrong'
+                                                        ? 'bg-rose-600 border-rose-400 scale-105 drop-shadow-[0_0_6px_rgba(239,68,68,0.7)]'
+                                                        : 'bg-slate-800 border-slate-700 opacity-40'
+                                            }`}>
+                                                {result === 'correct' ? '♥' : result === 'wrong' ? '✕' : '○'}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* PLAYING GRID AND CHARACTERS */}
+                            <div className="w-full flex-1 flex items-center justify-center my-4 relative">
+                                <div className={`w-full min-h-[220px] max-w-[500px] relative ${isShaking ? 'shake-effect' : ''}`}>
+                                    
+                                    {/* Left Food Circle */}
+                                    <div 
+                                        className="absolute top-1/2 w-28 h-28 rounded-full border-4 border-sky-400 bg-sky-950/40 flex items-center justify-center text-3xl font-black text-sky-300 glow-blue transition-all duration-500 ease-in-out"
+                                        style={{ 
+                                            left: '50%',
+                                            marginLeft: leftFoodEaten ? '-57.5px' : '-220px',
+                                            transform: leftFoodEaten ? 'translateY(-50%) scale(0)' : 'translateY(-50%) scale(1)',
+                                            opacity: leftFoodEaten ? 0 : 1
+                                        }}
+                                    >
+                                        {leftValue}
+                                    </div>
+
+                                    {/* Center Pacman Area */}
+                                    <div 
+                                        className="absolute top-1/2 left-1/2 w-28 h-28 flex items-center justify-center transition-all duration-300 ease-out"
+                                        style={{ 
+                                            marginLeft: '-57.5px',
+                                            transform: `translateY(-50%) rotate(${spinAngle}deg)`,
+                                            opacity: isPacmanVisible ? 1 : 0
+                                        }}
+                                    >
+                                        <PacmanChar facing={pacmanFacing} isOpen={pacmanMouthOpen} />
+                                    </div>
+
+                                    {/* Right Food Circle */}
+                                    <div 
+                                        className="absolute top-1/2 w-28 h-28 rounded-full border-4 border-rose-500 bg-rose-950/40 flex items-center justify-center text-3xl font-black text-rose-300 glow-rose transition-all duration-500 ease-in-out"
+                                        style={{ 
+                                            left: '50%',
+                                            marginLeft: rightFoodEaten ? '-57.5px' : '105px',
+                                            transform: rightFoodEaten ? 'translateY(-50%) scale(0)' : 'translateY(-50%) scale(1)',
+                                            opacity: rightFoodEaten ? 0 : 1
+                                        }}
+                                    >
+                                        {rightValue}
+                                    </div>
+
+                                </div>
+                            </div>
+
+                            {/* DECISION BUTTONS */}
+                            <div className="w-full max-w-xl flex flex-col items-center gap-3">
+                                <div className="flex items-center justify-center gap-6 w-full px-4">
+                                    <button 
+                                        onClick={() => handleChoice('>')}
+                                        disabled={!canAnswer}
+                                        className="flex-1 py-5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black text-4xl rounded-2xl shadow-lg border border-amber-400/40 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:pointer-events-none transition-all duration-150 cursor-pointer flex items-center justify-center gap-2 group relative"
+                                    >
+                                        大於 ＞
+                                    </button>
+
+                                    <button 
+                                        onClick={() => handleChoice('<')}
+                                        disabled={!canAnswer}
+                                        className="flex-1 py-5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-4xl rounded-2xl shadow-lg border border-emerald-400/40 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:pointer-events-none transition-all duration-150 cursor-pointer flex items-center justify-center gap-2 group relative"
+                                    >
+                                        小於 ＜
+                                    </button>
+                                </div>
+                            </div>
+                        </main>
+                    )}
+
+                    {/* REWARD GAME READY UNLOCKED OVERLAY */}
+                    {gameState === 'reward_ready' && (
+                        <main className="flex-1 w-full max-w-4xl flex flex-col items-center justify-center gap-6 py-8 z-10">
+                            <div className="text-center space-y-4">
+                                <span className="text-6xl animate-bounce block">🏆</span>
+                                <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 via-amber-400 to-orange-500">
+                                    恭喜過五關！
+                                </h2>
+                                <p className="text-indigo-200 text-sm max-w-md mx-auto">
+                                    5 題全部作答！共獲得 <span className="text-yellow-300 font-black text-base">{correctCount} 條命</span>！
+                                    快去玩經典街機小精靈，吃豆豆、反咬幽靈，挑戰最高分！
+                                </p>
+                                <div className="flex gap-3 justify-center mt-2">
+                                    {Array.from({ length: correctCount }).map((_, i) => (
+                                        <span key={i} className="text-2xl drop-shadow-[0_0_8px_rgba(251,191,36,0.9)]">💛</span>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <button onClick={startRewardGame} className="w-64 py-4 px-8 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-2xl shadow-lg hover:scale-105 active:scale-95 transition-all text-center">
+                                🕹️ 開始玩小精靈
+                            </button>
+                        </main>
+                    )}
+
+                    {/* PLAYING REWARD — Canvas-based Pac-Man */}
+                    {/* (This section contains the scoreboard and virtual D-pad etc.) */}
+                    
+                    {/* REWARD GAME OVER / VICTORY SUMMARY OVERLAY */}
+                    {gameState === 'reward_gameover' && (
+                        <main className="flex-1 w-full max-w-md flex flex-col items-center justify-center gap-6 py-8 z-10">
+                            <div className="bg-slate-900 border-2 border-slate-800 rounded-3xl p-8 w-full text-center space-y-6 shadow-2xl">
+                                <h3 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 via-amber-400 to-orange-500 arcade-font">
+                                    遊戲結束
+                                </h3>
+
+                                <div className="space-y-4 font-mono">
+                                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                                        <div className="text-slate-500 text-xs uppercase tracking-wider arcade-font mb-1">本次得分</div>
+                                        <div className="text-3xl font-black text-emerald-400 arcade-font">{rewardScore}</div>
+                                    </div>
+
+                                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                                        <div className="text-slate-500 text-xs uppercase tracking-wider arcade-font mb-1">歷史最高紀錄</div>
+                                        <div className="text-3xl font-black text-yellow-400 arcade-font">{pacmanHighScore}</div>
+                                    </div>
+                                </div>
+
+                                <button onClick={() => { playSfx('chomp'); setGameState('menu'); }}
+                                    className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-extrabold rounded-2xl shadow-lg transition-all hover:scale-105 active:scale-95 text-lg">
+                                    返回主選單
+                                </button>
+                            </div>
+                        </main>
+                    )}
+                    {gameState === 'playing_reward' && (
+                        <main className="flex-1 w-full max-w-md flex flex-col items-center justify-between py-2 z-10">
+
+                            {/* Scoreboard */}
+                            <div className="w-full flex items-center justify-between px-5 py-2 bg-slate-900 border-2 border-slate-800 rounded-xl mb-3">
+                                <div>
+                                    <div className="text-[9px] uppercase tracking-wider text-slate-500 arcade-font">Score</div>
+                                    <div className="text-lg text-yellow-400 arcade-font">{String(rewardScore).padStart(6,'0')}</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-[9px] uppercase tracking-wider text-slate-500 arcade-font">Lives</div>
+                                    <div className="flex gap-1.5 justify-end mt-1">
+                                        {Array.from({ length: Math.max(0, rewardLives) }).map((_, i) => (
+                                            <div key={i} className="w-4 h-4 bg-yellow-400 flex-shrink-0"
+                                                style={{clipPath:'polygon(100% 74%,50% 50%,100% 26%,100% 0%,0% 0%,0% 100%,100% 100%)'}}>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Canvas arcade screen */}
+                            <div
+                                className="bg-black rounded-2xl border-4 border-sky-500 shadow-[0_0_24px_rgba(56,189,248,0.6)] p-1 relative"
+                                onTouchStart={(e) => {
+                                    const t = e.touches[0];
+                                    touchStartRef.current = { x: t.clientX, y: t.clientY };
+                                }}
+                                onTouchEnd={(e) => {
+                                    if (!touchStartRef.current) return;
+                                    const t = e.changedTouches[0];
+                                    const dx = t.clientX - touchStartRef.current.x;
+                                    const dy = t.clientY - touchStartRef.current.y;
+                                    touchStartRef.current = null;
+                                    if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
+                                    if (Math.abs(dx) > Math.abs(dy)) handlePacmanControl(dx > 0 ? 'right' : 'left');
+                                    else handlePacmanControl(dy > 0 ? 'down' : 'up');
+                                }}
+                            >
+                                <canvas ref={canvasRef} width={612} height={324}
+                                    className="rounded-xl block" style={{imageRendering:'pixelated'}} />
+                            </div>
+
+                            {/* D-Pad (mobile) */}
+                            <div className="grid grid-cols-3 gap-2 w-44 mt-4 md:hidden" style={{height:'11rem'}}>
+                                <div/>
+                                <button onTouchStart={(e)=>{e.preventDefault();handlePacmanControl('up');}} onClick={()=>handlePacmanControl('up')}
+                                    className="bg-slate-800 border-2 border-slate-700 text-yellow-400 text-2xl rounded-xl active:scale-90 active:bg-slate-700 flex items-center justify-center select-none">▲</button>
+                                <div/>
+                                <button onTouchStart={(e)=>{e.preventDefault();handlePacmanControl('left');}} onClick={()=>handlePacmanControl('left')}
+                                    className="bg-slate-800 border-2 border-slate-700 text-yellow-400 text-2xl rounded-xl active:scale-90 active:bg-slate-700 flex items-center justify-center select-none">◀</button>
+                                <div className="bg-slate-950 rounded-xl flex items-center justify-center text-[10px] text-slate-600 arcade-font">D</div>
+                                <button onTouchStart={(e)=>{e.preventDefault();handlePacmanControl('right');}} onClick={()=>handlePacmanControl('right')}
+                                    className="bg-slate-800 border-2 border-slate-700 text-yellow-400 text-2xl rounded-xl active:scale-90 active:bg-slate-700 flex items-center justify-center select-none">▶</button>
+                                <div/>
+                                <button onTouchStart={(e)=>{e.preventDefault();handlePacmanControl('down');}} onClick={()=>handlePacmanControl('down')}
+                                    className="bg-slate-800 border-2 border-slate-700 text-yellow-400 text-2xl rounded-xl active:scale-90 active:bg-slate-700 flex items-center justify-center select-none">▼</button>
+                                <div/>
+                            </div>
+
+                            {/* Keyboard hint (desktop) */}
+                            <div className="hidden md:flex items-center gap-2 mt-3 text-slate-500 text-xs select-none">
+                                {['↑','↓','←','→'].map(k => (
+                                    <span key={k} className="px-2 py-1 bg-slate-800 border border-slate-700 rounded font-mono">{k}</span>
+                                ))}
+                                <span className="text-slate-600 ml-1">方向鍵操控小精靈</span>
+                            </div>
+                        </main>
+                    )}
+
+
+
+                    <footer className="w-full text-center py-2 text-[10px] text-slate-750 z-10">
+                        紅旗老師的AI教具 © 2026. All Rights Reserved.
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
