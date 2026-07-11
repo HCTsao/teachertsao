@@ -412,26 +412,84 @@
             const isIncl = isExact ? state.activeTab.startsWith('incl') : state.activeTab === 'inclusion';
             const itemEmoji = isExact ? (isIncl ? '🍰' : '🍪') : (isIncl ? '🍓' : '🎈');
 
-            for (let k = 0; k < movingItemsList.length; k++) {
-                const idx = movingItemsList[k].index;
-                const srcRect = srcRects[idx];
-                const delay = k * 150; // 由左至右依序起飛
+            // 1. 整理移動中的物品（已經由 handleAction 測量並排好左右順序）
+            // movingItemsList 已經是由左至右排序的陣列：[{ index: i, rect: rect }]
 
-                const mapping = state.itemMappings[idx];
-                if (!mapping) {
-                    flyingItems.delete(idx);
-                    continue;
+            // 2. 獲取當前步驟所有的目標格位 DOM 元素，並依據其目的地物理 X 座標由左至右排序
+            const dests = [];
+            if (isIncl) {
+                // 分裝模式下，目標是當前盤子（state.step - 1）的所有格位
+                const plateGrid = document.getElementById(`plate-grid-${state.step - 1}`);
+                if (plateGrid) {
+                    for (let j = 0; j < state.divisor; j++) {
+                        const span = plateGrid.children[j];
+                        if (span) {
+                            dests.push({
+                                plate: state.step - 1,
+                                slot: j,
+                                rect: span.getBoundingClientRect()
+                            });
+                        }
+                    }
                 }
-                const targetPlateIdx = mapping.plate;
-                const targetSlotIdx = mapping.slot;
+            } else {
+                // 平分模式下，目標是每個盤子的當前新格位（第 state.step - 1 格）
+                for (let p = 0; p < state.divisor; p++) {
+                    const plateGrid = document.getElementById(`plate-grid-${p}`);
+                    if (plateGrid) {
+                        const span = plateGrid.children[state.step - 1];
+                        if (span) {
+                            dests.push({
+                                plate: p,
+                                slot: state.step - 1,
+                                rect: span.getBoundingClientRect()
+                            });
+                        }
+                    }
+                }
+            }
+
+            // 對目的地進行物理 X 座標由左至右排序（若 X 座標極為相近，則依 Y 座標由上至下排序）
+            dests.sort((a, b) => {
+                const leftA = a.rect ? a.rect.left : 0;
+                const leftB = b.rect ? b.rect.left : 0;
+                if (Math.abs(leftA - leftB) < 1) {
+                    const topA = a.rect ? a.rect.top : 0;
+                    const topB = b.rect ? b.rect.top : 0;
+                    return topA - topB;
+                }
+                return leftA - leftB;
+            });
+
+            // 3. 一對一配對：最左邊的物品飛往最左邊的格位，最右邊飛往最右邊
+            const finalPairs = [];
+            for (let k = 0; k < movingItemsList.length; k++) {
+                const item = movingItemsList[k];
+                const dest = dests[k];
+                if (item && dest) {
+                    // 重新將該物品 index 對應到排序後的盤子/格位
+                    state.itemMappings[item.index] = { plate: dest.plate, slot: dest.slot };
+                    finalPairs.push({
+                        idx: item.index,
+                        srcRect: srcRects[item.index],
+                        dstRect: dest.rect
+                    });
+                } else {
+                    // 若有缺失，直接將其自飛行集合中移除
+                    flyingItems.delete(item.index);
+                }
+            }
+
+            // 4. 開始執行 Staggered 飛行動畫
+            for (let k = 0; k < finalPairs.length; k++) {
+                const pair = finalPairs[k];
+                const idx = pair.idx;
+                const srcRect = pair.srcRect;
+                const dstRect = pair.dstRect;
+                const delay = k * 150; // 照左右物理順序，一個接一個起飛
 
                 setTimeout(() => {
-                    const plateGrid = document.getElementById(`plate-grid-${targetPlateIdx}`);
-                    const dstEl = plateGrid ? plateGrid.children[targetSlotIdx] : null;
-
-                    if (srcRect && dstEl) {
-                        const dstRect = dstEl.getBoundingClientRect();
-
+                    if (srcRect && dstRect) {
                         const flyer = document.createElement('div');
                         flyer.innerText = itemEmoji;
                         flyer.className = 'animate-zoom-in';
@@ -440,7 +498,7 @@
                         flyer.style.top = `${srcRect.top}px`;
                         flyer.style.width = `${srcRect.width}px`;
                         flyer.style.height = `${srcRect.height}px`;
-                        flyer.style.fontSize = '22px'; // 直接使用與盤子大小相近的尺寸，避免中途強烈縮放
+                        flyer.style.fontSize = '22px';
                         flyer.style.display = 'flex';
                         flyer.style.alignItems = 'center';
                         flyer.style.justifyContent = 'center';
@@ -448,20 +506,18 @@
                         flyer.style.transition = 'all 0.6s cubic-bezier(0.25, 1, 0.5, 1)';
                         document.body.appendChild(flyer);
 
-                        // 強制重繪並啟動動畫
                         requestAnimationFrame(() => {
                             requestAnimationFrame(() => {
-                                // 飛到目標盤子內該格位的中心點
+                                // 直接飛往配對好的格位中心點
                                 flyer.style.left = `${dstRect.left + dstRect.width / 2 - srcRect.width / 2}px`;
                                 flyer.style.top = `${dstRect.top + dstRect.height / 2 - srcRect.height / 2}px`;
                                 flyer.style.opacity = '0.9';
                             });
                         });
 
-                        const currentIdx = idx;
                         setTimeout(() => {
                             flyer.remove();
-                            flyingItems.delete(currentIdx);
+                            flyingItems.delete(idx);
                             render();
                         }, 600);
                     } else {
@@ -695,9 +751,13 @@
                 ? (isExact ? (finished ? maxStep : state.step + 1) : (state.step === quotient ? quotient : state.step + 1)) 
                 : state.divisor;
             
-            if (platesContainer.children.length !== displayPlateCount) {
+            if (!state.itemsInitialized) {
                 platesContainer.innerHTML = '';
-                for (let i = 0; i < displayPlateCount; i++) {
+            }
+
+            const currentPlateCount = platesContainer.children.length;
+            if (currentPlateCount < displayPlateCount) {
+                for (let i = currentPlateCount; i < displayPlateCount; i++) {
                     const wrapper = document.createElement('div');
                     wrapper.className = "relative group animate-zoom-in";
                     if (!isIncl) {
@@ -716,6 +776,10 @@
                     wrapper.appendChild(plate);
                     platesContainer.appendChild(wrapper);
                 }
+            } else if (currentPlateCount > displayPlateCount) {
+                for (let i = currentPlateCount - 1; i >= displayPlateCount; i--) {
+                    platesContainer.removeChild(platesContainer.children[i]);
+                }
             }
 
             for (let i = 0; i < displayPlateCount; i++) {
@@ -726,9 +790,7 @@
                 const isActive = isIncl ? (i < state.step) : (state.step > 0);
                 plateBody.className = `relative w-24 h-24 rounded-full border-2 transition-all flex items-center justify-center ${isActive ? 'bg-white border-orange-400 shadow-md scale-105' : 'bg-slate-50/50 border-slate-100 opacity-20'} ${!isIncl ? 'border-blue-200' : ''}`;
 
-                // 重建盤子格位內容，並依據 itemMappings 與 flyingItems 狀態做動態渲染
-                plateGrid.innerHTML = '';
-
+                // 收集此盤應有的物品映射
                 const mappedItems = [];
                 for (let idx = 0; idx < state.total; idx++) {
                     const mapping = state.itemMappings[idx];
@@ -745,22 +807,41 @@
                     }
                 }
 
-                // 排序以維持固定的格子渲染順序
+                // 排序以維持固定的格子順序
                 mappedItems.sort((a, b) => a.slot - b.slot);
 
-                // 建立格位 Spans
-                for (let m = 0; m < mappedItems.length; m++) {
+                // 動態更新格位 Spans (增刪與樣式調整，以防止閃爍)
+                const currentSpansCount = plateGrid.children.length;
+                const targetSpansCount = mappedItems.length;
+
+                if (currentSpansCount > targetSpansCount) {
+                    for (let m = currentSpansCount - 1; m >= targetSpansCount; m--) {
+                        plateGrid.removeChild(plateGrid.children[m]);
+                    }
+                }
+
+                for (let m = 0; m < targetSpansCount; m++) {
                     const idx = mappedItems[m].idx;
-                    const span = document.createElement('span');
-                    span.innerText = itemEmoji;
-                    if (flyingItems.has(idx)) {
+                    const isFlyingNow = flyingItems.has(idx);
+                    
+                    let span;
+                    if (m < currentSpansCount) {
+                        span = plateGrid.children[m];
+                    } else {
+                        span = document.createElement('span');
+                        span.innerText = itemEmoji;
+                        plateGrid.appendChild(span);
+                    }
+
+                    if (isFlyingNow) {
                         span.className = "text-xl";
                         span.style.opacity = '0'; // 佔位但看不見，便於量測最終停留座標
                     } else {
-                        span.className = "text-xl animate-zoom-in";
-                        span.style.opacity = '1';
+                        if (span.style.opacity !== '1') {
+                            span.className = "text-xl animate-zoom-in";
+                            span.style.opacity = '1';
+                        }
                     }
-                    plateGrid.appendChild(span);
                 }
             }
 
