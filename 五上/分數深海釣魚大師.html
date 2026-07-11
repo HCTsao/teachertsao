@@ -603,16 +603,31 @@
 
             // 生成通分對決問題
             generateCommonDenominator() {
-                // 選出一些常見分母組合，讓其最小公倍數 (LCM) 介於 6 到 24
+                // 選出一些常見分母組合，讓其最小公倍數 (LCM) 介於 6 到 36
                 const pairs = [
+                    // 1. 互質 (直接互乘) 的情況
                     { f1: { n: 1, d: 2 }, f2: { n: 1, d: 3 } }, // LCM = 6
                     { f1: { n: 2, d: 3 }, f2: { n: 3, d: 4 } }, // LCM = 12
                     { f1: { n: 1, d: 3 }, f2: { n: 2, d: 5 } }, // LCM = 15
                     { f1: { n: 3, d: 4 }, f2: { n: 2, d: 5 } }, // LCM = 20
-                    { f1: { n: 5, d: 6 }, f2: { n: 3, d: 4 } }, // LCM = 12 (注意這兩個最小公倍數是12而非24)
                     { f1: { n: 3, d: 5 }, f2: { n: 1, d: 2 } }, // LCM = 10
                     { f1: { n: 2, d: 3 }, f2: { n: 3, d: 5 } }, // LCM = 15
-                    { f1: { n: 1, d: 4 }, f2: { n: 3, d: 8 } }  // LCM = 8
+
+                    // 2. 非直接互乘的情況 (LCM 比直接相乘小)
+                    { f1: { n: 5, d: 6 }, f2: { n: 3, d: 4 } }, // LCM = 12 (6*4=24)
+                    { f1: { n: 1, d: 4 }, f2: { n: 5, d: 6 } }, // LCM = 12 (4*6=24)
+                    { f1: { n: 3, d: 8 }, f2: { n: 1, d: 6 } }, // LCM = 24 (8*6=48)
+                    { f1: { n: 2, d: 9 }, f2: { n: 5, d: 6 } }, // LCM = 18 (9*6=54)
+                    { f1: { n: 3, d: 10 }, f2: { n: 2, d: 15 } }, // LCM = 30 (10*15=150)
+                    { f1: { n: 7, d: 12 }, f2: { n: 3, d: 8 } }, // LCM = 24 (12*8=96)
+                    { f1: { n: 1, d: 6 }, f2: { n: 4, d: 9 } }, // LCM = 18 (6*9=54)
+
+                    // 3. 分母互為倍數關係的情況
+                    { f1: { n: 1, d: 4 }, f2: { n: 3, d: 8 } }, // LCM = 8 (8是4的倍數)
+                    { f1: { n: 1, d: 3 }, f2: { n: 2, d: 6 } }, // LCM = 6 (6是3的倍數)
+                    { f1: { n: 3, d: 5 }, f2: { n: 7, d: 10 } }, // LCM = 10 (10是5的倍數)
+                    { f1: { n: 5, d: 12 }, f2: { n: 1, d: 4 } }, // LCM = 12 (12是4的倍數)
+                    { f1: { n: 2, d: 3 }, f2: { n: 4, d: 9 } }  // LCM = 9 (9是3的倍數)
                 ];
 
                 const selected = pairs[this.randomInt(0, pairs.length - 1)];
@@ -1367,8 +1382,18 @@
                 if (changeStem) {
                     mathData = MathGenerator.generateCommonDenominator();
                     currentBaseFraction = mathData;
-                    level3Stage = 1;
-                    level3ConvertedGroup = 0;
+                    
+                    // 檢查分母是否互有倍數關係 (即最小公倍數等於其中一個分母)
+                    if (mathData.lcm === mathData.f1.d) {
+                        level3Stage = 2; // 跳過第一階段，直接進入第二階段
+                        level3ConvertedGroup = 1; // f1 本身的分母就是 LCM，已經是通分狀態
+                    } else if (mathData.lcm === mathData.f2.d) {
+                        level3Stage = 2; // 跳過第一階段，直接進入第二階段
+                        level3ConvertedGroup = 2; // f2 本身的分母就是 LCM，已經是通分狀態
+                    } else {
+                        level3Stage = 1;
+                        level3ConvertedGroup = 0;
+                    }
                 } else {
                     // 保持同題幹，就算 changeStem=false 也不變更 mathData
                     mathData = currentBaseFraction;
