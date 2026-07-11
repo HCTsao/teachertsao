@@ -382,62 +382,65 @@
             }
         }
 
-        function triggerFlyAnimation(startIdx, endIdx) {
+        function triggerFlyAnimation(startIdx, endIdx, srcRects) {
             const isExact = state.mode === 'exact';
             const isIncl = isExact ? state.activeTab.startsWith('incl') : state.activeTab === 'inclusion';
             const itemEmoji = isExact ? (isIncl ? '🍰' : '🍪') : (isIncl ? '🍓' : '🎈');
 
             for (let i = startIdx; i < endIdx; i++) {
-                const srcEl = document.getElementById('item-stable-' + i);
+                // 平分模式下一個一個飛（每隔 150ms 飛一個），分裝模式下也逐一飛出，看起來更有序
+                const delay = (i - startIdx) * 150;
+
+                const srcRect = srcRects[i];
                 let targetPlateId = '';
                 if (isIncl) {
-                    // 對於分裝，目標是當前新增的那一盤（其索引為 state.step - 1，因為 step 已經增加）
                     targetPlateId = 'plate-body-' + (state.step - 1);
                 } else {
-                    // 對於平分，目標是與除數取餘數對應的盤子
                     targetPlateId = 'plate-body-' + (i % state.divisor);
                 }
-                const dstEl = document.getElementById(targetPlateId);
+                
+                const currentIdx = i;
+                setTimeout(() => {
+                    const dstEl = document.getElementById(targetPlateId);
+                    if (srcRect && dstEl) {
+                        const dstRect = dstEl.getBoundingClientRect();
 
-                if (srcEl && dstEl) {
-                    const srcRect = srcEl.getBoundingClientRect();
-                    const dstRect = dstEl.getBoundingClientRect();
+                        const flyer = document.createElement('div');
+                        flyer.innerText = itemEmoji;
+                        flyer.className = 'animate-zoom-in';
+                        flyer.style.position = 'fixed';
+                        flyer.style.left = `${srcRect.left}px`;
+                        flyer.style.top = `${srcRect.top}px`;
+                        flyer.style.width = `${srcRect.width}px`;
+                        flyer.style.height = `${srcRect.height}px`;
+                        flyer.style.fontSize = '22px'; // 直接使用與盤子大小相近的尺寸，避免中途強烈縮放
+                        flyer.style.display = 'flex';
+                        flyer.style.alignItems = 'center';
+                        flyer.style.justifyContent = 'center';
+                        flyer.style.zIndex = '9999';
+                        flyer.style.transition = 'all 0.6s cubic-bezier(0.25, 1, 0.5, 1)';
+                        document.body.appendChild(flyer);
 
-                    const flyer = document.createElement('div');
-                    flyer.innerText = itemEmoji;
-                    flyer.className = 'animate-zoom-in';
-                    flyer.style.position = 'fixed';
-                    flyer.style.left = `${srcRect.left}px`;
-                    flyer.style.top = `${srcRect.top}px`;
-                    flyer.style.width = `${srcRect.width}px`;
-                    flyer.style.height = `${srcRect.height}px`;
-                    flyer.style.fontSize = '32px';
-                    flyer.style.display = 'flex';
-                    flyer.style.alignItems = 'center';
-                    flyer.style.justifyContent = 'center';
-                    flyer.style.zIndex = '9999';
-                    flyer.style.transition = 'all 0.6s cubic-bezier(0.25, 1, 0.5, 1)';
-                    document.body.appendChild(flyer);
-
-                    // 強制重繪並開始動畫
-                    requestAnimationFrame(() => {
+                        // 強制重繪並啟動動畫
                         requestAnimationFrame(() => {
-                            flyer.style.left = `${dstRect.left + dstRect.width / 2 - srcRect.width / 2}px`;
-                            flyer.style.top = `${dstRect.top + dstRect.height / 2 - srcRect.height / 2}px`;
-                            flyer.style.transform = 'scale(0.5)';
-                            flyer.style.opacity = '0.7';
+                            requestAnimationFrame(() => {
+                                // 飛到目標盤子的中心點
+                                flyer.style.left = `${dstRect.left + dstRect.width / 2 - srcRect.width / 2}px`;
+                                flyer.style.top = `${dstRect.top + dstRect.height / 2 - srcRect.height / 2}px`;
+                                flyer.style.opacity = '0.9';
+                            });
                         });
-                    });
 
-                    const currentIdx = i;
-                    setTimeout(() => {
-                        flyer.remove();
+                        setTimeout(() => {
+                            flyer.remove();
+                            flyingItems.delete(currentIdx);
+                            render();
+                        }, 600);
+                    } else {
                         flyingItems.delete(currentIdx);
                         render();
-                    }, 600);
-                } else {
-                    flyingItems.delete(i);
-                }
+                    }
+                }, delay);
             }
         }
 
@@ -447,13 +450,23 @@
                 if (state.step < maxStep) {
                     const movingStart = state.step * state.divisor;
                     const movingEnd = (state.step + 1) * state.divisor;
+                    
+                    // 在呼叫 render() 導致 scale(0) 之前，先記錄原本在格子的正確位置
+                    const srcRects = {};
+                    for (let i = movingStart; i < movingEnd; i++) {
+                        const srcEl = document.getElementById('item-stable-' + i);
+                        if (srcEl) {
+                            srcRects[i] = srcEl.getBoundingClientRect();
+                        }
+                    }
+
                     for (let i = movingStart; i < movingEnd; i++) {
                         flyingItems.add(i);
                     }
                     state.step++;
                     state.explStep = 0;
                     render();
-                    triggerFlyAnimation(movingStart, movingEnd);
+                    triggerFlyAnimation(movingStart, movingEnd, srcRects);
                 }
             } else {
                 const quotient = Math.floor(state.total / state.divisor);
@@ -461,6 +474,16 @@
                     if (state.step < quotient) {
                         const movingStart = state.step * state.divisor;
                         const movingEnd = (state.step + 1) * state.divisor;
+                        
+                        // 在呼叫 render() 導致 scale(0) 之前，先記錄原本在格子的正確位置
+                        const srcRects = {};
+                        for (let i = movingStart; i < movingEnd; i++) {
+                            const srcEl = document.getElementById('item-stable-' + i);
+                            if (srcEl) {
+                                srcRects[i] = srcEl.getBoundingClientRect();
+                            }
+                        }
+
                         for (let i = movingStart; i < movingEnd; i++) {
                             flyingItems.add(i);
                         }
@@ -469,7 +492,7 @@
                             state.phase = 'multi';
                         }
                         render();
-                        triggerFlyAnimation(movingStart, movingEnd);
+                        triggerFlyAnimation(movingStart, movingEnd, srcRects);
                     }
                 } else if (state.phase === 'multi') {
                     state.phase = 'minus';
@@ -661,7 +684,13 @@
 
             // 6. 下一步動作按鈕狀態
             const mainActionBtn = document.getElementById('main-action-btn');
-            if (isExact) {
+            const isFlying = flyingItems.size > 0;
+
+            if (isFlying) {
+                mainActionBtn.disabled = true;
+                mainActionBtn.className = "flex-1 py-4 rounded-xl font-bold text-xl shadow-md bg-slate-300 text-white cursor-wait";
+                mainActionBtn.innerText = "分配中...";
+            } else if (isExact) {
                 mainActionBtn.disabled = finished;
                 mainActionBtn.className = finished 
                     ? "flex-1 py-4 rounded-xl font-bold text-xl shadow-md bg-slate-300 text-white cursor-not-allowed" 
