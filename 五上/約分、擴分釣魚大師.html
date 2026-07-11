@@ -21,8 +21,16 @@
             font-family: 'Outfit', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
             background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
             color: #f8fafc;
-            overflow-x: hidden;
+            overflow: hidden;
             user-select: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 10px;
+            box-sizing: border-box;
         }
 
         .glass-panel {
@@ -276,11 +284,22 @@
             <div class="space-y-6 text-sm text-slate-300 leading-relaxed">
                 <div>
                     <h4 class="font-bold text-sky-300 text-base mb-2"><i class="fa-solid fa-gamepad mr-1"></i> 操作方式</h4>
-                    <ul class="list-disc pl-5 space-y-1.5">
-                        <li><b>移動小船：</b>在畫面上左右滑動滑鼠，或使用鍵盤的 <kbd class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-xs border border-slate-700">←</kbd> 與 <kbd class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-xs border border-slate-700">→</kbd> 鍵移動。</li>
-                        <li><b>放出魚鉤：</b>點擊畫面上任意位置，或按鍵盤的 <kbd class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-xs border border-slate-700">↓</kbd> 鍵 / <kbd class="px-4 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-xs border border-slate-700">Space</kbd> 鍵投下魚鉤。</li>
-                        <li><b>回收機制：</b>當魚鉤碰到魚隻、游到最底部、或碰到鯊魚時會自動往上收。</li>
-                    </ul>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                        <div class="p-3 bg-slate-900/50 border border-slate-800 rounded-xl">
+                            <span class="font-bold text-sky-400 text-xs block mb-1">💻 電腦操作：</span>
+                            <ul class="list-disc pl-4 space-y-1 text-xs">
+                                <li>左右移動滑鼠，或按鍵盤 <b>[←] [→]</b> 移動小船。</li>
+                                <li>點擊滑鼠左鍵，或按鍵盤 <b>[↓] / [Space]</b> 投下魚鉤。</li>
+                            </ul>
+                        </div>
+                        <div class="p-3 bg-slate-900/50 border border-slate-800 rounded-xl">
+                            <span class="font-bold text-sky-400 text-xs block mb-1">📱 手機/平板操作：</span>
+                            <ul class="list-disc pl-4 space-y-1 text-xs">
+                                <li>手指在螢幕上<b>左右滑動（按住不放）</b>，即可控制小船對齊。</li>
+                                <li><b>放開手指（離開螢幕）</b>，即可發射魚鉤向下垂釣！</li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
 
                 <div>
@@ -782,6 +801,25 @@
         }
 
         initBestScores();
+
+        // 根據是否為觸控裝置，動態更新底部提示字
+        const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        if (isTouch) {
+            const hintDiv = document.getElementById('control-hint');
+            if (hintDiv) {
+                hintDiv.innerHTML = `
+                    <span class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-arrows-left-right text-sky-400"></i>
+                        手指左右滑動移動漁船
+                    </span>
+                    <span class="text-slate-600">|</span>
+                    <span class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-arrow-down text-sky-400"></i>
+                        放開手指發射魚鉤
+                    </span>
+                `;
+            }
+        }
 
         // 監聽音量拉桿以即時調整音量
         if (volumeSlider) {
@@ -1606,6 +1644,20 @@
             e.preventDefault(); // 阻止頁面滾動
         }, { passive: false });
 
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 0) {
+                handleInputMove(e.touches[0].clientX);
+            }
+            e.preventDefault();
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            if (gameState === STATE_PLAYING && rulesModal.classList.contains('hidden')) {
+                triggerHookDrop();
+            }
+            e.preventDefault();
+        }, { passive: false });
+
         window.addEventListener('click', (e) => {
             // 只有點擊在 canvas 區域內才觸發放鉤，避開 UI 按鈕與選單點擊
             if (e.target === canvas) {
@@ -1614,13 +1666,6 @@
                 }
             }
         });
-
-        canvas.addEventListener('touchstart', (e) => {
-            if (gameState === STATE_PLAYING) {
-                triggerHookDrop();
-            }
-            e.preventDefault();
-        }, { passive: false });
 
         // 鍵盤控制支援
         const keys = {};
