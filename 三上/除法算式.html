@@ -258,7 +258,8 @@
             divisor: 3,
             showSettings: false,
             itemsInitialized: false,
-            phase: 'moving' 
+            phase: 'moving',
+            itemMappings: {} // 儲存每個物品 index 對應的盤子與格位 { plate: p, slot: j }
         };
 
         let flyingItems = new Set();
@@ -271,6 +272,25 @@
                 11:'十一', 12:'十二', 13:'十三', 14:'十四', 15:'十五', 16:'十六', 17:'十七', 18:'十八', 19:'十九', 20:'二十'
             };
             return dict[num] || num;
+        }
+
+        // 初始化預設的對應關係（在開始新模式或切換頁籤時重設）
+        function initializeMappings() {
+            state.itemMappings = {};
+            const isExact = state.mode === 'exact';
+            const isIncl = isExact ? state.activeTab.startsWith('incl') : state.activeTab === 'inclusion';
+            
+            for (let idx = 0; idx < state.total; idx++) {
+                let p = 0, j = 0;
+                if (isIncl) {
+                    p = Math.floor(idx / state.divisor);
+                    j = idx % state.divisor;
+                } else {
+                    p = idx % state.divisor;
+                    j = Math.floor(idx / state.divisor);
+                }
+                state.itemMappings[idx] = { plate: p, slot: j };
+            }
         }
 
         // --- 模式切換與設定 ---
@@ -293,6 +313,7 @@
                 state.explStep = 0;
                 state.phase = 'moving';
             }
+            initializeMappings();
             document.getElementById('exact-history-list').innerHTML = '';
             render();
         }
@@ -300,6 +321,7 @@
         function goBackToMenu() {
             state.mode = 'menu';
             flyingItems.clear();
+            state.itemMappings = {};
             render();
         }
 
@@ -324,6 +346,7 @@
                 state.total = tab === 'inclusion' ? 13 : 9;
                 state.divisor = tab === 'inclusion' ? 3 : 2;
             }
+            initializeMappings();
             render();
         }
 
@@ -344,6 +367,7 @@
                     state.step = 0;
                     state.explStep = 0;
                     state.itemsInitialized = false;
+                    initializeMappings();
                     document.getElementById('exact-history-list').innerHTML = '';
                     render();
                 }
@@ -372,6 +396,7 @@
                 state.step = 0;
                 state.explStep = 0;
                 state.itemsInitialized = false;
+                initializeMappings();
                 document.getElementById('exact-history-list').innerHTML = '';
                 render();
             } else {
@@ -382,26 +407,28 @@
             }
         }
 
-        function triggerFlyAnimation(startIdx, endIdx, srcRects) {
+        function triggerFlyAnimation(startIdx, endIdx, srcRects, movingItemsList) {
             const isExact = state.mode === 'exact';
             const isIncl = isExact ? state.activeTab.startsWith('incl') : state.activeTab === 'inclusion';
             const itemEmoji = isExact ? (isIncl ? '🍰' : '🍪') : (isIncl ? '🍓' : '🎈');
 
-            for (let i = startIdx; i < endIdx; i++) {
-                // 平分模式下一個一個飛（每隔 150ms 飛一個），分裝模式下也逐一飛出，看起來更有序
-                const delay = (i - startIdx) * 150;
+            for (let k = 0; k < movingItemsList.length; k++) {
+                const idx = movingItemsList[k].index;
+                const srcRect = srcRects[idx];
+                const delay = k * 150; // 由左至右依序起飛
 
-                const srcRect = srcRects[i];
-                let targetPlateId = '';
-                if (isIncl) {
-                    targetPlateId = 'plate-body-' + (state.step - 1);
-                } else {
-                    targetPlateId = 'plate-body-' + (i % state.divisor);
+                const mapping = state.itemMappings[idx];
+                if (!mapping) {
+                    flyingItems.delete(idx);
+                    continue;
                 }
-                
-                const currentIdx = i;
+                const targetPlateIdx = mapping.plate;
+                const targetSlotIdx = mapping.slot;
+
                 setTimeout(() => {
-                    const dstEl = document.getElementById(targetPlateId);
+                    const plateGrid = document.getElementById(`plate-grid-${targetPlateIdx}`);
+                    const dstEl = plateGrid ? plateGrid.children[targetSlotIdx] : null;
+
                     if (srcRect && dstEl) {
                         const dstRect = dstEl.getBoundingClientRect();
 
@@ -424,20 +451,21 @@
                         // 強制重繪並啟動動畫
                         requestAnimationFrame(() => {
                             requestAnimationFrame(() => {
-                                // 飛到目標盤子的中心點
+                                // 飛到目標盤子內該格位的中心點
                                 flyer.style.left = `${dstRect.left + dstRect.width / 2 - srcRect.width / 2}px`;
                                 flyer.style.top = `${dstRect.top + dstRect.height / 2 - srcRect.height / 2}px`;
                                 flyer.style.opacity = '0.9';
                             });
                         });
 
+                        const currentIdx = idx;
                         setTimeout(() => {
                             flyer.remove();
                             flyingItems.delete(currentIdx);
                             render();
                         }, 600);
                     } else {
-                        flyingItems.delete(currentIdx);
+                        flyingItems.delete(idx);
                         render();
                     }
                 }, delay);
@@ -451,12 +479,35 @@
                     const movingStart = state.step * state.divisor;
                     const movingEnd = (state.step + 1) * state.divisor;
                     
-                    // 在呼叫 render() 導致 scale(0) 之前，先記錄原本在格子的正確位置
+                    // 在呼叫 render() 導致 scale(0) 之前，先記錄原本在格子的正確位置與順序
                     const srcRects = {};
+                    const movingItemsList = [];
                     for (let i = movingStart; i < movingEnd; i++) {
                         const srcEl = document.getElementById('item-stable-' + i);
                         if (srcEl) {
-                            srcRects[i] = srcEl.getBoundingClientRect();
+                            const rect = srcEl.getBoundingClientRect();
+                            srcRects[i] = rect;
+                            movingItemsList.push({ index: i, rect: rect });
+                        } else {
+                            movingItemsList.push({ index: i, rect: null });
+                        }
+                    }
+
+                    // 依據物理 X 座標由左到右重新排序
+                    movingItemsList.sort((a, b) => {
+                        const leftA = a.rect ? a.rect.left : 0;
+                        const leftB = b.rect ? b.rect.left : 0;
+                        return leftA - leftB;
+                    });
+
+                    // 更新此輪分配物品的 mappings 對應關係，使其與物理位置一致（左邊飛左邊，右邊飛右邊）
+                    const isIncl = state.activeTab.startsWith('incl');
+                    for (let k = 0; k < movingItemsList.length; k++) {
+                        const idx = movingItemsList[k].index;
+                        if (isIncl) {
+                            state.itemMappings[idx] = { plate: state.step, slot: k };
+                        } else {
+                            state.itemMappings[idx] = { plate: k, slot: state.step };
                         }
                     }
 
@@ -466,7 +517,7 @@
                     state.step++;
                     state.explStep = 0;
                     render();
-                    triggerFlyAnimation(movingStart, movingEnd, srcRects);
+                    triggerFlyAnimation(movingStart, movingEnd, srcRects, movingItemsList);
                 }
             } else {
                 const quotient = Math.floor(state.total / state.divisor);
@@ -475,12 +526,35 @@
                         const movingStart = state.step * state.divisor;
                         const movingEnd = (state.step + 1) * state.divisor;
                         
-                        // 在呼叫 render() 導致 scale(0) 之前，先記錄原本在格子的正確位置
+                        // 在呼叫 render() 導致 scale(0) 之前，先記錄原本在格子的正確位置與順序
                         const srcRects = {};
+                        const movingItemsList = [];
                         for (let i = movingStart; i < movingEnd; i++) {
                             const srcEl = document.getElementById('item-stable-' + i);
                             if (srcEl) {
-                                srcRects[i] = srcEl.getBoundingClientRect();
+                                const rect = srcEl.getBoundingClientRect();
+                                srcRects[i] = rect;
+                                movingItemsList.push({ index: i, rect: rect });
+                            } else {
+                                movingItemsList.push({ index: i, rect: null });
+                            }
+                        }
+
+                        // 依據物理 X 座標由左到右重新排序
+                        movingItemsList.sort((a, b) => {
+                            const leftA = a.rect ? a.rect.left : 0;
+                            const leftB = b.rect ? b.rect.left : 0;
+                            return leftA - leftB;
+                        });
+
+                        // 更新 mappings
+                        const isIncl = state.activeTab === 'inclusion';
+                        for (let k = 0; k < movingItemsList.length; k++) {
+                            const idx = movingItemsList[k].index;
+                            if (isIncl) {
+                                state.itemMappings[idx] = { plate: state.step, slot: k };
+                            } else {
+                                state.itemMappings[idx] = { plate: k, slot: state.step };
                             }
                         }
 
@@ -492,7 +566,7 @@
                             state.phase = 'multi';
                         }
                         render();
-                        triggerFlyAnimation(movingStart, movingEnd, srcRects);
+                        triggerFlyAnimation(movingStart, movingEnd, srcRects, movingItemsList);
                     }
                 } else if (state.phase === 'multi') {
                     state.phase = 'minus';
@@ -512,6 +586,7 @@
             state.explStep = 0;
             state.showSettings = false;
             flyingItems.clear();
+            initializeMappings();
             if (state.mode === 'exact') {
                 document.getElementById('exact-history-list').innerHTML = '';
             } else {
@@ -651,34 +726,41 @@
                 const isActive = isIncl ? (i < state.step) : (state.step > 0);
                 plateBody.className = `relative w-24 h-24 rounded-full border-2 transition-all flex items-center justify-center ${isActive ? 'bg-white border-orange-400 shadow-md scale-105' : 'bg-slate-50/50 border-slate-100 opacity-20'} ${!isIncl ? 'border-blue-200' : ''}`;
 
-                let countShouldBe = 0;
-                if (isIncl) {
-                    if (i < state.step) {
-                        for (let idx = i * state.divisor; idx < (i + 1) * state.divisor; idx++) {
-                            if (!flyingItems.has(idx)) {
-                                countShouldBe++;
+                // 重建盤子格位內容，並依據 itemMappings 與 flyingItems 狀態做動態渲染
+                plateGrid.innerHTML = '';
+
+                const mappedItems = [];
+                for (let idx = 0; idx < state.total; idx++) {
+                    const mapping = state.itemMappings[idx];
+                    if (mapping && mapping.plate === i) {
+                        if (isIncl) {
+                            if (i < state.step && mapping.slot < state.divisor) {
+                                mappedItems.push({ idx: idx, slot: mapping.slot });
                             }
-                        }
-                    }
-                } else {
-                    for (let idx = i; idx < state.step * state.divisor; idx += state.divisor) {
-                        if (!flyingItems.has(idx)) {
-                            countShouldBe++;
+                        } else {
+                            if (mapping.slot < state.step) {
+                                mappedItems.push({ idx: idx, slot: mapping.slot });
+                            }
                         }
                     }
                 }
 
-                const countCurrent = plateGrid.children.length;
+                // 排序以維持固定的格子渲染順序
+                mappedItems.sort((a, b) => a.slot - b.slot);
 
-                if (countCurrent < countShouldBe) {
-                    for (let j = countCurrent; j < countShouldBe; j++) {
-                        const span = document.createElement('span');
+                // 建立格位 Spans
+                for (let m = 0; m < mappedItems.length; m++) {
+                    const idx = mappedItems[m].idx;
+                    const span = document.createElement('span');
+                    span.innerText = itemEmoji;
+                    if (flyingItems.has(idx)) {
+                        span.className = "text-xl";
+                        span.style.opacity = '0'; // 佔位但看不見，便於量測最終停留座標
+                    } else {
                         span.className = "text-xl animate-zoom-in";
-                        span.innerText = itemEmoji;
-                        plateGrid.appendChild(span);
+                        span.style.opacity = '1';
                     }
-                } else if (countCurrent > countShouldBe) {
-                    plateGrid.innerHTML = '';
+                    plateGrid.appendChild(span);
                 }
             }
 
