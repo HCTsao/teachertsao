@@ -90,11 +90,11 @@ const toolsData = [
         type: "教學"
     },
     {
-        name: "約分擴分",
+        name: "約分、擴分釣魚大師",
         category: "五上",
-        path: "五上/約分擴分.html",
-        desc: "分數等值實驗室，利用圖像化的圓形與長條切割，幫助學生直觀感受分數在等值變換時，其代表的數值大小保持不變。",
-        type: "教學"
+        path: "五上/約分、擴分釣魚大師.html",
+        desc: "《約分、擴分釣魚大師》是一款結合擴分、約分與通分概念的趣味深海釣魚遊戲。在精緻的動態海底世界中釣起正確的分數魚，挑戰成為分數大師！",
+        type: "遊戲"
     },
     {
         name: "三角形、平行四邊形、梯形的面積公式",
@@ -321,7 +321,7 @@ function getToolIcon(name, type) {
     if (name.includes("四邊形")) return "fa-solid fa-draw-polygon";
     if (name.includes("周長")) return "fa-solid fa-ruler-combined";
     if (name.includes("面積") && !name.includes("複合")) return "fa-solid fa-border-all";
-    if (name.includes("約分擴分")) return "fa-solid fa-compress-arrows-alt";
+    if (name.includes("釣魚大師")) return "fa-solid fa-fish";
     if (name.includes("面積公式")) return "fa-solid fa-shapes";
     if (name.includes("百分率")) return "fa-solid fa-right-left";
     if (name.includes("表面積")) return "fa-solid fa-cube";
