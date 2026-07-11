@@ -1268,13 +1268,13 @@
                 // 題幹再現輔助函數
                 function renderStemForStage() {
                     // 决定題幹顯示：已通分的用 tf，尚未通分的用 f
-                    const showF1 = (level3ConvertedGroup === 1) ? mathData.tf1 : mathData.f1;
-                    const showF2 = (level3ConvertedGroup === 2) ? mathData.tf2 : mathData.f2;
-                    const f1Color = (level3ConvertedGroup === 1) ? 'text-emerald-400 border-emerald-400' : 'text-white border-white';
-                    const f2Color = (level3ConvertedGroup === 2) ? 'text-emerald-400 border-emerald-400' : 'text-white border-white';
+                    const showF1 = (level3ConvertedGroup === 1 || level3ConvertedGroup === 3) ? mathData.tf1 : mathData.f1;
+                    const showF2 = (level3ConvertedGroup === 2 || level3ConvertedGroup === 3) ? mathData.tf2 : mathData.f2;
+                    const f1Color = (level3ConvertedGroup === 1 || level3ConvertedGroup === 3) ? 'text-emerald-400 border-emerald-400 font-bold' : 'text-white border-white';
+                    const f2Color = (level3ConvertedGroup === 2 || level3ConvertedGroup === 3) ? 'text-emerald-400 border-emerald-400 font-bold' : 'text-white border-white';
 
-                    if (level3Stage === 3) {
-                        questionLabel.innerHTML = `兩個分數已通分完成！請釣起數値「較大」的魚：`;
+                    if (level3ConvertedGroup === 3) {
+                        questionLabel.innerHTML = `兩個分數已通分完成！`;
                     } else {
                         questionLabel.innerHTML = `請把分數通分，釣起分母是最小公倍數的魚：`;
                     }
@@ -1322,18 +1322,6 @@
                     });
                     remainFish.forEach(f => fishes.push(f));
 
-                } else {
-                    // Stage 3: 兩個分數都通分，釣起較大者
-                    renderStemForStage();
-                    const correctVal = mathData.correctFraction.n / mathData.correctFraction.d;
-                    fishes.forEach(fish => {
-                        if (fish.fraction && typeof fish.fraction === 'object') {
-                            fish.isCorrect = (Math.abs(fish.fraction.n / fish.fraction.d - correctVal) < 0.0001);
-                        }
-                    });
-                    const yBands = [0, 1, 2].sort(() => 0.5 - Math.random());
-                    fishes.push(new Fish(mathData.correctFraction, true, spawnX, false, yBands[0]));
-                    fishes.push(new Fish(mathData.incorrectFraction, false, spawnX, false, yBands[1]));
                 }
             }
         }
@@ -1690,27 +1678,23 @@
                         addFloatingText('✓ 第一個通分! +10', fx, fy, '#10b981', 20);
                         score += 10;
                         nextQuestion(false);
-                    } else if (level3Stage === 2) {
-                        // Stage 2: 釣起另一個分數的分母=LCM 的魚 → 兩個分數全部通分
-                        level3ConvertedGroup = 3; // 3 代表兩個已全部通分
-                        level3Stage = 3;
-                        addFloatingText('✓ 兩個分數已通分! +10', fx, fy, '#10b981', 20);
-                        score += 10;
-                        nextQuestion(false);
                     } else {
-                        // Stage 3: 釣起較大的分數 → 得分，停留 5 秒後換題
-                        addFloatingText('✓ 比大小正確! +20', fx, fy, '#10b981', 20);
+                        // Stage 2: 釣起另一個分數的分母=LCM 的魚 → 兩個分數全部通分，通分完成！
+                        level3ConvertedGroup = 3; // 3 代表兩個已全部通分
+                        addFloatingText('✓ 通分完成! +20', fx, fy, '#10b981', 20);
                         score += 20;
-                        level3Stage = 1;
-                        level3ConvertedGroup = 0;
 
-                        // 進入停留5秒看題模式
+                        // 通分成功，直接停留 5 秒讓同學觀察，之後換下兩個數字
                         level3Delaying = true;
-                        fishes = []; // 清空水中魚群，防止玩家繼續釣魚
-                        questionLabel.innerHTML = `<span class="text-emerald-400 font-bold">✓ 答對了！停留 5 秒讓同學觀察，之後換題</span>`;
+                        fishes = []; // 清空魚群
+                        renderStemForStage(); // 讓題幹即時更新為兩個通分完的高亮分數
+                        questionLabel.innerHTML = `<span class="text-emerald-400 font-bold">✓ 通分完成！停留 5 秒讓同學觀察，之後換題</span>`;
+                        
                         setTimeout(() => {
+                            level3Stage = 1;
+                            level3ConvertedGroup = 0;
                             level3Delaying = false;
-                            nextQuestion(true); // 5 秒後換全新題幹
+                            nextQuestion(true); // 換全新大題幹
                         }, 5000);
                     }
                 } else {
