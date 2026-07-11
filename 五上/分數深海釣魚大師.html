@@ -78,6 +78,12 @@
     <!-- 背景音樂 -->
     <audio id="bg-music" src="分數深海釣魚大師.mp3" loop preload="auto"></audio>
 
+    <!-- 全域音量控制組 (毛玻璃樣式，對稱右上角) -->
+    <div id="volume-control-panel" style="position: fixed; top: 12px; right: 12px; z-index: 999999; background: rgba(30, 41, 59, 0.85); color: #ffffff; padding: 8px 16px; border-radius: 20px; font-family: system-ui, -apple-system, sans-serif; font-size: 14px; font-weight: bold; backdrop-filter: blur(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 10px; border: 1px solid rgba(255,255,255,0.1);">
+        <i id="volume-icon" class="fa-solid fa-volume-high text-sky-400"></i>
+        <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.5" style="width: 80px; height: 6px; border-radius: 3px; appearance: none; background: rgba(255,255,255,0.25); outline: none; cursor: pointer; accent-color: #38bdf8;" />
+    </div>
+
     <!-- 主容器 -->
     <div class="w-full max-w-[1024px] flex flex-col gap-4">
 
@@ -323,6 +329,7 @@
             constructor() {
                 this.ctx = null;
                 this.muted = false;
+                this.volume = 0.5; // 預設 50% 音量
             }
 
             init() {
@@ -745,6 +752,8 @@
 
         // 音效控制按鈕
         const btnToggleSound = document.getElementById('btn-toggle-sound');
+        const volumeSlider = document.getElementById('volume-slider');
+        const volumeIcon = document.getElementById('volume-icon');
 
         // 初始化 LocalStorage 最佳紀錄
         function initBestScores() {
@@ -758,6 +767,36 @@
         }
 
         initBestScores();
+
+        // 監聽音量拉桿以即時調整音量
+        if (volumeSlider) {
+            // 初始化背景音樂與音效管理器的預設音量
+            const initVolume = parseFloat(volumeSlider.value);
+            soundManager.volume = initVolume;
+            const bgMusic = document.getElementById('bg-music');
+            if (bgMusic) bgMusic.volume = initVolume;
+
+            volumeSlider.addEventListener('input', (e) => {
+                const vol = parseFloat(e.target.value);
+                soundManager.volume = vol;
+                
+                const bgMusic = document.getElementById('bg-music');
+                if (bgMusic) {
+                    bgMusic.volume = vol;
+                    bgMusic.muted = (vol === 0);
+                }
+                
+                if (volumeIcon) {
+                    if (vol === 0) {
+                        volumeIcon.className = "fa-solid fa-volume-xmark text-slate-500";
+                    } else if (vol < 0.5) {
+                        volumeIcon.className = "fa-solid fa-volume-low text-sky-400";
+                    } else {
+                        volumeIcon.className = "fa-solid fa-volume-high text-sky-400";
+                    }
+                }
+            });
+        }
 
         // ==========================================
         // 4. 實體建構子與生成器
