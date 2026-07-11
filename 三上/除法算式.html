@@ -718,8 +718,14 @@
                         else if (state.explStep === 3) explText.innerText = isIncl ? `「${quotient}」代表最後裝成了 ${quotient} 盤` : `「${quotient}」代表一個小朋友分到 ${quotient} 片`;
                     }
 
+                    const readText = `${toChineseNum(state.total)}除以${toChineseNum(state.divisor)}等於${toChineseNum(quotient)}`;
                     const readAloud = document.getElementById('read-aloud');
-                    readAloud.innerHTML = `讀作：<span class="text-yellow-300">${toChineseNum(state.total)}</span> 除以 <span class="text-yellow-300">${toChineseNum(state.divisor)}</span> 等於 <span class="text-yellow-300">${toChineseNum(quotient)}</span>`;
+                    readAloud.innerHTML = `
+                        <div class="flex items-center justify-center gap-2">
+                            <span>讀作：<span class="text-yellow-300">${toChineseNum(state.total)}</span> 除以 <span class="text-yellow-300">${toChineseNum(state.divisor)}</span> 等於 <span class="text-yellow-300">${toChineseNum(quotient)}</span></span>
+                            <button onclick="speakFormula('${readText}')" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 active:scale-90 flex items-center justify-center transition-all cursor-pointer" title="播放語音">🔊</button>
+                        </div>
+                    `;
                 } else {
                     exactFormula.classList.add('hidden');
                     remainderFormula.classList.remove('hidden');
@@ -754,8 +760,14 @@
                     else if (state.explStep === 3) explText.innerText = isIncl ? `「${quotient}」代表最後裝成了 ${quotient} 盤` : `「${quotient}」代表每個人拿到 ${quotient} 顆`;
                     else if (state.explStep === 4) explText.innerText = `「${remainder}」代表還剩下 ${remainder} 顆`;
 
+                    const readText = `${toChineseNum(state.total)}除以${toChineseNum(state.divisor)}等於${toChineseNum(quotient)}餘${toChineseNum(remainder)}`;
                     const readAloud = document.getElementById('read-aloud');
-                    readAloud.innerHTML = `讀作：<span class="text-yellow-300">${toChineseNum(state.total)}</span> 除以 <span class="text-yellow-300">${toChineseNum(state.divisor)}</span> 等於 <span class="text-yellow-300">${toChineseNum(quotient)}</span> 餘 <span class="text-yellow-300">${toChineseNum(remainder)}</span>`;
+                    readAloud.innerHTML = `
+                        <div class="flex items-center justify-center gap-2">
+                            <span>讀作：<span class="text-yellow-300">${toChineseNum(state.total)}</span> 除以 <span class="text-yellow-300">${toChineseNum(state.divisor)}</span> 等於 <span class="text-yellow-300">${toChineseNum(quotient)}</span> 餘 <span class="text-yellow-300">${toChineseNum(remainder)}</span></span>
+                            <button onclick="speakFormula('${readText}')" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 active:scale-90 flex items-center justify-center transition-all cursor-pointer" title="播放語音">🔊</button>
+                        </div>
+                    `;
                 }
 
                 document.querySelectorAll('.expl-btn').forEach((b, i) => {
@@ -765,6 +777,23 @@
                 });
             } else {
                 summaryPanel.classList.add('hidden');
+            }
+        }
+
+        function speakFormula(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'zh-TW';
+                utterance.rate = 0.8;
+                
+                const voices = window.speechSynthesis.getVoices();
+                const twVoice = voices.find(voice => voice.lang.includes('ZH-TW') || voice.lang.includes('zh-TW'));
+                if (twVoice) utterance.voice = twVoice;
+                
+                window.speechSynthesis.speak(utterance);
+            } else {
+                alert('您的瀏覽器不支援語音合成功能！');
             }
         }
 
