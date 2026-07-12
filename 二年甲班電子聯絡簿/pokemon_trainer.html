@@ -789,7 +789,8 @@
     function syncMovesAndCheckPending(studentId) {
       const student = students[studentId];
       if (!student || !student.pokemons || student.pokemons.length === 0) return;
-      const poke = student.pokemons[student.pokemons.length - 1];
+      const activeIndex = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < student.pokemons.length) ? student.activePokemonIndex : (student.pokemons.length - 1);
+      const poke = student.pokemons[activeIndex];
       if (poke.points >= 200) return;
 
       const level = Math.floor(poke.points / 10);
@@ -879,8 +880,11 @@
       const content = document.getElementById('main-content');
       const pokes = student.pokemons;
       
-      const activePoke = pokes.length > 0 ? pokes[pokes.length - 1] : null;
-      const needsNewSelection = !activePoke || activePoke.points >= 200;
+      const activeIndex = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < pokes.length) ? student.activePokemonIndex : (pokes.length - 1);
+      const activePoke = pokes.length > 0 ? pokes[activeIndex] : null;
+
+      const latestPoke = pokes.length > 0 ? pokes[pokes.length - 1] : null;
+      const needsNewSelection = !latestPoke || latestPoke.points >= 200;
 
       if (needsNewSelection) {
         // Show Selection Screen
@@ -1013,33 +1017,51 @@
     // Helper to render already earned pokemon collection
     function renderCollectionHTML(student) {
       const pokes = student.pokemons;
-      const collectionPokes = pokes.filter((p, index) => {
-        return index < pokes.length - 1 || p.points >= 200;
-      });
-
-      if (collectionPokes.length === 0) return '';
+      if (pokes.length === 0) return '';
+      
+      const activeIndex = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < pokes.length) ? student.activePokemonIndex : (pokes.length - 1);
 
       let gridItems = '';
-      collectionPokes.forEach(p => {
+      pokes.forEach((p, index) => {
         const currentPoke = getCurrentPokemon(p);
         const level = Math.floor(p.points / 10);
+        const isActive = index === activeIndex;
+        
+        const activeBadge = isActive 
+          ? `<div style="background: #22c55e; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: bold; margin-top: 5px;">出戰中</div>`
+          : `<button onclick="setActivePokemon(${index})" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; padding: 4px 10px; border-radius: 10px; font-size: 0.7rem; font-weight: bold; cursor: pointer; margin-top: 5px; font-family: inherit;">出戰</button>`;
+          
+        const itemStyle = isActive
+          ? `border: 2px solid #22c55e; background: rgba(34, 197, 94, 0.1);`
+          : `border: 1px solid rgba(0,0,0,0.1);`;
+
         gridItems += `
-          <div class="collection-item">
-            <img src="${currentPoke.url}" class="collection-img" alt="${currentPoke.name}" />
-            <div class="collection-name">${currentPoke.name}</div>
+          <div class="collection-item" style="${itemStyle} display: flex; flex-direction: column; align-items: center; padding: 10px; border-radius: 12px; transition: transform 0.2s;">
+            <img src="${currentPoke.url}" class="collection-img" alt="${currentPoke.name}" style="width: 50px; height: 50px; object-fit: contain;" />
+            <div class="collection-name" style="font-weight: 700; margin-top: 5px; font-size: 0.85rem; color: #1e293b;">${currentPoke.name}</div>
             <div style="font-size:0.75rem; color: #64748b; font-weight:700;">Lv.${level}</div>
+            ${activeBadge}
           </div>
         `;
       });
 
       return `
-        <div class="collection-section">
-          <div class="collection-title"><i class="fa-solid fa-box-archive"></i> 我的寶可夢倉庫</div>
-          <div class="collection-grid">
+        <div class="collection-section" style="margin-top: 25px; width: 100%; border-top: 1px dashed rgba(0,0,0,0.15); padding-top: 20px;">
+          <div class="collection-title" style="font-weight: 800; color: #334155; margin-bottom: 15px; text-align: center;"><i class="fa-solid fa-box-archive"></i> 我的寶可夢倉庫 (${pokes.length} 隻)</div>
+          <div class="collection-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px;">
             ${gridItems}
           </div>
         </div>
       `;
+    }
+
+    function setActivePokemon(index) {
+      const student = students[currentStudentId];
+      if (student && index >= 0 && index < student.pokemons.length) {
+        student.activePokemonIndex = index;
+        saveData();
+        renderContent();
+      }
     }
 
     // Select Starter
@@ -1206,7 +1228,8 @@
         callback();
         return;
       }
-      const poke = student.pokemons[student.pokemons.length - 1];
+      const activeIndex = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < student.pokemons.length) ? student.activePokemonIndex : (student.pokemons.length - 1);
+      const poke = student.pokemons[activeIndex];
       if (poke.points >= 200) {
         callback();
         return;
@@ -1454,8 +1477,10 @@
       const p2Id = document.getElementById('battle-p2-select').value;
       const s1 = students[p1Id];
       const s2 = students[p2Id];
-      const active1 = s1.pokemons.length > 0 ? s1.pokemons[s1.pokemons.length - 1] : null;
-      const active2 = s2.pokemons.length > 0 ? s2.pokemons[s2.pokemons.length - 1] : null;
+      const idx1 = (s1.activePokemonIndex !== undefined && s1.activePokemonIndex >= 0 && s1.activePokemonIndex < s1.pokemons.length) ? s1.activePokemonIndex : (s1.pokemons.length - 1);
+      const idx2 = (s2.activePokemonIndex !== undefined && s2.activePokemonIndex >= 0 && s2.activePokemonIndex < s2.pokemons.length) ? s2.activePokemonIndex : (s2.pokemons.length - 1);
+      const active1 = s1.pokemons.length > 0 ? s1.pokemons[idx1] : null;
+      const active2 = s2.pokemons.length > 0 ? s2.pokemons[idx2] : null;
       const lobbyPokeP1 = document.getElementById('lobby-poke-p1');
       const lobbyPokeP2 = document.getElementById('lobby-poke-p2');
       
@@ -1503,8 +1528,10 @@
       const p2Id = document.getElementById('battle-p2-select').value;
       const s1 = students[p1Id];
       const s2 = students[p2Id];
-      const active1 = s1.pokemons[s1.pokemons.length - 1];
-      const active2 = s2.pokemons[s2.pokemons.length - 1];
+      const idx1 = (s1.activePokemonIndex !== undefined && s1.activePokemonIndex >= 0 && s1.activePokemonIndex < s1.pokemons.length) ? s1.activePokemonIndex : (s1.pokemons.length - 1);
+      const idx2 = (s2.activePokemonIndex !== undefined && s2.activePokemonIndex >= 0 && s2.activePokemonIndex < s2.pokemons.length) ? s2.activePokemonIndex : (s2.pokemons.length - 1);
+      const active1 = s1.pokemons[idx1];
+      const active2 = s2.pokemons[idx2];
       const lv1 = Math.floor(active1.points / 10);
       const lv2 = Math.floor(active2.points / 10);
 
@@ -2378,8 +2405,10 @@
         const newStudent = students[currentStudentId];
         
         if (oldStudent && newStudent && oldStudent.pokemons.length > 0 && newStudent.pokemons.length > 0) {
-          const oldActive = oldStudent.pokemons[oldStudent.pokemons.length - 1];
-          const newActive = newStudent.pokemons[newStudent.pokemons.length - 1];
+          const oldActiveIdx = (oldStudent.activePokemonIndex !== undefined && oldStudent.activePokemonIndex >= 0 && oldStudent.activePokemonIndex < oldStudent.pokemons.length) ? oldStudent.activePokemonIndex : (oldStudent.pokemons.length - 1);
+          const newActiveIdx = (newStudent.activePokemonIndex !== undefined && newStudent.activePokemonIndex >= 0 && newStudent.activePokemonIndex < newStudent.pokemons.length) ? newStudent.activePokemonIndex : (newStudent.pokemons.length - 1);
+          const oldActive = oldStudent.pokemons[oldActiveIdx];
+          const newActive = newStudent.pokemons[newActiveIdx];
           
           if (oldActive.family === newActive.family) {
             const oldLevel = Math.floor(oldActive.points / 10);
