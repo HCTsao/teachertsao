@@ -1584,6 +1584,7 @@
         speed: Math.floor(p1Details.speed * scale1),
         atkMod: 1,
         defMod: 1,
+        poisoned: false,
         moves: p1Moves
       };
       
@@ -1603,6 +1604,7 @@
         speed: Math.floor(p2Details.speed * scale2),
         atkMod: 1,
         defMod: 1,
+        poisoned: false,
         moves: p2Moves
       };
 
@@ -1784,6 +1786,13 @@
               if (isCrit) damage = Math.floor(damage * 1.5);
 
               defender.hp = Math.max(0, defender.hp - damage);
+              
+              let poisonedThisTurn = false;
+              if (move.type === 'poison' && !defender.poisoned && defender.hp > 0 && Math.random() < 0.35) {
+                defender.poisoned = true;
+                poisonedThisTurn = true;
+              }
+
               updateBattleUI();
 
               const nextStep = () => {
@@ -1802,6 +1811,10 @@
               if (isCrit) {
                 resultText = `擊中要害！造成了 ${damage} 點傷害！`;
               }
+              if (poisonedThisTurn) {
+                resultText += ` ${defender.name}的${defender.pokeDetails.name}中毒了！☠️`;
+              }
+
               if (eff.text) {
                 queueLog(`${eff.text} ${resultText}`, nextStep);
               } else {
@@ -1957,7 +1970,7 @@
           osc.start(now);
           osc.stop(now + 0.45);
         }
-        else if (move.name === '藤鞭' || move.name === '葉片快刀') {
+        else if (move.name === '藤鞭' || move.name === '飛葉快刀') {
           // Vine Whip / Razor Leaf: quick sharp swish and slash
           const osc = ctx.createOscillator();
           const gainNode = ctx.createGain();
@@ -2392,7 +2405,7 @@
           }, i * 200);
         }
         setTimeout(callback, 600);
-      } else if (move.name === '葉片快刀') {
+      } else if (move.name === '飛葉快刀') {
         // Razor Leaf particles
         let delay = 0;
         for (let i = 0; i < 8; i++) {
@@ -2573,6 +2586,31 @@
     }
 
     function endTurn() {
+      // Check if current active pokemon is poisoned at the end of their turn
+      const activeFighter = battleState[battleState.currentTurn];
+      if (activeFighter.poisoned && activeFighter.hp > 0) {
+        const poisonDmg = Math.max(4, Math.floor(activeFighter.maxHp * 0.08));
+        activeFighter.hp = Math.max(0, activeFighter.hp - poisonDmg);
+        updateBattleUI();
+        
+        queueLog(`☠️ ${activeFighter.name}的${activeFighter.pokeDetails.name} 受到 ${poisonDmg} 點中毒傷害！`, () => {
+          if (activeFighter.hp <= 0) {
+            animateFaint(battleState.currentTurn, () => {
+              queueLog(`${activeFighter.name}的${activeFighter.pokeDetails.name} 倒下了！`, () => {
+                const winner = battleState.currentTurn === 'p1' ? battleState.p2.name : battleState.p1.name;
+                endBattle(winner);
+              });
+            });
+          } else {
+            proceedTurnTransition();
+          }
+        });
+      } else {
+        proceedTurnTransition();
+      }
+    }
+
+    function proceedTurnTransition() {
       battleState.currentTurn = battleState.currentTurn === 'p1' ? 'p2' : 'p1';
       startTurn();
     }
@@ -2593,6 +2631,10 @@
 
       document.getElementById('battle-hp-text-p1').textContent = `${battleState.p1.hp} / ${battleState.p1.maxHp}`;
       document.getElementById('battle-hp-text-p2').textContent = `${battleState.p2.hp} / ${battleState.p2.maxHp}`;
+
+      // Show poison status badge next to name
+      document.getElementById('battle-name-p1').innerHTML = `${battleState.p1.name}的${battleState.p1.pokeDetails.name}${battleState.p1.poisoned ? ' <span style="background: #a855f7; color: white; font-size: 0.75rem; padding: 1px 4px; border-radius: 3px; font-weight: bold; margin-left: 5px;">☠️ 中毒</span>' : ''}`;
+      document.getElementById('battle-name-p2').innerHTML = `${battleState.p2.name}的${battleState.p2.pokeDetails.name}${battleState.p2.poisoned ? ' <span style="background: #a855f7; color: white; font-size: 0.75rem; padding: 1px 4px; border-radius: 3px; font-weight: bold; margin-left: 5px;">☠️ 中毒</span>' : ''}`;
     }
 
     function endBattle(winnerName) {
