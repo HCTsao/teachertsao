@@ -834,7 +834,13 @@
 
     // Shared Sync Handler
     function handleDataSync(newData) {
-      if (!newData || typeof newData !== 'object' || Array.isArray(newData) || !newData["1"]) return;
+      // Firebase sometimes returns arrays for numeric keys - convert back to object
+      if (Array.isArray(newData)) {
+        const obj = {};
+        newData.forEach((v, i) => { if (v !== null && i > 0) obj[String(i)] = v; });
+        newData = obj;
+      }
+      if (!newData || typeof newData !== 'object' || !newData["1"]) return;
       
       // Perform structural upgrades if needed
       for(let id in defaultStudents) {
@@ -913,9 +919,18 @@
       try {
         const rawData = localStorage.getItem('pokemon_trainer_data');
         if (rawData) {
-          students = JSON.parse(rawData);
+          let parsed = JSON.parse(rawData);
+          // Convert array back to object if needed
+          if (Array.isArray(parsed)) {
+            const obj = {};
+            parsed.forEach((v, i) => { if (v !== null && i > 0) obj[String(i)] = v; });
+            parsed = obj;
+          }
+          if (parsed && typeof parsed === 'object' && parsed["1"]) {
+            students = parsed;
+          }
         }
-        if (!students || typeof students !== 'object' || Array.isArray(students) || !students["1"]) {
+        if (!students || typeof students !== 'object' || !students["1"]) {
           students = JSON.parse(JSON.stringify(defaultStudents));
         }
       } catch (e) {
@@ -925,11 +940,18 @@
 
       // 2. Connect live real-time Firebase listener
       if (database) {
-        database.ref('students').on('value', (snapshot) => {
+        // Use 'studentData' node with explicit string keys to avoid Firebase array coercion
+        database.ref('studentData').on('value', (snapshot) => {
           const val = snapshot.val();
-          if (val) {
+          if (val && typeof val === 'object' && val["1"]) {
             localStorage.setItem('pokemon_trainer_data', JSON.stringify(val));
+            students = val;
             handleDataSync(val);
+          } else if (!val) {
+            // Firebase is empty — push local data up to seed the database
+            database.ref('studentData').set(students).catch(err => {
+              console.error("Firebase 初始化寫入失敗：", err);
+            });
           }
         });
       }
@@ -945,12 +967,14 @@
       return chosen;
     }
 
-    // Save Data
+    // Save Data — writes to both localStorage and Firebase 'studentData' node
     function saveData() {
       try {
         localStorage.setItem('pokemon_trainer_data', JSON.stringify(students));
         if (database) {
-          database.ref('students').set(students).catch(err => {
+          // Use explicit string-keyed object to prevent Firebase array coercion
+          const payload = Object.assign({}, students);
+          database.ref('studentData').set(payload).catch(err => {
             console.error("Firebase 寫入失敗：", err);
           });
         }

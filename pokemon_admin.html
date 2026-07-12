@@ -331,11 +331,11 @@
         students = JSON.parse(JSON.stringify(defaultStudents));
       }
 
-      // 2. Connect live real-time Firebase listener
+      // 2. Connect live real-time Firebase listener on 'studentData' node
       if (database) {
-        database.ref('students').on('value', (snapshot) => {
+        database.ref('studentData').on('value', (snapshot) => {
           const val = snapshot.val();
-          if (val) {
+          if (val && typeof val === 'object' && val["1"]) {
             students = val;
             localStorage.setItem('pokemon_trainer_data', JSON.stringify(val));
             renderOverview();
@@ -349,7 +349,9 @@
     function saveData() {
       localStorage.setItem('pokemon_trainer_data', JSON.stringify(students));
       if (database) {
-        database.ref('students').set(students).catch(err => {
+        // Use Object.assign to ensure plain object (not array) is stored
+        const payload = Object.assign({}, students);
+        database.ref('studentData').set(payload).catch(err => {
           console.error("Firebase 寫入失敗：", err);
         });
       }
