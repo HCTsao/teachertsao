@@ -114,6 +114,8 @@ function initDOMElements() {
     DOM.btnPassTurn = document.getElementById('btn-pass-turn');
     DOM.btnUseSkill = document.getElementById('btn-use-skill');
     DOM.btnStartGame = document.getElementById('btn-start-game');
+    DOM.btnShowSkill = document.getElementById('btn-show-skill');
+    DOM.btnShowSkillMobile = document.getElementById('btn-show-skill-mobile');
     
     DOM.modalMainMenu = document.getElementById('modal-main-menu');
     DOM.btnMainStart = document.getElementById('btn-main-start');
@@ -311,6 +313,33 @@ function setupEvents() {
     document.getElementById('btn-replay').addEventListener('click', () => {
         location.reload();
     });
+
+    const showSkillModal = () => {
+        const player = gameState.players[0];
+        if (!player || !player.role) return;
+        
+        document.getElementById('view-skill-role-img').src = player.role.img;
+        document.getElementById('view-skill-role-name').textContent = player.role.name;
+        
+        const cardDescKey = Object.keys(CARD_DESC).find(k => CARD_DESC[k].name === player.role.name && CARD_DESC[k].type === "role");
+        const descHTML = cardDescKey ? CARD_DESC[cardDescKey].desc : player.role.desc;
+        document.getElementById('view-skill-role-desc').innerHTML = descHTML;
+        
+        document.getElementById('modal-view-skill').classList.remove('hidden');
+    };
+
+    if (DOM.btnShowSkill) {
+        DOM.btnShowSkill.addEventListener('click', showSkillModal);
+    }
+    if (DOM.btnShowSkillMobile) {
+        DOM.btnShowSkillMobile.addEventListener('click', showSkillModal);
+    }
+    const btnCloseSkill = document.getElementById('btn-view-skill-confirm');
+    if (btnCloseSkill) {
+        btnCloseSkill.addEventListener('click', () => {
+            document.getElementById('modal-view-skill').classList.add('hidden');
+        });
+    }
 }
 
 function showMainMenu() {
@@ -804,19 +833,27 @@ function updateRolePanel() {
 
     const emoji = player.role ? getRoleEmoji(player.role.name) : "👤";
     const roleName = player.role ? player.role.name : "未知";
-    const roleDesc = player.role ? player.role.desc : "";
 
     const setHTML = (el) => {
         if (!el) return;
         if (player.skillUsed) {
             el.innerHTML = `${emoji} <span class="role-name-bold">【${roleName}】</span> <span class="role-skill-used">(技能已使用)</span>`;
         } else {
-            el.innerHTML = `${emoji} <span class="role-name-bold">【${roleName}】</span> <span class="role-skill-desc">${roleDesc}</span>`;
+            el.innerHTML = `${emoji} <span class="role-name-bold">【${roleName}】</span>`;
         }
     };
 
     setHTML(displayEl);
     setHTML(displayElMobile);
+
+    // 控制「查看技能」按鈕顯示
+    if (player.role) {
+        if (DOM.btnShowSkill) DOM.btnShowSkill.style.display = 'inline-block';
+        if (DOM.btnShowSkillMobile) DOM.btnShowSkillMobile.style.display = 'inline-block';
+    } else {
+        if (DOM.btnShowSkill) DOM.btnShowSkill.style.display = 'none';
+        if (DOM.btnShowSkillMobile) DOM.btnShowSkillMobile.style.display = 'none';
+    }
 
     if (player.skillUsed) {
         DOM.btnUseSkill.textContent = "技能已使用";
@@ -858,6 +895,7 @@ function updateRolePanel() {
             DOM.btnUseSkill.classList.add('btn-disabled');
             DOM.btnUseSkill.disabled = true;
             DOM.btnUseSkill.style.animation = 'none';
+        }
         DOM.btnUseSkill.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> 發動技能`;
     }
 
