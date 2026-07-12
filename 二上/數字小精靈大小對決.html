@@ -276,6 +276,7 @@
             const touchStartRef = useRef(null);
             const rewardIntervalRef = useRef(null);
             const gameTickRef       = useRef(null);
+            const lastQuestionRef   = useRef({ left: 0, right: 0 });
 
 
             // ─── Canvas game loop ──────────────────────────────────────────
@@ -526,7 +527,6 @@
                         ctx.closePath();
                         ctx.fill();
                         ctx.shadowBlur = 0;
-                    } else {
                         const mAngle = p.mouth * Math.PI;
                         ctx.fillStyle = '#facc15';
                         ctx.shadowColor = '#facc15';
@@ -537,13 +537,25 @@
                         ctx.closePath();
                         ctx.fill();
                         ctx.shadowBlur = 0;
-                        // Eye (always upper-right before rotation)
-                        ctx.fillStyle = '#111827';
-                        ctx.beginPath();
-                        ctx.arc(2, -(TILE / 2 - 5), 1.8, 0, Math.PI * 2);
-                        ctx.fill();
                     }
                     ctx.restore();
+
+                    // Draw Pac-Man Eye (outside the rotation group, calculated per direction to stay near top)
+                    if (p.alive) {
+                        let eyeOffset = { dx: 6, dy: -10 }; // facing right (default)
+                        if (p.dir.dx === -1) {
+                            eyeOffset = { dx: -6, dy: -10 }; // facing left
+                        } else if (p.dir.dy === -1) {
+                            eyeOffset = { dx: 7, dy: -4 };  // facing up
+                        } else if (p.dir.dy === 1) {
+                            eyeOffset = { dx: -7, dy: 4 };   // facing down
+                        }
+                        
+                        ctx.fillStyle = '#111827';
+                        ctx.beginPath();
+                        ctx.arc(p.x + eyeOffset.dx, p.y + eyeOffset.dy, 1.8, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
                 };
 
                 // ── update ───────────────────────────────────────────────────
@@ -865,9 +877,15 @@
                 const index = attemptIndex !== undefined ? attemptIndex : totalAttempts;
                 const targetOp = (activeSeq && activeSeq[index]) ? activeSeq[index] : (Math.random() > 0.5 ? '>' : '<');
 
-                const { left, right } = generateNumbers(targetOp);
-                setLeftValue(left);
-                setRightValue(right);
+                let res = generateNumbers(targetOp);
+                // Prevent identical consecutive questions
+                while (res.left === lastQuestionRef.current.left && res.right === lastQuestionRef.current.right) {
+                    res = generateNumbers(targetOp);
+                }
+                lastQuestionRef.current = { left: res.left, right: res.right };
+
+                setLeftValue(res.left);
+                setRightValue(res.right);
                 setCorrectChoice(targetOp);
             };
 
@@ -977,6 +995,9 @@
                 setTotalAttempts(0);
                 setSlotResults([null, null, null, null, null]);
                 setPacmanFacing('right');
+                
+                // Clear duplicate check ref
+                lastQuestionRef.current = { left: 0, right: 0 };
                 
                 // Pre-generate a list containing exactly at least two '>' and two '<' symbols
                 const seq = ['>', '>', '<', '<', Math.random() > 0.5 ? '>' : '<'];
