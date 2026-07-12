@@ -366,7 +366,7 @@
     <!-- 開始畫面 -->
     <div id="start-screen" class="screen-overlay">
         <h1 class="game-title">森林運動會：時間障礙賽</h1>
-        <div class="rule-box">
+        <div class="rule-box" id="rule-box-content">
             路上有跨欄障礙物，可以按空白鍵跳過去，或換跑道躲開，撞到會扣一條命！遇到時間門的時候，要看時鐘選出正確的時間喔！
         </div>
 
@@ -706,10 +706,12 @@ const Game = {
     nextQuestionTime: 0,
     obstacles: [],
 
-    // 跳躍物理
+    // 跳躍與特殊動作物理
     playerJumpY: 0,
     playerJumpVel: 0,
     isJumping: false,
+    isActionActive: false,
+    actionTimer: 0,
 
     // 答題回饋
     floatingTexts: [],
@@ -748,6 +750,18 @@ const Game = {
 
     getLaneX(i) { return this.roadX + i * this.laneWidth + this.laneWidth / 2; },
 
+    updateRuleBox() {
+        const ruleBox = document.getElementById('rule-box-content');
+        if (!ruleBox) return;
+        if (this.selectedChar === 'rabbit') {
+            ruleBox.innerHTML = '路上有跨欄障礙物，可以按空白鍵<b>跳過去</b>，或換跑道躲開！遇到時間門的時候，要看時鐘選出正確的時間喔！';
+        } else if (this.selectedChar === 'turtle') {
+            ruleBox.innerHTML = '路上有跨欄障礙物，可以按空白鍵<b>縮入殼中</b>把障礙物撞開，或換跑道躲開！遇到時間門的時候，要看時鐘選出正確的時間喔！';
+        } else if (this.selectedChar === 'cheetah') {
+            ruleBox.innerHTML = '路上有跨欄障礙物，可以按空白鍵<b>使出撞擊</b>把障礙物撞開，或換跑道躲開！遇到時間門的時候，要看時鐘選出正確的時間喔！';
+        }
+    },
+
     selectedChar: 'rabbit',
 
     bindUI() {
@@ -756,6 +770,7 @@ const Game = {
                 document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
                 card.classList.add('selected');
                 this.selectedChar = card.dataset.char;
+                this.updateRuleBox();
             });
         });
 
@@ -802,9 +817,23 @@ const Game = {
     },
 
     jump() {
-        if (this.isJumping || this.stunnedTimer > 0) return;
-        this.isJumping = true;
-        this.playerJumpVel = 14; // 初速度（向上）
+        if (this.stunnedTimer > 0) return;
+        if (this.selectedChar === 'rabbit') {
+            if (this.isJumping) return;
+            this.isJumping = true;
+            this.playerJumpVel = 14; // 初速度（向上）
+            playSound('jump');
+        } else if (this.selectedChar === 'turtle') {
+            if (this.isActionActive) return;
+            this.isActionActive = true;
+            this.actionTimer = 800; // 縮殼持續時間 (毫秒)
+            playSound('jump');
+        } else if (this.selectedChar === 'cheetah') {
+            if (this.isActionActive) return;
+            this.isActionActive = true;
+            this.actionTimer = 600; // 撞擊衝刺持續時間 (毫秒)
+            playSound('jump');
+        }
     },
 
     showScreen(id) {
@@ -830,6 +859,8 @@ const Game = {
         this.playerJumpY = 0;
         this.playerJumpVel = 0;
         this.isJumping = false;
+        this.isActionActive = false;
+        this.actionTimer = 0;
         this.floatingTexts = [];
         this.flashAlpha = 0;
         this.finishLineY = null;   // 終點線 Y 座標
@@ -839,6 +870,17 @@ const Game = {
         document.getElementById('hint-overlay').style.display = 'none';
         document.getElementById('correct-card').className = '';
         document.getElementById('clock-overlay').style.display = 'none';
+        
+        // 根據選中的動物更新操作按鈕文字
+        const actionBtn = document.getElementById('jump-btn');
+        if (this.selectedChar === 'rabbit') {
+            actionBtn.textContent = '跳！';
+        } else if (this.selectedChar === 'turtle') {
+            actionBtn.textContent = '縮殼！';
+        } else if (this.selectedChar === 'cheetah') {
+            actionBtn.textContent = '撞擊！';
+        }
+
         this.updateHearts();
         this.updateTimerHUD();     // 更新 HUD 計時顯示
         this.showScreen(null);
@@ -994,6 +1036,15 @@ const Game = {
                 this.questionCount++;
                 // 下一題在本題答完後的5秒才會出現（由 scheduleNextQuestion 更新）
                 this.nextQuestionTime = Infinity; // 先凍結，等答完再設
+            }
+
+            // 特殊技能/動作計時更新
+            if (this.isActionActive) {
+                this.actionTimer -= dt;
+                if (this.actionTimer <= 0) {
+                    this.isActionActive = false;
+                    this.actionTimer = 0;
+                }
             }
 
             // 生出障礙物（田徑跨欄）
@@ -1164,10 +1215,41 @@ const Game = {
             const o = this.obstacles[i];
             o.y += speed;
 
-            // 碰撞檢測（跳起時可無視跨欄，撞到僅會減速，不扣血）
-            if (o.lane === this.lane && !this.isJumping) {
+            // 碰撞檢測
+            if (o.lane === this.lane) {
                 const dist = Math.abs(o.y - py);
                 if (dist < 28 && this.stunnedTimer <= 0) {
+                    if (this.selectedChar === 'rabbit') {
+                        if (this.isJumping) continue; // 兔子跳起時避開
+                    } else if (this.selectedChar === 'turtle') {
+                        if (this.isActionActive) {
+                            // 烏龜縮入殼中：撞飛障礙物
+                            this.createParticles(this.playerX, py, '#52b788');
+                            this.floatingTexts.push({
+                                x: this.playerX, y: py - 40,
+                                text: '撞飛！💥', color: '#52b788', strokeColor: '#fff',
+                                size: 24, life: 1000, alpha: 1
+                            });
+                            this.obstacles.splice(i, 1);
+                            playSound('correct');
+                            continue;
+                        }
+                    } else if (this.selectedChar === 'cheetah') {
+                        if (this.isActionActive) {
+                            // 獵豹撞擊：撞碎障礙物
+                            this.createParticles(this.playerX, py, '#ffb703');
+                            this.floatingTexts.push({
+                                x: this.playerX, y: py - 40,
+                                text: '撞碎！💥', color: '#ffb703', strokeColor: '#fff',
+                                size: 24, life: 1000, alpha: 1
+                            });
+                            this.obstacles.splice(i, 1);
+                            playSound('correct');
+                            continue;
+                        }
+                    }
+
+                    // 未閃避/未發動技能，撞到會減速
                     this.stunnedTimer = 1200;
                     this.createParticles(this.playerX, py, '#e76f51');
                     this.obstacles.splice(i, 1);
@@ -1433,7 +1515,7 @@ showChoice(barrier) {
     },
 
     // --- 動物角色繪製（向量圖）---
-    drawCharacter(x, y, charType, isStunned, isJumping) {
+    drawCharacter(x, y, charType, isStunned, isJumping, isActionActive) {
         const ctx = this.ctx;
         const groundY = this.canvas.height * 0.78; // 地面基準高度
 
@@ -1458,8 +1540,8 @@ showChoice(barrier) {
         const cycle = (this.timeElapsed * 0.002 * runSpeed);
 
         if (charType === 'rabbit') this.drawRabbit(ctx, cycle, isStunned, isJumping);
-        else if (charType === 'turtle') this.drawTurtle(ctx, cycle, isStunned, isJumping);
-        else if (charType === 'cheetah') this.drawCheetah(ctx, cycle, isStunned, isJumping);
+        else if (charType === 'turtle') this.drawTurtle(ctx, cycle, isStunned, isActionActive);
+        else if (charType === 'cheetah') this.drawCheetah(ctx, cycle, isStunned, isActionActive);
 
         if (isStunned) {
             ctx.font = '16px Arial';
@@ -1516,15 +1598,27 @@ showChoice(barrier) {
         ctx.restore();
     },
 
-    drawTurtle(ctx, cycle, isStunned, isJumping) {
-        let bob = isJumping ? 0 : Math.sin(cycle * 1.5) * 1.5;
+    drawTurtle(ctx, cycle, isStunned, isActionActive) {
+        if (isActionActive) {
+            // 縮殼狀態：只畫殼，並旋轉
+            ctx.save();
+            ctx.rotate(cycle * 6);
+            ctx.fillStyle = '#38b000';
+            ctx.beginPath(); ctx.ellipse(0, -9, 15, 17, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#007200'; ctx.lineWidth = 2.0;
+            ctx.beginPath(); ctx.ellipse(0, -9, 10, 11, 0, 0, Math.PI * 2); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(0, 2);
+            ctx.moveTo(-10, -9); ctx.lineTo(10, -9); ctx.stroke();
+            ctx.restore();
+            return;
+        }
+
+        let bob = Math.sin(cycle * 1.5) * 1.5;
         ctx.translate(0, bob);
         if (!isStunned) ctx.rotate(0.02 * Math.sin(cycle));
 
-        if (!isJumping) {
-            ctx.fillStyle = 'rgba(0,0,0,0.15)';
-            ctx.beginPath(); ctx.ellipse(0, 0, 18, 5, 0, 0, Math.PI * 2); ctx.fill();
-        }
+        ctx.fillStyle = 'rgba(0,0,0,0.15)';
+        ctx.beginPath(); ctx.ellipse(0, 0, 18, 5, 0, 0, Math.PI * 2); ctx.fill();
 
         ctx.fillStyle = '#70e000';
         ctx.save(); ctx.translate(-13, -16 - Math.sin(cycle) * 3);
@@ -1552,15 +1646,18 @@ showChoice(barrier) {
         ctx.beginPath(); ctx.ellipse(0, -28, 5, 7, 0, 0, Math.PI * 2); ctx.fill();
     },
 
-    drawCheetah(ctx, cycle, isStunned, isJumping) {
-        let bob = isJumping ? 0 : Math.sin(cycle * 2.5) * 2;
+    drawCheetah(ctx, cycle, isStunned, isActionActive) {
+        if (isActionActive) {
+            ctx.scale(1.35, 0.72);
+            ctx.translate(3, 4);
+        }
+
+        let bob = Math.sin(cycle * 2.5) * 2;
         ctx.translate(0, bob);
         if (!isStunned) ctx.rotate(0.04 * Math.sin(cycle));
 
-        if (!isJumping) {
-            ctx.fillStyle = 'rgba(0,0,0,0.15)';
-            ctx.beginPath(); ctx.ellipse(0, 0, 15, 4, 0, 0, Math.PI * 2); ctx.fill();
-        }
+        ctx.fillStyle = 'rgba(0,0,0,0.15)';
+        ctx.beginPath(); ctx.ellipse(0, 0, 15, 4, 0, 0, Math.PI * 2); ctx.fill();
 
         ctx.fillStyle = '#ffb703';
         ctx.save(); ctx.translate(-7, -18 - Math.sin(cycle) * 5);
@@ -1616,7 +1713,7 @@ showChoice(barrier) {
         // 跳躍時角色上移
         const groundY = this.canvas.height * 0.78;
         const py = groundY - this.playerJumpY;
-        this.drawCharacter(this.playerX, py, this.selectedChar, this.stunnedTimer > 0, this.isJumping);
+        this.drawCharacter(this.playerX, py, this.selectedChar, this.stunnedTimer > 0, this.isJumping, this.isActionActive);
 
         // 跳躍中風劫粒子
         if (this.isJumping) {
@@ -1626,6 +1723,23 @@ showChoice(barrier) {
             ctx.textAlign = 'center';
             ctx.fillText('· · ·', this.playerX, groundY);
             ctx.globalAlpha = 1;
+            ctx.restore();
+        }
+
+        // 獵豹衝撞風阻特效
+        if (this.selectedChar === 'cheetah' && this.isActionActive) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 209, 102, 0.65)';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            for (let i = 0; i < 3; i++) {
+                const xOff = -30 - Math.random() * 20;
+                const yOff = groundY - 10 - i * 12;
+                ctx.beginPath();
+                ctx.moveTo(this.playerX + xOff, yOff);
+                ctx.lineTo(this.playerX + xOff - 15, yOff);
+                ctx.stroke();
+            }
             ctx.restore();
         }
 
