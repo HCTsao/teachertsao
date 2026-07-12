@@ -1112,21 +1112,17 @@
       const activeIndex = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < pokes.length) ? student.activePokemonIndex : (pokes.length - 1);
       const activePoke = pokes.length > 0 ? pokes[activeIndex] : null;
 
-      // Check for first-time evolution animation trigger
+      // Check for first-time evolution animation trigger based on level 10 or 20 (points exactly 100 or 200)
       if (activePoke) {
-        const level = Math.floor(activePoke.points / 10);
-        const currentStage = getStage(level);
-        
-        if (activePoke.lastSeenStage === undefined) {
-          activePoke.lastSeenStage = currentStage;
-          saveData();
-        } else if (currentStage > activePoke.lastSeenStage) {
-          const oldStage = activePoke.lastSeenStage;
-          activePoke.lastSeenStage = currentStage;
-          saveData();
-          
-          triggerEvolutionAnimation(activePoke, oldStage, currentStage);
-          return;
+        if (activePoke.points === 100 || activePoke.points === 200) {
+          const sessionKey = `has_seen_evolution_${activePoke.family}_${activePoke.points}`;
+          if (!sessionStorage.getItem(sessionKey)) {
+            sessionStorage.setItem(sessionKey, 'true');
+            const oldStage = activePoke.points === 100 ? 0 : 1;
+            const newStage = activePoke.points === 100 ? 1 : 2;
+            triggerEvolutionAnimation(activePoke, oldStage, newStage);
+            return;
+          }
         }
       }
 
