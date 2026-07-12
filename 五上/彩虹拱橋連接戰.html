@@ -1,0 +1,1946 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>鵲橋相會：配對法找因數</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+  <style>
+    /* --- CSS Variables & Design Tokens --- */
+    :root {
+      --font-display: 'Outfit', 'Noto Sans TC', sans-serif;
+      --font-body: 'Noto Sans TC', sans-serif;
+      
+      --color-sky-top: #0a1128;
+      --color-sky-bottom: #1c2541;
+      --color-river-top: #3a0ca3;
+      --color-river-bottom: #7209b7;
+      --color-grass: #1b4d3e;
+      --color-grass-shadow: #113028;
+      --color-text-dark: #2d3748;
+      --color-text-light: #ffffff;
+      
+      --shadow-bubble: inset -4px -4px 12px rgba(0, 0, 0, 0.15),
+                      inset 4px 4px 12px rgba(255, 255, 255, 0.8),
+                      0 8px 16px rgba(0, 0, 0, 0.1);
+      --shadow-bubble-selected: 0 0 0 4px #fff, 0 0 20px #ecc94b, 0 10px 25px rgba(236, 201, 75, 0.5);
+    }
+
+    /* --- Reset & Base Styles --- */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background: #020813;
+      color: var(--color-text-dark);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* --- Main Container (16:9 Aspect Ratio Lock) --- */
+    .game-container {
+      width: 100%;
+      max-width: 1024px;
+      height: 100%;
+      max-height: 700px;
+      aspect-ratio: 1024 / 700;
+      position: relative;
+      background: linear-gradient(to bottom, var(--color-sky-top), var(--color-sky-bottom));
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      border-radius: 20px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    @media (max-aspect-ratio: 1024/700) {
+      .game-container {
+        width: 100vw;
+        height: auto;
+        border-radius: 0;
+      }
+    }
+
+    /* --- Floating Background Clouds & Stars --- */
+    .clouds-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 200px;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .cloud {
+      position: absolute;
+      fill: rgba(255, 255, 255, 0.1);
+      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2));
+    }
+
+    .cloud-1 {
+      width: 150px;
+      top: 30px;
+      animation: floatCloud 30s linear infinite;
+    }
+
+    .cloud-2 {
+      width: 200px;
+      top: 80px;
+      animation: floatCloud 45s linear infinite reverse;
+    }
+
+    @keyframes floatCloud {
+      0% { transform: translateX(-220px); }
+      100% { transform: translateX(1100px); }
+    }
+
+    /* --- Header (UI Bar) --- */
+    header {
+      height: 60px;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+      position: relative;
+    }
+
+    .hud-left, .hud-right {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .hud-panel {
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(10px);
+      padding: 6px 16px;
+      border-radius: 30px;
+      font-weight: 800;
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #fff;
+    }
+
+    .hud-panel span {
+      color: #38bdf8;
+    }
+
+    .btn-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 1.2rem;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      transition: all 0.2s ease;
+      color: #fff;
+    }
+
+    .btn-icon:hover {
+      transform: translateY(-2px) scale(1.05);
+      background: rgba(30, 41, 59, 0.8);
+      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-icon:active {
+      transform: translateY(0) scale(0.95);
+    }
+
+    /* --- Scene View --- */
+    .scene-view {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    /* Target Plaque */
+    .target-plaque {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(8px);
+      padding: 12px 30px;
+      border-radius: 20px;
+      border: 3px solid #6366f1;
+      box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);
+      text-align: center;
+      z-index: 5;
+      animation: pulsePlaque 2s infinite ease-in-out;
+    }
+
+    .target-plaque h2 {
+      font-size: 0.9rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .target-plaque .target-num {
+      font-size: 2.8rem;
+      font-weight: 900;
+      color: #818cf8;
+      font-family: var(--font-display);
+      line-height: 1;
+      margin-top: 4px;
+      text-shadow: 0 0 10px rgba(129, 140, 248, 0.5);
+    }
+
+    @keyframes pulsePlaque {
+      0%, 100% { transform: translate(-50%, 0) scale(1); }
+      50% { transform: translate(-50%, -4px) scale(1.02); }
+    }
+
+    @keyframes pulseScale {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    /* Milky Way Background SVG */
+    .river-svg {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 180px;
+      z-index: 2;
+    }
+
+    .river-wave {
+      animation: waveFlow 10s linear infinite;
+    }
+
+    .river-wave-2 {
+      animation: waveFlow 15s linear infinite reverse;
+      opacity: 0.5;
+    }
+
+    @keyframes waveFlow {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-400px); }
+    }
+
+    /* Landbanks */
+    .land-bank {
+      position: absolute;
+      bottom: 0;
+      height: 30%;
+      width: 220px;
+      background: linear-gradient(to bottom, var(--color-grass), var(--color-grass-shadow));
+      z-index: 3;
+      box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.4);
+    }
+
+    .land-bank.left {
+      left: 0;
+      border-top-right-radius: 40px;
+      border-right: 8px solid #0f766e;
+    }
+
+    .land-bank.right {
+      right: 0;
+      border-top-left-radius: 40px;
+      border-left: 8px solid #0f766e;
+    }
+
+    /* Bridge Slots & Paths SVG */
+    .bridge-svg-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 4;
+      pointer-events: none;
+    }
+
+    .bridge-arc {
+      fill: none;
+      stroke-width: 8px;
+      stroke-linecap: round;
+      opacity: 0.15;
+      transition: all 0.5s ease;
+    }
+
+    .bridge-arc.completed {
+      opacity: 0.85;
+      stroke-width: 14px;
+      filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.6));
+    }
+
+    /* Slots on the Bank */
+    .slot {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 3px dashed rgba(255, 255, 255, 0.4);
+      background: rgba(0, 0, 0, 0.4);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #fff;
+      font-weight: 800;
+      font-size: 1.1rem;
+      font-family: var(--font-display);
+      transform: translate(-50%, -50%);
+      z-index: 5;
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .slot.filled {
+      border: 3px solid #ffffff;
+      background: #6366f1;
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.8), inset 0 0 10px rgba(255,255,255,0.4);
+    }
+
+    #hell-matched-row .slot {
+      position: relative;
+      transform: none;
+    }
+
+    /* Floating cloud stone for square roots */
+    .floating-stone {
+      position: absolute;
+      bottom: 25px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90px;
+      height: 45px;
+      background: radial-gradient(ellipse at center, rgba(255,255,255,0.9) 0%, rgba(200,220,255,0.7) 70%, rgba(100,150,255,0.4) 100%);
+      border-radius: 50%;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4), 0 0 15px rgba(255,255,255,0.6);
+      z-index: 3;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      animation: stoneBob 4s ease-in-out infinite;
+    }
+
+    @keyframes stoneBob {
+      0%, 100% { transform: translate(-50%, 0); }
+      50% { transform: translate(-50%, -6px); }
+    }
+
+    .center-slot {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 3px dashed rgba(255, 255, 255, 0.6);
+      background: rgba(0, 0, 0, 0.2);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #fff;
+      font-weight: 800;
+      font-size: 1.1rem;
+      font-family: var(--font-display);
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+      transition: all 0.4s ease;
+    }
+
+    .center-slot.filled {
+      border: 3px solid #fff;
+      background: #ec4899;
+      box-shadow: 0 0 15px rgba(236, 72, 153, 0.8);
+    }
+
+    /* --- Characters (Cowherd & Weaver Girl) --- */
+    .character-container {
+      position: absolute;
+      width: 70px;
+      height: 70px;
+      z-index: 15;
+      transform-origin: bottom center;
+      transform: translateX(-50%);
+      bottom: 30%;
+    }
+
+    /* Anim Classes */
+    .breath-animation {
+      animation: breath 2.5s ease-in-out infinite;
+      transform-origin: bottom center;
+    }
+
+    .walk-animation {
+      animation: walk 0.5s linear infinite;
+      transform-origin: bottom center;
+    }
+
+    @keyframes breath {
+      0%, 100% { transform: scaleY(1); }
+      50% { transform: scaleY(1.06) scaleX(0.96); }
+    }
+
+    @keyframes walk {
+      0% { transform: translateY(0) rotate(0); }
+      25% { transform: translateY(-6px) rotate(-6deg); }
+      50% { transform: translateY(0) rotate(0); }
+      75% { transform: translateY(-6px) rotate(6deg); }
+      100% { transform: translateY(0) rotate(0); }
+    }
+
+    /* --- Lower Panel: Bubble Pool / Input Panel --- */
+    .pool-panel {
+      height: 180px;
+      background: linear-gradient(to bottom, #1e293b, #0f172a);
+      border-top: 6px solid #334155;
+      box-shadow: inset 0 8px 16px rgba(0, 0, 0, 0.5);
+      position: relative;
+      padding: 15px 30px;
+      z-index: 6;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .pool-title {
+      font-size: 0.95rem;
+      color: #94a3b8;
+      font-weight: 700;
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+    }
+
+    .bubbles-pool {
+      width: 100%;
+      height: 110px;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: nowrap;
+    }
+
+    /* Advanced Input Row Styling */
+    .input-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      max-width: 600px;
+    }
+
+    .input-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: transform 0.4s ease;
+    }
+
+    .input-row input {
+      width: 90px;
+      height: 52px;
+      border-radius: 12px;
+      border: 2px solid #4a5568;
+      background: #0f172a;
+      color: #fff;
+      font-size: 1.8rem;
+      font-weight: 800;
+      text-align: center;
+      font-family: var(--font-display);
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .input-row input:focus {
+      border-color: #818cf8;
+      box-shadow: 0 0 15px rgba(129, 140, 248, 0.4);
+    }
+
+    .input-row input::-webkit-outer-spin-button,
+    .input-row input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .input-row .operator {
+      color: #94a3b8;
+      font-size: 1.8rem;
+      font-weight: 800;
+    }
+
+    .input-row .target-display {
+      font-size: 2rem;
+      font-weight: 900;
+      color: #818cf8;
+      font-family: var(--font-display);
+      text-shadow: 0 0 10px rgba(129, 140, 248, 0.5);
+    }
+
+    /* Floating Bubble */
+    .bubble {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9) 0%, rgba(129, 140, 248, 0.7) 60%, rgba(79, 70, 229, 0.9) 100%);
+      box-shadow: var(--shadow-bubble);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: var(--color-text-light);
+      font-size: 1.5rem;
+      font-weight: 900;
+      font-family: var(--font-display);
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease, opacity 0.5s ease;
+      animation: bubbleFloat 4s ease-in-out infinite;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .bubble::after {
+      content: '';
+      position: absolute;
+      top: 6px;
+      left: 8px;
+      width: 10px;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.6);
+      border-radius: 50%;
+      transform: rotate(-30deg);
+    }
+
+    .bubble:hover {
+      transform: scale(1.1);
+      box-shadow: inset -4px -4px 12px rgba(0, 0, 0, 0.1),
+                  inset 4px 4px 12px rgba(255, 255, 255, 0.9),
+                  0 12px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .bubble.selected {
+      transform: scale(1.15) translateY(-5px);
+      box-shadow: var(--shadow-bubble-selected);
+      background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9) 0%, rgba(244, 63, 94, 0.7) 60%, rgba(225, 29, 72, 0.9) 100%);
+    }
+
+    .bubble.error-shake, .input-row.error-shake {
+      animation: errorShake 0.4s ease;
+    }
+    
+    .input-row.error-shake input {
+      border-color: #ef4444;
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
+    }
+
+    .bubble.fade-out {
+      transform: scale(0);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    @keyframes bubbleFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    @keyframes errorShake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+
+    /* --- Flying Animation Helper --- */
+    .flying-bubble {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9) 0%, rgba(99, 102, 241, 0.8) 60%, rgba(67, 56, 202, 1) 100%);
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: 800;
+      font-size: 1.2rem;
+      font-family: var(--font-display);
+      z-index: 9999;
+      pointer-events: none;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      transition: all 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+
+    /* --- Floating Point Indicator --- */
+    .score-indicator {
+      position: absolute;
+      color: #fbbf24;
+      font-weight: 900;
+      font-size: 1.5rem;
+      font-family: var(--font-display);
+      z-index: 1000;
+      animation: floatUpScore 1.5s forwards ease-out;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+      pointer-events: none;
+    }
+
+    @keyframes floatUpScore {
+      0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+      20% { transform: translate(-50%, -70%) scale(1.2); opacity: 1; }
+      100% { transform: translate(-50%, -150%) scale(1); opacity: 0; }
+    }
+
+    /* --- Overlays & Modals --- */
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.35);
+      z-index: 100;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      border-radius: 20px;
+    }
+
+    .overlay.active {
+      display: flex;
+    }
+
+    .modal-card {
+      background: #1e293b;
+      color: #f8fafc;
+      border-radius: 24px;
+      padding: 30px 40px;
+      width: 90%;
+      max-width: 480px;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+      text-align: center;
+      border: 4px solid #6366f1;
+    }
+
+    #menu-overlay {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+    }
+
+    .modal-card h2 {
+      font-size: 1.7rem;
+      font-weight: 900;
+      color: #818cf8;
+      margin-bottom: 12px;
+      white-space: nowrap; /* Ensure it stays in one line */
+    }
+
+    .modal-card p {
+      font-size: 1.1rem;
+      color: #cbd5e1;
+      line-height: 1.6;
+      margin-bottom: 25px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(to right, #6366f1, #4f46e5);
+      color: #fff;
+      font-size: 1.2rem;
+      font-weight: 800;
+      padding: 12px 36px;
+      border-radius: 30px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+      transition: all 0.2s ease;
+      font-family: var(--font-body);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 25px rgba(99, 102, 241, 0.6);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    /* Level Selector Grid */
+    .level-grid {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 25px;
+      flex-wrap: wrap;
+    }
+
+    .btn-level {
+      background: #0f172a;
+      border: 2px solid #334155;
+      border-radius: 16px;
+      padding: 20px 16px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s ease;
+      color: #fff;
+      flex: 1;
+      min-width: 130px;
+    }
+
+    .btn-level:hover {
+      transform: translateY(-2px);
+      border-color: #818cf8;
+      background: #1e293b;
+    }
+
+    .btn-level.selected {
+      border-color: #818cf8;
+      background: #1e293b;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-level h3 {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: #e2e8f0;
+      margin-bottom: 6px;
+    }
+
+    .btn-level p {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    #sparkle-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 99;
+    }
+  </style>
+</head>
+<body>
+  <audio id="bgm" loop src="鵲橋配對.mp3"></audio>
+  <div class="game-container">
+    <canvas id="sparkle-canvas"></canvas>
+
+    <div class="clouds-container">
+      <svg class="cloud cloud-1" viewBox="0 0 100 60"><path d="M10 40a20 20 0 0 1 37-10 15 15 0 0 1 27 5 20 20 0 0 1 6 35H10z"/></svg>
+      <svg class="cloud cloud-2" viewBox="0 0 100 60"><path d="M10 40a20 20 0 0 1 37-10 15 15 0 0 1 27 5 20 20 0 0 1 6 35H10z"/></svg>
+    </div>
+
+    <header>
+      <div class="hud-left">
+        <button class="btn-icon" id="btn-back" title="返回選關">🏠</button>
+        <div class="hud-panel level-indicator">模式: <span id="hud-level-txt">基礎挑戰</span></div>
+      </div>
+      <div class="hud-right">
+        <div class="hud-panel progress-panel">題號: <span id="hud-progress-txt">1 / 5</span></div>
+        <button class="btn-icon" id="btn-mute" title="開關聲音">🔊</button>
+      </div>
+    </header>
+
+    <div class="scene-view">
+      <div class="target-plaque">
+        <h2>目標數 Target</h2>
+        <div class="target-num" id="target-value">24</div>
+      </div>
+
+      <div class="land-bank left"></div>
+      <div class="character-container" id="cowherd-box"></div>
+
+      <div class="land-bank right"></div>
+      <div class="character-container" id="weaver-box"></div>
+
+      <div class="floating-stone" id="center-stone" style="display: none;">
+        <div class="center-slot" id="slot-center">?</div>
+      </div>
+
+      <svg class="bridge-svg-container" id="bridge-canvas" viewBox="0 0 1000 600" preserveAspectRatio="none">
+      </svg>
+      
+      <div id="slots-overlay" style="position: absolute; top:0; left:0; width:100%; height:100%; z-index: 5; pointer-events: none;">
+      </div>
+      <!-- Hell Matched Step Stones Row -->
+      <div id="hell-matched-row" style="display: none; position: absolute; top: 70%; left: 0; width: 100%; transform: translateY(-50%); justify-content: space-between; padding: 0 calc(12% + 45px); pointer-events: none; z-index: 10;">
+      <div id="hell-left-group" style="display: flex; gap: 8px;"></div>
+      <div id="hell-right-group" style="display: flex; gap: 8px; flex-direction: row-reverse;"></div>
+    </div>
+
+      <svg class="river-svg" viewBox="0 0 1000 180" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="riverGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#3a0ca3" />
+            <stop offset="50%" stop-color="#4361ee" />
+            <stop offset="100%" stop-color="#7209b7" />
+          </linearGradient>
+        </defs>
+        <path class="river-wave river-wave-2" d="M 0 50 Q 250 20 500 50 T 1000 50 L 1000 180 L 0 180 Z" fill="#3f37c9" />
+        <path class="river-wave river-wave-2" d="M -400 50 Q -150 20 100 50 T 600 50 T 1100 50 L 1100 180 L -400 180 Z" fill="#3f37c9" />
+        <path class="river-wave" d="M 0 70 Q 250 110 500 70 T 1000 70 L 1000 180 L 0 180 Z" fill="url(#riverGrad)" />
+        <path class="river-wave" d="M -400 70 Q -150 110 100 70 T 600 70 T 1100 70 L 1100 180 L -400 180 Z" fill="url(#riverGrad)" />
+      </svg>
+    </div>
+
+    <div class="pool-panel">
+      <!-- Loading message overlay for magpie bridge construction -->
+      <div id="pool-msg-overlay" style="display: none; width: 100%; height: 100%; justify-content: center; align-items: center; text-align: center; font-weight:900; font-size:1.6rem; color:#a5b4fc; text-shadow:0 0 10px rgba(165,180,252,0.5); animation: pulseScale 1.5s infinite;">🕊️ 召喚成群喜鵲！鵲橋正在搭建中... 🕊️</div>
+
+      <div class="input-panel" id="basic-input-panel">
+        <div class="pool-title" id="basic-title">🔮 請用兩兩配對的方法找出因數 🔮</div>
+        <div class="bubbles-pool" id="bubbles-container"></div>
+      </div>
+
+      <div class="input-panel" id="advanced-input-panel" style="display: none;">
+        <div class="pool-title">✍️ 請用兩兩配對的方法找出因數 ✍️</div>
+        <div class="input-row" id="adv-input-row">
+          <input type="number" id="input-factor-1" min="1" max="120">
+          <input type="number" id="input-factor-2" min="1" max="120">
+        </div>
+        <div style="display: flex; justify-content: center; gap: 15px; margin-top: 8px; width: 100%;">
+          <button class="btn-primary" id="btn-submit-pair" style="padding: 8px 24px; font-size: 1.1rem;">確認配對 ➔</button>
+          <button class="btn-primary" id="btn-finish-hell" style="display: none; padding: 8px 24px; font-size: 1.1rem; background: #dc2626; border-color: #ef4444;">我找完了 ➔</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay active" id="menu-overlay">
+      <div class="modal-card">
+        <h2>🌌 鵲橋相會：配對法找因數</h2>
+        <p>歡迎來到銀河！請使用<b>「配對法」</b>找出目標數的因數。兩兩配對成功，就能召喚喜鵲搭建鵲橋，讓牛郎與織女在銀河相聚喔！</p>
+        
+        <div class="level-grid">
+          <button class="btn-level selected" data-mode="basic">
+            <h3>基礎挑戰</h3>
+          </button>
+          <button class="btn-level" data-mode="advanced">
+            <h3>進階挑戰</h3>
+          </button>
+          <button class="btn-level" data-mode="hell">
+            <h3>地獄挑戰</h3>
+          </button>
+        </div>
+
+        <button class="btn-primary" id="btn-start-game">啟動鵲橋大冒險 🌠</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="clear-overlay">
+      <div class="modal-card">
+        <h2 id="clear-title">執子之手，與子偕老！💞</h2>
+        <p id="clear-msg">牛郎與織女終於成功在鵲橋上碰面相會了！</p>
+        <div style="font-size: 3rem; margin: 15px 0;" id="clear-badge">💖</div>
+        <button class="btn-primary" id="btn-next-level">下一關挑戰 (3s) ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ALL_TARGETS = [
+      6, 8, 10, 12, 14, 15, 18, 20, 21, 22, 24, 25, 26, 27, 28, 30, 32, 33, 34, 35, 36, 38, 39, 40, 42, 44, 45, 46, 48, 49, 50
+    ];
+
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.isMuted = false;
+      }
+      
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      }
+
+      playTone(freq, type, duration, delay = 0) {
+        if (this.isMuted) return;
+        this.init();
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+
+        setTimeout(() => {
+          try {
+            let osc = this.ctx.createOscillator();
+            let gain = this.ctx.createGain();
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+            
+            gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+
+            osc.start(this.ctx.currentTime);
+            osc.stop(this.ctx.currentTime + duration);
+          } catch(e) {
+            console.error("Audio error: ", e);
+          }
+        }, delay * 1000);
+      }
+
+      playClick() { this.playTone(600, 'sine', 0.1); }
+      playSuccess() {
+        this.playTone(523.25, 'triangle', 0.15, 0);
+        this.playTone(659.25, 'triangle', 0.15, 0.06);
+        this.playTone(783.99, 'triangle', 0.2, 0.12);
+      }
+      playError() {
+        this.playTone(180, 'sawtooth', 0.2, 0);
+        this.playTone(140, 'sawtooth', 0.2, 0.05);
+      }
+      playVictory() {
+        this.playTone(523.25, 'sine', 0.2, 0);
+        this.playTone(659.25, 'sine', 0.2, 0.1);
+        this.playTone(783.99, 'sine', 0.2, 0.2);
+        this.playTone(1046.50, 'sine', 0.4, 0.3);
+      }
+    }
+
+    const sound = new SoundEngine();
+
+    let gameMode = 'basic';
+    let currentQuestionIndex = 0;
+    let sessionTargets = [];
+    let targetNum = 24;
+    let factorPairs = [];
+    let matchedPairs = []; 
+    let selectedBubble = null;
+    let gameState = 'playing';
+    let countdownInterval = null;
+
+    const RAINBOW_COLORS = ['#ff4b5c', '#ff8f5a', '#ffd043', '#2bd47e', '#279bf6', '#635bf7', '#a75bf7'];
+
+    const menuOverlay = document.getElementById('menu-overlay');
+    const clearOverlay = document.getElementById('clear-overlay');
+    const clearTitle = document.getElementById('clear-title');
+    const clearBadge = document.getElementById('clear-badge');
+    const clearMsg = document.getElementById('clear-msg');
+    const btnStartGame = document.getElementById('btn-start-game');
+    const btnBack = document.getElementById('btn-back');
+    const btnMute = document.getElementById('btn-mute');
+    const hudLevelTxt = document.getElementById('hud-level-txt');
+    const hudProgressTxt = document.getElementById('hud-progress-txt');
+    const targetValue = document.getElementById('target-value');
+    const bubblesContainer = document.getElementById('bubbles-container');
+    const basicInputPanel = document.getElementById('basic-input-panel');
+    const advancedInputPanel = document.getElementById('advanced-input-panel');
+    const hellMatchedRow = document.getElementById('hell-matched-row');
+    const btnFinishHell = document.getElementById('btn-finish-hell');
+    let isFailMode = false;
+    const inputFactor1 = document.getElementById('input-factor-1');
+    const inputFactor2 = document.getElementById('input-factor-2');
+    const inputTargetDisplay = document.getElementById('input-target-display');
+    const btnSubmitPair = document.getElementById('btn-submit-pair');
+    const advInputRow = document.getElementById('adv-input-row');
+    const cowherdBox = document.getElementById('cowherd-box');
+    const weaverBox = document.getElementById('weaver-box');
+    const bridgeCanvas = document.getElementById('bridge-canvas');
+    const slotsOverlay = document.getElementById('slots-overlay');
+    const btnNextLevel = document.getElementById('btn-next-level');
+    const centerStone = document.getElementById('center-stone');
+    const slotCenter = document.getElementById('slot-center');
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+
+    function getCowherdSVG(state='idle') {
+      let anim = state === 'walk' ? 'walk-animation' : 'breath-animation';
+      return `
+        <svg class="${anim}" viewBox="0 0 100 100" style="width:100%; height:100%;">
+          <circle cx="50" cy="18" r="8" fill="#2d3748" />
+          <rect x="47" y="22" width="6" height="6" fill="#4299e1" />
+          <circle cx="50" cy="45" r="22" fill="#fbd38d" stroke="#2d3748" stroke-width="2.5" />
+          <path d="M 28 36 Q 50 26 72 36" fill="none" stroke="#2d3748" stroke-width="3" stroke-linecap="round" />
+          <circle cx="42" cy="44" r="2.5" fill="#2d3748" />
+          <circle cx="58" cy="44" r="2.5" fill="#2d3748" />
+          <circle cx="43" cy="42" r="0.8" fill="#fff" />
+          <circle cx="59" cy="42" r="0.8" fill="#fff" />
+          <path d="M 45 54 Q 50 58 55 54" fill="none" stroke="#e53e3e" stroke-width="2" stroke-linecap="round" />
+          <path d="M 30 67 L 70 67 L 76 100 L 24 100 Z" fill="#3182ce" stroke="#2d3748" stroke-width="2.5" />
+          <path d="M 40 67 L 50 82 L 60 67" fill="none" stroke="#fff" stroke-width="2" />
+        </svg>
+      `;
+    }
+
+    function getWeaverGirlSVG(state='idle') {
+      let anim = state === 'walk' ? 'walk-animation' : 'breath-animation';
+      return `
+        <svg class="${anim}" viewBox="0 0 100 100" style="width:100%; height:100%;">
+          <circle cx="32" cy="22" r="7" fill="#2d3748" />
+          <circle cx="68" cy="22" r="7" fill="#2d3748" />
+          <circle cx="50" cy="45" r="22" fill="#fbd38d" stroke="#2d3748" stroke-width="2.5" />
+          <path d="M 28 36 Q 50 24 72 36" fill="none" stroke="#2d3748" stroke-width="3" stroke-linecap="round" />
+          <circle cx="42" cy="44" r="2.5" fill="#2d3748" />
+          <circle cx="58" cy="44" r="2.5" fill="#2d3748" />
+          <circle cx="43" cy="42" r="0.8" fill="#fff" />
+          <circle cx="59" cy="42" r="0.8" fill="#fff" />
+          <path d="M 45 54 Q 50 59 55 54" fill="none" stroke="#e53e3e" stroke-width="2" stroke-linecap="round" />
+          <path d="M 28 67 L 72 67 L 78 100 L 22 100 Z" fill="#d63384" stroke="#2d3748" stroke-width="2.5" />
+          <path d="M 24 72 Q 50 85 76 72" fill="none" stroke="#f687b3" stroke-width="2" />
+        </svg>
+      `;
+    }
+
+    function calculateFactorPairs(num) {
+      let pairs = [];
+      for (let i = 1; i <= Math.sqrt(num); i++) {
+        if (num % i === 0) {
+          let side = num / i;
+          pairs.push({
+            f1: i,
+            f2: side,
+            isSquare: i === side,
+            id: `pair-${i}-${side}`
+          });
+        }
+      }
+      return pairs;
+    }
+
+    function startNewGame() {
+      gameState = 'playing';
+      selectedBubble = null;
+      matchedPairs = [];
+      magpies = []; // Reset magpies array
+      
+      document.getElementById('pool-msg-overlay').style.display = 'none';
+      centerStone.style.display = 'none'; // Unify center layout, hide old center stone
+
+      targetNum = sessionTargets[currentQuestionIndex];
+      targetValue.innerText = `找出 ${targetNum} 的所有因數`;
+      hudProgressTxt.innerText = `${currentQuestionIndex + 1} / 5`;
+
+      factorPairs = calculateFactorPairs(targetNum);
+      
+      // Extract and sort all factors from smallest to largest
+      sortedFactors = [];
+      factorPairs.forEach(p => {
+        sortedFactors.push(p.f1);
+        if (!p.isSquare) {
+          sortedFactors.push(p.f2);
+        }
+      });
+      sortedFactors.sort((a, b) => a - b);
+
+      cowherdBox.style.left = '12%';
+      cowherdBox.style.bottom = '30%';
+      cowherdBox.innerHTML = getCowherdSVG('idle');
+
+      weaverBox.style.left = '88%';
+      weaverBox.style.bottom = '30%';
+      weaverBox.innerHTML = getWeaverGirlSVG('idle');
+
+      buildBridgeSkeleton();
+
+      if (gameMode === 'hell') {
+        hellMatchedRow.style.display = 'flex';
+        hellMatchedRow.innerHTML = '<div id="hell-left-group" style="display: flex; gap: 8px;"></div><div id="hell-right-group" style="display: flex; gap: 8px; flex-direction: row-reverse;"></div>';
+        btnFinishHell.style.display = 'inline-block';
+        basicInputPanel.style.display = 'none';
+        advancedInputPanel.style.display = 'flex';
+        inputFactor1.value = '';
+        inputFactor2.value = '';
+        inputFactor1.focus();
+      } else {
+        hellMatchedRow.style.display = 'none';
+        btnFinishHell.style.display = 'none';
+        if (gameMode === 'basic') {
+          basicInputPanel.style.display = 'flex';
+          advancedInputPanel.style.display = 'none';
+          generateBubbles();
+        } else {
+          basicInputPanel.style.display = 'none';
+          advancedInputPanel.style.display = 'flex';
+          inputFactor1.value = '';
+          inputFactor2.value = '';
+          inputFactor1.focus();
+        }
+      }
+    }
+
+    function buildBridgeSkeleton() {
+      bridgeCanvas.innerHTML = '';
+      slotsOverlay.innerHTML = '';
+      
+      // Dynamic horizontal magpie bridge deck line (hidden initially)
+      let deck = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      deck.setAttribute("id", "magpie-bridge-deck");
+      deck.setAttribute("d", "M 220 420 L 780 420");
+      deck.setAttribute("stroke", "rgba(255, 255, 255, 0.95)");
+      deck.setAttribute("stroke-width", "12");
+      deck.setAttribute("stroke-linecap", "round");
+      deck.style.display = "none";
+      deck.style.filter = "drop-shadow(0 0 10px rgba(255,255,255,0.85)) drop-shadow(0 0 4px #818cf8)";
+      bridgeCanvas.appendChild(deck);
+
+      // In Hell Mode, slots are generated but hidden initially so they can spread evenly on success
+      slotsOverlay.style.display = gameMode === 'hell' ? 'none' : 'block';
+
+      let n = sortedFactors.length;
+      let startX = 200;
+      let endX = 800;
+      let step = n > 1 ? (endX - startX) / (n - 1) : 0;
+      let slotY = 420;
+
+      // Create the slots in a horizontal row from left to right (sorted order)
+      for (let i = 0; i < n; i++) {
+        let x = n > 1 ? startX + i * step : 500;
+        createSlotElement(sortedFactors[i], (x / 10), (slotY / 6), `slot-${i}`);
+      }
+    }
+
+    function createSlotElement(num, leftPct, topPct, id) {
+      let slot = document.createElement('div');
+      slot.className = 'slot';
+      slot.id = id;
+      slot.style.left = `${leftPct}%`;
+      slot.style.top = `${topPct}%`;
+      slot.innerText = '?';
+      slotsOverlay.appendChild(slot);
+    }
+
+    function generateBubbles() {
+      let pool = [];
+      factorPairs.forEach(p => {
+        pool.push(p.f1);
+        if(!p.isSquare) pool.push(p.f2);
+      });
+
+      while(pool.length < 10) {
+        let rand = Math.floor(Math.random() * 49) + 2;
+        if(!pool.includes(rand) && targetNum % rand !== 0) {
+          pool.push(rand);
+        }
+      }
+      shuffle(pool);
+
+      bubblesContainer.innerHTML = '';
+      pool.forEach(val => {
+        let b = document.createElement('div');
+        b.className = 'bubble';
+        b.innerText = val;
+        b.addEventListener('click', (e) => onBubbleClick(b, val));
+        bubblesContainer.appendChild(b);
+      });
+    }
+
+    function onBubbleClick(element, value) {
+      if(gameState !== 'playing') return;
+      sound.playClick();
+
+      // Check if value is a perfect square root of targetNum
+      if (value * value === targetNum) {
+        let match = factorPairs.find(p => p.isSquare && p.f1 === value);
+        if (match && !matchedPairs.some(p => p.id === match.id)) {
+          element.classList.add('fade-out');
+          if (selectedBubble) {
+            selectedBubble.element.classList.remove('selected');
+            selectedBubble = null;
+          }
+          triggerMatchSuccess(match, value, value, element, element);
+          return;
+        }
+      }
+
+      if (!selectedBubble) {
+        selectedBubble = { element, value };
+        element.classList.add('selected');
+      } else {
+        if (selectedBubble.element === element) {
+          element.classList.remove('selected');
+          selectedBubble = null;
+          return;
+        }
+
+        let v1 = selectedBubble.value;
+        let v2 = value;
+        
+        let match = factorPairs.find(p => 
+          (p.f1 === v1 && p.f2 === v2) || (p.f1 === v2 && p.f2 === v1)
+        );
+
+        if (match && !matchedPairs.some(p => p.id === match.id)) {
+          let el1 = selectedBubble.element;
+          let el2 = element;
+          
+          el1.classList.remove('selected');
+          el1.classList.add('fade-out');
+          el2.classList.add('fade-out');
+          
+          triggerMatchSuccess(match, v1, v2, el1, el2);
+          selectedBubble = null;
+        } else {
+          element.classList.add('error-shake');
+          selectedBubble.element.classList.add('error-shake');
+          sound.playError();
+          
+          setTimeout(() => {
+            element.classList.remove('error-shake', 'selected');
+            selectedBubble.element.classList.remove('error-shake', 'selected');
+            selectedBubble = null;
+          }, 400);
+        }
+      }
+    }
+
+    function submitAdvancedPair() {
+      if(gameState !== 'playing') return;
+      let v1 = parseInt(inputFactor1.value);
+      let v2 = parseInt(inputFactor2.value);
+
+      // Support entering only one number for perfect squares
+      if (isNaN(v1) && !isNaN(v2)) v1 = v2;
+      if (!isNaN(v1) && isNaN(v2)) v2 = v1;
+
+      if(isNaN(v1) || isNaN(v2)) {
+        shakeInputRow();
+        return;
+      }
+
+      let match = factorPairs.find(p => 
+        (p.f1 === v1 && p.f2 === v2) || (p.f1 === v2 && p.f2 === v1)
+      );
+
+      if(match && !matchedPairs.some(p => p.id === match.id)) {
+        triggerMatchSuccess(match, v1, v2, inputFactor1, inputFactor2);
+        inputFactor1.value = '';
+        inputFactor2.value = '';
+        inputFactor1.focus();
+      } else {
+        shakeInputRow();
+      }
+    }
+
+    function shakeInputRow() {
+      advInputRow.classList.add('error-shake');
+      sound.playError();
+      setTimeout(() => advInputRow.classList.remove('error-shake'), 400);
+    }
+
+    function triggerMatchSuccess(match, v1, v2, originEl1, originEl2) {
+      matchedPairs.push(match);
+      sound.playSuccess();
+      
+      createScoreIndicator(originEl2);
+
+      if (gameMode === 'hell') {
+        let leftGroup = document.getElementById('hell-left-group');
+        let rightGroup = document.getElementById('hell-right-group');
+        let idx1 = sortedFactors.indexOf(Math.min(v1, v2));
+        let idx2 = sortedFactors.indexOf(Math.max(v1, v2));
+        
+        // Populate hidden slots so they are ready for the bridge reveal later
+        let realLeftSlot = document.getElementById(`slot-${idx1}`);
+        if(realLeftSlot) {
+          realLeftSlot.className = 'slot filled';
+          realLeftSlot.innerText = Math.min(v1, v2);
+        }
+        
+        let s1 = document.createElement('div');
+        s1.className = 'slot filled';
+        s1.innerText = Math.min(v1, v2);
+        leftGroup.appendChild(s1);
+        
+        let targetEl = s1;
+        animateFlyingBubble(originEl1, s1, v1);
+
+        if (!match.isSquare) {
+          let realRightSlot = document.getElementById(`slot-${idx2}`);
+          if(realRightSlot) {
+            realRightSlot.className = 'slot filled';
+            realRightSlot.innerText = Math.max(v1, v2);
+          }
+
+          let s2 = document.createElement('div');
+          s2.className = 'slot filled';
+          s2.innerText = Math.max(v1, v2);
+          rightGroup.appendChild(s2);
+          animateFlyingBubble(originEl2, s2, v2);
+          targetEl = s2;
+        }
+
+        setTimeout(() => {
+          createExplosion(s1.getBoundingClientRect());
+          if (!match.isSquare) {
+            createExplosion(targetEl.getBoundingClientRect());
+          }
+          checkGameProgress();
+        }, 800);
+        return;
+      }
+
+      let idx1 = sortedFactors.indexOf(v1);
+      let idx2 = sortedFactors.indexOf(v2);
+      let minIdx = Math.min(idx1, idx2);
+      let maxIdx = Math.max(idx1, idx2);
+
+      if (match.isSquare) {
+        let centerSlot = document.getElementById(`slot-${minIdx}`);
+        animateFlyingBubble(originEl1, centerSlot, v1);
+        setTimeout(() => {
+          if (centerSlot) {
+            centerSlot.className = 'slot filled';
+            centerSlot.innerText = v1;
+            createExplosion(centerSlot.getBoundingClientRect());
+          }
+          checkGameProgress();
+        }, 800);
+      } else {
+        let leftSlot = document.getElementById(`slot-${minIdx}`);
+        let rightSlot = document.getElementById(`slot-${maxIdx}`);
+
+        let leftVal = match.f1 === v1 ? v1 : v2;
+        let rightVal = match.f1 === v1 ? v2 : v1;
+
+        animateFlyingBubble(originEl1, leftSlot, leftVal);
+        animateFlyingBubble(originEl2, rightSlot, rightVal);
+
+        setTimeout(() => {
+          if (leftSlot) {
+            leftSlot.className = 'slot filled';
+            leftSlot.innerText = leftVal;
+            createExplosion(leftSlot.getBoundingClientRect());
+          }
+          if (rightSlot) {
+            rightSlot.className = 'slot filled';
+            rightSlot.innerText = rightVal;
+            createExplosion(rightSlot.getBoundingClientRect());
+          }
+          checkGameProgress();
+        }, 800);
+      }
+    }
+
+    function animateFlyingBubble(fromEl, toEl, value) {
+      if(!fromEl || !toEl) return;
+      let fromRect = fromEl.getBoundingClientRect();
+      let toRect = toEl.getBoundingClientRect();
+      let containerRect = document.querySelector('.game-container').getBoundingClientRect();
+
+      let flyer = document.createElement('div');
+      flyer.className = 'flying-bubble';
+      flyer.innerText = value;
+      flyer.style.left = `${fromRect.left - containerRect.left}px`;
+      flyer.style.top = `${fromRect.top - containerRect.top}px`;
+      
+      document.querySelector('.game-container').appendChild(flyer);
+
+      setTimeout(() => {
+        flyer.style.left = `${toRect.left - containerRect.left}px`;
+        flyer.style.top = `${toRect.top - containerRect.top}px`;
+        flyer.style.transform = 'scale(0.8)';
+      }, 50);
+
+      setTimeout(() => flyer.remove(), 850);
+    }
+
+    function createScoreIndicator(el) {
+      if(!el) return;
+      let rect = el.getBoundingClientRect();
+      let containerRect = document.querySelector('.game-container').getBoundingClientRect();
+      
+      let ind = document.createElement('div');
+      ind.className = 'score-indicator';
+      ind.innerText = `＋因數配對成功`;
+      ind.style.left = `${rect.left - containerRect.left + rect.width/2}px`;
+      ind.style.top = `${rect.top - containerRect.top}px`;
+      
+      document.querySelector('.game-container').appendChild(ind);
+      setTimeout(() => ind.remove(), 1500);
+    }
+
+    let magpies = [];
+
+    class Magpie {
+      constructor(startX, startY, targetX, targetY) {
+        this.startX = startX;
+        this.startY = startY;
+        this.targetX = targetX;
+        this.targetY = targetY;
+        this.x = startX;
+        this.y = startY;
+        this.progress = 0;
+        this.speed = 0.025 + Math.random() * 0.025;
+        this.angle = 0;
+        this.wingFlap = Math.random() * 10;
+        this.settled = false;
+        this.scale = 0.6 + Math.random() * 0.4;
+      }
+
+      update() {
+        if (this.settled) {
+          this.wingFlap += 0.2;
+          return;
+        }
+        this.progress += this.speed;
+        if (this.progress >= 1) {
+          this.progress = 1;
+          this.settled = true;
+          this.x = this.targetX;
+          this.y = this.targetY;
+        } else {
+          // Curved flying trajectory
+          let t = this.progress;
+          this.x = this.startX + t * (this.targetX - this.startX);
+          this.y = this.startY + t * (this.targetY - this.startY) - Math.sin(t * Math.PI) * 120;
+          this.wingFlap += 0.45;
+        }
+      }
+
+      draw(c) {
+        c.save();
+        c.translate(this.x, this.y);
+        c.scale(this.scale, this.scale);
+        
+        if (!this.settled) {
+          let dx = this.targetX - this.startX;
+          let dy = this.targetY - this.startY;
+          this.angle = Math.atan2(dy, dx);
+        } else {
+          this.angle = 0;
+        }
+        c.rotate(this.angle);
+
+        // Draw white magpie shape
+        c.fillStyle = "#ffffff";
+        c.beginPath();
+        c.ellipse(0, 0, 10, 4, 0, 0, Math.PI * 2);
+        c.fill();
+
+        c.beginPath();
+        c.arc(8, -2, 3.2, 0, Math.PI * 2);
+        c.fill();
+
+        c.fillStyle = "#fbbf24";
+        c.beginPath();
+        c.moveTo(11, -3);
+        c.lineTo(15, -2);
+        c.lineTo(11, -1);
+        c.fill();
+
+        c.fillStyle = "#f1f5f9";
+        let flap = Math.sin(this.wingFlap) * 8;
+        c.beginPath();
+        c.moveTo(0, -2);
+        c.lineTo(-4, -12 - flap);
+        c.lineTo(-8, -2);
+        c.fill();
+
+        c.beginPath();
+        c.moveTo(0, 2);
+        c.lineTo(-4, 12 + flap);
+        c.lineTo(-8, 2);
+        c.fill();
+
+        c.fillStyle = "#e2e8f0";
+        c.beginPath();
+        c.moveTo(-10, 0);
+        c.lineTo(-18, -3);
+        c.lineTo(-18, 3);
+        c.fill();
+
+        c.restore();
+      }
+    }
+
+    function checkGameProgress() {
+      if (gameMode === 'hell') {
+        // In Hell Mode, do not trigger bridge building automatically.
+        // The user must click "我找完了".
+        return;
+      }
+      if (matchedPairs.length === factorPairs.length) {
+        gameState = 'building_bridge';
+        setTimeout(buildMagpieBridgeAnimation, 600);
+      }
+    }
+
+    function buildMagpieBridgeAnimation() {
+      basicInputPanel.style.display = 'none';
+      advancedInputPanel.style.display = 'none';
+      document.getElementById('pool-msg-overlay').style.display = 'flex';
+      hellMatchedRow.style.display = 'none';
+      slotsOverlay.style.display = 'block';
+
+      // Spawn 32 white magpies horizontally spanning from X=220 to X=780 at Y=420
+      let numBirds = 32;
+      magpies = [];
+      for (let i = 0; i < numBirds; i++) {
+        let targetX = 220 + (i / (numBirds - 1)) * 560;
+        let targetY = 420 + Math.sin(i * 0.5) * 4;
+        
+        let startX = i % 2 === 0 ? -50 - Math.random() * 100 : 1074 + Math.random() * 100;
+        let startY = 100 + Math.random() * 300;
+
+        magpies.push(new Magpie(startX, startY, targetX, targetY));
+      }
+
+      sound.playTone(800, 'sine', 0.15);
+      let checkInterval = setInterval(() => {
+        let allSettled = magpies.every(m => m.settled);
+        if (allSettled) {
+          clearInterval(checkInterval);
+          
+          let deck = document.getElementById("magpie-bridge-deck");
+          if (deck) deck.style.display = "block";
+          sound.playSuccess();
+          
+          setTimeout(() => {
+            gameState = 'walking';
+            triggerMeetingAnimation();
+          }, 600);
+        } else {
+          sound.playTone(987.77, 'sine', 0.08);
+        }
+      }, 250);
+    }
+
+    function triggerMeetingAnimation() {
+      cowherdBox.innerHTML = getCowherdSVG('walk');
+      weaverBox.innerHTML = getWeaverGirlSVG('walk');
+      
+      let step = 0;
+      let totalSteps = 120; // 2 seconds walking animation
+
+      function walkFrame() {
+        if (step <= totalSteps) {
+          let t = step / totalSteps;
+          
+          let leftC = 12 + t * (48 - 12);
+          let bottomC = 30; // 固定在 30%
+
+          let leftW = 88 - t * (88 - 52);
+          let bottomW = 30; // 固定在 30%
+
+          cowherdBox.style.left = `${leftC}%`;
+          cowherdBox.style.bottom = `${bottomC}%`;
+          
+          weaverBox.style.left = `${leftW}%`;
+          weaverBox.style.bottom = `${bottomW}%`;
+
+          if (step % 6 === 0) {
+            createExplosion(cowherdBox.getBoundingClientRect());
+            createExplosion(weaverBox.getBoundingClientRect());
+          }
+
+          step++;
+          requestAnimationFrame(walkFrame);
+        } else {
+          cowherdBox.innerHTML = getCowherdSVG('idle');
+          weaverBox.innerHTML = getWeaverGirlSVG('idle');
+          
+          let rectC = cowherdBox.getBoundingClientRect();
+          let rectW = weaverBox.getBoundingClientRect();
+          let centerRect = {
+            left: (rectC.left + rectW.left) / 2,
+            top: (rectC.top + rectW.top) / 2,
+            width: 0, height: 0
+          };
+          
+          let containerRect = document.querySelector('.game-container').getBoundingClientRect();
+          let meetX = centerRect.left - containerRect.left;
+          let meetY = centerRect.top - containerRect.top;
+
+          sound.playVictory();
+          
+          // Generate 3 floating hearts at the meeting point
+          createHearts(meetX, meetY, 3);
+          
+          for(let i=0; i<10; i++) {
+            setTimeout(() => {
+              createExplosion({
+                left: centerRect.left + (Math.random()*80 - 40),
+                top: centerRect.top + (Math.random()*40 - 20),
+                width: 0, height: 0
+              });
+            }, i * 150);
+          }
+
+          setTimeout(showClearScreen, 1200);
+        }
+      }
+      walkFrame();
+    }
+
+    function showClearScreen() {
+      isFailMode = false;
+      clearTitle.innerText = "配對成功，鵲橋相會！ 🎉";
+      clearBadge.innerText = "💖";
+      clearMsg.innerText = "恭喜你完成了所有五個數字的因數配對，牛郎與織女過上了幸福快樂的日子！";
+
+      clearOverlay.classList.add('active');
+      let countdown = 3;
+      
+      if(currentQuestionIndex < 4) {
+        btnNextLevel.innerText = `下一關挑戰 (${countdown}s) ➔`;
+      } else {
+        clearTitle.innerText = `銀河主宰！大獲全勝 🏆`;
+        clearMsg.innerText = `恭喜你完成了所有五個數字的因數配對，牛郎與織女過上了幸福快樂的日子！`;
+        btnNextLevel.innerText = `返回主選單 🏠`;
+      }
+
+      countdownInterval = setInterval(() => {
+        countdown--;
+        if(countdown <= 0) {
+          clearInterval(countdownInterval);
+          btnNextLevel.click();
+        } else {
+          if(currentQuestionIndex < 4) {
+            btnNextLevel.innerText = `下一關挑戰 (${countdown}s) ➔`;
+          }
+        }
+      }, 1000);
+    }
+
+    function showFailureScreen() {
+      isFailMode = true;
+      clearTitle.innerText = "配對未完成，墜入銀河！ 🌊";
+      clearBadge.innerText = "😭";
+      clearMsg.innerText = "因數還沒找完，喜鵲沒有來，牛郎與織女掉進河水裡了。";
+      btnNextLevel.innerText = "重新挑戰本題 ➔";
+
+      if (countdownInterval) clearInterval(countdownInterval);
+
+      clearOverlay.classList.add('active');
+    }
+
+    function triggerFallingAnimation() {
+      cowherdBox.innerHTML = getCowherdSVG('walk');
+      weaverBox.innerHTML = getWeaverGirlSVG('walk');
+      
+      let step = 0;
+      let walkSteps = 45; // walk to cliff
+      let fallSteps = 45; // fall down
+      let totalSteps = walkSteps + fallSteps;
+
+      function fallFrame() {
+        if (step <= totalSteps) {
+          if (step <= walkSteps) {
+            let t = step / walkSteps;
+            let leftC = 12 + t * (22 - 12);
+            let leftW = 88 - t * (88 - 78);
+            cowherdBox.style.left = `${leftC}%`;
+            weaverBox.style.left = `${leftW}%`;
+            cowherdBox.style.bottom = `30%`;
+            weaverBox.style.bottom = `30%`;
+          } else {
+            let t = (step - walkSteps) / fallSteps;
+            let leftC = 22 + t * 4;
+            let leftW = 78 - t * 4;
+            let bottomVal = 30 - t * 50;
+
+            cowherdBox.style.left = `${leftC}%`;
+            cowherdBox.style.bottom = `${bottomVal}%`;
+            cowherdBox.style.transform = `translateX(-50%) rotate(${t * 180}deg)`;
+
+            weaverBox.style.left = `${leftW}%`;
+            weaverBox.style.bottom = `${bottomVal}%`;
+            weaverBox.style.transform = `translateX(-50%) rotate(${-t * 180}deg)`;
+            
+            if (step % 5 === 0) {
+              createExplosion(cowherdBox.getBoundingClientRect());
+              createExplosion(weaverBox.getBoundingClientRect());
+            }
+          }
+          step++;
+          requestAnimationFrame(fallFrame);
+        } else {
+          cowherdBox.innerHTML = getCowherdSVG('idle');
+          weaverBox.innerHTML = getWeaverGirlSVG('idle');
+          cowherdBox.style.transform = '';
+          weaverBox.style.transform = '';
+          
+          sound.playError();
+          showFailureScreen();
+        }
+      }
+      fallFrame();
+    }
+
+    /* --- Canvas Stars & Explosions Particle System --- */
+    const canvas = document.getElementById('sparkle-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    function resizeCanvas() {
+      let rect = document.querySelector('.game-container').getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    setTimeout(resizeCanvas, 100);
+
+    function createExplosion(rect) {
+      let containerRect = document.querySelector('.game-container').getBoundingClientRect();
+      let x = rect.left - containerRect.left + rect.width / 2;
+      let y = rect.top - containerRect.top + rect.height / 2;
+      
+      for (let i = 0; i < 18; i++) {
+        particles.push({
+          x, y,
+          vx: (Math.random() - 0.5) * 6,
+          vy: (Math.random() - 0.5) * 6,
+          radius: Math.random() * 3 + 2,
+          color: RAINBOW_COLORS[Math.floor(Math.random() * RAINBOW_COLORS.length)],
+          alpha: 1,
+          decay: Math.random() * 0.02 + 0.015
+        });
+      }
+    }
+
+    function createHearts(x, y, count) {
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x, y,
+          vx: (Math.random() - 0.5) * 3,
+          vy: (Math.random() - 0.5) * 3 - 2, // float upwards
+          radius: Math.random() * 6 + 6,
+          color: `hsl(${Math.random() * 20 + 340}, 100%, 65%)`, // pink
+          alpha: 1,
+          decay: 0.01 + Math.random() * 0.01,
+          isHeart: true
+        });
+      }
+    }
+
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Update and draw magpies
+      magpies.forEach(m => {
+        m.update();
+        m.draw(ctx);
+      });
+      
+      if (Math.random() < 0.1) {
+        particles.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * (canvas.height - 200),
+          vx: 0,
+          vy: Math.random() * 0.2 + 0.1,
+          radius: Math.random() * 1.5,
+          color: '#ffffff',
+          alpha: Math.random() * 0.5 + 0.5,
+          decay: 0,
+          isStar: true,
+          blinkSpeed: Math.random() * 0.05 + 0.01
+        });
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        
+        if (p.isStar) {
+          p.y += p.vy;
+          p.alpha += p.blinkSpeed;
+          if (p.alpha > 1 || p.alpha < 0.2) p.blinkSpeed = -p.blinkSpeed;
+          
+          if (p.y > canvas.height - 200) {
+            particles.splice(i, 1);
+            continue;
+          }
+          
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`;
+          ctx.fill();
+        } else if (p.isHeart) {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy -= 0.03; 
+          p.alpha -= p.decay;
+          
+          if (p.alpha <= 0) {
+            particles.splice(i, 1);
+            continue;
+          }
+          
+          ctx.save();
+          ctx.globalAlpha = p.alpha;
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.bezierCurveTo(p.x - p.radius/2, p.y - p.radius/2, p.x - p.radius, p.y, p.x, p.y + p.radius);
+          ctx.bezierCurveTo(p.x + p.radius, p.y, p.x + p.radius/2, p.y - p.radius/2, p.x, p.y);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        } else {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.05; 
+          p.alpha -= p.decay;
+          
+          if (p.alpha <= 0) {
+            particles.splice(i, 1);
+            continue;
+          }
+          
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.globalAlpha = p.alpha;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+      }
+      requestAnimationFrame(animateParticles);
+    }
+    requestAnimationFrame(animateParticles);
+
+    btnStartGame.addEventListener('click', () => {
+      sound.playClick();
+      let bgm = document.getElementById('bgm');
+      if (bgm) {
+        bgm.volume = 0.4;
+        bgm.play().catch(e => console.log('BGM play blocked', e));
+      }
+      menuOverlay.classList.remove('active');
+      
+      if (gameMode === 'basic') {
+        // Basic Mode: Targets up to 50
+        let squares = [9, 16, 25, 36, 49];
+        let sq = squares[Math.floor(Math.random() * squares.length)];
+
+        let primes = [7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47];
+        let pr = primes[Math.floor(Math.random() * primes.length)];
+
+        let composites = [
+          6, 8, 10, 12, 14, 15, 18, 20, 21, 22, 24, 26, 27, 28, 30, 32, 33, 34, 35, 38, 39, 40, 42, 44, 45, 46, 48, 50
+        ];
+        shuffle(composites);
+        let comp3 = composites.slice(0, 3);
+
+        sessionTargets = [sq, pr, ...comp3];
+      } else if (gameMode === 'advanced') {
+        // Advanced Mode: Targets up to 100
+        let squares = [25, 36, 49, 64, 81, 100];
+        let sq = squares[Math.floor(Math.random() * squares.length)];
+
+        let primes = [31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97];
+        let pr = primes[Math.floor(Math.random() * primes.length)];
+
+        let composites = [
+          12, 18, 24, 28, 30, 32, 36, 40, 42, 44, 45, 48, 50, 52, 54, 56, 60, 62, 63, 65, 66, 68, 70, 72, 74, 75, 76, 78, 80, 82, 84, 85, 86, 88, 90, 92, 94, 95, 96, 98, 99, 100
+        ];
+        shuffle(composites);
+        let comp3 = composites.slice(0, 3);
+
+        sessionTargets = [sq, pr, ...comp3];
+      } else {
+        // Hell Mode: Targets up to 120
+        let squares = [25, 36, 49, 64, 81, 100];
+        let sq = squares[Math.floor(Math.random() * squares.length)];
+
+        let primes = [43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113];
+        let pr = primes[Math.floor(Math.random() * primes.length)];
+
+        let composites = [
+          60, 72, 80, 84, 90, 96, 100, 104, 108, 110, 112, 114, 116, 118, 120
+        ];
+        shuffle(composites);
+        let comp3 = composites.slice(0, 3);
+
+        sessionTargets = [sq, pr, ...comp3];
+      }
+      shuffle(sessionTargets);
+      
+      currentQuestionIndex = 0;
+      hudLevelTxt.innerText = gameMode === 'basic' ? "基礎挑戰" : (gameMode === 'advanced' ? "進階挑戰" : "地獄挑戰");
+      
+      startNewGame();
+    });
+
+    document.querySelectorAll('.btn-level').forEach(btn => {
+      btn.addEventListener('click', () => {
+        sound.playClick();
+        document.querySelectorAll('.btn-level').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        gameMode = btn.dataset.mode;
+      });
+    });
+
+    btnBack.addEventListener('click', () => {
+      sound.playClick();
+      if (countdownInterval) clearInterval(countdownInterval);
+      menuOverlay.classList.add('active');
+      clearOverlay.classList.remove('active');
+    });
+
+    btnMute.addEventListener('click', () => {
+      sound.isMuted = !sound.isMuted;
+      btnMute.innerText = sound.isMuted ? '🔇' : '🔊';
+      let bgm = document.getElementById('bgm');
+      if (bgm) {
+        bgm.muted = sound.isMuted;
+      }
+      if (!sound.isMuted) sound.playClick();
+    });
+
+    btnNextLevel.addEventListener('click', () => {
+      sound.playClick();
+      if (countdownInterval) clearInterval(countdownInterval);
+      clearOverlay.classList.remove('active');
+      
+      if (isFailMode) {
+        isFailMode = false;
+        startNewGame();
+      } else {
+        if (currentQuestionIndex < 4) {
+          currentQuestionIndex++;
+          startNewGame();
+        } else {
+          menuOverlay.classList.add('active');
+        }
+      }
+    });
+
+    const handleKeyPress = (e) => { if (e.key === 'Enter') submitAdvancedPair(); };
+    inputFactor1.addEventListener('keypress', handleKeyPress);
+    inputFactor2.addEventListener('keypress', handleKeyPress);
+    btnSubmitPair.addEventListener('click', submitAdvancedPair);
+
+    btnFinishHell.addEventListener('click', () => {
+      if (gameState !== 'playing') return;
+      sound.playClick();
+
+      if (matchedPairs.length === factorPairs.length) {
+        gameState = 'building_bridge';
+        buildMagpieBridgeAnimation();
+      } else {
+        gameState = 'falling';
+        triggerFallingAnimation();
+      }
+    });
+  </script>
+</body>
+</html>
