@@ -568,6 +568,35 @@
                     }
                 }
 
+                // 防禦性填充：確保 optionsPool 長度達到 targetPoolSize
+                if (qType === 'numerator') {
+                    let fallbackN = 1;
+                    while (pool.length < targetPoolSize && fallbackN < 100) {
+                        if (fallbackN !== targetNumerator && !pool.some(p => p.n === fallbackN)) {
+                            pool.push({
+                                n: fallbackN,
+                                d: targetDenominator,
+                                isCorrect: false,
+                                val: fallbackN / targetDenominator
+                            });
+                        }
+                        fallbackN++;
+                    }
+                } else {
+                    let fallbackD = targetNumerator + 1;
+                    while (pool.length < targetPoolSize && fallbackD < targetDenominator * 3 + 50) {
+                        if (fallbackD !== targetDenominator && !pool.some(p => p.d === fallbackD)) {
+                            pool.push({
+                                n: targetNumerator,
+                                d: fallbackD,
+                                isCorrect: false,
+                                val: targetNumerator / fallbackD
+                            });
+                        }
+                        fallbackD++;
+                    }
+                }
+
                 return {
                     base: { n: baseNumerator, d: baseDenominator }, // e.g. 12/30 (題幹不變)
                     targetD: targetDenominator, // e.g. 15
@@ -646,6 +675,35 @@
                             }
                         });
                         offset++;
+                    }
+                }
+
+                // 防禦性填充：確保 optionsPool 長度達到 targetPoolSize
+                if (qType === 'numerator') {
+                    let fallbackN = 1;
+                    while (pool.length < targetPoolSize && fallbackN < 100) {
+                        if (fallbackN !== expandedNumerator && !pool.some(p => p.n === fallbackN)) {
+                            pool.push({
+                                n: fallbackN,
+                                d: expandedDenominator,
+                                isCorrect: false,
+                                val: fallbackN / expandedDenominator
+                            });
+                        }
+                        fallbackN++;
+                    }
+                } else {
+                    let fallbackD = expandedNumerator + 1;
+                    while (pool.length < targetPoolSize && fallbackD < expandedDenominator * 3 + 50) {
+                        if (fallbackD !== expandedDenominator && !pool.some(p => p.d === fallbackD)) {
+                            pool.push({
+                                n: expandedNumerator,
+                                d: fallbackD,
+                                isCorrect: false,
+                                val: expandedNumerator / fallbackD
+                            });
+                        }
+                        fallbackD++;
                     }
                 }
 
@@ -1423,6 +1481,17 @@
 
                 // 生成 2 隻錯誤魚
                 const selectedIncorrect = incorrectList.sort(() => 0.5 - Math.random()).slice(0, 2);
+                while (selectedIncorrect.length < 2) {
+                    const fallbackFrac = { ...correctItem };
+                    if (mathData.questionType === 'denominator') {
+                        fallbackFrac.d = correctItem.d + (selectedIncorrect.length + 1) * 3;
+                    } else {
+                        fallbackFrac.n = correctItem.n + (selectedIncorrect.length + 1) * 2;
+                    }
+                    fallbackFrac.isCorrect = false;
+                    fallbackFrac.val = fallbackFrac.n / fallbackFrac.d;
+                    selectedIncorrect.push(fallbackFrac);
+                }
                 fishes.push(new Fish(selectedIncorrect[0], false, spawnX, false, yBands[2]));
                 fishes.push(new Fish(selectedIncorrect[1], false, spawnX, false, yBands[3]));
 
@@ -1492,6 +1561,17 @@
                 fishes.push(new Fish(correctItem, true, spawnX, false, yBands[0]));
                 fishes.push(new Fish(correctItem, true, spawnX, false, yBands[1]));
                 const selectedIncorrect = incorrectList.sort(() => 0.5 - Math.random()).slice(0, 2);
+                while (selectedIncorrect.length < 2) {
+                    const fallbackFrac = { ...correctItem };
+                    if (mathData.questionType === 'denominator') {
+                        fallbackFrac.d = correctItem.d + (selectedIncorrect.length + 1) * 3;
+                    } else {
+                        fallbackFrac.n = correctItem.n + (selectedIncorrect.length + 1) * 2;
+                    }
+                    fallbackFrac.isCorrect = false;
+                    fallbackFrac.val = fallbackFrac.n / fallbackFrac.d;
+                    selectedIncorrect.push(fallbackFrac);
+                }
                 fishes.push(new Fish(selectedIncorrect[0], false, spawnX, false, yBands[2]));
                 fishes.push(new Fish(selectedIncorrect[1], false, spawnX, false, yBands[3]));
 
