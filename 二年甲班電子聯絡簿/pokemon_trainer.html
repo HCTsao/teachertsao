@@ -1140,9 +1140,14 @@
 
     // GBA Evolution logic
     let evoCallback = null;
+    let currentEvoSound = null;
 
     function triggerEvolution(studentName, oldPoke, newPoke, callback) {
       evoCallback = callback;
+      
+      // Pause battle BGM if playing
+      battleBGM.pause();
+
       const overlay = document.getElementById('evolution-overlay');
       const imgOld = document.getElementById('evo-img-old');
       const imgNew = document.getElementById('evo-img-new');
@@ -1151,9 +1156,6 @@
       const flash = document.getElementById('evo-flash');
       const particles = document.getElementById('evo-particles');
       
-      const ctx = window.audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-      window.audioCtx = ctx;
-
       overlay.style.display = 'flex';
       btnGroup.style.display = 'none';
       imgOld.src = oldPoke.url;
@@ -1170,65 +1172,42 @@
       
       txt.textContent = `咦？${studentName}的 ${oldPoke.name} 樣子怪怪的...！`;
 
-      const playWarningSound = (freqStart, freqEnd, duration) => {
-        const osc = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freqStart, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(freqEnd, ctx.currentTime + duration);
-        gainNode.gain.setValueAtTime(0.08, ctx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
-        osc.connect(gainNode);
-        gainNode.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + duration);
-      };
+      // Load and play custom evolution MP3
+      currentEvoSound = new Audio("Pokemon Evolution Template (Open to Download and Public Use).mp3");
+      currentEvoSound.volume = 0.35;
+      currentEvoSound.play().catch(err => console.log("Audio play error:", err));
+
+      let flashDuration = 21000; // Flashing lasts exactly 21 seconds
+      let startTime = Date.now();
+      let flashCount = 0;
       
-      // Flashing animation
-      setTimeout(() => {
-        let flashCount = 0;
-        let delay = 400;
-        
-        function flashStep() {
-          if (delay > 50) {
-            const showNew = flashCount % 2 === 1;
-            playWarningSound(showNew ? 300 : 500, showNew ? 500 : 800, delay / 1000);
-
-            if (showNew) {
-              imgOld.style.opacity = '0';
-              imgNew.style.opacity = '1';
-              imgNew.style.filter = 'brightness(0) invert(1) drop-shadow(0 0 20px white)';
-            } else {
-              imgOld.style.opacity = '1';
-              imgNew.style.opacity = '0';
-              imgOld.style.filter = 'brightness(0) invert(1) drop-shadow(0 0 20px white)';
-            }
-            
-            flashCount++;
-            delay = Math.max(50, delay * 0.85);
-            setTimeout(flashStep, delay);
+      function runFlash() {
+        let elapsed = Date.now() - startTime;
+        if (elapsed < flashDuration) {
+          let ratio = elapsed / flashDuration;
+          // Delays speed up from 450ms down to 45ms
+          let currentDelay = 450 - (405 * Math.pow(ratio, 1.4));
+          
+          const showNew = flashCount % 2 === 1;
+          if (showNew) {
+            imgOld.style.opacity = '0';
+            imgNew.style.opacity = '1';
+            imgNew.style.filter = 'brightness(0) invert(1) drop-shadow(0 0 20px white)';
           } else {
-            let rapidCount = 0;
-            function rapidFlash() {
-              if (rapidCount < 12) {
-                const showNew = rapidCount % 2 === 1;
-                playWarningSound(showNew ? 300 : 500, showNew ? 500 : 800, 0.06);
-
-                imgOld.style.opacity = showNew ? '0' : '1';
-                imgNew.style.opacity = showNew ? '1' : '0';
-                imgOld.style.filter = 'brightness(0) invert(1) drop-shadow(0 0 20px white)';
-                imgNew.style.filter = 'brightness(0) invert(1) drop-shadow(0 0 20px white)';
-                rapidCount++;
-                setTimeout(rapidFlash, 60);
-              } else {
-                triggerBurst();
-              }
-            }
-            rapidFlash();
+            imgOld.style.opacity = '1';
+            imgNew.style.opacity = '0';
+            imgOld.style.filter = 'brightness(0) invert(1) drop-shadow(0 0 20px white)';
           }
+          
+          flashCount++;
+          setTimeout(runFlash, currentDelay);
+        } else {
+          triggerBurst();
         }
-        flashStep();
-      }, 2000);
+      }
+      
+      // Start flashing immediately
+      runFlash();
 
       function triggerBurst() {
         imgOld.style.opacity = '0';
@@ -1238,28 +1217,6 @@
         
         flash.style.transform = 'scale(2.5)';
         flash.style.opacity = '1';
-
-        // Play classic GBA level up/triumph fanfare
-        const playNote = (freq, start, duration) => {
-          const osc = ctx.createOscillator();
-          const gainNode = ctx.createGain();
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(freq, start);
-          gainNode.gain.setValueAtTime(0.08, start);
-          gainNode.gain.exponentialRampToValueAtTime(0.001, start + duration - 0.02);
-          osc.connect(gainNode);
-          gainNode.connect(ctx.destination);
-          osc.start(start);
-          osc.stop(start + duration);
-        };
-        
-        const now = ctx.currentTime;
-        playNote(523.25, now, 0.12);
-        playNote(587.33, now + 0.12, 0.12);
-        playNote(659.25, now + 0.24, 0.12);
-        playNote(698.46, now + 0.36, 0.12);
-        playNote(783.99, now + 0.48, 0.24);
-        playNote(880.00, now + 0.72, 0.48);
         
         setTimeout(() => {
           imgNew.style.transform = 'scale(1)';
@@ -1315,6 +1272,10 @@
 
     function closeEvolution() {
       document.getElementById('evolution-overlay').style.display = 'none';
+      if (currentEvoSound) {
+        currentEvoSound.pause();
+        currentEvoSound = null;
+      }
       if(evoCallback) {
         evoCallback();
         evoCallback = null;
