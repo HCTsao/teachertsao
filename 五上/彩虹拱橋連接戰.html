@@ -459,7 +459,7 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      gap: 14px;
+      gap: 20px;
       flex-wrap: nowrap;
     }
 
@@ -539,6 +539,7 @@
       transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease, opacity 0.5s ease;
       animation: bubbleFloat 4s ease-in-out infinite;
       text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      flex-shrink: 0;
     }
 
     .bubble::after {
@@ -564,6 +565,12 @@
       transform: scale(1.15) translateY(-5px);
       box-shadow: var(--shadow-bubble-selected);
       background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9) 0%, rgba(244, 63, 94, 0.7) 60%, rgba(225, 29, 72, 0.9) 100%);
+    }
+
+    .bubble.selected-gcf {
+      transform: scale(1.2) translateY(-7px);
+      box-shadow: 0 0 20px rgba(251, 191, 36, 0.8), inset 0 0 10px rgba(255,255,255,0.6);
+      background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9) 0%, rgba(251, 191, 36, 0.8) 60%, rgba(217, 119, 6, 1) 100%);
     }
 
     .bubble.error-shake, .input-row.error-shake {
@@ -881,6 +888,21 @@
         <button class="btn-primary" id="btn-next-level">下一關挑戰 (3s) ➔</button>
       </div>
     </div>
+
+    <div class="overlay" id="common-factor-overlay">
+      <div class="modal-card" style="max-width: 600px;">
+        <h2 id="cf-overlay-title">🌌 公因數與最大公因數挑戰</h2>
+        <div id="cf-info-section" style="text-align: left; margin: 15px 0; background: rgba(0,0,0,0.25); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
+          <p style="margin-bottom: 8px; font-size: 1.15rem;">數字 <span id="cf-num-a" style="color: #fbbf24; font-weight: 800;">A</span> 的因數有：<span id="cf-factors-a" style="color: #60a5fa; font-weight: bold; letter-spacing: 1px;">...</span></p>
+          <p style="font-size: 1.15rem;">數字 <span id="cf-num-b" style="color: #fbbf24; font-weight: 800;">B</span> 的因數有：<span id="cf-factors-b" style="color: #60a5fa; font-weight: bold; letter-spacing: 1px;">...</span></p>
+        </div>
+        <p id="cf-prompt-text" style="font-weight: 800; color: #a5b4fc; margin-bottom: 12px; font-size: 1.2rem;">🔮 請點擊選擇它們的所有「公因數」 🔮</p>
+        <div class="bubbles-pool" id="cf-bubbles-container" style="justify-content: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;"></div>
+        <div style="display: flex; justify-content: center; gap: 15px; width: 100%;">
+          <button class="btn-primary" id="btn-submit-cf-overlay" style="padding: 10px 30px; font-size: 1.1rem;">確認公因數 ➔</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -957,6 +979,19 @@
     let selectedBubble = null;
     let gameState = 'playing';
     let countdownInterval = null;
+    let isMatchingAnimationActive = false;
+
+    // Common Factor Phase variables
+    let inCommonFactorPhase = false;
+    let commonFactorQuestionIndex = 0;
+    let commonFactorTargets = [];
+    let commonFactorNumA = 0;
+    let commonFactorNumB = 0;
+    let correctCommonFactors = [];
+    let correctGCF = 0;
+    let selectedCommonFactors = [];
+    let selectedGCF = null;
+    let commonFactorStep = 'select_factors'; // 'select_factors' or 'select_gcf'
 
     const RAINBOW_COLORS = ['#ff4b5c', '#ff8f5a', '#ffd043', '#2bd47e', '#279bf6', '#635bf7', '#a75bf7'];
 
@@ -1054,6 +1089,7 @@
       gameState = 'playing';
       selectedBubble = null;
       matchedPairs = [];
+      isMatchingAnimationActive = false;
       magpies = []; // Reset magpies array
       
       document.getElementById('pool-msg-overlay').style.display = 'none';
@@ -1152,6 +1188,60 @@
       slotsOverlay.appendChild(slot);
     }
 
+    function getDistractors(targetNum, needed) {
+      let factors = [];
+      for (let i = 1; i <= targetNum; i++) {
+        if (targetNum % i === 0) factors.push(i);
+      }
+      
+      let candidates = [];
+      
+      for (let x = 2; x < targetNum; x++) {
+        if (factors.includes(x)) continue;
+        
+        let score = 0;
+        
+        for (let f of factors) {
+          if (f !== 1 && f !== targetNum && Math.abs(x - f) === 1) {
+            score += 3;
+          }
+        }
+        
+        for (let k = 2; k <= 12; k++) {
+          let diff = Math.abs(x * k - targetNum);
+          if (diff === 1) score += 4;
+          else if (diff === 2) score += 2;
+        }
+        
+        if (targetNum === 32 && x === 9) score += 10;
+        if (targetNum === 28 && (x === 3 || x === 8)) score += 10;
+        if (targetNum === 42 && (x === 8 || x === 6)) score += 10;
+        if (targetNum === 48 && (x === 7 || x === 6)) score += 10;
+        if (targetNum === 24 && x === 7) score += 10;
+        
+        if (score > 0) {
+          candidates.push({ val: x, score: score });
+        }
+      }
+      
+      candidates.sort((a, b) => b.score - a.score);
+      
+      let result = candidates.map(c => c.val);
+      
+      if (result.length < needed) {
+        let others = [];
+        for (let x = 2; x < targetNum; x++) {
+          if (!factors.includes(x) && !result.includes(x)) {
+            others.push(x);
+          }
+        }
+        shuffle(others);
+        result = result.concat(others.slice(0, needed - result.length));
+      }
+      
+      return result.slice(0, needed);
+    }
+
     function generateBubbles() {
       let pool = [];
       factorPairs.forEach(p => {
@@ -1159,18 +1249,11 @@
         if(!p.isSquare) pool.push(p.f2);
       });
 
-      let possibleNonFactors = [];
-      for (let i = 2; i < targetNum; i++) {
-        if (targetNum % i !== 0) {
-          possibleNonFactors.push(i);
-        }
+      let needed = 12 - pool.length;
+      if (needed > 0) {
+        let selectedNonFactors = getDistractors(targetNum, needed);
+        pool = pool.concat(selectedNonFactors);
       }
-      
-      shuffle(possibleNonFactors);
-      
-      let needed = 10 - pool.length;
-      let selectedNonFactors = possibleNonFactors.slice(0, needed);
-      pool = pool.concat(selectedNonFactors);
 
       pool.sort((a, b) => a - b);
 
@@ -1185,7 +1268,7 @@
     }
 
     function onBubbleClick(element, value) {
-      if(gameState !== 'playing') return;
+      if(gameState !== 'playing' || isMatchingAnimationActive) return;
       sound.playClick();
 
       // Check if value is a perfect square root of targetNum
@@ -1244,7 +1327,7 @@
     }
 
     function submitAdvancedPair() {
-      if(gameState !== 'playing') return;
+      if(gameState !== 'playing' || isMatchingAnimationActive) return;
       let v1 = parseInt(inputFactor1.value);
       let v2 = parseInt(inputFactor2.value);
 
@@ -1278,6 +1361,7 @@
     }
 
     function triggerMatchSuccess(match, v1, v2, originEl1, originEl2) {
+      isMatchingAnimationActive = true;
       matchedPairs.push(match);
       sound.playSuccess();
       
@@ -1324,6 +1408,7 @@
           if (!match.isSquare) {
             createExplosion(targetEl.getBoundingClientRect());
           }
+          isMatchingAnimationActive = false;
           checkGameProgress();
         }, 800);
         return;
@@ -1343,6 +1428,7 @@
             centerSlot.innerText = v1;
             createExplosion(centerSlot.getBoundingClientRect());
           }
+          isMatchingAnimationActive = false;
           checkGameProgress();
         }, 800);
       } else {
@@ -1366,6 +1452,7 @@
             rightSlot.innerText = rightVal;
             createExplosion(rightSlot.getBoundingClientRect());
           }
+          isMatchingAnimationActive = false;
           checkGameProgress();
         }, 800);
       }
@@ -1518,6 +1605,7 @@
     function buildMagpieBridgeAnimation() {
       basicInputPanel.style.display = 'none';
       advancedInputPanel.style.display = 'none';
+      if (document.getElementById('common-factor-overlay')) document.getElementById('common-factor-overlay').classList.remove('active');
       document.getElementById('pool-msg-overlay').style.display = 'flex';
       hellMatchedRow.style.display = 'none';
       slotsOverlay.style.display = 'block';
@@ -1623,40 +1711,64 @@
 
     function showClearScreen() {
       isFailMode = false;
+      if (countdownInterval) clearInterval(countdownInterval);
       clearOverlay.classList.add('active');
+      
+      let needCountdown = !inCommonFactorPhase && currentQuestionIndex < 4;
       let countdown = 3;
       
-      if(currentQuestionIndex < 4) {
-        clearTitle.innerText = "配對成功，鵲橋相會！ 🎉";
-        clearBadge.innerText = "💖";
-        clearMsg.innerText = "太棒了！你成功找出了這個數字的所有因數，幫助喜鵲搭好這段橋！準備前往下一個挑戰吧！";
-        btnNextLevel.innerText = `下一關挑戰 (${countdown}s) ➔`;
+      if (inCommonFactorPhase) {
+        if (commonFactorQuestionIndex < 2) {
+          clearTitle.innerText = "公因數配對成功，鵲橋再次相連！ 🎉";
+          clearBadge.innerText = "💖";
+          clearMsg.innerText = `太棒了！你成功找出了 ${commonFactorNumA} 和 ${commonFactorNumB} 的公因數與最大公因數 (${correctGCF})！`;
+          btnNextLevel.innerText = `下一道挑戰 ➔`;
+        } else {
+          clearTitle.innerText = "公因數終極挑戰成功！ 🏆";
+          clearBadge.innerText = "👑";
+          clearMsg.innerText = "恭喜你！不僅找完了所有因數，還成功解決了公因數與最大公因數的所有挑戰！牛郎織女將永遠感謝你！";
+          btnNextLevel.innerText = `返回主選單 🏠`;
+        }
       } else {
-        clearTitle.innerText = `銀河主宰！大獲全勝 🏆`;
-        clearBadge.innerText = "💖";
-        clearMsg.innerText = `恭喜你完成了所有五個數字的因數配對，牛郎與織女過上了幸福快樂的日子！`;
-        btnNextLevel.innerText = `返回主選單 🏠`;
+        if(currentQuestionIndex < 4) {
+          clearTitle.innerText = "配對成功，鵲橋相會！ 🎉";
+          clearBadge.innerText = "💖";
+          clearMsg.innerText = "太棒了！你成功找出了這個數字的所有因數，幫助喜鵲搭好這段橋！準備前往下一個挑戰吧！";
+          btnNextLevel.innerText = `下一關挑戰 (${countdown}s) ➔`;
+        } else {
+          clearTitle.innerText = "五題因數挑戰完成！開啟隱藏關卡";
+          clearBadge.innerText = "✨";
+          clearMsg.innerText = "太厲害了！你已順利幫所有數字配對完因數。接下來，喜鵲將發起最後的【公因數與最大公因數】挑戰！";
+          btnNextLevel.innerText = `進入公因數挑戰 ➔`;
+        }
       }
 
-      countdownInterval = setInterval(() => {
-        countdown--;
-        if(countdown <= 0) {
-          clearInterval(countdownInterval);
-          btnNextLevel.click();
-        } else {
-          if(currentQuestionIndex < 4) {
+      if (needCountdown) {
+        countdownInterval = setInterval(() => {
+          countdown--;
+          if(countdown <= 0) {
+            clearInterval(countdownInterval);
+            btnNextLevel.click();
+          } else {
             btnNextLevel.innerText = `下一關挑戰 (${countdown}s) ➔`;
           }
-        }
-      }, 1000);
+        }, 1000);
+      }
     }
 
     function showFailureScreen() {
       isFailMode = true;
-      clearTitle.innerText = "配對未完成，墜入銀河！ 🌊";
-      clearBadge.innerText = "😭";
-      clearMsg.innerText = "因數還沒找完，喜鵲沒有來，牛郎與織女掉進河水裡了。";
-      btnNextLevel.innerText = "重新挑戰本題 ➔";
+      if (inCommonFactorPhase) {
+        clearTitle.innerText = "挑戰失敗，墜入銀河！ 🌊";
+        clearBadge.innerText = "😭";
+        clearMsg.innerText = "公因數或最大公因數回答錯誤，喜鵲沒有來。";
+        btnNextLevel.innerText = "重新挑戰本題 ➔";
+      } else {
+        clearTitle.innerText = "配對未完成，墜入銀河！ 🌊";
+        clearBadge.innerText = "😭";
+        clearMsg.innerText = "因數還沒找完，喜鵲沒有來，牛郎與織女掉進河水裡了。";
+        btnNextLevel.innerText = "重新挑戰本題 ➔";
+      }
 
       if (countdownInterval) clearInterval(countdownInterval);
 
@@ -1846,6 +1958,28 @@
     }
     requestAnimationFrame(animateParticles);
 
+    function gcd(x, y) {
+      while (y) {
+        let t = y;
+        y = x % y;
+        x = t;
+      }
+      return x;
+    }
+
+    function isValidTargetSet(targets) {
+      let unique = Array.from(new Set(targets));
+      let goodGCFCount = 0;
+      for (let i = 0; i < unique.length; i++) {
+        for (let j = i + 1; j < unique.length; j++) {
+          if (gcd(unique[i], unique[j]) >= 3) {
+            goodGCFCount++;
+          }
+        }
+      }
+      return goodGCFCount >= 3;
+    }
+
     btnStartGame.addEventListener('click', () => {
       sound.playClick();
       let bgm = document.getElementById('bgm');
@@ -1854,53 +1988,66 @@
         bgm.play().catch(e => console.log('BGM play blocked', e));
       }
       menuOverlay.classList.remove('active');
+      document.getElementById('common-factor-overlay').classList.remove('active');
+      inCommonFactorPhase = false;
       
-      if (gameMode === 'basic') {
-        // Basic Mode: Targets up to 50
-        let squares = [9, 16, 25, 36, 49];
-        let sq = squares[Math.floor(Math.random() * squares.length)];
+      let attempts = 0;
+      sessionTargets = [];
+      while (attempts < 100) {
+        let sq, pr, comp3;
+        if (gameMode === 'basic') {
+          // Basic Mode: Targets up to 50
+          let squares = [9, 16, 25, 36, 49];
+          sq = squares[Math.floor(Math.random() * squares.length)];
 
-        let primes = [7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47];
-        let pr = primes[Math.floor(Math.random() * primes.length)];
+          let primes = [7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47];
+          pr = primes[Math.floor(Math.random() * primes.length)];
 
-        let composites = [
-          6, 8, 10, 12, 14, 15, 18, 20, 21, 22, 24, 26, 27, 28, 30, 32, 33, 34, 35, 38, 39, 40, 42, 44, 45, 46, 48, 50
-        ];
-        shuffle(composites);
-        let comp3 = composites.slice(0, 3);
+          let composites = [
+            6, 8, 10, 12, 14, 15, 18, 20, 21, 22, 24, 26, 27, 28, 30, 32, 33, 34, 35, 38, 39, 40, 42, 44, 45, 46, 48, 50
+          ];
+          shuffle(composites);
+          comp3 = composites.slice(0, 3);
+        } else if (gameMode === 'advanced') {
+          // Advanced Mode: Targets up to 100
+          let squares = [25, 36, 49, 64, 81, 100];
+          sq = squares[Math.floor(Math.random() * squares.length)];
 
-        sessionTargets = [sq, pr, ...comp3];
-      } else if (gameMode === 'advanced') {
-        // Advanced Mode: Targets up to 100
-        let squares = [25, 36, 49, 64, 81, 100];
-        let sq = squares[Math.floor(Math.random() * squares.length)];
+          let primes = [31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97];
+          pr = primes[Math.floor(Math.random() * primes.length)];
 
-        let primes = [31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97];
-        let pr = primes[Math.floor(Math.random() * primes.length)];
+          let composites = [
+            12, 18, 24, 28, 30, 32, 36, 40, 42, 44, 45, 48, 50, 52, 54, 56, 60, 62, 63, 65, 66, 68, 70, 72, 74, 75, 76, 78, 80, 82, 84, 85, 86, 88, 90, 92, 94, 95, 96, 98, 99, 100
+          ];
+          shuffle(composites);
+          comp3 = composites.slice(0, 3);
+        } else {
+          // Hell Mode: Targets up to 120
+          let squares = [25, 36, 49, 64, 81, 100];
+          sq = squares[Math.floor(Math.random() * squares.length)];
 
-        let composites = [
-          12, 18, 24, 28, 30, 32, 36, 40, 42, 44, 45, 48, 50, 52, 54, 56, 60, 62, 63, 65, 66, 68, 70, 72, 74, 75, 76, 78, 80, 82, 84, 85, 86, 88, 90, 92, 94, 95, 96, 98, 99, 100
-        ];
-        shuffle(composites);
-        let comp3 = composites.slice(0, 3);
+          let primes = [43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113];
+          pr = primes[Math.floor(Math.random() * primes.length)];
 
-        sessionTargets = [sq, pr, ...comp3];
-      } else {
-        // Hell Mode: Targets up to 120
-        let squares = [25, 36, 49, 64, 81, 100];
-        let sq = squares[Math.floor(Math.random() * squares.length)];
-
-        let primes = [43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113];
-        let pr = primes[Math.floor(Math.random() * primes.length)];
-
-        let composites = [
-          60, 72, 80, 84, 90, 96, 100, 104, 108, 110, 112, 114, 116, 118, 120
-        ];
-        shuffle(composites);
-        let comp3 = composites.slice(0, 3);
-
-        sessionTargets = [sq, pr, ...comp3];
+          let composites = [
+            60, 72, 80, 84, 90, 96, 100, 104, 108, 110, 112, 114, 116, 118, 120
+          ];
+          shuffle(composites);
+          comp3 = composites.slice(0, 3);
+        }
+        
+        let testTargets = [sq, pr, ...comp3];
+        if (isValidTargetSet(testTargets)) {
+          sessionTargets = testTargets;
+          break;
+        }
+        attempts++;
       }
+      
+      if (sessionTargets.length === 0) {
+        sessionTargets = [16, 17, 12, 18, 30];
+      }
+
       shuffle(sessionTargets);
       
       currentQuestionIndex = 0;
@@ -1929,19 +2076,38 @@
     });
 
     btnNextLevel.addEventListener('click', () => {
+      if (!clearOverlay.classList.contains('active')) return;
       sound.playClick();
       if (countdownInterval) clearInterval(countdownInterval);
       clearOverlay.classList.remove('active');
       
       if (isFailMode) {
         isFailMode = false;
-        startNewGame();
-      } else {
-        if (currentQuestionIndex < 4) {
-          currentQuestionIndex++;
-          startNewGame();
+        if (inCommonFactorPhase) {
+          startCommonFactorQuestion();
         } else {
-          menuOverlay.classList.add('active');
+          startNewGame();
+        }
+      } else {
+        if (inCommonFactorPhase) {
+          if (commonFactorQuestionIndex < 2) {
+            commonFactorQuestionIndex++;
+            startCommonFactorQuestion();
+          } else {
+            inCommonFactorPhase = false;
+            commonFactorQuestionIndex = 0;
+            menuOverlay.classList.add('active');
+          }
+        } else {
+          if (currentQuestionIndex < 4) {
+            currentQuestionIndex++;
+            startNewGame();
+          } else {
+            generateCommonFactorPairs();
+            commonFactorQuestionIndex = 0;
+            inCommonFactorPhase = true;
+            startCommonFactorQuestion();
+          }
         }
       }
     });
@@ -1963,12 +2129,242 @@
         triggerFallingAnimation();
       }
     });
+
     document.getElementById('btn-top-menu').addEventListener('click', () => {
       sound.playClick();
       if (countdownInterval) clearInterval(countdownInterval);
       menuOverlay.classList.add('active');
       clearOverlay.classList.remove('active');
+      document.getElementById('common-factor-overlay').classList.remove('active');
+      inCommonFactorPhase = false;
     });
+
+    document.getElementById('btn-submit-cf-overlay').addEventListener('click', submitCommonFactors);
+
+    function generateCommonFactorPairs() {
+      let uniqueTargets = Array.from(new Set(sessionTargets));
+      if (uniqueTargets.length < 2) {
+        uniqueTargets.push(24);
+      }
+      
+      let allPairs = [];
+      for (let i = 0; i < uniqueTargets.length; i++) {
+        for (let j = i + 1; j < uniqueTargets.length; j++) {
+          allPairs.push([uniqueTargets[i], uniqueTargets[j]]);
+        }
+      }
+      
+      let excellent = allPairs.filter(p => gcd(p[0], p[1]) >= 3);
+      let okay = allPairs.filter(p => gcd(p[0], p[1]) === 2);
+      let coprime = allPairs.filter(p => gcd(p[0], p[1]) === 1);
+      
+      let selected = [];
+      shuffle(excellent);
+      shuffle(okay);
+      shuffle(coprime);
+      
+      if (excellent.length >= 3) {
+        if (Math.random() < 0.2 && okay.length >= 1) {
+          selected = excellent.slice(0, 2).concat(okay.slice(0, 1));
+        } else {
+          selected = excellent.slice(0, 3);
+        }
+      } else if (excellent.length === 2 && okay.length >= 1) {
+        selected = excellent.concat(okay.slice(0, 1));
+      } else {
+        let pool = excellent.concat(okay).concat(coprime);
+        selected = pool.slice(0, 3);
+      }
+      
+      shuffle(selected);
+      commonFactorTargets = selected;
+    }
+
+    function startCommonFactorQuestion() {
+      gameState = 'playing';
+      inCommonFactorPhase = true;
+      selectedCommonFactors = [];
+      commonFactorStep = 'select_factors';
+      selectedGCF = null;
+      magpies = [];
+
+      document.getElementById('pool-msg-overlay').style.display = 'none';
+      centerStone.style.display = 'none';
+
+      let pair = commonFactorTargets[commonFactorQuestionIndex];
+      commonFactorNumA = pair[0];
+      commonFactorNumB = pair[1];
+
+      targetValue.innerText = `找出 ${commonFactorNumA} 和 ${commonFactorNumB} 的公因數與最大公因數`;
+      hudProgressTxt.innerText = `公因數: ${commonFactorQuestionIndex + 1} / 3`;
+
+      basicInputPanel.style.display = 'none';
+      advancedInputPanel.style.display = 'none';
+      hellMatchedRow.style.display = 'none';
+      btnFinishHell.style.display = 'none';
+      
+      let factorsA = [];
+      for (let i = 1; i <= commonFactorNumA; i++) {
+        if (commonFactorNumA % i === 0) factorsA.push(i);
+      }
+      let factorsB = [];
+      for (let i = 1; i <= commonFactorNumB; i++) {
+        if (commonFactorNumB % i === 0) factorsB.push(i);
+      }
+      
+      correctCommonFactors = factorsA.filter(x => factorsB.includes(x));
+      correctGCF = Math.max(...correctCommonFactors);
+
+      const overlay = document.getElementById('common-factor-overlay');
+      overlay.classList.add('active');
+      
+      document.getElementById('cf-num-a').innerText = commonFactorNumA;
+      document.getElementById('cf-num-b').innerText = commonFactorNumB;
+      document.getElementById('cf-factors-a').innerText = factorsA.join(', ');
+      document.getElementById('cf-factors-b').innerText = factorsB.join(', ');
+      document.getElementById('cf-prompt-text').innerText = `🔮 請點擊選擇它們的所有「公因數」 🔮`;
+      document.getElementById('btn-submit-cf-overlay').innerText = `確認公因數 ➔`;
+
+      let optionPool = Array.from(new Set([...factorsA, ...factorsB])).sort((x, y) => x - y);
+      
+      const container = document.getElementById('cf-bubbles-container');
+      container.innerHTML = '';
+      
+      optionPool.forEach(val => {
+        let b = document.createElement('div');
+        b.className = 'bubble';
+        b.innerText = val;
+        b.addEventListener('click', () => {
+          if (commonFactorStep === 'select_factors') {
+            if (selectedCommonFactors.includes(val)) {
+              selectedCommonFactors = selectedCommonFactors.filter(x => x !== val);
+              b.classList.remove('selected');
+            } else {
+              selectedCommonFactors.push(val);
+              b.classList.add('selected');
+            }
+            sound.playClick();
+          } else if (commonFactorStep === 'select_gcf') {
+            if (selectedCommonFactors.includes(val)) {
+              container.querySelectorAll('.bubble').forEach(btn => btn.classList.remove('selected-gcf'));
+              b.classList.add('selected-gcf');
+              selectedGCF = val;
+              sound.playClick();
+            } else {
+              sound.playError();
+            }
+          }
+        });
+        container.appendChild(b);
+      });
+
+      bridgeCanvas.innerHTML = '';
+      slotsOverlay.innerHTML = '';
+      
+      let n = correctCommonFactors.length;
+      let startX = 200;
+      let endX = 800;
+      let step = n > 1 ? (endX - startX) / (n - 1) : 0;
+      let slotY = 420;
+
+      for (let i = 0; i < n; i++) {
+        let x = n > 1 ? startX + i * step : 500;
+        createSlotElement(correctCommonFactors.slice().sort((x, y) => x - y)[i], (x / 10), (slotY / 6), `common-slot-${i}`);
+      }
+
+      let deck = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      deck.setAttribute("id", "magpie-bridge-deck");
+      deck.setAttribute("d", "M 220 420 L 780 420");
+      deck.setAttribute("stroke", "rgba(255, 255, 255, 0.95)");
+      deck.setAttribute("stroke-width", "12");
+      deck.setAttribute("stroke-linecap", "round");
+      deck.style.display = "none";
+      deck.style.filter = "drop-shadow(0 0 10px rgba(255,255,255,0.85)) drop-shadow(0 0 4px #818cf8)";
+      bridgeCanvas.appendChild(deck);
+
+      cowherdBox.style.left = '12%';
+      cowherdBox.style.bottom = '30%';
+      cowherdBox.innerHTML = getCowherdSVG('idle');
+
+      weaverBox.style.left = '88%';
+      weaverBox.style.bottom = '30%';
+      weaverBox.innerHTML = getWeaverGirlSVG('idle');
+    }
+
+    function revealCommonFactorSlots() {
+      let sorted = correctCommonFactors.slice().sort((x, y) => x - y);
+      for (let i = 0; i < sorted.length; i++) {
+        let slot = document.getElementById(`common-slot-${i}`);
+        if (slot) {
+          slot.innerText = sorted[i];
+          slot.classList.add('filled');
+        }
+      }
+    }
+
+    function submitCommonFactors() {
+      if (gameState !== 'playing') return;
+      sound.playClick();
+
+      if (commonFactorStep === 'select_factors') {
+        let isCorrect = selectedCommonFactors.length === correctCommonFactors.length &&
+                        selectedCommonFactors.every(x => correctCommonFactors.includes(x));
+
+        if (isCorrect) {
+          sound.playSuccess();
+          revealCommonFactorSlots();
+          
+          commonFactorStep = 'select_gcf';
+          selectedGCF = null;
+          
+          document.getElementById('cf-prompt-text').innerText = `👑 答對了！請點擊選擇「最大公因數」 👑`;
+          document.getElementById('btn-submit-cf-overlay').innerText = `確認最大公因數 ➔`;
+
+          const container = document.getElementById('cf-bubbles-container');
+          container.querySelectorAll('.bubble').forEach(b => {
+            let val = parseInt(b.innerText);
+            if (correctCommonFactors.includes(val)) {
+              b.classList.remove('selected');
+            } else {
+              b.classList.add('fade-out');
+            }
+          });
+        } else {
+          sound.playError();
+          const container = document.getElementById('cf-bubbles-container');
+          container.querySelectorAll('.bubble').forEach(b => {
+            let val = parseInt(b.innerText);
+            let isCommon = correctCommonFactors.includes(val);
+            let isSel = selectedCommonFactors.includes(val);
+            if ((isSel && !isCommon) || (!isSel && isCommon)) {
+              b.classList.add('error-shake');
+              setTimeout(() => b.classList.remove('error-shake'), 400);
+            }
+          });
+        }
+      } else if (commonFactorStep === 'select_gcf') {
+        if (!selectedGCF) {
+          sound.playError();
+          return;
+        }
+
+        if (selectedGCF === correctGCF) {
+          gameState = 'building_bridge';
+          document.getElementById('common-factor-overlay').classList.remove('active');
+          buildMagpieBridgeAnimation();
+        } else {
+          sound.playError();
+          const container = document.getElementById('cf-bubbles-container');
+          container.querySelectorAll('.bubble').forEach(b => {
+            let val = parseInt(b.innerText);
+            if (val === selectedGCF) {
+              b.classList.add('error-shake');
+              setTimeout(() => b.classList.remove('error-shake'), 400);
+            }
+          });
+        }
+      }
+    }
 
     // 處理螢幕縮放，確保行動裝置能看到完整畫面
     function adjustScale() {
