@@ -919,202 +919,7 @@
       return familyArr[stageIndex];
     }
 
-    // Evolution animation overlay and transition effect
-    function triggerEvolutionAnimation(poke, oldStage, newStage) {
-      const studentName = students[currentStudentId].name;
-      const oldPokeData = POKEMON_DATA[poke.family][oldStage];
-      const newPokeData = POKEMON_DATA[poke.family][newStage];
-      
-      const ctx = window.audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-      window.audioCtx = ctx;
 
-      let isOld = true;
-      let count = 0;
-      let delay = 350;
-
-      // Create a full-screen fixed dark overlay covering everything!
-      const overlay = document.createElement('div');
-      overlay.id = 'evolution-overlay';
-      overlay.style.position = 'fixed';
-      overlay.style.inset = '0';
-      overlay.style.background = '#0d1322'; // Match screenshot dark navy blue
-      overlay.style.display = 'flex';
-      overlay.style.flexDirection = 'column';
-      overlay.style.alignItems = 'center';
-      overlay.style.justifyContent = 'center';
-      overlay.style.zIndex = '999999'; // On top of everything
-      overlay.style.fontFamily = "'Fredoka', 'Noto Sans TC', sans-serif";
-      overlay.style.overflow = 'hidden';
-      document.body.appendChild(overlay);
-
-      overlay.innerHTML = `
-        <div class="evolution-screen" style="display: flex; flex-direction: column; align-items: center; justify-content: space-between; height: 100%; width: 100%; max-width: 1000px; padding: 60px 20px; box-sizing: border-box; position: relative;">
-          
-          <!-- Middle: Pokemon sprite area -->
-          <div style="flex: 1; display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 20px;">
-            <div id="evolution-glow" style="position: absolute; width: 220px; height: 220px; background: radial-gradient(circle, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 70%); border-radius: 50%; transform: scale(1); transition: all 0.15s ease-out;"></div>
-            <img id="evolution-img" src="${oldPokeData.url}" style="width: 250px; height: 250px; object-fit: contain; filter: brightness(0) invert(1) drop-shadow(0 0 25px white); transform: scale(1); transition: all 0.1s ease-out; z-index: 2;" />
-          </div>
-
-          <!-- Bottom GBA Text Box -->
-          <div id="evolution-textbox" style="width: min(85%, 800px); border: 4px solid white; border-radius: 12px; background: rgba(13, 19, 34, 0.95); padding: 25px 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); display: flex; flex-direction: column; align-items: flex-start; justify-content: center; min-height: 120px; box-sizing: border-box;">
-            <div id="evolution-msg" style="font-size: clamp(1.2rem, 2.5vw, 1.8rem); font-weight: bold; color: #f8fafc; line-height: 1.6; text-align: left; width: 100%;">
-              咦？${studentName}的 ${oldPokeData.name} 樣子怪怪的...！
-            </div>
-          </div>
-        </div>
-      `;
-
-      const img = document.getElementById('evolution-img');
-      const glow = document.getElementById('evolution-glow');
-      const msg = document.getElementById('evolution-msg');
-      const textbox = document.getElementById('evolution-textbox');
-
-      const playWarningSound = (freqStart, freqEnd, duration) => {
-        const osc = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freqStart, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(freqEnd, ctx.currentTime + duration);
-        gainNode.gain.setValueAtTime(0.08, ctx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
-        osc.connect(gainNode);
-        gainNode.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + duration);
-      };
-
-      const flash = () => {
-        if (count < 22) {
-          isOld = !isOld;
-          img.src = isOld ? oldPokeData.url : newPokeData.url;
-          
-          playWarningSound(isOld ? 300 : 500, isOld ? 500 : 800, delay / 1000);
-
-          img.style.filter = 'brightness(0) invert(1) drop-shadow(0 0 25px white)';
-          img.style.transform = isOld ? 'scale(0.85)' : 'scale(1.2)';
-          glow.style.transform = isOld ? 'scale(0.8)' : 'scale(1.5)';
-
-          setTimeout(() => {
-            count++;
-            delay = Math.max(70, delay * 0.82);
-            setTimeout(flash, delay);
-          }, delay / 2);
-        } else {
-          img.src = newPokeData.url;
-          img.style.transform = 'scale(1.5)';
-          img.style.filter = 'brightness(1) drop-shadow(0 0 35px #eab308)';
-          glow.style.background = 'radial-gradient(circle, rgba(234,179,8,0.7) 0%, rgba(234,179,8,0) 70%)';
-          glow.style.transform = 'scale(2.5)';
-          
-          playTriumphantSound(ctx);
-
-          setTimeout(() => {
-            img.style.transform = 'scale(1.1)';
-            img.style.filter = 'drop-shadow(0 0 20px rgba(56,189,248,0.5))';
-            glow.style.transform = 'scale(1.2)';
-            glow.style.background = 'radial-gradient(circle, rgba(56,189,248,0.3) 0%, rgba(56,189,248,0) 70%)';
-            
-            msg.innerHTML = `
-              恭喜！你的 ${oldPokeData.name} 進化成了 <span style="color: #eab308; font-size: 1.2em; font-weight: 900; text-shadow: 0 0 10px rgba(234,179,8,0.5);">${newPokeData.name}</span>！🎉
-            `;
-
-            const container = document.querySelector('.evolution-screen');
-            for (let i = 0; i < 35; i++) {
-              createConfetti(container);
-            }
-
-            const btn = document.createElement('button');
-            btn.className = 'btn-reset';
-            btn.style.marginTop = '15px';
-            btn.style.padding = '8px 25px';
-            btn.style.fontSize = '1.05rem';
-            btn.style.fontWeight = 'bold';
-            btn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-            btn.style.color = 'white';
-            btn.style.border = 'none';
-            btn.style.borderRadius = '20px';
-            btn.style.boxShadow = '0 4px 15px rgba(16,185,129,0.4)';
-            btn.style.cursor = 'pointer';
-            btn.style.alignSelf = 'flex-end';
-            btn.style.transform = 'scale(1)';
-            btn.style.transition = 'all 0.2s';
-            btn.innerHTML = '太棒了！ <i class="fa-solid fa-thumbs-up"></i>';
-            btn.onmouseover = () => btn.style.transform = 'scale(1.06)';
-            btn.onmouseout = () => btn.style.transform = 'scale(1)';
-            
-            btn.onclick = () => {
-              overlay.remove();
-            };
-            textbox.appendChild(btn);
-          }, 600);
-        }
-      };
-
-      setTimeout(flash, 800);
-    }
-
-    function playTriumphantSound(ctx) {
-      const playNote = (freq, start, duration) => {
-        const osc = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(freq, start);
-        gainNode.gain.setValueAtTime(0.08, start);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, start + duration - 0.02);
-        osc.connect(gainNode);
-        gainNode.connect(ctx.destination);
-        osc.start(start);
-        osc.stop(start + duration);
-      };
-      
-      const now = ctx.currentTime;
-      playNote(523.25, now, 0.12);
-      playNote(587.33, now + 0.12, 0.12);
-      playNote(659.25, now + 0.24, 0.12);
-      playNote(698.46, now + 0.36, 0.12);
-      playNote(783.99, now + 0.48, 0.24);
-      playNote(880.00, now + 0.72, 0.48);
-    }
-
-    function createConfetti(parent) {
-      const confetti = document.createElement('div');
-      confetti.style.position = 'absolute';
-      confetti.style.width = '10px';
-      confetti.style.height = '10px';
-      confetti.style.borderRadius = '50%';
-      confetti.style.background = `hsl(${Math.random() * 360}, 100%, 60%)`;
-      confetti.style.pointerEvents = 'none';
-      confetti.style.zIndex = '10';
-      
-      const angle = Math.random() * Math.PI * 2;
-      const velocity = Math.random() * 8 + 4;
-      const vx = Math.cos(angle) * velocity;
-      const vy = Math.sin(angle) * velocity - 3;
-      
-      let x = 110 + (Math.random() * 60 - 30);
-      let y = 140 + (Math.random() * 60 - 30);
-      
-      confetti.style.left = `${x}px`;
-      confetti.style.top = `${y}px`;
-      parent.appendChild(confetti);
-      
-      let life = 60;
-      function step() {
-        x += vx;
-        y += vy;
-        confetti.style.left = `${x}px`;
-        confetti.style.top = `${y}px`;
-        confetti.style.opacity = life / 60;
-        life--;
-        if (life > 0) {
-          requestAnimationFrame(step);
-        } else {
-          confetti.remove();
-        }
-      }
-      requestAnimationFrame(step);
-    }
 
     // Render Content (Selection screen, Active Pokemon view, and Collection list)
     function renderContent() {
@@ -1133,7 +938,11 @@
             sessionStorage.setItem(sessionKey, 'true');
             const oldStage = activePoke.points === 100 ? 0 : 1;
             const newStage = activePoke.points === 100 ? 1 : 2;
-            triggerEvolutionAnimation(activePoke, oldStage, newStage);
+            const oldPoke = POKEMON_DATA[activePoke.family][oldStage];
+            const newPoke = POKEMON_DATA[activePoke.family][newStage];
+            triggerEvolution(student.name, oldPoke, newPoke, () => {
+              renderContent();
+            });
           }
         }
       }
@@ -1342,6 +1151,9 @@
       const flash = document.getElementById('evo-flash');
       const particles = document.getElementById('evo-particles');
       
+      const ctx = window.audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      window.audioCtx = ctx;
+
       overlay.style.display = 'flex';
       btnGroup.style.display = 'none';
       imgOld.src = oldPoke.url;
@@ -1357,6 +1169,20 @@
       particles.innerHTML = '';
       
       txt.textContent = `咦？${studentName}的 ${oldPoke.name} 樣子怪怪的...！`;
+
+      const playWarningSound = (freqStart, freqEnd, duration) => {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freqStart, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(freqEnd, ctx.currentTime + duration);
+        gainNode.gain.setValueAtTime(0.08, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+      };
       
       // Flashing animation
       setTimeout(() => {
@@ -1366,6 +1192,8 @@
         function flashStep() {
           if (delay > 50) {
             const showNew = flashCount % 2 === 1;
+            playWarningSound(showNew ? 300 : 500, showNew ? 500 : 800, delay / 1000);
+
             if (showNew) {
               imgOld.style.opacity = '0';
               imgNew.style.opacity = '1';
@@ -1384,6 +1212,8 @@
             function rapidFlash() {
               if (rapidCount < 12) {
                 const showNew = rapidCount % 2 === 1;
+                playWarningSound(showNew ? 300 : 500, showNew ? 500 : 800, 0.06);
+
                 imgOld.style.opacity = showNew ? '0' : '1';
                 imgNew.style.opacity = showNew ? '1' : '0';
                 imgOld.style.filter = 'brightness(0) invert(1) drop-shadow(0 0 20px white)';
@@ -1408,6 +1238,28 @@
         
         flash.style.transform = 'scale(2.5)';
         flash.style.opacity = '1';
+
+        // Play classic GBA level up/triumph fanfare
+        const playNote = (freq, start, duration) => {
+          const osc = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(freq, start);
+          gainNode.gain.setValueAtTime(0.08, start);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, start + duration - 0.02);
+          osc.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          osc.start(start);
+          osc.stop(start + duration);
+        };
+        
+        const now = ctx.currentTime;
+        playNote(523.25, now, 0.12);
+        playNote(587.33, now + 0.12, 0.12);
+        playNote(659.25, now + 0.24, 0.12);
+        playNote(698.46, now + 0.36, 0.12);
+        playNote(783.99, now + 0.48, 0.24);
+        playNote(880.00, now + 0.72, 0.48);
         
         setTimeout(() => {
           imgNew.style.transform = 'scale(1)';
@@ -3121,12 +2973,19 @@
               const oldPoke = familyArr[oldStage];
               const newPoke = familyArr[newStage];
               
-              triggerEvolution(newStudent.name, oldPoke, newPoke, () => {
-                // After evolution completes, check for new moves
-                syncMovesAndCheckPending(currentStudentId);
-                renderTabs();
-                renderContent();
-              });
+              // Set the sessionKey so that page-load does not trigger it again
+              const targetPoints = newStage === 1 ? 100 : 200;
+              const sessionKey = `has_seen_evolution_${newActive.family}_${targetPoints}`;
+              sessionStorage.setItem(sessionKey, 'true');
+
+              if (document.getElementById('evolution-overlay').style.display !== 'flex') {
+                triggerEvolution(newStudent.name, oldPoke, newPoke, () => {
+                  // After evolution completes, check for new moves
+                  syncMovesAndCheckPending(currentStudentId);
+                  renderTabs();
+                  renderContent();
+                });
+              }
               return;
             }
             
