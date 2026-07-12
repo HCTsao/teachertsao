@@ -1707,13 +1707,15 @@ showChoice(barrier) {
         this.drawScenery();
         this.drawFinishLine(); // 繪製終點線 (在背景上，但角色和障礙物之下)
         this.drawObstacles();
-        this.drawBarriers();
+        this.drawBarriersBackground(); // 先畫傳送門光幕背景
         this.drawParticles();
 
-        // 跳躍時角色上移
+        // 畫角色選手
         const groundY = this.canvas.height * 0.78;
         const py = groundY - this.playerJumpY;
         this.drawCharacter(this.playerX, py, this.selectedChar, this.stunnedTimer > 0, this.isJumping, this.isActionActive);
+
+        this.drawBarriersForeground(); // 後畫傳送門的前景柱子與橫梁牌子
 
         // 跳躍中風劫粒子
         if (this.isJumping) {
@@ -1921,83 +1923,94 @@ showChoice(barrier) {
         });
     },
 
-    drawBarriers() {
+drawBarriersBackground() {
         this.barriers.forEach(b => {
             const ctx = this.ctx;
             const gateY = b.y;
 
-            // 1. 繪製 4 根大柱子 (Pillars on the sides and lane dividers)
-            // 分別位於 roadX, roadX + laneWidth, roadX + 2*laneWidth, roadX + roadWidth
-            ctx.save();
-            for (let i = 0; i <= 3; i++) {
-                const px = this.roadX + i * this.laneWidth;
-                
-                // 柱身 (柱子立體感)
-                ctx.fillStyle = '#457b9d';
-                ctx.fillRect(px - 4, gateY - 70, 8, 70);
-                
-                // 柱頭裝飾 (金黃色圓球)
-                ctx.fillStyle = '#ffd166';
-                ctx.beginPath();
-                ctx.arc(px, gateY - 74, 6, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // 柱底座
-                ctx.fillStyle = '#1d3557';
-                ctx.fillRect(px - 6, gateY - 4, 12, 4);
-            }
-
-            // 2. 橫跨整條路的橫樑 (Girders at the top)
-            ctx.fillStyle = '#1d3557';
-            ctx.fillRect(this.roadX - 6, gateY - 70, this.roadWidth + 12, 10);
-
-            // 3. 針對三個跑道分別繪製傳送門與牌子
             b.laneOptions.forEach((timeText, lane) => {
-                const x = this.getLaneX(lane);
                 const left = this.roadX + lane * this.laneWidth;
                 const width = this.laneWidth;
 
                 // 傳送門光幕 (Portals energy shield)
                 if (!b.passed) {
-                    // 還沒答題：藍色傳送門光幕
                     ctx.fillStyle = 'rgba(69, 123, 157, 0.25)';
                     ctx.fillRect(left + 2, gateY - 60, width - 4, 60);
 
-                    // 光幕邊緣動態閃爍線
                     ctx.strokeStyle = 'rgba(69, 123, 157, 0.7)';
                     ctx.lineWidth = 2;
                     ctx.strokeRect(left + 2, gateY - 60, width - 4, 60);
                 } else {
-                    // 已經答題
                     if (lane === b.correctLane) {
-                        // 正確的門：綠色敞開 (透明無光幕，但有綠色流光邊框)
                         ctx.strokeStyle = '#2ecc71';
                         ctx.lineWidth = 4;
                         ctx.strokeRect(left + 4, gateY - 60, width - 8, 60);
 
-                        // 寫上一個綠色「OK」或「O」
                         ctx.fillStyle = 'rgba(46, 204, 113, 0.2)';
                         ctx.fillRect(left + 4, gateY - 60, width - 8, 60);
-                        ctx.fillStyle = '#2ecc71';
-                        ctx.font = '900 24px Arial';
-                        ctx.fillText('⭕', x, gateY - 30);
                     } else {
-                        // 錯誤的門：紅色關閉 (深紅光幕 + 鎖頭圖案)
                         ctx.fillStyle = 'rgba(231, 76, 60, 0.4)';
                         ctx.fillRect(left + 2, gateY - 60, width - 4, 60);
 
                         ctx.strokeStyle = '#e74c3c';
                         ctx.lineWidth = 3;
                         ctx.strokeRect(left + 2, gateY - 60, width - 4, 60);
+                    }
+                }
+            });
+        });
+    },
 
-                        // 寫上紅色「X」
+    drawBarriersForeground() {
+        this.barriers.forEach(b => {
+            const ctx = this.ctx;
+            const gateY = b.y;
+
+            // 1. 繪製 4 根大柱子
+            ctx.save();
+            for (let i = 0; i <= 3; i++) {
+                const px = this.roadX + i * this.laneWidth;
+                
+                ctx.fillStyle = '#457b9d';
+                ctx.fillRect(px - 4, gateY - 70, 8, 70);
+                
+                ctx.fillStyle = '#ffd166';
+                ctx.beginPath();
+                ctx.arc(px, gateY - 74, 6, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = '#1d3557';
+                ctx.fillRect(px - 6, gateY - 4, 12, 4);
+            }
+
+            // 2. 橫跨整條路的橫樑
+            ctx.fillStyle = '#1d3557';
+            ctx.fillRect(this.roadX - 6, gateY - 70, this.roadWidth + 12, 10);
+
+            // 3. 繪製勾勾與叉叉符號以及告示牌
+            b.laneOptions.forEach((timeText, lane) => {
+                const x = this.getLaneX(lane);
+                const left = this.roadX + lane * this.laneWidth;
+                const width = this.laneWidth;
+
+                if (b.passed) {
+                    ctx.save();
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    if (lane === b.correctLane) {
+                        ctx.fillStyle = '#2ecc71';
+                        ctx.font = '900 24px Arial';
+                        ctx.fillText('⭕', x, gateY - 30);
+                    } else {
                         ctx.fillStyle = '#e74c3c';
                         ctx.font = '900 24px Arial';
                         ctx.fillText('❌', x, gateY - 30);
                     }
+                    ctx.restore();
                 }
 
-                // 4. 掛在橫樑下方的告示牌 (Option display boards)
+                // 4. 告示牌
+                ctx.save();
                 ctx.fillStyle = 'rgba(29, 53, 87, 0.95)';
                 ctx.beginPath();
                 ctx.roundRect(x - 52, gateY - 100, 104, 26, 8);
@@ -2006,7 +2019,6 @@ showChoice(barrier) {
                 ctx.lineWidth = 1.5;
                 ctx.stroke();
 
-                // 告示牌吊索 (Hanger lines)
                 ctx.strokeStyle = '#1d3557';
                 ctx.lineWidth = 2;
                 ctx.beginPath();
@@ -2014,18 +2026,18 @@ showChoice(barrier) {
                 ctx.moveTo(x + 30, gateY - 70); ctx.lineTo(x + 30, gateY - 74);
                 ctx.stroke();
 
-                // 告示牌選項文字 (Option text)
                 ctx.fillStyle = '#ffffff';
                 ctx.font = '900 13px "Noto Sans TC", sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(timeText, x, gateY - 87);
+                ctx.restore();
             });
             ctx.restore();
         });
     },
 
-    drawParticles() {
+        drawParticles() {
         this.particles.forEach(p => {
             this.ctx.save();
             this.ctx.globalAlpha = p.alpha;
