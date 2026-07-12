@@ -112,7 +112,7 @@
             
             toggleLoading(true, "老師正在為你出題...");
 
-            const prompt = `[指令：你是一位專業的國語老師。]\n請針對詞語「${word}」提供一個國小生活化的造句練習情境。要求：1. 情境中絕對不可出現「${word}」這四個字。2. 包含一個逗號與一個句號。`;
+            const prompt = `[指令：你是一位專業的國語老師。]\n請針對詞語「${word}」提供一個國小生活化的造句練習情境。要求：1. 情境中絕對不可出現「${word}」這四個字。2. 包含一個逗號與一個句號。\n\n請務必只回覆 JSON 格式，格式如下：\n{"scenario": "這裡填寫情境內容"}`;
             
             const result = await callGemini(prompt);
             
@@ -123,7 +123,12 @@
                 return;
             }
 
-            scenarioText = result;
+            try {
+                const jsonObj = JSON.parse(result);
+                scenarioText = jsonObj.scenario || result;
+            } catch (e) {
+                scenarioText = result.replace(/```json/g, '').replace(/```/g, '').trim();
+            }
             renderPracticePage();
         }
 
@@ -164,7 +169,7 @@
             toggleLoading(true, "老師正在評分與分析中...");
 
             const word = WORD_LIST[currentWordIndex].word;
-            const prompt = `[指令：你是一位嚴格且專業的國語老師，請執行五星級造句法批改。]\n\n練習情境：${scenarioText}\n學生造句：「${lastStudentInput}」\n目標語詞：${word}\n\n回覆要求：\n1. 標註星星數量 (1-5星)。\n2. 修改處用 <span class='red-mark'>內容</span> 標記，並保留目標詞。\n\n請嚴格按此格式回覆：\n[星星數量]數字\n[修改句子]內容\n[評語]內容\n[參考例句]內容`;
+            const prompt = `[指令：你是一位嚴格且專業的國語老師，請執行五星級造句法批改。]\n\n練習情境：${scenarioText}\n學生造句：「${lastStudentInput}」\n目標語詞：${word}\n\n回覆要求：\n1. 標註星星數量 (1-5星)。\n2. 修改處用 <span class='red-mark'>內容</span> 標記，並保留目標詞。\n\n請務必只回覆 JSON 格式，包含以下 keys：\n{"stars": 數字(1到5), "modified": "修改後的句子", "comment": "老師評語", "example": "五星級參考例句"}`;
 
             const result = await callGemini(prompt);
             
@@ -178,16 +183,32 @@
                 return;
             }
 
-            const cleanFeedback = feedback.replace(/\*/g, '');
-            const starMatch = cleanFeedback.match(/\[?星星數量\]?\s*[:：]?\s*(\d)/);
-            const modifiedMatch = cleanFeedback.match(/\[?修改(?:句子|建議)\]?\s*[:：]?\s*([\s\S]*?)(?=\[?(?:老師)?評語\]?[:：]?|$)/);
-            const commentMatch = cleanFeedback.match(/\[?(?:老師)?評語\]?\s*[:：]?\s*([\s\S]*?)(?=\[?(?:參考|五星級)?例句\]?[:：]?|$)/);
-            const exampleMatch = cleanFeedback.match(/\[?(?:參考|五星級)?例句\]?\s*[:：]?\s*([\s\S]*)/);
+            let starCount = 0;
+            let modifiedSentence = "解析失敗";
+            let comment = "無評語";
+            let example = "無範例";
 
-            const starCount = starMatch ? parseInt(starMatch[1]) : 0;
-            const modifiedSentence = modifiedMatch ? modifiedMatch[1].trim() : "解析失敗";
-            const comment = commentMatch ? commentMatch[1].trim() : "無評語";
-            const example = exampleMatch ? exampleMatch[1].trim() : "無範例";
+            try {
+                // 嘗試解析 JSON (Groq 支援 json_object 模式)
+                const cleanJsonStr = feedback.replace(/```json/g, '').replace(/```/g, '').trim();
+                const jsonObj = JSON.parse(cleanJsonStr);
+                starCount = parseInt(jsonObj.stars) || 0;
+                modifiedSentence = jsonObj.modified || "解析失敗";
+                comment = jsonObj.comment || "無評語";
+                example = jsonObj.example || "無範例";
+            } catch (e) {
+                // 如果 JSON 解析失敗，退回正則表達式解析
+                const cleanFeedback = feedback.replace(/\*/g, '');
+                const starMatch = cleanFeedback.match(/\[?星星數量\]?\s*[:：]?\s*(\d)/);
+                const modifiedMatch = cleanFeedback.match(/\[?修改(?:句子|建議)\]?\s*[:：]?\s*([\s\S]*?)(?=\[?(?:老師)?評語\]?[:：]?|$)/);
+                const commentMatch = cleanFeedback.match(/\[?(?:老師)?評語\]?\s*[:：]?\s*([\s\S]*?)(?=\[?(?:參考|五星級)?例句\]?[:：]?|$)/);
+                const exampleMatch = cleanFeedback.match(/\[?(?:參考|五星級)?例句\]?\s*[:：]?\s*([\s\S]*)/);
+
+                starCount = starMatch ? parseInt(starMatch[1]) : 0;
+                modifiedSentence = modifiedMatch ? modifiedMatch[1].trim() : "解析失敗";
+                comment = commentMatch ? commentMatch[1].trim() : "無評語";
+                example = exampleMatch ? exampleMatch[1].trim() : "無範例";
+            }
 
             let starsHtml = "";
             for (let i = 1; i <= 5; i++) {
@@ -226,7 +247,8 @@
             
             const payload = {
                 model: "llama-3.3-70b-versatile",
-                messages: [{ role: "user", content: promptText }]
+                messages: [{ role: "user", content: promptText }],
+                response_format: { type: "json_object" }
             };
 
             for (let i = 0; i < 3; i++) {
