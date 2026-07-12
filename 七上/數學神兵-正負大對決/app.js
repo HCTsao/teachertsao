@@ -741,6 +741,9 @@ function updatePvpRoleLabels() {
 
 // 紀錄學生作答數據並上傳至本地教師後台
 function recordStudentAnswer(questionText, selectedOption, isCorrect, customStudentInfo = null) {
+  // 教師後台只要收入學生答錯的題目，不需要收入正確的題目
+  if (isCorrect) return;
+
   const studentInfoInput = document.getElementById('input-student-info');
   const defaultInfo = studentInfoInput ? studentInfoInput.value.trim() : '未命名學生';
   const studentInfo = customStudentInfo || defaultInfo;
@@ -2998,6 +3001,10 @@ function handleOnlineMessage(data) {
 
     case 'sync_record':
       try {
+        // 如果對方送過來的是正確作答紀錄，也不予存檔
+        if (data.record && data.record.isCorrect) {
+          break;
+        }
         const records = JSON.parse(localStorage.getItem('math_hero_records') || '[]');
         records.unshift(data.record);
         localStorage.setItem('math_hero_records', JSON.stringify(records));
