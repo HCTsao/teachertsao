@@ -520,6 +520,24 @@
     </div>
   </div>
 
+  <!-- Adjust Moveset Setup Overlay -->
+  <div id="moves-setup-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; font-family: 'Fredoka', 'Noto Sans TC', monospace; color: white; padding: 20px; user-select: none;">
+    <div style="width: 90%; max-width: 500px; background: #1e293b; border: 4px solid #f8fafc; border-radius: 8px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+      <div style="font-size: 1.2rem; font-weight: 800; color: #fbbf24; margin-bottom: 10px; text-align: center;"><i class="fa-solid fa-gears"></i> 調整目前配置的招式</div>
+      <div style="font-size: 0.9rem; color: #cbd5e1; margin-bottom: 20px; text-align: center; font-weight: 500;">請選擇最多 4 個招式帶入對戰：</div>
+      <div id="moves-setup-grid" style="display: grid; grid-template-columns: 1fr; gap: 10px; max-height: 250px; overflow-y: auto; padding-right: 5px;">
+        <!-- Dynamically generated move checkboxes -->
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px;">
+        <span id="moves-setup-count" style="font-size: 0.95rem; font-weight: bold; color: #94a3b8;">已選: 0 / 4</span>
+        <div style="display: flex; gap: 10px;">
+          <button onclick="closeMoveLibrarySelector(false)" style="background: #475569; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: 700; cursor: pointer; font-family: inherit;">取消</button>
+          <button onclick="closeMoveLibrarySelector(true)" id="btn-save-moveset" style="background: #eab308; color: #0f172a; border: none; padding: 8px 24px; font-weight: 900; border-radius: 4px; cursor: pointer; font-family: inherit;">保存配置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <a href="二年甲班電子聯絡簿.html" class="btn-return"><i class="fa-solid fa-arrow-left"></i> 回聯絡簿</a>
 
   <button onclick="toggleBattleView(true)" style="position: absolute; top: 20px; right: 20px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: 700; box-shadow: var(--shadow-sm); display: flex; align-items: center; gap: 8px; cursor: pointer; transition: transform 0.2s; z-index: 100;" id="btn-goto-battle">
@@ -796,39 +814,26 @@
       const level = Math.floor(poke.points / 10);
       const pool = MOVES_POOL[poke.family];
       
-      if (!poke.moves) {
-        poke.moves = ["撞擊"];
+      if (!poke.moveLibrary) {
+        poke.moveLibrary = [];
       }
 
-      // 1. Auto-learn unlocked moves if slots are empty (< 4)
       let changed = false;
       const unlocked = pool.filter(m => m.level <= level);
-      
       for (let m of unlocked) {
-        if (!poke.moves.includes(m.name) && poke.moves.length < 4) {
-          poke.moves.push(m.name);
+        if (!poke.moveLibrary.includes(m.name)) {
+          poke.moveLibrary.push(m.name);
           changed = true;
         }
       }
 
-      if (changed) {
-        saveData();
+      if (!poke.moves || poke.moves.length === 0) {
+        poke.moves = poke.moveLibrary.slice(0, 4);
+        changed = true;
       }
 
-      // 2. If moveset is full (4 moves) and there are still unlearned unlocked moves, prompt GBA learning
-      const unlearned = unlocked.filter(m => !poke.moves.includes(m.name));
-      if (unlearned.length > 0) {
-        learningState = {
-          studentId: studentId,
-          poke: poke,
-          pendingMoves: unlearned,
-          currentNewMove: null,
-          callback: () => {
-            renderTabs();
-            renderContent();
-          }
-        };
-        processNextMoveLearning();
+      if (changed) {
+        saveData();
       }
     }
 
@@ -1001,9 +1006,14 @@
             </div>
 
             <!-- Current Moves Grid -->
-            <div style="margin-bottom: 20px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; max-width: 400px;">
-              <div style="font-size: 0.85rem; font-weight: 800; color: #64748b; width: 100%; margin-bottom: 5px;"><i class="fa-solid fa-gamepad"></i> 當前學會的招式</div>
-              ${movesListHTML}
+            <div style="margin-bottom: 20px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; max-width: 400px; width: 100%;">
+              <div style="font-size: 0.85rem; font-weight: 800; color: #64748b; width: 100%; margin-bottom: 5px; display: flex; align-items: center; justify-content: space-between;">
+                <span><i class="fa-solid fa-gamepad"></i> 當前配置的招式</span>
+                <button onclick="openMoveLibrarySelector()" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; padding: 4px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; font-family: inherit; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: transform 0.1s;">調整配招</button>
+              </div>
+              <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; width: 100%;">
+                ${movesListHTML}
+              </div>
             </div>
 
             ${stampCardHTML}
@@ -1235,52 +1245,22 @@
         return;
       }
 
-      // Initialize moves array if missing
-      if (!poke.moves) {
-        initializeDefaultMoves(poke);
-        saveData();
-      }
-
       const pool = MOVES_POOL[poke.family];
-      // Find all moves unlocked in level range (oldLevel < level <= newLevel)
       const newUnlocked = pool.filter(m => m.level > oldLevel && m.level <= newLevel);
       
-      // Filter out moves they already know
-      const pending = newUnlocked.filter(m => !poke.moves.includes(m.name));
+      // Add to library
+      if (!poke.moveLibrary) poke.moveLibrary = [];
+      let addedNames = [];
+      newUnlocked.forEach(m => {
+        if (!poke.moveLibrary.includes(m.name)) {
+          poke.moveLibrary.push(m.name);
+          addedNames.push(m.name);
+        }
+      });
 
-      if (pending.length === 0) {
-        callback();
-        return;
-      }
-
-      learningState = {
-        studentId: studentId,
-        poke: poke,
-        pendingMoves: pending,
-        currentNewMove: null,
-        callback: callback
-      };
-
-      processNextMoveLearning();
-    }
-
-    function processNextMoveLearning() {
-      if (learningState.pendingMoves.length === 0) {
+      if (addedNames.length > 0) {
         saveData();
-        learningState.callback();
-        return;
-      }
-
-      const newMove = learningState.pendingMoves.shift();
-      learningState.currentNewMove = newMove;
-      
-      const poke = learningState.poke;
-      const pokeData = getCurrentPokemon(poke);
-
-      if (poke.moves.length < 4) {
-        // Automatically learn if slots are not full
-        poke.moves.push(newMove.name);
-        
+        // Show unlock popup
         const overlay = document.getElementById('move-learn-overlay');
         const txt = document.getElementById('move-learn-text');
         const choices = document.getElementById('move-learn-choices');
@@ -1294,62 +1274,51 @@
           <button onclick="acknowledgeAutoLearn()" style="background: #eab308; color: #0f172a; border: none; padding: 8px 24px; font-weight: 900; border-radius: 4px; cursor: pointer; font-family: inherit;">確定</button>
         `;
         
-        txt.textContent = `${students[learningState.studentId].name}的 ${pokeData.name} 升到了 Lv.${newMove.level}！\n學會了新招式「${newMove.name}」！`;
+        const pokeData = getCurrentPokemon(poke);
+        txt.innerHTML = `${student.name}的 ${pokeData.name} 升到了 Lv.${newLevel}！<br>學會了新招式：<br><strong>${addedNames.join('、')}</strong><br>已加入招式庫，可至個人頁面調整配招！`;
+        
+        learningState.callback = callback;
       } else {
-        // Prompt forget decision if slots are full (4 moves)
-        const overlay = document.getElementById('move-learn-overlay');
-        const txt = document.getElementById('move-learn-text');
-        const choices = document.getElementById('move-learn-choices');
-        const replaceList = document.getElementById('move-replace-list');
-
-        overlay.style.display = 'flex';
-        choices.style.display = 'flex';
-        replaceList.style.display = 'none';
-
-        choices.innerHTML = `
-          <button onclick="rejectNewMove()" style="background: #64748b; color: white; border: none; padding: 8px 20px; font-weight: 700; border-radius: 4px; cursor: pointer; margin-right: 10px; font-family: inherit;">放棄</button>
-          <button onclick="promptForgetSelection()" style="background: #eab308; color: #0f172a; border: none; padding: 8px 20px; font-weight: 900; border-radius: 4px; cursor: pointer; font-family: inherit;">遺忘舊招式</button>
-        `;
-
-        txt.textContent = `${students[learningState.studentId].name}的 ${pokeData.name} 想要學習新招式「${newMove.name}」。\n但是，它最多只能記住4個招式。要遺忘一個招式來學習「${newMove.name}」嗎？`;
+        callback();
       }
     }
 
     function acknowledgeAutoLearn() {
       const overlay = document.getElementById('move-learn-overlay');
       overlay.style.display = 'none';
-      processNextMoveLearning();
+      if (learningState.callback) {
+        const cb = learningState.callback;
+        learningState.callback = null;
+        cb();
+      }
     }
 
-    function rejectNewMove() {
-      const overlay = document.getElementById('move-learn-overlay');
-      const txt = document.getElementById('move-learn-text');
-      const choices = document.getElementById('move-learn-choices');
+    let selectedSetupMoves = [];
+
+    function openMoveLibrarySelector() {
+      const student = students[currentStudentId];
+      if (!student || student.pokemons.length === 0) return;
+      const activeIndex = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < student.pokemons.length) ? student.activePokemonIndex : (student.pokemons.length - 1);
+      const poke = student.pokemons[activeIndex];
       
-      const poke = learningState.poke;
-      const pokeData = getCurrentPokemon(poke);
-
-      choices.innerHTML = `
-        <button onclick="acknowledgeReject()" style="background: #eab308; color: #0f172a; border: none; padding: 8px 24px; font-weight: 900; border-radius: 4px; cursor: pointer; font-family: inherit;">確定</button>
-      `;
-      txt.textContent = `${pokeData.name} 放棄學習「${learningState.currentNewMove.name}」。`;
-    }
-
-    function acknowledgeReject() {
-      const overlay = document.getElementById('move-learn-overlay');
-      overlay.style.display = 'none';
-      processNextMoveLearning();
-    }
-
-    function promptForgetSelection() {
-      const choices = document.getElementById('move-learn-choices');
-      const replaceList = document.getElementById('move-replace-list');
-      const grid = document.getElementById('move-replace-grid');
+      if (!poke.moveLibrary) {
+        poke.moveLibrary = [];
+      }
+      // Ensure all unlocked moves are in the library
+      const level = Math.floor(poke.points / 10);
+      const pool = MOVES_POOL[poke.family];
+      const unlocked = pool.filter(m => m.level <= level);
+      unlocked.forEach(m => {
+        if (!poke.moveLibrary.includes(m.name)) {
+          poke.moveLibrary.push(m.name);
+        }
+      });
       
-      choices.style.display = 'none';
-      replaceList.style.display = 'flex';
-      grid.innerHTML = "";
+      selectedSetupMoves = [...(poke.moves || [])];
 
+      const grid = document.getElementById('moves-setup-grid');
+      grid.innerHTML = '';
+      
       const typeLabels = {
         fire: '<span style="font-size: 0.7rem; background: #ef4444; color: white; padding: 1px 4px; border-radius: 3px; margin-left: 4px; font-weight: bold;">🔥火</span>',
         water: '<span style="font-size: 0.7rem; background: #3b82f6; color: white; padding: 1px 4px; border-radius: 3px; margin-left: 4px; font-weight: bold;">💧水</span>',
@@ -1358,53 +1327,81 @@
         status: '<span style="font-size: 0.7rem; background: #eab308; color: #1e293b; padding: 1px 4px; border-radius: 3px; margin-left: 4px; font-weight: bold;">✨變</span>'
       };
 
-      const poke = learningState.poke;
-      poke.moves.forEach((moveName, index) => {
-        const move = MOVES_DETAILS_MAP[moveName];
-        const btn = document.createElement('button');
-        btn.className = 'btn-battle-move';
-        btn.style.color = '#ef4444';
-        btn.style.borderColor = '#ef4444';
-        btn.style.padding = '12px';
-        btn.innerHTML = `${moveName} ${typeLabels[move.type]}`;
-        btn.onclick = () => replaceMoveWith(index);
-        grid.appendChild(btn);
+      poke.moveLibrary.forEach(name => {
+        const move = MOVES_DETAILS_MAP[name];
+        const isChecked = selectedSetupMoves.includes(name);
+        
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.alignItems = 'center';
+        row.style.justifyContent = 'space-between';
+        row.style.background = isChecked ? 'rgba(234, 179, 8, 0.15)' : 'rgba(255,255,255,0.05)';
+        row.style.border = isChecked ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.1)';
+        row.style.padding = '10px 15px';
+        row.style.borderRadius = '6px';
+        row.style.cursor = 'pointer';
+        row.style.transition = 'all 0.2s';
+        
+        row.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px; font-weight: 700;">
+            <span>${name}</span>
+            ${typeLabels[move.type]}
+            <span style="font-size: 0.75rem; color: #94a3b8;">(威力: ${move.power || '-'})</span>
+          </div>
+          <input type="checkbox" style="width: 18px; height: 18px; cursor: pointer;" ${isChecked ? 'checked' : ''}>
+        `;
+        
+        const checkbox = row.querySelector('input');
+        const toggle = () => {
+          const index = selectedSetupMoves.indexOf(name);
+          if (index > -1) {
+            selectedSetupMoves.splice(index, 1);
+            row.style.background = 'rgba(255,255,255,0.05)';
+            row.style.border = '1px solid rgba(255,255,255,0.1)';
+            checkbox.checked = false;
+          } else {
+            if (selectedSetupMoves.length >= 4) {
+              alert("最多只能配置 4 個招式帶入對戰！");
+              return;
+            }
+            selectedSetupMoves.push(name);
+            row.style.background = 'rgba(234, 179, 8, 0.15)';
+            row.style.border = '1px solid #eab308';
+            checkbox.checked = true;
+          }
+          document.getElementById('moves-setup-count').textContent = `已選: ${selectedSetupMoves.length} / 4`;
+        };
+        
+        row.onclick = (e) => {
+          if (e.target !== checkbox) toggle();
+        };
+        checkbox.onchange = (e) => {
+          e.stopPropagation();
+          checkbox.checked = !checkbox.checked;
+          toggle();
+        };
+        
+        grid.appendChild(row);
       });
+      
+      document.getElementById('moves-setup-count').textContent = `已選: ${selectedSetupMoves.length} / 4`;
+      document.getElementById('moves-setup-overlay').style.display = 'flex';
     }
-
-    function cancelMoveReplace() {
-      const choices = document.getElementById('move-learn-choices');
-      const replaceList = document.getElementById('move-replace-list');
-      choices.style.display = 'flex';
-      replaceList.style.display = 'none';
-    }
-
-    function replaceMoveWith(index) {
-      const poke = learningState.poke;
-      const pokeData = getCurrentPokemon(poke);
-      const oldMove = poke.moves[index];
-      const newMove = learningState.currentNewMove.name;
-
-      poke.moves[index] = newMove;
-
-      const overlay = document.getElementById('move-learn-overlay');
-      const txt = document.getElementById('move-learn-text');
-      const choices = document.getElementById('move-learn-choices');
-      const replaceList = document.getElementById('move-replace-list');
-
-      replaceList.style.display = 'none';
-      choices.style.display = 'flex';
-      choices.innerHTML = `
-        <button onclick="acknowledgeReplaceSuccess()" style="background: #eab308; color: #0f172a; border: none; padding: 8px 24px; font-weight: 900; border-radius: 4px; cursor: pointer; font-family: inherit;">確定</button>
-      `;
-
-      txt.innerHTML = `噠噠噠！<br>${pokeData.name} 忘記了「${oldMove}」...<br>並且，學會了「${newMove}」！`;
-    }
-
-    function acknowledgeReplaceSuccess() {
-      const overlay = document.getElementById('move-learn-overlay');
-      overlay.style.display = 'none';
-      processNextMoveLearning();
+    
+    function closeMoveLibrarySelector(save) {
+      if (save) {
+        if (selectedSetupMoves.length === 0) {
+          alert("請至少選擇 1 個招式帶入對戰！");
+          return;
+        }
+        const student = students[currentStudentId];
+        const activeIndex = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < student.pokemons.length) ? student.activePokemonIndex : (student.pokemons.length - 1);
+        const poke = student.pokemons[activeIndex];
+        poke.moves = [...selectedSetupMoves];
+        saveData();
+        renderContent();
+      }
+      document.getElementById('moves-setup-overlay').style.display = 'none';
     }
 
 
