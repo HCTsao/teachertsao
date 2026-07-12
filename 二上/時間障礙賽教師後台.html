@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>時間障礙賽：教師管理後台</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase SDK (v8 Namespace version) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        :root {
+            --primary: #1d3557;
+            --secondary: #457b9d;
+            --accent: #e76f51;
+            --bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --text: #2b2d42;
+            --success: #2ecc71;
+            --border: #e9ecef;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            background-color: var(--primary);
+            color: #fff;
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-title h1 {
+            font-size: 1.6rem;
+            font-weight: 900;
+            margin-bottom: 5px;
+        }
+
+        .header-title p {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .btn {
+            background-color: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary);
+        }
+
+        .btn-danger {
+            background-color: #e63946;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border: 1px solid var(--border);
+        }
+
+        .stat-card h3 {
+            font-size: 0.9rem;
+            color: #6c757d;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .value {
+            font-size: 2.2rem;
+            font-weight: 900;
+            color: var(--primary);
+        }
+
+        .controls-card {
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .input-group {
+            flex: 1;
+            min-width: 200px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .input-group label {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #6c757d;
+        }
+
+        .input-group input, .input-group select {
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            outline: none;
+            font-family: inherit;
+        }
+
+        .table-card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: #f1f3f5;
+            color: #495057;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .seat-badge {
+            background-color: var(--secondary);
+            color: #fff;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+
+        .wrong-badge {
+            background-color: #fde8e8;
+            color: #e63946;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+
+        .correct-badge {
+            background-color: #eafaf1;
+            color: var(--success);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+
+        .loading {
+            padding: 40px;
+            text-align: center;
+            color: #6c757d;
+            font-weight: 700;
+        }
+
+        .empty-state {
+            padding: 40px;
+            text-align: center;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="header-title">
+            <h1>⏰ 時間障礙賽：教師管理後台</h1>
+            <p>即時監控班級學生作答狀況與錯誤類型分析</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" onclick="location.href='../index.html'"><i class="fa-solid fa-house"></i> 首頁</button>
+            <button class="btn btn-danger" onclick="clearLogs()"><i class="fa-solid fa-trash"></i> 清除作答紀錄</button>
+        </div>
+    </header>
+
+    <!-- 儀表板數據 -->
+    <div class="dashboard-grid">
+        <div class="stat-card">
+            <h3>📊 累計錯題筆數</h3>
+            <div class="value" id="stat-total-errors">0 筆</div>
+        </div>
+        <div class="stat-card">
+            <h3>👥 錯題學生人數</h3>
+            <div class="value" id="stat-total-students">0 人</div>
+        </div>
+        <div class="stat-card">
+            <h3>🔴 易錯時間</h3>
+            <div class="value" id="stat-common-error">無</div>
+        </div>
+    </div>
+
+    <!-- 篩選控制器 -->
+    <div class="controls-card">
+        <div class="input-group">
+            <label for="search-input">搜尋學生姓名或座號</label>
+            <input type="text" id="search-input" placeholder="輸入關鍵字...">
+        </div>
+        <div class="input-group">
+            <label for="question-filter">篩選題目時間</label>
+            <select id="question-filter">
+                <option value="all">全部題目</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- 表格 -->
+    <div class="table-card">
+        <div id="loading-el" class="loading">
+            <i class="fa-solid fa-spinner fa-spin"></i> 正在連線至 Firebase 資料庫...
+        </div>
+        <table id="data-table" style="display: none;">
+            <thead>
+                <tr>
+                    <th style="width: 100px;">座號</th>
+                    <th style="width: 150px;">姓名</th>
+                    <th>題目 (正確答案)</th>
+                    <th>學生的錯誤選擇</th>
+                    <th>作答時間</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                <!-- 動態注入 -->
+            </tbody>
+        </table>
+        <div id="empty-el" class="empty-state" style="display: none;">
+            📭 目前尚無學生作答錯誤紀錄。
+        </div>
+    </div>
+</div>
+
+<script>
+    // Firebase 連線設定
+    const firebaseConfig = {
+        apiKey: "AIzaSyCFNaVRETt862_As1hF7Mfyr22pKM5-lvk",
+        authDomain: "chickenrabbit-ea442.firebaseapp.com",
+        databaseURL: "https://chickenrabbit-ea442-default-rtdb.firebaseio.com",
+        projectId: "chickenrabbit-ea442",
+        storageBucket: "chickenrabbit-ea442.appspot.com",
+        messagingSenderId: "65728951973",
+        appId: "1:65728951973:web:efff912caf5f6f185abf4c"
+    };
+
+    let db = null;
+    let allRecords = {};
+
+    try {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.database();
+        console.log("Firebase 初始化成功！");
+        listenToDatabase();
+    } catch (e) {
+        console.error("Firebase 初始化失敗：", e);
+        document.getElementById('loading-el').innerHTML = "⚠️ Firebase 初始化失敗，請檢查網路連線。";
+    }
+
+    function listenToDatabase() {
+        db.ref('time_race_errors').on('value', (snapshot) => {
+            allRecords = snapshot.val() || {};
+            document.getElementById('loading-el').style.display = 'none';
+            document.getElementById('data-table').style.display = 'table';
+            updateStatsAndFilters();
+            renderTable();
+        }, (err) => {
+            console.error(err);
+            document.getElementById('loading-el').innerHTML = "⚠️ 讀取資料失敗，請確認 Firebase 設定權限。";
+        });
+    }
+
+    function updateStatsAndFilters() {
+        const records = Object.values(allRecords);
+        
+        // 1. 總筆數
+        document.getElementById('stat-total-errors').textContent = `${records.length} 筆`;
+
+        // 2. 學生去重
+        const students = new Set();
+        const questions = new Set();
+        const questionCounts = {};
+
+        records.forEach(rec => {
+            if (rec.name) students.add(`${rec.seat}_${rec.name}`);
+            if (rec.question) {
+                questions.add(rec.question);
+                questionCounts[rec.question] = (questionCounts[rec.question] || 0) + 1;
+            }
+        });
+
+        document.getElementById('stat-total-students').textContent = `${students.size} 人`;
+
+        // 3. 最常錯時間
+        let commonError = '無';
+        let maxCount = 0;
+        for (const [q, count] of Object.entries(questionCounts)) {
+            if (count > maxCount) {
+                maxCount = count;
+                commonError = q;
+            }
+        }
+        document.getElementById('stat-common-error').textContent = commonError !== '無' ? `${commonError} (${maxCount}次)` : '無';
+
+        // 更新篩選下拉選單
+        const select = document.getElementById('question-filter');
+        const currentValue = select.value;
+        select.innerHTML = '<option value="all">全部題目</option>';
+        [...questions].sort().forEach(q => {
+            const opt = document.createElement('option');
+            opt.value = q;
+            opt.textContent = q;
+            select.appendChild(opt);
+        });
+        select.value = currentValue;
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('table-body');
+        tbody.innerHTML = '';
+
+        const searchQuery = document.getElementById('search-input').value.trim().toLowerCase();
+        const qFilter = document.getElementById('question-filter').value;
+
+        const recordsArray = Object.keys(allRecords).map(key => {
+            return { id: key, ...allRecords[key] };
+        }).sort((a, b) => b.timestamp - a.timestamp);
+
+        let shownCount = 0;
+
+        recordsArray.forEach(rec => {
+            const seat = rec.seat || '無';
+            const name = rec.name || '匿名';
+            const question = rec.question || '';
+            const wrongChoice = rec.wrongChoice || '';
+            const timeStr = rec.timestamp ? new Date(rec.timestamp).toLocaleString() : '未知';
+
+            const matchesSearch = seat.toLowerCase().includes(searchQuery) || name.toLowerCase().includes(searchQuery);
+            const matchesFilter = qFilter === 'all' || question === qFilter;
+
+            if (!matchesSearch || !matchesFilter) return;
+
+            shownCount++;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><span class="seat-badge">${escapeHtml(seat)} 號</span></td>
+                <td style="font-weight: bold;">${escapeHtml(name)}</td>
+                <td><span class="correct-badge">${escapeHtml(question)}</span></td>
+                <td><span class="wrong-badge">${escapeHtml(wrongChoice)}</span></td>
+                <td style="font-size: 0.85rem; color: #6c757d;">${timeStr}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById('empty-el').style.display = shownCount === 0 ? 'block' : 'none';
+        document.getElementById('data-table').style.display = shownCount === 0 ? 'none' : 'table';
+    }
+
+    function clearLogs() {
+        if (!confirm("⚠️ 您確定要清除所有的錯題紀錄嗎？此動作無法復原！")) return;
+        db.ref('time_race_errors').remove()
+            .then(() => alert("資料庫已成功重置！"))
+            .catch(err => alert("重置失敗：" + err.message));
+    }
+
+    // HTML 轉義
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, s => {
+            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[s];
+        });
+    }
+
+    document.getElementById('search-input').addEventListener('input', renderTable);
+    document.getElementById('question-filter').addEventListener('change', renderTable);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1953 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>森林運動會：時間障礙賽</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- Firebase SDK (v8 Namespace version) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        :root {
+            --primary-green: #2d6a4f;
+            --light-green: #d8f3dc;
+            --accent-orange: #f4a261;
+            --accent-red: #e76f51;
+            --sky-blue: #a8dadc;
+            --dark-blue: #1d3557;
+        }
+
+        * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: 'Noto Sans TC', 'Fredoka One', sans-serif;
+            background: #1a1a1a;
+            color: #2f3e46;
+            overflow: hidden;
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; touch-action: none;
+        }
+
+        #game-container {
+            position: relative; width: 100%; max-width: 600px;
+            height: 100vh; max-height: 900px;
+            background: #40916c; overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+
+        #game-canvas { width: 100%; height: 100%; display: block; background: #52b788; }
+
+        /* 全螢幕覆蓋 */
+        .screen-overlay {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 100; padding: 24px;
+        }
+
+        /* 開始畫面 */
+        #start-screen {
+            background: linear-gradient(135deg, rgba(45,106,79,0.95), rgba(29,53,87,0.95));
+            color: #fff;
+        }
+
+        .game-title {
+            font-family: 'Fredoka One', 'Noto Sans TC', sans-serif;
+            font-size: 2.6rem; font-weight: 900; margin: 0;
+            background: linear-gradient(45deg, #ffd166, #f4a261, #e76f51);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            animation: titleFloat 3s ease-in-out infinite;
+        }
+
+        .game-subtitle {
+            font-size: 1.1rem; color: #d8f3dc; margin-top: 8px;
+        }
+
+        .rule-box {
+            background: rgba(0,0,0,0.25); padding: 16px 20px;
+            border-radius: 16px; max-width: 420px;
+            font-size: 1rem; line-height: 1.7; text-align: center;
+            margin: 16px 0 24px 0;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #ffd166, #f4a261);
+            color: var(--dark-blue); border: none;
+            border-radius: 30px; padding: 16px 48px;
+            font-size: 1.3rem; font-weight: 900; cursor: pointer;
+            box-shadow: 0 6px 20px rgba(244,162,97,0.4);
+            transition: all 0.2s ease;
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+        .btn:active { transform: scale(0.95); }
+
+        /* HUD */
+        #hud {
+            position: absolute; top: 0; left: 0; width: 100%;
+            padding: 12px 16px; z-index: 50;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+
+        .nav-btn {
+            background: rgba(0,0,0,0.4); color: #fff; border: none;
+            border-radius: 20px; padding: 6px 14px;
+            font-size: 0.9rem; font-weight: 700; cursor: pointer;
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+
+        .hearts-container { display: flex; gap: 4px; }
+        .heart-icon { font-size: 1.3rem; color: #e76f51; }
+        .heart-icon.lost { color: rgba(255,255,255,0.25); }
+
+        /* 角色選擇卡片 */
+        .char-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 10px; width: 100%; max-width: 420px; margin: 16px 0 20px 0;
+        }
+        .char-card {
+            background: rgba(255,255,255,0.12);
+            border: 2px solid rgba(255,255,255,0.15);
+            border-radius: 16px; padding: 12px 6px;
+            text-align: center; cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .char-card.selected {
+            background: rgba(255,255,255,0.3);
+            border-color: #ffd166;
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+        .char-avatar { font-size: 2.5rem; margin-bottom: 6px; }
+        .char-name { font-weight: 900; font-size: 1rem; color: #fff; }
+
+        .hud-card {
+            background: rgba(0,0,0,0.4); color: #fff;
+            padding: 6px 14px; border-radius: 20px;
+            font-weight: 700; font-size: 0.95rem;
+        }
+
+        /* 觸控區域 */
+        .touch-area {
+            position: absolute; bottom: 0; width: 100%;
+            height: 60%; display: flex; z-index: 30;
+        }
+        .touch-half { flex: 1; height: 100%; }
+
+        /* 跳躍按鈕 (行動裝置) */
+        #jump-btn {
+            position: absolute;
+            bottom: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 40;
+            background: linear-gradient(135deg, #ffd166, #f4a261);
+            color: var(--dark-blue); border: none;
+            border-radius: 50%; width: 72px; height: 72px;
+            font-size: 1.6rem; font-weight: 900; cursor: pointer;
+            box-shadow: 0 6px 18px rgba(244,162,97,0.45);
+            transition: transform 0.1s;
+            font-family: 'Noto Sans TC', sans-serif;
+            display: none;
+        }
+        #jump-btn:active { transform: translateX(-50%) scale(0.9); }
+
+        /* 時鐘提示 */
+        #clock-overlay {
+            position: absolute; top: 60px; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(12px);
+            border-radius: 24px; padding: 16px 20px;
+            z-index: 45; display: none; text-align: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            width: 88%; max-width: 380px;
+        }
+
+        #clock-overlay .clock-label {
+            font-size: 1.1rem; font-weight: 900; color: var(--dark-blue); margin-bottom: 12px;
+        }
+
+        #svg-clock { width: 170px; height: 170px; }
+
+        /* 選擇按鈕 */
+        #choice-overlay {
+            position: absolute; bottom: 0; left: 0; width: 100%; z-index: 100;
+            display: none; flex-direction: column; align-items: center;
+            padding: 16px 20px 40px 20px;
+            background: linear-gradient(to top, rgba(0,0,0,0.6), transparent);
+        }
+
+        .choice-grid { display: flex; gap: 12px; width: 100%; max-width: 480px; }
+
+        .choice-btn {
+            flex: 1; border: none;
+            border-radius: 20px; padding: 18px 8px;
+            font-size: 1.3rem; font-weight: 900; cursor: pointer;
+            background: #fff;
+            color: var(--dark-blue);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transition: all 0.15s ease;
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+        .choice-btn:active { transform: scale(0.92); background: #ffd166; }
+
+        /* 暫停/結束 */
+        .overlay-card {
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(12px);
+            border-radius: 24px; padding: 32px 24px; text-align: center;
+            width: 85%; max-width: 380px;
+        }
+
+        .overlay-title { font-size: 2rem; font-weight: 900; margin: 0 0 12px 0; color: var(--primary-green); }
+        .overlay-stat { font-size: 1.1rem; margin: 6px 0; font-weight: 700; }
+
+        @keyframes titleFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        /* === 答題回饋 === */
+
+        /* 畫面閃光覆蓋 */
+        #screen-flash {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 60;
+            opacity: 0; transition: opacity 0.05s;
+        }
+
+        /* 答對：提示卡 */
+        #correct-card {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.5);
+            background: linear-gradient(135deg, #52b788, #40916c);
+            border-radius: 24px; padding: 20px 28px;
+            text-align: center; z-index: 110;
+            box-shadow: 0 8px 32px rgba(82,183,136,0.55);
+            pointer-events: none;
+            opacity: 0;
+            transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s;
+        }
+        #correct-card.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        #correct-card.hide {
+            opacity: 0;
+            transform: translate(-50%, -65%) scale(0.8);
+            transition: transform 0.4s ease-in, opacity 0.4s;
+        }
+        .correct-emoji { font-size: 2.4rem; margin-bottom: 4px; }
+        .correct-label { font-size: 1.1rem; font-weight: 900; color: #fff; }
+        .correct-score { font-size: 2rem; font-weight: 900; color: #ffd166;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.25); }
+
+        /* 答錯：常識提示覆蓋 */
+        #hint-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(29,53,87,0.94);
+            backdrop-filter: blur(6px);
+            display: none; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 150; padding: 20px;
+            animation: hintIn 0.3s ease;
+        }
+        @keyframes hintIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+        .hint-card {
+            background: #fff; border-radius: 24px;
+            padding: 20px 22px; width: 100%; max-width: 400px;
+            text-align: center;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+        }
+        .hint-title {
+            font-size: 1.4rem; font-weight: 900;
+            color: #e63946; margin-bottom: 10px;
+        }
+        .hint-explain {
+            background: #f8f9fa; border-radius: 14px;
+            padding: 14px 16px; margin: 10px 0;
+            font-size: 0.93rem; line-height: 2.0;
+            color: #2d3e46; text-align: left;
+            word-break: break-word;
+        }
+        .hint-answer {
+            font-size: 1.2rem; font-weight: 900;
+            color: var(--primary-green); margin-top: 8px;
+        }
+        /* 提示卡中的時鐘圖 */
+        #hint-clock {
+            width: 140px; height: 140px;
+            margin: 10px auto 4px auto;
+            display: block;
+            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15));
+        }
+        /* 繼續按鈕更大更顯眼 */
+        .hint-tap {
+            margin-top: 16px;
+            background: linear-gradient(135deg, #ffd166, #f4a261);
+            color: var(--dark-blue);
+            border: none;
+            border-radius: 30px; padding: 14px 40px;
+            font-size: 1.15rem; font-weight: 900; cursor: pointer;
+            font-family: 'Noto Sans TC', sans-serif;
+            box-shadow: 0 6px 18px rgba(244,162,97,0.45);
+            transition: transform 0.1s;
+        }
+        .hint-tap:active { transform: scale(0.95); }
+    </style>
+</head>
+<body>
+<div id="game-container">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div style="display:flex; gap:8px; align-items:center;">
+            <button class="nav-btn" onclick="location.href='../index.html'">🏠 首頁</button>
+            <button class="nav-btn" onclick="Game.backToMenu()">🎮 選單</button>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+            <div class="hearts-container" id="hearts-container">
+                <span class="heart-icon" id="heart-1">❤️</span>
+                <span class="heart-icon" id="heart-2">❤️</span>
+                <span class="heart-icon" id="heart-3">❤️</span>
+            </div>
+            <div class="hud-card" id="hud-timer">⏱️ 180秒</div>
+            <div class="hud-card" id="hud-score">⭐ 0分</div>
+        </div>
+    </div>
+
+    <!-- 時鐘提示 -->
+    <div id="clock-overlay">
+        <div class="clock-label">⏰ 看一看時鐘，選出正確的時間！</div>
+        <svg id="svg-clock" viewBox="0 0 200 200"></svg>
+    </div>
+
+    <!-- 選擇答案 -->
+    <div id="choice-overlay">
+        <div class="choice-grid" id="choice-buttons-container"></div>
+    </div>
+
+    <!-- 觸控換道 -->
+    <div class="touch-area">
+        <div class="touch-half" id="touch-left"></div>
+        <div class="touch-half" id="touch-right"></div>
+    </div>
+
+    <!-- 跳躍按鈕 (行動裝置) -->
+    <button id="jump-btn" title="跳躍">跳！</button>
+
+    <!-- 畫面閃光 (答題回饋) -->
+    <canvas id="screen-flash"></canvas>
+
+    <!-- 答對獎勵卡 -->
+    <div id="correct-card">
+        <div class="correct-emoji">⭐</div>
+        <div class="correct-label">太棒了！</div>
+        <div class="correct-score" id="correct-score-text">+50分</div>
+    </div>
+
+    <!-- 答錯提示覆蓋 -->
+    <div id="hint-overlay">
+        <div class="hint-card">
+            <div class="hint-title">❌ 再看看時鐘！</div>
+            <!-- 鐘面就在這裡 -->
+            <svg id="hint-clock" viewBox="0 0 200 200"></svg>
+            <div class="hint-explain" id="hint-explain"></div>
+            <div class="hint-answer" id="hint-answer"></div>
+        </div>
+        <button class="hint-tap" id="hint-tap-btn">🚶 我清楚了！繼續跑</button>
+    </div>
+
+    <!-- 開始畫面 -->
+    <div id="start-screen" class="screen-overlay">
+        <h1 class="game-title">森林運動會</h1>
+        <div class="game-subtitle">時間障礙賽</div>
+        <div class="rule-box">
+            路上有跨欄障礙物，可以按空白鍵跳過去，或換跑道躲開，撞到會扣一條命！<br>
+            遇到時間門的時候，要看時鐘選出正確的時間喔！
+        </div>
+
+        <!-- 學生資訊輸入 -->
+        <div style="display: flex; gap: 12px; margin: 15px 0; width: 85%; max-width: 320px; font-family:'Noto Sans TC', sans-serif;">
+            <div style="flex: 1; text-align: left;">
+                <label style="color: #fff; font-weight: 900; font-size: 0.9rem; display: block; margin-bottom: 4px;">班級座號：</label>
+                <input type="number" id="student-seat" min="1" max="50" placeholder="座號" style="width: 100%; padding: 8px 10px; border-radius: 10px; border: none; font-size: 1rem; font-weight: bold; text-align: center; outline: none;">
+            </div>
+            <div style="flex: 2; text-align: left;">
+                <label style="color: #fff; font-weight: 900; font-size: 0.9rem; display: block; margin-bottom: 4px;">學生姓名：</label>
+                <input type="text" id="student-name" placeholder="請輸入姓名" style="width: 100%; padding: 8px 12px; border-radius: 10px; border: none; font-size: 1rem; font-weight: bold; outline: none;">
+            </div>
+        </div>
+
+        <div style="color:#ffd166; font-weight:900; font-size:1rem;">選一隻動物選手：</div>
+        <div class="char-grid">
+            <div class="char-card selected" data-char="rabbit">
+                <div class="char-avatar">🐰</div>
+                <div class="char-name">兔寶</div>
+            </div>
+            <div class="char-card" data-char="turtle">
+                <div class="char-avatar">🐢</div>
+                <div class="char-name">阿吉</div>
+            </div>
+            <div class="char-card" data-char="cheetah">
+                <div class="char-avatar">🐆</div>
+                <div class="char-name">閃電</div>
+            </div>
+        </div>
+
+        <button class="btn" id="play-btn">開始跑步！</button><a href="時間障礙賽教師後台.html" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem; font-weight: bold; margin-top: 15px; display: inline-flex; align-items: center; gap: 5px; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.7)'">⚙️ 教師管理後台</a>
+    </div>
+
+    <!-- 暫停 -->
+    <div id="pause-overlay" class="screen-overlay" style="display:none; background:rgba(0,0,0,0.7);">
+        <div class="overlay-card">
+            <div class="overlay-title">暫停</div>
+            <button class="btn" id="resume-btn" style="width:100%; margin-bottom:12px;">繼續跑</button>
+            <button class="btn" id="restart-btn" style="width:100%; background:#e76f51; color:#fff;">重新開始</button>
+        </div>
+    </div>
+
+    <!-- 失敗 -->
+    <div id="gameover-overlay" class="screen-overlay" style="display:none; background:rgba(0,0,0,0.8);">
+        <div class="overlay-card">
+            <div class="overlay-title" style="color:var(--accent-red);">Game Over</div>
+            <p class="overlay-stat" id="stat-score">得分：0 分</p>
+            <p class="overlay-stat" id="stat-dist">跑了：0 公尺</p>
+            <div style="margin:16px 0; font-size:0.95rem;">再試一次吧！</div>
+            <button class="btn" id="retry-btn" style="width:100%;">再跑一次</button>
+            <button class="btn" id="back-menu-btn" style="width:100%; margin-top:10px; background:#a8dadc; color:var(--dark-blue);">回選單</button>
+        </div>
+    </div>
+
+    <!-- 勝利 -->
+    <div id="victory-overlay" class="screen-overlay" style="display:none; background:linear-gradient(135deg, rgba(255,209,102,0.95), rgba(45,106,79,0.95));">
+        <div class="overlay-card">
+            <div class="overlay-title" id="victory-cheer">🏆 抵達終點！</div>
+            <div style="background:#f8f9fa; border-radius:16px; padding:16px; margin:16px 0; text-align:left; font-size:1.05rem; line-height:2.0; font-family:'Noto Sans TC', sans-serif;">
+                <div style="display:flex; justify-content:space-between;">
+                    <span>答題得分：</span>
+                    <span id="victory-base-score" style="font-weight:900; color:var(--primary-green);">0 分</span>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span>剩餘時間：</span>
+                    <span id="victory-time-left" style="font-weight:900; color:#e67e22;">0 秒</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; border-top:2px dashed #ddd; margin-top:10px; padding-top:10px; font-size:1.25rem;">
+                    <span><b>總得分：</b></span>
+                    <span id="victory-total-score" style="font-weight:900; color:#d35400;">0 分</span>
+                </div>
+            </div>
+            <button class="btn" id="play-again-btn" style="width:100%;">再玩一次</button>
+            <button class="btn" id="victory-menu-btn" style="width:100%; margin-top:10px; background:#a8dadc; color:var(--dark-blue);">回選單</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// === Firebase 初始化 ===
+const firebaseConfig = {
+    apiKey: "AIzaSyCFNaVRETt862_As1hF7Mfyr22pKM5-lvk",
+    authDomain: "chickenrabbit-ea442.firebaseapp.com",
+    databaseURL: "https://chickenrabbit-ea442-default-rtdb.firebaseio.com",
+    projectId: "chickenrabbit-ea442",
+    storageBucket: "chickenrabbit-ea442.appspot.com",
+    messagingSenderId: "65728951973",
+    appId: "1:65728951973:web:efff912caf5f6f185abf4c"
+};
+
+let db = null;
+try {
+    if (typeof firebase !== 'undefined') {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.database();
+        console.log("Firebase 連結成功！");
+    }
+} catch (e) {
+    console.error("Firebase 初始化失敗：", e);
+}
+
+// === Web Audio 音效 ===
+let _audioCtx = null;
+function getAudioCtx() {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return _audioCtx;
+}
+function playSound(type) {
+    try {
+        const ctx = getAudioCtx();
+        if (type === 'correct') {
+            // 三音上行歡呵声
+            [523.25, 659.25, 783.99].forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                const t = ctx.currentTime + i * 0.13;
+                gain.gain.setValueAtTime(0.28, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+                osc.start(t); osc.stop(t + 0.36);
+            });
+            // 剛好的小光潤乃音
+            const osc2 = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            osc2.connect(gain2); gain2.connect(ctx.destination);
+            osc2.type = 'triangle';
+            osc2.frequency.value = 1046.5;
+            gain2.gain.setValueAtTime(0.15, ctx.currentTime + 0.38);
+            gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
+            osc2.start(ctx.currentTime + 0.38); osc2.stop(ctx.currentTime + 0.71);
+        } else if (type === 'wrong') {
+            // 下行不協和警告音
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(280, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(110, ctx.currentTime + 0.45);
+            gain.gain.setValueAtTime(0.25, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+            osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.51);
+        } else if (type === 'victory') {
+            [523, 659, 784, 1047].forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'sine'; osc.frequency.value = freq;
+                const t = ctx.currentTime + i * 0.1;
+                gain.gain.setValueAtTime(0.2, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+                osc.start(t); osc.stop(t + 0.41);
+            });
+        } else if (type === 'tick') {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.type = 'sine'; osc.frequency.value = 880;
+            gain.gain.setValueAtTime(0.05, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+            osc.start(); osc.stop(ctx.currentTime + 0.06);
+        }
+    } catch(e) { /* 靜默失敗 */ }
+}
+
+// roundRect polyfill for older browsers
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+        if (r > w/2) r = w/2;
+        if (r > h/2) r = h/2;
+        this.moveTo(x + r, y);
+        this.lineTo(x + w - r, y);
+        this.quadraticCurveTo(x + w, y, x + w, y + r);
+        this.lineTo(x + w, y + h - r);
+        this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        this.lineTo(x + r, y + h);
+        this.quadraticCurveTo(x, y + h, x, y + h - r);
+        this.lineTo(x, y + r);
+        this.quadraticCurveTo(x, y, x + r, y);
+        return this;
+    };
+}
+
+// --- 時鐘繪製（適合二年級的清楚大鐘面）---
+const ClockDraw = {
+    draw(svgEl, h, m) {
+        svgEl.innerHTML = '';
+        const ns = "http://www.w3.org/2000/svg";
+        const cx = 100, cy = 100, r = 88;
+
+        // 1. 白色鐘面 + 深色外框
+        const plate = document.createElementNS(ns, "circle");
+        plate.setAttribute("cx", cx); plate.setAttribute("cy", cy);
+        plate.setAttribute("r", r);
+        plate.setAttribute("fill", "#fff9f0");
+        plate.setAttribute("stroke", "#2d3e46"); plate.setAttribute("stroke-width", "5");
+        svgEl.appendChild(plate);
+
+        // 2. 60 個小刻度（淺灰色細線）
+        for (let i = 0; i < 60; i++) {
+            const a = i * 6 * Math.PI / 180;
+            const isMajor = i % 5 === 0;
+            if (isMajor) continue;
+            const x1 = cx + (r - 6) * Math.sin(a), y1 = cy - (r - 6) * Math.cos(a);
+            const x2 = cx + (r - 12) * Math.sin(a), y2 = cy - (r - 12) * Math.cos(a);
+            const line = document.createElementNS(ns, "line");
+            line.setAttribute("x1", x1); line.setAttribute("y1", y1);
+            line.setAttribute("x2", x2); line.setAttribute("y2", y2);
+            line.setAttribute("stroke", "#c0c0c0"); line.setAttribute("stroke-width", "1.5");
+            svgEl.appendChild(line);
+        }
+
+        // 3. 大格刻度線（對應 1~12 每個數字位置，較長的直線）
+        for (let i = 1; i <= 12; i++) {
+            const a = i * 30 * Math.PI / 180;
+            const x1 = cx + (r - 6) * Math.sin(a), y1 = cy - (r - 6) * Math.cos(a);
+            const x2 = cx + (r - 18) * Math.sin(a), y2 = cy - (r - 18) * Math.cos(a);
+            const line = document.createElementNS(ns, "line");
+            line.setAttribute("x1", x1); line.setAttribute("y1", y1);
+            line.setAttribute("x2", x2); line.setAttribute("y2", y2);
+            line.setAttribute("stroke", "#1d3557"); line.setAttribute("stroke-width", "2");
+            svgEl.appendChild(line);
+        }
+
+        // 4. 數字 1~12（大又清楚，粗體深色）
+        // 注意：不加任何 +7 偏移，不然分針会對不準數字中心
+        for (let i = 1; i <= 12; i++) {
+            const a = i * 30 * Math.PI / 180;
+            const tx = cx + (r - 24) * Math.sin(a);
+            const ty = cy - (r - 24) * Math.cos(a);
+            const t = document.createElementNS(ns, "text");
+            t.setAttribute("x", tx); t.setAttribute("y", ty);
+            t.setAttribute("font-family", "'Fredoka One', 'Noto Sans TC', sans-serif");
+            t.setAttribute("font-size", "20");
+            t.setAttribute("font-weight", "900");
+            t.setAttribute("text-anchor", "middle");
+            t.setAttribute("dominant-baseline", "central");
+            t.setAttribute("fill", "#1d3557");
+            t.textContent = i;
+            svgEl.appendChild(t);
+        }
+
+        // 5. 指針角度計算
+        const minA = m * 6;
+        const hourA = (h % 12) * 30 + m * 0.5;
+        const hRad = hourA * Math.PI / 180;
+        const mRad = minA * Math.PI / 180;
+
+        // 6. 時針（短、粗、紅色 — 課本風格）
+        const hh = document.createElementNS(ns, "line");
+        hh.setAttribute("x1", cx); hh.setAttribute("y1", cy);
+        hh.setAttribute("x2", cx + (r - 42) * Math.sin(hRad));
+        hh.setAttribute("y2", cy - (r - 42) * Math.cos(hRad));
+        hh.setAttribute("stroke", "#e63946");
+        hh.setAttribute("stroke-width", "7");
+        hh.setAttribute("stroke-linecap", "round");
+        svgEl.appendChild(hh);
+
+        // 7. 分針（長、細、深藍色 — 課本風格）
+        const mh = document.createElementNS(ns, "line");
+        mh.setAttribute("x1", cx); mh.setAttribute("y1", cy);
+        mh.setAttribute("x2", cx + (r - 18) * Math.sin(mRad));
+        mh.setAttribute("y2", cy - (r - 18) * Math.cos(mRad));
+        mh.setAttribute("stroke", "#1d3557");
+        mh.setAttribute("stroke-width", "4.5");
+        mh.setAttribute("stroke-linecap", "round");
+        svgEl.appendChild(mh);
+
+        // 8. 中心小圓點（金色）
+        const dot = document.createElementNS(ns, "circle");
+        dot.setAttribute("cx", cx); dot.setAttribute("cy", cy);
+        dot.setAttribute("r", "5");
+        dot.setAttribute("fill", "#ffd166");
+        dot.setAttribute("stroke", "#1d3557");
+        dot.setAttribute("stroke-width", "2");
+        svgEl.appendChild(dot);
+    }
+};
+
+// --- 題目生成 (只出整點、半點、5分倍數，適合二年級) ---
+function generateQuestion() {
+    const hour = Math.floor(Math.random() * 12) + 1;
+    const minuteChoices = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+    const min = minuteChoices[Math.floor(Math.random() * minuteChoices.length)];
+    const correct = `${hour}時${min}分`;
+
+    const options = [correct];
+
+    // 錯誤選項1：時針看錯（時針靠近下一個小時的誤讀）
+    let wH1 = min >= 30 ? (hour === 12 ? 1 : hour + 1) : (hour === 1 ? 12 : hour - 1);
+    if (wH1 === hour) wH1 = (hour % 12) + 1; // 防止湊巧相同
+    options.push(`${wH1}時${min}分`);
+
+    // 錯誤選項2：「分針直接讀刻度數字」的誘答
+    // 例如 7:40 → 分針指在 8 → 學生誤讀成「8分」而非「40分」
+    let wM2;
+    if (min === 0) {
+        wM2 = 12; // 整點時分針指12，有學生誤讀為12分
+    } else {
+        wM2 = min / 5; // 分針對齊的數字，如40分→指在8→誤讀成8分
+    }
+    // 避免與正確答案或選項1相同
+    if (`${hour}時${wM2}分` === correct || wM2 === min) {
+        wM2 = (min + 15) % 60 || 5;
+    }
+    options.push(`${hour}時${wM2}分`);
+
+    // 打亂
+    for (let i = options.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [options[i], options[j]] = [options[j], options[i]];
+    }
+
+    return { h: hour, m: min, correct, options };
+}
+
+
+// --- 遊戲主引擎 (簡化版) ---
+const Game = {
+    canvas: null, ctx: null,
+    state: 'START',
+    score: 0, distance: 0, hearts: 3,
+    timeElapsed: 0, lastTime: 0,
+    lane: 1, playerX: 0, playerTargetX: 0, speed: 0,
+    baseSpeed: 5,
+    scrollOffset: 0,
+    lanesCount: 3, laneWidth: 0, roadWidth: 0, roadX: 0,
+    stunnedTimer: 0,
+    nextBarrierDist: 30,
+    barriers: [], items: [], particles: [],
+    waitChoiceResolve: null,
+
+    questionCount: 0,
+    maxQuestions: 5,
+    nextQuestionTime: 0,
+    obstacles: [],
+
+    // 跳躍物理
+    playerJumpY: 0,
+    playerJumpVel: 0,
+    isJumping: false,
+
+    // 答題回饋
+    floatingTexts: [],
+    flashAlpha: 0,
+    flashColor: '#52b788',
+
+    init() {
+        this.canvas = document.getElementById('game-canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+        this.bindUI();
+    },
+
+    resize() {
+        const p = this.canvas.parentElement;
+        this.canvas.width = p.clientWidth;
+        this.canvas.height = p.clientHeight;
+        this.roadWidth = this.canvas.width * 0.85;
+        this.laneWidth = this.roadWidth / 3;
+        this.roadX = (this.canvas.width - this.roadWidth) / 2;
+        this.playerX = this.getLaneX(this.lane);
+        this.playerTargetX = this.playerX;
+    },
+
+    getLaneX(i) { return this.roadX + i * this.laneWidth + this.laneWidth / 2; },
+
+    selectedChar: 'rabbit',
+
+    bindUI() {
+        document.querySelectorAll('.char-card').forEach(card => {
+            card.addEventListener('click', e => {
+                document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                this.selectedChar = card.dataset.char;
+            });
+        });
+
+        document.getElementById('play-btn').addEventListener('click', () => this.start());
+        document.getElementById('resume-btn').addEventListener('click', () => this.resume());
+        document.getElementById('restart-btn').addEventListener('click', () => this.start());
+        document.getElementById('retry-btn').addEventListener('click', () => this.start());
+        document.getElementById('back-menu-btn').addEventListener('click', () => this.showScreen('start-screen'));
+        document.getElementById('play-again-btn').addEventListener('click', () => this.start());
+        document.getElementById('victory-menu-btn').addEventListener('click', () => this.showScreen('start-screen'));
+
+        document.getElementById('touch-left').addEventListener('pointerdown', e => {
+            e.preventDefault();
+            if (this.state === 'RUNNING') this.moveLane(-1);
+        });
+        document.getElementById('touch-right').addEventListener('pointerdown', e => {
+            e.preventDefault();
+            if (this.state === 'RUNNING') this.moveLane(1);
+        });
+
+        window.addEventListener('keydown', e => {
+            if (this.state !== 'RUNNING') return;
+            if (e.key === 'ArrowLeft' || e.key === 'a') this.moveLane(-1);
+            else if (e.key === 'ArrowRight' || e.key === 'd') this.moveLane(1);
+            else if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w') {
+                e.preventDefault();
+                this.jump();
+            }
+        });
+
+        // 跳躍按鈕（行動裝置）
+        const jumpBtn = document.getElementById('jump-btn');
+        jumpBtn.style.display = 'block';
+        jumpBtn.addEventListener('pointerdown', e => {
+            e.preventDefault();
+            if (this.state === 'RUNNING') this.jump();
+        });
+    },
+
+    moveLane(dir) {
+        if (this.stunnedTimer > 0) return;
+        const nl = this.lane + dir;
+        if (nl >= 0 && nl < 3) { this.lane = nl; this.playerTargetX = this.getLaneX(nl); }
+    },
+
+    jump() {
+        if (this.isJumping || this.stunnedTimer > 0) return;
+        this.isJumping = true;
+        this.playerJumpVel = 14; // 初速度（向上）
+    },
+
+    showScreen(id) {
+        ['start-screen','pause-overlay','gameover-overlay','victory-overlay','choice-overlay'].forEach(s => {
+            document.getElementById(s).style.display = 'none';
+        });
+        if (id) document.getElementById(id).style.display = 'flex';
+    },
+
+    start() {
+        this.state = 'RUNNING';
+        this.score = 0; this.distance = 0; this.timeElapsed = 0;
+        this.hearts = 3; this.lane = 1;
+        this.playerX = this.getLaneX(1); this.playerTargetX = this.playerX;
+        this.speed = this.baseSpeed; this.stunnedTimer = 0;
+        this.barriers = []; this.items = []; this.particles = [];
+        this.obstacles = [];
+        this.nextBarrierDist = 30;
+        this.scrollOffset = 0;
+        this.questionCount = 0;
+        this.nextQuestionTime = 6500;
+        this.nextWaveTime = 1500;   // 1.5秒後出第一波障礙物
+        this.playerJumpY = 0;
+        this.playerJumpVel = 0;
+        this.isJumping = false;
+        this.floatingTexts = [];
+        this.flashAlpha = 0;
+        this.finishLineY = null;   // 終點線 Y 座標
+        this.sprintSpeed = 0;      // 衝刺冲刺速度
+        this.timeLeft = 180000;    // 180秒 (毫秒)
+        this.isShowingHint = false; // 是否正在顯示錯誤提示
+        document.getElementById('hint-overlay').style.display = 'none';
+        document.getElementById('correct-card').className = '';
+        document.getElementById('clock-overlay').style.display = 'none';
+        this.updateHearts();
+        this.updateTimerHUD();     // 更新 HUD 計時顯示
+        this.showScreen(null);
+        this.lastTime = performance.now();
+        requestAnimationFrame(t => this.loop(t));
+    },
+
+    resume() {
+        this.state = 'RUNNING';
+        this.showScreen(null);
+        this.lastTime = performance.now();
+        requestAnimationFrame(t => this.loop(t));
+    },
+
+    backToMenu() {
+        this.state = 'MENU';
+        document.getElementById('start-screen').style.display = 'flex';
+        ['pause-overlay','gameover-overlay','victory-overlay','choice-overlay','clock-overlay'].forEach(s => {
+            document.getElementById(s).style.display = 'none';
+        });
+    },
+
+    gameOver() {
+        this.state = 'GAMEOVER';
+        document.getElementById('stat-score').textContent = `得分：${this.score} 分`;
+        document.getElementById('stat-dist').textContent = `答對：${this.score / 50} 題`;
+        this.showScreen('gameover-overlay');
+    },
+
+    victory() {
+        this.state = 'VICTORY';
+        this.showScreen('victory-overlay');
+
+        const baseScore = this.score;
+        const initialTimeLeft = Math.ceil(this.timeLeft / 1000); // 秒
+
+        // 初始化顯示
+        document.getElementById('victory-base-score').textContent = `${baseScore} 分`;
+        document.getElementById('victory-time-left').textContent = `${initialTimeLeft} 秒`;
+        document.getElementById('victory-total-score').textContent = `${baseScore} 分`;
+        document.getElementById('victory-cheer').textContent = '🏁 抵達終點！';
+
+        const playAgainBtn = document.getElementById('play-again-btn');
+        const menuBtn = document.getElementById('victory-menu-btn');
+        playAgainBtn.disabled = true;
+        menuBtn.disabled = true;
+
+        let currentTimeLeft = initialTimeLeft;
+        let currentTotalScore = baseScore;
+
+        const duration = 2000; // 動畫總時長
+        const steps = Math.min(initialTimeLeft, 40); // 最多40步
+        if (steps <= 0) {
+            document.getElementById('victory-cheer').textContent = '🎉 挑戰成功！';
+            playAgainBtn.disabled = false;
+            menuBtn.disabled = false;
+            return;
+        }
+
+        const stepTime = duration / steps;
+        const timePerStep = Math.ceil(initialTimeLeft / steps);
+        const scorePerStep = timePerStep * 10; // 每秒 10 分
+
+        let currentStep = 0;
+
+        const interval = setInterval(() => {
+            currentStep++;
+            currentTimeLeft = Math.max(0, currentTimeLeft - timePerStep);
+            currentTotalScore += scorePerStep;
+
+            // 播放計分滴答聲
+            playSound('tick');
+
+            // 更新顯示
+            document.getElementById('victory-time-left').textContent = `${currentTimeLeft} 秒`;
+            document.getElementById('victory-total-score').textContent = `${currentTotalScore} 分`;
+
+            if (currentStep >= steps || currentTimeLeft <= 0) {
+                clearInterval(interval);
+
+                // 確保最後結果絕對精準
+                document.getElementById('victory-time-left').textContent = '0 秒';
+                const finalTotalScore = baseScore + initialTimeLeft * 10;
+                document.getElementById('victory-total-score').textContent = `${finalTotalScore} 分`;
+
+                // 播放勝利結尾慶祝音
+                playSound('victory');
+                document.getElementById('victory-cheer').textContent = '🏆 榮譽完成！太棒了！';
+
+                playAgainBtn.disabled = false;
+                menuBtn.disabled = false;
+            }
+        }, stepTime);
+    },
+
+    // --- 主迴圈 ---
+    loop(ts) {
+        if (this.state !== 'RUNNING' && this.state !== 'WAIT_CHOICE' && this.state !== 'SPRINT_FINISH') return;
+        const dt = Math.min(ts - this.lastTime, 100);
+        this.lastTime = ts;
+        this.update(dt);
+        this.render();
+        requestAnimationFrame(t => this.loop(t));
+    },
+
+    update(dt) {
+        this.timeElapsed += dt;
+
+        // 倒數計時更新 (只在沒顯示提示、且非過關或結束時扣除)
+        if (this.state !== 'GAMEOVER' && this.state !== 'VICTORY' && !this.isShowingHint) {
+            this.timeLeft = Math.max(0, this.timeLeft - dt);
+            this.updateTimerHUD();
+            if (this.timeLeft <= 0) {
+                this.gameOver();
+                return;
+            }
+        }
+
+        if (this.stunnedTimer > 0) this.stunnedTimer -= dt;
+
+        this.playerX += (this.playerTargetX - this.playerX) * 0.25;
+
+        // 跳躍物理更新
+        if (this.isJumping) {
+            const gravity = 0.6;
+            this.playerJumpY += this.playerJumpVel;
+            this.playerJumpVel -= gravity;
+            if (this.playerJumpY <= 0) {
+                this.playerJumpY = 0;
+                this.playerJumpVel = 0;
+                this.isJumping = false;
+            }
+        }
+
+        // 閃光效果淡出（每 ms 減少 0.003，約 0.33 秒消散）
+        if (this.flashAlpha > 0) {
+            this.flashAlpha = Math.max(0, this.flashAlpha - dt * 0.003);
+        }
+
+        // 浮層得分/懲罰文字更新
+        this.updateFloatingTexts(dt);
+
+        if (this.state === 'RUNNING') {
+            let spd = this.baseSpeed;
+            if (this.stunnedTimer > 0) spd = 1.2;
+            this.speed += (spd - this.speed) * 0.1;
+            this.distance += this.speed * (dt / 1000);
+            this.scrollOffset += this.speed * (dt / 1000) * 60;
+
+            // 時間到就出題（最多5題）
+            if (this.questionCount < this.maxQuestions && this.timeElapsed >= this.nextQuestionTime) {
+                this.spawnBarrier();
+                this.questionCount++;
+                // 下一題在本題答完後的5秒才會出現（由 scheduleNextQuestion 更新）
+                this.nextQuestionTime = Infinity; // 先凍結，等答完再設
+            }
+
+            // 生出障礙物（田徑跨欄）
+            this.spawnObstacles();
+            this.updateObstacles(dt);
+            this.updateBarriers(dt);
+        } else if (this.state === 'SPRINT_FINISH') {
+            // 衝刺加速
+            this.sprintSpeed = Math.min(this.sprintSpeed + dt * 0.015, 20);
+            this.speed = this.sprintSpeed;
+            this.distance += this.speed * (dt / 1000);
+            this.scrollOffset += this.speed * (dt / 1000) * 60;
+
+            // 終點線從畫面上方往下滑動
+            if (this.finishLineY !== null) {
+                this.finishLineY += this.speed * (dt / 1000) * 60;
+            }
+
+            // 隨機在天空中生成慶祝紙屑粒子
+            if (Math.random() < 0.35) {
+                const cols = ['#ffd166','#06d6a0','#ef476f','#118ab2','#fff','#ff9f1c'];
+                this.particles.push({
+                    x: Math.random() * this.canvas.width,
+                    y: -20,
+                    vx: Math.random() * 3 - 1.5,
+                    vy: Math.random() * 2 + 3,
+                    size: Math.random() * 7 + 4,
+                    color: cols[Math.floor(Math.random() * cols.length)],
+                    alpha: 1, life: 2500
+                });
+            }
+
+            // 當終點線被角色越過
+            const py = this.canvas.height * 0.78;
+            if (this.finishLineY !== null && this.finishLineY >= py + 40) {
+                this.victory();
+            }
+        }
+
+        this.updateParticles(dt);
+        this.updateScore();
+
+        // 全部5題答完 + 最後一題結束後 = 進入最後衝刺模式
+        if (this.questionCount >= this.maxQuestions && this.barriers.length === 0 && this.state === 'RUNNING' && this.stunnedTimer <= 0) {
+            this.state = 'SPRINT_FINISH';
+            this.sprintSpeed = this.speed;
+            this.finishLineY = -120; // 從畫面上方滾入
+            
+            // 播放衝刺音效
+            playSound('victory');
+            
+            // 浮層提示文字
+            this.floatingTexts.push({
+                x: this.canvas.width / 2,
+                y: this.canvas.height * 0.4,
+                text: '🏃 最後衝刺！💨',
+                color: '#ffb703',
+                strokeColor: '#000',
+                size: 36,
+                life: 2500,
+                alpha: 1
+            });
+            
+            // 大量彩帶碎紙從天而降
+            const cols = ['#ffd166','#06d6a0','#ef476f','#118ab2','#fff','#ff9f1c'];
+            for (let i = 0; i < 50; i++) {
+                this.particles.push({
+                    x: Math.random() * this.canvas.width,
+                    y: Math.random() * -300 - 50,
+                    vx: Math.random() * 3 - 1.5,
+                    vy: Math.random() * 3 + 2,
+                    size: Math.random() * 9 + 4,
+                    color: cols[Math.floor(Math.random() * cols.length)],
+                    alpha: 1, life: 3000 + Math.random() * 1000
+                });
+            }
+        } else if (this.hearts <= 0) {
+            this.gameOver();
+        }
+    },
+
+    // --- 障礙門 ---
+
+    spawnBarrier() {
+        const q = generateQuestion();
+        const b = {
+            distance: this.distance,
+            question: q,
+            laneOptions: [...q.options],
+            y: -100,
+            passed: false,
+            choiceTriggered: false
+        };
+        this.barriers.push(b);
+        // 不強制清除障礙物，讓現有的自然滑出畫面（spawnObstacles 在出題前2秒就會停止生成新的）
+    },
+
+    // 答完一題後呼叫，讓角色再跑 6.5 秒才會出下一題
+    scheduleNextQuestion() {
+        this.nextQuestionTime = this.timeElapsed + 6500;
+    },
+
+    // --- 障礙物（田徑跨欄）--- 「波次制」生成
+    spawnObstacles() {
+        if (this.barriers.length > 0) return;
+        if (this.nextQuestionTime !== Infinity && this.nextQuestionTime - this.timeElapsed <= 2000) return;
+        if (this.timeElapsed < this.nextWaveTime) return;
+
+        // 下一波間隔 1.3–2.1 秒（比之前更需要跳躍）
+        this.nextWaveTime = this.timeElapsed + 1300 + Math.random() * 800;
+
+        const roll = Math.random();
+        const wave = [];   // { lane, yOff }
+
+        if (roll < 0.18) {
+            // A：單道——最簡單，可换道
+            wave.push({ lane: Math.floor(Math.random() * 3), yOff: 0 });
+
+        } else if (roll < 0.34) {
+            // B：雙道並排——可换到空欄跟道或跳躍
+            const f = Math.floor(Math.random() * 2); // 0或0或1
+            wave.push({ lane: f,     yOff: 0 });
+            wave.push({ lane: f + 1, yOff: 0 });
+
+        } else if (roll < 0.48) {
+            // C：左右道（中間放行）——可退進到中道或跳躍
+            wave.push({ lane: 0, yOff: 0 });
+            wave.push({ lane: 2, yOff: 0 });
+
+        } else if (roll < 0.62) {
+            // D：三道全满——必須跳躍
+            wave.push({ lane: 0, yOff: 0 });
+            wave.push({ lane: 1, yOff: 0 });
+            wave.push({ lane: 2, yOff: 0 });
+
+        } else if (roll < 0.74) {
+            // E：鈔形雙道——两道但错開80px，要先换道再跳躍
+            const f2 = Math.floor(Math.random() * 3);
+            const s2 = (f2 + 1 + Math.floor(Math.random() * 2)) % 3;
+            wave.push({ lane: f2, yOff: 0   });
+            wave.push({ lane: s2, yOff: -90  });
+
+        } else if (roll < 0.86) {
+            // F：同道雙距——同一跟道两個連續跨欄，要跳躍且要跨到其他跟道
+            const ln = Math.floor(Math.random() * 3);
+            wave.push({ lane: ln, yOff:   0 });
+            wave.push({ lane: ln, yOff: -95 });
+
+        } else {
+            // G：三道鈔形——三個跨欄分別錯開，鈴聲系列跩跳
+            wave.push({ lane: 0, yOff:    0 });
+            wave.push({ lane: 1, yOff:  -80 });
+            wave.push({ lane: 2, yOff: -160 });
+            // 隨機決定方向（從左到右或從右到左）
+            if (Math.random() < 0.5) wave.forEach(o => o.lane = 2 - o.lane);
+        }
+
+        wave.forEach(o => {
+            this.obstacles.push({ lane: o.lane, y: -80 + (o.yOff || 0) });
+        });
+    },
+
+    updateObstacles(dt) {
+        const speed = this.speed * (dt / 1000) * 60;
+        const py = this.canvas.height * 0.78;
+
+        for (let i = this.obstacles.length - 1; i >= 0; i--) {
+            const o = this.obstacles[i];
+            o.y += speed;
+
+            // 碰撞檢測（跳起時可無視跨欄）
+            if (o.lane === this.lane && !this.isJumping) {
+                const dist = Math.abs(o.y - py);
+                if (dist < 28 && this.stunnedTimer <= 0) {
+                    this.stunnedTimer = 1200;
+                    this.hearts--;
+                    this.updateHearts();
+                    this.createParticles(this.playerX, py, '#e76f51');
+                    this.obstacles.splice(i, 1);
+                    continue;
+                }
+            }
+
+            if (o.y > this.canvas.height + 80) {
+                this.obstacles.splice(i, 1);
+            }
+        }
+    },
+
+    showChoice(barrier) {
+        this.state = 'WAIT_CHOICE';
+        const container = document.getElementById('choice-buttons-container');
+        container.innerHTML = '';
+
+        document.getElementById('clock-overlay').style.display = 'block';
+        ClockDraw.draw(document.getElementById('svg-clock'), barrier.question.h, barrier.question.m);
+
+        barrier.laneOptions.forEach((timeText, idx) => {
+            const btn = document.createElement('button');
+            btn.className = 'choice-btn';
+            btn.textContent = timeText;
+            btn.addEventListener('click', () => {
+                this.lane = idx;
+                this.playerTargetX = this.getLaneX(idx);
+                this.playerX = this.playerTargetX;
+
+                document.getElementById('choice-overlay').style.display = 'none';
+                document.getElementById('clock-overlay').style.display = 'none';
+
+                //     // 答錯懲罰動畫 + 教學提示
+    showWrongFeedback(question, wrongChoice) {
+        // 1. 畫面紅光閃
+        this.flashColor = 'rgba(231,111,81,0.45)';
+        this.flashAlpha = 1;
+
+        // 2. 浮層懲罰文字
+        this.floatingTexts.push({
+            x: this.playerX,
+            y: this.canvas.height * 0.68,
+            text: '-1命！',
+            color: '#e63946',
+            strokeColor: '#fff',
+            size: 28,
+            life: 1400,
+            alpha: 1
+        });
+
+        // 3. 畫出鐘面（讓學生看到原本的時鐘）
+        const h = question.h;
+        const m = question.m;
+        ClockDraw.draw(document.getElementById('hint-clock'), h, m);
+
+        // 4. 讀法說明（仳照老師度讀時間的方式）
+
+        // 小時部分
+        const nextH = h === 12 ? 1 : h + 1;
+        let hourLine;
+        if (m === 0) {
+            hourLine = `⏰ <b>時針（短針）</b>指向 <b style="color:#e63946">${h}</b>
+                        &nbsp;→&nbsp;所以是 <b style="color:#e63946">${h}時</b>`;
+        } else {
+            hourLine = `⏰ <b>時針（短針）</b>超過 <b style="color:#e63946">${h}</b> 時，還沒到 ${nextH} 時
+                        &nbsp;→&nbsp;所以是 <b style="color:#e63946">${h}時</b>`;
+        }
+
+        // 分鐘部分：逆數大格並列出吸盤數字
+        let minuteLine;
+        if (m === 0) {
+            minuteLine = `⏰ <b>分針（長針）</b>指向 12，整點
+                          &nbsp;→&nbsp;所以是 <b style="color:#1d3557">0分</b>`;
+        } else {
+            const bigSteps = m / 5;   // 大格數
+            const stepList = [];
+            for (let i = 5; i <= m; i += 5) stepList.push(i);
+            const countStr = stepList.join('、');
+            minuteLine = `⏰ <b>分針（長針）</b>走了 <b style="color:#1d3557">${bigSteps} </b> 大格
+                          &nbsp;→&nbsp;數一數：<span style="color:#555;font-size:0.88em">${countStr}</span>
+                          &nbsp;→&nbsp;所以是 <b style="color:#1d3557">${m}分</b>`;
+        }
+
+        const explainHTML = `
+            <strong style="color:#e63946">怎麼讀這個時鐘？</strong><br><br>
+            ${hourLine}<br><br>
+            ${minuteLine}`;
+        document.getElementById('hint-explain').innerHTML = explainHTML;
+        document.getElementById('hint-answer').textContent = `✅ 正確答案：${h}時${m}分`;
+
+        // 4.5. 上傳錯誤紀錄到 Firebase
+        if (db) {
+            const seat = document.getElementById('student-seat').value.trim() || '無';
+            const name = document.getElementById('student-name').value.trim() || '匿名';
+            db.ref('time_race_errors').push({
+                seat: seat,
+                name: name,
+                question: `${h}時${m}分`,
+                wrongChoice: wrongChoice || '未填',
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            }).catch(err => console.error("上傳錯誤紀錄失敗：", err));
+        }
+
+        // 5. 顯示覆蓋；學生按按鈕才繼續（不自動關閉）
+        const overlay = document.getElementById('hint-overlay');
+        overlay.style.display = 'flex';
+        this.isShowingHint = true;
+
+        document.getElementById('hint-tap-btn').onclick = () => {
+            overlay.style.display = 'none';
+            this.isShowingHint = false;
+            // 現在才復跑：設定下一題時間并繼續迴圈
+            this.scheduleNextQuestion();
+            this.lastTime = performance.now();
+            this.state = 'RUNNING';
+        };
+    },   size: Math.random() * 6 + 3,
+                color: Math.random() < 0.5 ? '#ffd166' : '#52b788',
+                alpha: 1, life: 700 + Math.random() * 300
+            });
+        }
+    },
+
+    // 答錯懲罰動畫 + 教學提示
+    showWrongFeedback(question) {
+        // 1. 畫面紅光閃
+        this.flashColor = 'rgba(231,111,81,0.45)';
+        this.flashAlpha = 1;
+
+        // 2. 浮層懲罰文字
+        this.floatingTexts.push({
+            x: this.playerX,
+            y: this.canvas.height * 0.68,
+            text: '-1命！',
+            color: '#e63946',
+            strokeColor: '#fff',
+            size: 28,
+            life: 1400,
+            alpha: 1
+        });
+
+        // 3. 畫出鐘面（讓學生看到原本的時鐘）
+        const h = question.h;
+        const m = question.m;
+        ClockDraw.draw(document.getElementById('hint-clock'), h, m);
+
+        // 4. 讀法說明（仳照老師度讀時間的方式）
+
+        // 小時部分
+        const nextH = h === 12 ? 1 : h + 1;
+        let hourLine;
+        if (m === 0) {
+            hourLine = `⏰ <b>時針（短針）</b>指向 <b style="color:#e63946">${h}</b>
+                        &nbsp;→&nbsp;所以是 <b style="color:#e63946">${h}時</b>`;
+        } else {
+            hourLine = `⏰ <b>時針（短針）</b>超過 <b style="color:#e63946">${h}</b> 時，還沒到 ${nextH} 時
+                        &nbsp;→&nbsp;所以是 <b style="color:#e63946">${h}時</b>`;
+        }
+
+        // 分鐘部分：逆數大格並列出吸盤數字
+        let minuteLine;
+        if (m === 0) {
+            minuteLine = `⏰ <b>分針（長針）</b>指向 12，整點
+                          &nbsp;→&nbsp;所以是 <b style="color:#1d3557">0分</b>`;
+        } else {
+            const bigSteps = m / 5;   // 大格數
+            const stepList = [];
+            for (let i = 5; i <= m; i += 5) stepList.push(i);
+            const countStr = stepList.join('、');
+            minuteLine = `⏰ <b>分針（長針）</b>走了 <b style="color:#1d3557">${bigSteps}</b> 大格
+                          &nbsp;→&nbsp;數一數：<span style="color:#555;font-size:0.88em">${countStr}</span>
+                          &nbsp;→&nbsp;所以是 <b style="color:#1d3557">${m}分</b>`;
+        }
+
+        const explainHTML = `
+            <strong style="color:#e63946">怎麼讀這個時鐘？</strong><br><br>
+            ${hourLine}<br><br>
+            ${minuteLine}`;
+        document.getElementById('hint-explain').innerHTML = explainHTML;
+        document.getElementById('hint-answer').textContent = `✅ 正確答案：${h}時${m}分`;
+
+        // 5. 顯示覆蓋；學生按按鈕才繼續（不自動關閉）
+        const overlay = document.getElementById('hint-overlay');
+        overlay.style.display = 'flex';
+        this.isShowingHint = true;
+
+        document.getElementById('hint-tap-btn').onclick = () => {
+            overlay.style.display = 'none';
+            this.isShowingHint = false;
+            // 現在才復跑：設定下一題時間并繼續迴圈
+            this.scheduleNextQuestion();
+            this.lastTime = performance.now();
+            this.state = 'RUNNING';
+        };
+    },
+
+    updateBarriers(dt) {
+        const speed = this.speed * (dt / 1000) * 60;
+        const py = this.canvas.height * 0.78;
+
+        for (let i = this.barriers.length - 1; i >= 0; i--) {
+            const b = this.barriers[i];
+            b.y += speed;
+
+            if (!b.choiceTriggered && b.y >= this.canvas.height * 0.35) {
+                b.choiceTriggered = true;
+                this.showChoice(b);
+            }
+
+            if (b.y > this.canvas.height + 100) {
+                this.barriers.splice(i, 1);
+            }
+        }
+    },
+
+    // --- 粒子 ---
+    createParticles(x, y, color) {
+        for (let i = 0; i < 10; i++) {
+            this.particles.push({
+                x, y,
+                vx: Math.random() * 4 - 2,
+                vy: Math.random() * -4 - 1,
+                size: Math.random() * 5 + 2,
+                color, alpha: 1, life: 400 + Math.random() * 200
+            });
+        }
+    },
+
+    // 浮層得分文字
+    updateFloatingTexts(dt) {
+        for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
+            const t = this.floatingTexts[i];
+            t.y -= 1.2;
+            t.life -= dt;
+            t.alpha = Math.max(t.life / 1600, 0);
+            if (t.life <= 0) this.floatingTexts.splice(i, 1);
+        }
+    },
+
+    drawFloatingTexts() {
+        this.floatingTexts.forEach(t => {
+            const ctx = this.ctx;
+            ctx.save();
+            ctx.globalAlpha = t.alpha;
+            ctx.font = `900 ${t.size}px "Noto Sans TC", sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            // 文字描邊（讓文字在任何背景上都清楚）
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = t.strokeColor || 'rgba(0,0,0,0.5)';
+            ctx.lineJoin = 'round';
+            ctx.strokeText(t.text, t.x, t.y);
+            ctx.fillStyle = t.color;
+            ctx.fillText(t.text, t.x, t.y);
+            ctx.restore();
+        });
+    },
+
+    updateParticles(dt) {
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            const p = this.particles[i];
+            p.x += p.vx; p.y += p.vy;
+            p.vy += 0.15;
+            p.life -= dt;
+            p.alpha = Math.max(p.life / 500, 0);
+            if (p.life <= 0) this.particles.splice(i, 1);
+        }
+    },
+
+    // --- 動物角色繪製（向量圖）---
+    drawCharacter(x, y, charType, isStunned, isJumping) {
+        const ctx = this.ctx;
+        const groundY = this.canvas.height * 0.78; // 地面基準高度
+
+        // 地面陰影（跳躍時依然畫在地面，不隨角色上浮）
+        const jumpPct = isJumping ? Math.min(this.playerJumpY / 80, 1) : 0; // 跳得越高陰影越小
+        const shadowRx = 16 * (1 - jumpPct * 0.5);
+        const shadowRy = 5  * (1 - jumpPct * 0.5);
+        const shadowAlpha = 0.18 - jumpPct * 0.1;
+        ctx.save();
+        ctx.globalAlpha = shadowAlpha;
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.ellipse(x, groundY, shadowRx, shadowRy, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(x, y);
+
+        const runSpeed = isStunned ? 0.5 : 2.5;
+        const cycle = (this.timeElapsed * 0.002 * runSpeed);
+
+        if (charType === 'rabbit') this.drawRabbit(ctx, cycle, isStunned, isJumping);
+        else if (charType === 'turtle') this.drawTurtle(ctx, cycle, isStunned, isJumping);
+        else if (charType === 'cheetah') this.drawCheetah(ctx, cycle, isStunned, isJumping);
+
+        if (isStunned) {
+            ctx.font = '16px Arial';
+            const starAngle = (this.timeElapsed * 0.005) % (Math.PI * 2);
+            ctx.fillText('💫', 18 * Math.cos(starAngle), 6 * Math.sin(starAngle) - 38);
+        }
+
+        ctx.restore();
+    },
+
+    drawRabbit(ctx, cycle, isStunned, isJumping) {
+        // 跳躍時不實施上下波動（bob），但保留跑步腿部動畫
+        let bob = isJumping ? 0 : Math.sin(cycle * 2) * 2;
+        ctx.translate(0, bob);
+        if (!isStunned) ctx.rotate(0.04 * Math.sin(cycle));
+
+        // 跳躍時陰影由 drawCharacter 統一處理，這裡不再畫
+        if (!isJumping) {
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
+            ctx.beginPath(); ctx.ellipse(0, 0, 16, 5, 0, 0, Math.PI * 2); ctx.fill();
+        }
+
+        ctx.fillStyle = '#e5e5e5';
+        ctx.save(); ctx.translate(-8, 2 + Math.sin(cycle) * 4);
+        ctx.beginPath(); ctx.ellipse(0, 0, 3.5, 6, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.translate(8, 2 - Math.sin(cycle) * 4);
+        ctx.beginPath(); ctx.ellipse(0, 0, 3.5, 6, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.ellipse(0, -10, 15, 13, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(0, -1, 5, 0, Math.PI * 2); ctx.fill();
+
+        ctx.save(); ctx.translate(-14, -16 + Math.sin(cycle + Math.PI) * 3);
+        ctx.beginPath(); ctx.ellipse(0, 0, 3, 5, -0.1, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.translate(14, -16 + Math.sin(cycle) * 3);
+        ctx.beginPath(); ctx.ellipse(0, 0, 3, 5, 0.1, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+
+        ctx.beginPath(); ctx.arc(0, -25, 10, 0, Math.PI * 2); ctx.fill();
+
+        ctx.save(); ctx.translate(-4, -33);
+        ctx.rotate(-0.06 + Math.sin(cycle * 2) * 0.04);
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.ellipse(0, -8, 3, 10, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ffccd5';
+        ctx.beginPath(); ctx.ellipse(0, -8, 1.5, 7, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+
+        ctx.save(); ctx.translate(4, -33);
+        ctx.rotate(0.06 - Math.sin(cycle * 2) * 0.04);
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.ellipse(0, -8, 3, 10, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ffccd5';
+        ctx.beginPath(); ctx.ellipse(0, -8, 1.5, 7, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+    },
+
+    drawTurtle(ctx, cycle, isStunned, isJumping) {
+        let bob = isJumping ? 0 : Math.sin(cycle * 1.5) * 1.5;
+        ctx.translate(0, bob);
+        if (!isStunned) ctx.rotate(0.02 * Math.sin(cycle));
+
+        if (!isJumping) {
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
+            ctx.beginPath(); ctx.ellipse(0, 0, 18, 5, 0, 0, Math.PI * 2); ctx.fill();
+        }
+
+        ctx.fillStyle = '#70e000';
+        ctx.save(); ctx.translate(-13, -16 - Math.sin(cycle) * 3);
+        ctx.beginPath(); ctx.ellipse(0, 0, 4, 7, -Math.PI / 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.translate(13, -16 + Math.sin(cycle) * 3);
+        ctx.beginPath(); ctx.ellipse(0, 0, 4, 7, Math.PI / 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.translate(-11, -1 + Math.sin(cycle) * 3);
+        ctx.beginPath(); ctx.ellipse(0, 0, 3.5, 6, -0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.translate(11, -1 - Math.sin(cycle) * 3);
+        ctx.beginPath(); ctx.ellipse(0, 0, 3.5, 6, 0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+
+        ctx.beginPath();
+        ctx.moveTo(0, 5); ctx.lineTo(-2, 10); ctx.lineTo(2, 10); ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = '#38b000';
+        ctx.beginPath(); ctx.ellipse(0, -9, 15, 17, 0, 0, Math.PI * 2); ctx.fill();
+
+        ctx.strokeStyle = '#007200'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.ellipse(0, -9, 10, 11, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(0, 2);
+        ctx.moveTo(-10, -9); ctx.lineTo(10, -9); ctx.stroke();
+
+        ctx.fillStyle = '#70e000';
+        ctx.beginPath(); ctx.ellipse(0, -28, 5, 7, 0, 0, Math.PI * 2); ctx.fill();
+    },
+
+    drawCheetah(ctx, cycle, isStunned, isJumping) {
+        let bob = isJumping ? 0 : Math.sin(cycle * 2.5) * 2;
+        ctx.translate(0, bob);
+        if (!isStunned) ctx.rotate(0.04 * Math.sin(cycle));
+
+        if (!isJumping) {
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
+            ctx.beginPath(); ctx.ellipse(0, 0, 15, 4, 0, 0, Math.PI * 2); ctx.fill();
+        }
+
+        ctx.fillStyle = '#ffb703';
+        ctx.save(); ctx.translate(-7, -18 - Math.sin(cycle) * 5);
+        ctx.beginPath(); ctx.ellipse(0, 0, 2, 7, -0.05, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.translate(7, -18 + Math.sin(cycle) * 5);
+        ctx.beginPath(); ctx.ellipse(0, 0, 2, 7, 0.05, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.translate(-7, -2 + Math.sin(cycle) * 5);
+        ctx.beginPath(); ctx.ellipse(0, 0, 2.5, 7, 0.05, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.translate(7, -2 - Math.sin(cycle) * 5);
+        ctx.beginPath(); ctx.ellipse(0, 0, 2.5, 7, -0.05, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+
+        ctx.strokeStyle = '#ffb703'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(0, 5);
+        let tailW = Math.sin(cycle) * 8;
+        ctx.quadraticCurveTo(tailW, 14, tailW * 1.5, 23);
+        ctx.stroke();
+        ctx.fillStyle = '#023047';
+        ctx.beginPath(); ctx.arc(tailW * 1.5, 23, 1.8, 0, Math.PI * 2); ctx.fill();
+
+        ctx.fillStyle = '#ffb703';
+        ctx.beginPath(); ctx.ellipse(0, -10, 10, 17, 0, 0, Math.PI * 2); ctx.fill();
+
+        ctx.fillStyle = '#023047';
+        ctx.beginPath();
+        ctx.arc(-3, -16, 1.2, 0, Math.PI * 2); ctx.arc(3, -9, 1.2, 0, Math.PI * 2);
+        ctx.arc(-2, -4, 1.2, 0, Math.PI * 2); ctx.arc(2, -18, 1.2, 0, Math.PI * 2);
+        ctx.arc(0, -11, 1.2, 0, Math.PI * 2); ctx.arc(-4, -8, 1.2, 0, Math.PI * 2);
+        ctx.arc(4, -3, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffb703';
+        ctx.beginPath(); ctx.arc(0, -29, 8, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(-6, -34, 2.2, 0, Math.PI * 2);
+        ctx.arc(6, -34, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#023047';
+        ctx.beginPath(); ctx.arc(-6, -34, 1.1, 0, Math.PI * 2);
+        ctx.arc(6, -34, 1.1, 0, Math.PI * 2);
+        ctx.fill();
+    },
+
+    // --- 繪製 ---
+    render() {
+        const ctx = this.ctx;
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.drawRoad();
+        this.drawScenery();
+        this.drawFinishLine(); // 繪製終點線 (在背景上，但角色和障礙物之下)
+        this.drawObstacles();
+        this.drawBarriers();
+        this.drawParticles();
+
+        // 跳躍時角色上移
+        const groundY = this.canvas.height * 0.78;
+        const py = groundY - this.playerJumpY;
+        this.drawCharacter(this.playerX, py, this.selectedChar, this.stunnedTimer > 0, this.isJumping);
+
+        // 跳躍中風劫粒子
+        if (this.isJumping) {
+            ctx.save();
+            ctx.globalAlpha = 0.55;
+            ctx.font = '18px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('· · ·', this.playerX, groundY);
+            ctx.globalAlpha = 1;
+            ctx.restore();
+        }
+
+        // 浮層得分文字
+        this.drawFloatingTexts();
+
+        // 畫面閃光效果
+        if (this.flashAlpha > 0) {
+            ctx.save();
+            ctx.globalAlpha = this.flashAlpha * 0.55;
+            ctx.fillStyle = this.flashColor;
+            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            ctx.restore();
+        }
+    },
+
+    drawFinishLine() {
+        if (this.state !== 'SPRINT_FINISH' || this.finishLineY === null) return;
+        const ctx = this.ctx;
+        const y = this.finishLineY;
+
+        // 1. 黑白棋盤格 (Checkerboard pattern)
+        const sqSize = 16;
+        const rows = 2;
+        const colsCount = Math.ceil(this.roadWidth / sqSize);
+        ctx.save();
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < colsCount; c++) {
+                ctx.fillStyle = ((r + c) % 2 === 0) ? '#ffffff' : '#000000';
+                ctx.fillRect(this.roadX + c * sqSize, y + r * sqSize, sqSize, sqSize);
+            }
+        }
+        
+        // 2. 邊緣黃黑相間警示條
+        ctx.fillStyle = '#f1c40f';
+        ctx.fillRect(this.roadX, y - 6, this.roadWidth, 6);
+        ctx.fillStyle = '#000000';
+        ctx.lineWidth = 2;
+        for (let x = this.roadX; x < this.roadX + this.roadWidth; x += 20) {
+            ctx.beginPath();
+            ctx.moveTo(x, y - 6);
+            ctx.lineTo(x + 10, y);
+            ctx.strokeStyle = '#000000';
+            ctx.stroke();
+        }
+
+        // 3. 紅色終點彩帶 (Finish ribbon)
+        const py = this.canvas.height * 0.78;
+        ctx.fillStyle = '#e63946';
+        ctx.strokeStyle = '#e63946';
+        ctx.lineWidth = 6;
+        
+        if (y < py) {
+            // 還沒越過終點：彩帶拉直
+            ctx.beginPath();
+            ctx.moveTo(this.roadX, y + sqSize * rows);
+            ctx.lineTo(this.roadX + this.roadWidth, y + sqSize * rows);
+            ctx.stroke();
+
+            // 終點文字橫幅 (Banner)
+            ctx.fillStyle = '#e63946';
+            ctx.fillRect(this.roadX + this.roadWidth / 2 - 50, y + sqSize * rows - 12, 100, 24);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 14px "Noto Sans TC", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('FINISH', this.roadX + this.roadWidth / 2, y + sqSize * rows);
+        } else {
+            // 已經越過終點：彩帶斷裂向兩邊飄開
+            const breakOffset = Math.min((y - py) * 1.5, this.roadWidth / 2);
+            
+            // 左半邊
+            ctx.beginPath();
+            ctx.moveTo(this.roadX, y + sqSize * rows);
+            ctx.lineTo(this.playerX - 20 - breakOffset * 0.5, y + sqSize * rows + breakOffset * 0.3);
+            ctx.stroke();
+
+            // 右半邊
+            ctx.beginPath();
+            ctx.moveTo(this.roadX + this.roadWidth, y + sqSize * rows);
+            ctx.lineTo(this.playerX + 20 + breakOffset * 0.5, y + sqSize * rows + breakOffset * 0.3);
+            ctx.stroke();
+        }
+        ctx.restore();
+    },
+
+    drawRoad() {
+        const ctx = this.ctx;
+        const pct = Math.min(this.distance / 1000, 1);
+        let grass, road, border;
+
+        if (pct < 0.5) {
+            grass = '#40916c'; road = '#9b724c'; border = '#2d6a4f';
+        } else {
+            const t = (pct - 0.5) / 0.5;
+            grass = this.lerpColor('#40916c', '#b56576', t);
+            road = this.lerpColor('#9b724c', '#d4a373', t);
+            border = this.lerpColor('#2d6a4f', '#6f1d1b', t);
+        }
+
+        ctx.fillStyle = grass;
+        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        ctx.fillStyle = road;
+        ctx.fillRect(this.roadX, 0, this.roadWidth, this.canvas.height);
+
+        ctx.strokeStyle = border;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(this.roadX, 0); ctx.lineTo(this.roadX, this.canvas.height);
+        ctx.moveTo(this.roadX + this.roadWidth, 0); ctx.lineTo(this.roadX + this.roadWidth, this.canvas.height);
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([15, 25]);
+        ctx.lineDashOffset = -this.scrollOffset;
+        for (let i = 1; i < 3; i++) {
+            const x = this.roadX + i * this.laneWidth;
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, this.canvas.height);
+            ctx.stroke();
+        }
+        ctx.setLineDash([]);
+    },
+
+    drawScenery() {
+        const spacing = 160;
+        const offset = this.scrollOffset % spacing;
+        this.ctx.font = '18px Arial';
+        this.ctx.textAlign = 'center';
+        for (let y = -spacing; y < this.canvas.height + spacing; y += spacing) {
+            const curY = y + offset;
+            this.ctx.fillText('🌲', this.roadX * 0.35, curY);
+            this.ctx.fillText('🌲', this.canvas.width - this.roadX * 0.35, curY - 30);
+            this.ctx.fillText('🌸', this.roadX * 0.3, curY + 50);
+        }
+    },
+
+    drawObstacles() {
+        this.obstacles.forEach(o => {
+            const x = this.getLaneX(o.lane);
+            const ctx = this.ctx;
+            ctx.save();
+            ctx.translate(x, o.y);
+
+            // === 田徑跨欄 ===
+            // 橫桿（紅白相間）
+            const barHalfW = 36;
+            const barY = -24;
+            // 白底橫桿
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(-barHalfW, barY - 5, barHalfW * 2, 10);
+            // 紅色條紋（每隔12px）
+            ctx.fillStyle = '#e63946';
+            for (let sx = -barHalfW; sx < barHalfW; sx += 12) {
+                ctx.fillRect(sx, barY - 5, 6, 10);
+            }
+            // 橫桿外框
+            ctx.strokeStyle = '#2d3e46';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(-barHalfW, barY - 5, barHalfW * 2, 10);
+
+            // 左支腳
+            ctx.fillStyle = '#c1440e';
+            ctx.fillRect(-barHalfW, barY, 6, 28);
+            ctx.strokeStyle = '#2d3e46'; ctx.lineWidth = 1.2;
+            ctx.strokeRect(-barHalfW, barY, 6, 28);
+
+            // 右支腳
+            ctx.fillRect(barHalfW - 6, barY, 6, 28);
+            ctx.strokeRect(barHalfW - 6, barY, 6, 28);
+
+            // 底座（小矩形）
+            ctx.fillStyle = '#7b2d00';
+            ctx.fillRect(-barHalfW - 4, barY + 24, 16, 6);
+            ctx.fillRect(barHalfW - 12, barY + 24, 16, 6);
+
+            ctx.restore();
+        });
+    },
+
+    drawBarriers() {
+        this.barriers.forEach(b => {
+            const ctx = this.ctx;
+            const gateY = b.y;
+
+            // 1. 繪製 4 根大柱子 (Pillars on the sides and lane dividers)
+            // 分別位於 roadX, roadX + laneWidth, roadX + 2*laneWidth, roadX + roadWidth
+            ctx.save();
+            for (let i = 0; i <= 3; i++) {
+                const px = this.roadX + i * this.laneWidth;
+                
+                // 柱身 (柱子立體感)
+                ctx.fillStyle = '#457b9d';
+                ctx.fillRect(px - 4, gateY - 70, 8, 70);
+                
+                // 柱頭裝飾 (金黃色圓球)
+                ctx.fillStyle = '#ffd166';
+                ctx.beginPath();
+                ctx.arc(px, gateY - 74, 6, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // 柱底座
+                ctx.fillStyle = '#1d3557';
+                ctx.fillRect(px - 6, gateY - 4, 12, 4);
+            }
+
+            // 2. 橫跨整條路的橫樑 (Girders at the top)
+            ctx.fillStyle = '#1d3557';
+            ctx.fillRect(this.roadX - 6, gateY - 70, this.roadWidth + 12, 10);
+
+            // 3. 針對三個跑道分別繪製傳送門與牌子
+            b.laneOptions.forEach((timeText, lane) => {
+                const x = this.getLaneX(lane);
+                const left = this.roadX + lane * this.laneWidth;
+                const width = this.laneWidth;
+
+                // 傳送門光幕 (Portals energy shield)
+                if (!b.passed) {
+                    // 還沒答題：藍色傳送門光幕
+                    ctx.fillStyle = 'rgba(69, 123, 157, 0.25)';
+                    ctx.fillRect(left + 2, gateY - 60, width - 4, 60);
+
+                    // 光幕邊緣動態閃爍線
+                    ctx.strokeStyle = 'rgba(69, 123, 157, 0.7)';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(left + 2, gateY - 60, width - 4, 60);
+                } else {
+                    // 已經答題
+                    if (lane === b.correctLane) {
+                        // 正確的門：綠色敞開 (透明無光幕，但有綠色流光邊框)
+                        ctx.strokeStyle = '#2ecc71';
+                        ctx.lineWidth = 4;
+                        ctx.strokeRect(left + 4, gateY - 60, width - 8, 60);
+
+                        // 寫上一個綠色「OK」或「O」
+                        ctx.fillStyle = 'rgba(46, 204, 113, 0.2)';
+                        ctx.fillRect(left + 4, gateY - 60, width - 8, 60);
+                        ctx.fillStyle = '#2ecc71';
+                        ctx.font = '900 24px Arial';
+                        ctx.fillText('⭕', x, gateY - 30);
+                    } else {
+                        // 錯誤的門：紅色關閉 (深紅光幕 + 鎖頭圖案)
+                        ctx.fillStyle = 'rgba(231, 76, 60, 0.4)';
+                        ctx.fillRect(left + 2, gateY - 60, width - 4, 60);
+
+                        ctx.strokeStyle = '#e74c3c';
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(left + 2, gateY - 60, width - 4, 60);
+
+                        // 寫上紅色「X」
+                        ctx.fillStyle = '#e74c3c';
+                        ctx.font = '900 24px Arial';
+                        ctx.fillText('❌', x, gateY - 30);
+                    }
+                }
+
+                // 4. 掛在橫樑下方的告示牌 (Option display boards)
+                ctx.fillStyle = 'rgba(29, 53, 87, 0.95)';
+                ctx.beginPath();
+                ctx.roundRect(x - 52, gateY - 100, 104, 26, 8);
+                ctx.fill();
+                ctx.strokeStyle = '#ffd166';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // 告示牌吊索 (Hanger lines)
+                ctx.strokeStyle = '#1d3557';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(x - 30, gateY - 70); ctx.lineTo(x - 30, gateY - 74);
+                ctx.moveTo(x + 30, gateY - 70); ctx.lineTo(x + 30, gateY - 74);
+                ctx.stroke();
+
+                // 告示牌選項文字 (Option text)
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '900 13px "Noto Sans TC", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(timeText, x, gateY - 87);
+            });
+            ctx.restore();
+        });
+    },
+
+    drawParticles() {
+        this.particles.forEach(p => {
+            this.ctx.save();
+            this.ctx.globalAlpha = p.alpha;
+            this.ctx.fillStyle = p.color;
+            this.ctx.beginPath();
+            this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.restore();
+        });
+    },
+
+    lerpColor(c1, c2, t) {
+        const r = (a, b) => Math.round(a + (b - a) * t);
+        const p = (c) => ({ r: parseInt(c.slice(1,3),16), g: parseInt(c.slice(3,5),16), b: parseInt(c.slice(5,7),16) });
+        const a = p(c1), b = p(c2);
+        return `rgb(${r(a.r,b.r)},${r(a.g,b.g)},${r(a.b,b.b)})`;
+    },
+
+    updateHearts() {
+        for (let i = 1; i <= 3; i++) {
+            const el = document.getElementById(`heart-${i}`);
+            if (i <= this.hearts) el.classList.remove('lost');
+            else el.classList.add('lost');
+        }
+    },
+
+    updateScore() {
+        document.getElementById('hud-score').textContent = `⭐ ${this.score}分`;
+    },
+
+    updateTimerHUD() {
+        const sec = Math.ceil(this.timeLeft / 1000);
+        document.getElementById('hud-timer').textContent = `⏱️ ${sec}秒`;
+    }
+};
+
+window.addEventListener('DOMContentLoaded', () => Game.init());
+</script>
+</body>
+</html>
