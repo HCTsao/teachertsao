@@ -576,8 +576,7 @@
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 12px; max-width: 300px; margin: 0 auto;">
-        <button class="btn-add" onclick="startBattle('auto')" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px; border-radius: 10px; font-weight: 800; font-size: 1.1rem; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;"><i class="fa-solid fa-robot"></i> 開始對戰 (自動觀戰)</button>
-        <button class="btn-add" onclick="startBattle('manual')" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: 12px; border-radius: 10px; font-weight: 800; font-size: 1.1rem; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;"><i class="fa-solid fa-gamepad"></i> 開始對戰 (雙人手動)</button>
+        <button class="btn-add" onclick="startBattle()" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: 12px; border-radius: 10px; font-weight: 800; font-size: 1.1rem; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;"><i class="fa-solid fa-gamepad"></i> 開始對戰</button>
         <button class="btn-reset" onclick="toggleBattleView(false)" style="margin: 0 auto; width: auto; padding: 10px 20px; font-weight: 700; cursor: pointer; border-radius: 8px; border: none;"><i class="fa-solid fa-circle-xmark"></i> 退出對戰</button>
       </div>
     </div>
@@ -659,6 +658,10 @@
   </div>
 
   <script>
+    // Global Battle BGM
+    const battleBGM = new Audio("Trainer Battle - Pokémon Red⧸Blue⧸Yellow Soundtrack.mp3");
+    battleBGM.loop = true;
+
     // Pokedex Configuration
     const POKEMON_DATA = {
       fire: [
@@ -1403,6 +1406,10 @@
         btnGotoBattle.style.display = 'none';
         initBattleLobby();
       } else {
+        // Stop background music
+        battleBGM.pause();
+        battleBGM.currentTime = 0;
+
         studentContainer.style.display = 'block';
         battleContainer.style.display = 'none';
         btnGotoBattle.style.display = 'flex';
@@ -1411,6 +1418,33 @@
     }
 
     function initBattleLobby() {
+      // Populate P1 select dynamically with the current active student
+      const p1Select = document.getElementById('battle-p1-select');
+      p1Select.innerHTML = '';
+      const opt1 = document.createElement('option');
+      opt1.value = currentStudentId;
+      opt1.textContent = `${currentStudentId}號 ${students[currentStudentId].name}`;
+      p1Select.appendChild(opt1);
+      p1Select.disabled = true;
+
+      // Populate P2 select with all other students
+      const p2Select = document.getElementById('battle-p2-select');
+      p2Select.innerHTML = '';
+      let firstOtherId = null;
+      for (let id in students) {
+        if (id !== currentStudentId) {
+          if (!firstOtherId) firstOtherId = id;
+          const opt2 = document.createElement('option');
+          opt2.value = id;
+          opt2.textContent = `${id}號 ${students[id].name}`;
+          p2Select.appendChild(opt2);
+        }
+      }
+      if (firstOtherId) {
+        p2Select.value = firstOtherId;
+      }
+      p2Select.disabled = false;
+
       updateLobbyDetails();
     }
 
@@ -1463,7 +1497,7 @@
       }
     }
 
-    function startBattle(mode) {
+    function startBattle() {
       const p1Id = document.getElementById('battle-p1-select').value;
       const p2Id = document.getElementById('battle-p2-select').value;
       const s1 = students[p1Id];
@@ -1478,7 +1512,6 @@
       const p2Moves = active2.moves || initializeDefaultMoves(active2);
 
       battleState.active = true;
-      battleState.mode = mode;
       battleState.logQueue = [];
       battleState.isNarrating = false;
       
@@ -1532,6 +1565,10 @@
 
       updateBattleUI();
 
+      // Play Battle BGM
+      battleBGM.currentTime = 0;
+      battleBGM.play().catch(err => console.log("音訊播放受瀏覽器政策限制：", err));
+
       queueLog(`對戰開始！由 ${battleState.p1.name}的${battleState.p1.pokeDetails.name} 對決 ${battleState.p2.name}的${battleState.p2.pokeDetails.name}！`, () => {
         const speed1 = battleState.p1.baseSpeed + battleState.p1.level * 2;
         const speed2 = battleState.p2.baseSpeed + battleState.p2.level * 2;
@@ -1575,21 +1612,12 @@
 
     function startTurn() {
       if (!battleState.active) return;
-      const activeFighter = battleState.currentTurn === 'p1' ? battleState.p1 : battleState.p2;
       
-      if (battleState.mode === 'auto') {
-        document.getElementById('battle-moves-grid').style.display = 'none';
-        document.getElementById('battle-auto-indicator').style.display = 'block';
-        
-        setTimeout(() => {
-          const unlockedMoves = getUnlockedMoves(activeFighter);
-          const move = unlockedMoves[Math.floor(Math.random() * unlockedMoves.length)];
-          executeMove(activeFighter, move);
-        }, 600);
-      } else {
+      if (battleState.currentTurn === 'p1') {
+        // Player 1's turn (Manual Control)
         document.getElementById('battle-auto-indicator').style.display = 'none';
         document.getElementById('battle-moves-grid').style.display = 'grid';
-        document.getElementById('battle-log').textContent = `請選擇 ${activeFighter.name}的${activeFighter.pokeDetails.name} 要使用的招式...`;
+        document.getElementById('battle-log').textContent = `請選擇 ${battleState.p1.name}的${battleState.p1.pokeDetails.name} 要使用的招式...`;
         
         const typeLabels = {
           fire: '<span style="font-size: 0.75rem; background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: bold;">🔥火</span>',
@@ -1599,7 +1627,7 @@
           status: '<span style="font-size: 0.75rem; background: #eab308; color: #1e293b; padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: bold;">✨變</span>'
         };
 
-        const fighterMoves = activeFighter.moves;
+        const fighterMoves = battleState.p1.moves;
         for (let i = 0; i < 4; i++) {
           const btn = document.getElementById(`move-btn-${i}`);
           const moveName = fighterMoves[i];
@@ -1614,6 +1642,17 @@
             btn.style.borderColor = 'rgba(255,255,255,0.1)';
           }
         }
+      } else {
+        // Player 2's turn (AI Control)
+        document.getElementById('battle-moves-grid').style.display = 'none';
+        document.getElementById('battle-auto-indicator').style.display = 'block';
+        document.getElementById('battle-auto-indicator').innerHTML = `<i class="fa-solid fa-robot"></i> 對手 AI 思考中...`;
+        
+        setTimeout(() => {
+          const unlockedMoves = getUnlockedMoves(battleState.p2);
+          const move = unlockedMoves[Math.floor(Math.random() * unlockedMoves.length)];
+          executeMove(battleState.p2, move);
+        }, 1000);
       }
     }
 
@@ -2117,6 +2156,10 @@
       battleState.active = false;
       document.getElementById('battle-moves-grid').style.display = 'none';
       document.getElementById('battle-auto-indicator').style.display = 'none';
+
+      // Stop background music
+      battleBGM.pause();
+      battleBGM.currentTime = 0;
       
       queueLog(`對戰結束！恭喜 ${winnerName} 獲得了勝利！`, () => {
         document.getElementById('battle-img-p1').style.transition = '';
