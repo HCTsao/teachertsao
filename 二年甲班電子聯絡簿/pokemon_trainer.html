@@ -429,14 +429,18 @@
     }
 
     /* Battle Mode Styles */
+    #battle-arena-card {
+      container-type: inline-size;
+      container-name: arena;
+    }
     .btn-battle-move {
       background: rgba(255, 255, 255, 0.1);
       border: 2px solid rgba(255, 255, 255, 0.3);
       color: white;
       border-radius: 6px;
-      padding: 8px;
+      padding: clamp(4px, 1.2cqw, 10px);
       font-weight: 700;
-      font-size: 0.95rem;
+      font-size: clamp(0.7rem, 2.1cqw, 1.05rem);
       cursor: pointer;
       font-family: inherit;
       transition: all 0.2s;
@@ -454,6 +458,19 @@
     .btn-battle-move:disabled {
       opacity: 0.3;
       cursor: not-allowed;
+    }
+
+    #battle-arena-card #battle-log {
+      font-size: clamp(0.85rem, 2.3cqw, 1.25rem) !important;
+    }
+    #battle-arena-card [id^="battle-name-"] {
+      font-size: clamp(0.85rem, 2.2cqw, 1.2rem) !important;
+    }
+    #battle-arena-card [id^="battle-lv-"] {
+      font-size: clamp(0.75rem, 1.9cqw, 1.05rem) !important;
+    }
+    #battle-arena-card [id^="battle-hp-text-"] {
+      font-size: clamp(0.65rem, 1.6cqw, 0.9rem) !important;
     }
 
     #battle-img-p1, #battle-img-p2 {
@@ -600,7 +617,7 @@
     </div>
 
     <!-- Battle Arena Screen -->
-    <div class="glass-card" id="battle-arena-card" style="display: none; padding: 0; background: #000; overflow: hidden; position: relative; aspect-ratio: 4/3; width: 95%; max-width: 1200px; margin: 0 auto; border: 4px solid #1e293b; border-radius: 16px;">
+    <div class="glass-card" id="battle-arena-card" style="display: none; padding: 0; background: #000; overflow: hidden; position: relative; aspect-ratio: 4/3; width: min(92vw, calc(70vh * 4 / 3)); max-width: 1100px; margin: 0 auto; border: 4px solid #1e293b; border-radius: 16px;">
       
       <!-- Arena Background -->
       <div style="position: absolute; inset: 0; background: linear-gradient(#bae6fd 0%, #bae6fd 50%, #4ade80 50%, #22c55e 100%);">
@@ -2014,10 +2031,21 @@
     function playMoveEffect(move, attackerSide, defenderSide, callback) {
       playSynthSound(move);
       const arena = document.getElementById('battle-arena-card');
-      const startX = attackerSide === 'p1' ? 180 : 455;
-      const startY = attackerSide === 'p1' ? 230 : 110;
-      const endX = defenderSide === 'p1' ? 180 : 455;
-      const endY = defenderSide === 'p1' ? 230 : 110;
+      const arenaRect = arena.getBoundingClientRect();
+      const img1 = document.getElementById('battle-img-p1');
+      const img2 = document.getElementById('battle-img-p2');
+      const rect1 = img1.getBoundingClientRect();
+      const rect2 = img2.getBoundingClientRect();
+
+      const p1X = (rect1.left + rect1.width / 2) - arenaRect.left;
+      const p1Y = (rect1.top + rect1.height * 0.45) - arenaRect.top;
+      const p2X = (rect2.left + rect2.width / 2) - arenaRect.left;
+      const p2Y = (rect2.top + rect2.height * 0.45) - arenaRect.top;
+
+      const startX = attackerSide === 'p1' ? p1X : p2X;
+      const startY = attackerSide === 'p1' ? p1Y : p2Y;
+      const endX = defenderSide === 'p1' ? p1X : p2X;
+      const endY = defenderSide === 'p1' ? p1Y : p2Y;
 
       if (move.status === 'heal') {
         // Synthesis Green sparkles rising
@@ -2144,31 +2172,119 @@
           setTimeout(() => kanji.remove(), 300);
           callback();
         }, 900);
-      } else if (move.name === '水槍' || move.name === '水炮' || move.name === '水之波動') {
-        // Water bubbles
-        const count = move.name === '水槍' ? 12 : 28;
+      } else if (move.name === '水槍') {
+        const count = 15;
         let delay = 0;
         for (let i = 0; i < count; i++) {
           setTimeout(() => {
             createParticle({
               x: startX,
               y: startY,
-              vx: (endX - startX) / 18 + (Math.random() * 3 - 1.5),
-              vy: (endY - startY) / 18 + (Math.random() * 3 - 1.5),
-              color: '#3b82f6',
+              vx: (endX - startX) / 16 + (Math.random() * 2 - 1),
+              vy: (endY - startY) / 16 + (Math.random() * 2 - 1),
+              color: '#60a5fa',
               size: Math.random() * 6 + 4,
-              duration: 500,
+              duration: 400,
               isBubble: true
             });
           }, delay);
           delay += 25;
         }
+        setTimeout(() => flashDefender(defenderSide), delay + 200);
+        setTimeout(callback, delay + 500);
+      } else if (move.name === '水之波動') {
+        for (let i = 0; i < 4; i++) {
+          setTimeout(() => {
+            const ring = document.createElement('div');
+            ring.style.position = 'absolute';
+            ring.style.left = `${endX}px`;
+            ring.style.top = `${endY}px`;
+            ring.style.width = '10px';
+            ring.style.height = '10px';
+            ring.style.border = '4px solid #3b82f6';
+            ring.style.boxShadow = '0 0 15px #60a5fa';
+            ring.style.borderRadius = '50%';
+            ring.style.transform = 'translate(-50%, -50%)';
+            ring.style.transition = 'all 0.6s cubic-bezier(0.1, 0.8, 0.3, 1)';
+            ring.style.pointerEvents = 'none';
+            ring.style.zIndex = '40';
+            arena.appendChild(ring);
+
+            requestAnimationFrame(() => {
+              ring.style.width = '180px';
+              ring.style.height = '180px';
+              ring.style.opacity = '0';
+            });
+            setTimeout(() => ring.remove(), 600);
+            
+            for (let j = 0; j < 8; j++) {
+              createParticle({
+                x: endX + (Math.random() * 80 - 40),
+                y: endY + (Math.random() * 80 - 40),
+                vx: Math.random() * 4 - 2,
+                vy: Math.random() * 4 - 2,
+                color: '#93c5fd',
+                size: Math.random() * 8 + 4,
+                duration: 500,
+                isBubble: true
+              });
+            }
+          }, i * 150);
+        }
+        setTimeout(() => flashDefender(defenderSide), 500);
+        setTimeout(callback, 900);
+      } else if (move.name === '水炮') {
+        const torrent = document.createElement('div');
+        torrent.style.position = 'absolute';
+        torrent.style.left = `${startX}px`;
+        torrent.style.top = `${startY}px`;
+        torrent.style.width = '0px';
+        torrent.style.height = '0px';
+        torrent.style.background = 'linear-gradient(90deg, #2563eb, #3b82f6, #60a5fa)';
+        torrent.style.boxShadow = '0 0 20px #60a5fa, 0 0 35px #3b82f6';
+        torrent.style.borderRadius = '20px';
+        torrent.style.pointerEvents = 'none';
+        torrent.style.zIndex = '44';
+        torrent.style.transform = 'translate(-50%, -50%)';
+        torrent.style.transition = 'all 0.25s ease-in';
+        arena.appendChild(torrent);
+
+        const dx = endX - startX;
+        const dy = endY - startY;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+        requestAnimationFrame(() => {
+          torrent.style.left = `${startX + dx/2}px`;
+          torrent.style.top = `${startY + dy/2}px`;
+          torrent.style.width = `${dist}px`;
+          torrent.style.height = '60px';
+          torrent.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+        });
+
+        let bubbleCount = 0;
+        const bubbleInterval = setInterval(() => {
+          createParticle({
+            x: startX + (dx * (bubbleCount / 15)),
+            y: startY + (dy * (bubbleCount / 15)) + (Math.random() * 30 - 15),
+            vx: Math.random() * 4 - 2,
+            vy: Math.random() * 4 - 2,
+            color: '#bfdbfe',
+            size: Math.random() * 15 + 10,
+            duration: 350,
+            isBubble: true
+          });
+          bubbleCount++;
+          if (bubbleCount >= 15) clearInterval(bubbleInterval);
+        }, 20);
 
         setTimeout(() => {
           flashDefender(defenderSide);
-        }, delay + 250);
-
-        setTimeout(callback, delay + 600);
+          torrent.style.transition = 'all 0.3s ease-out';
+          torrent.style.opacity = '0';
+          setTimeout(() => torrent.remove(), 300);
+          callback();
+        }, 600);
       } else if (move.name === '藤鞭') {
         // Draw green whip slash lines
         for (let i = 0; i < 2; i++) {
@@ -2268,6 +2384,34 @@
             callback();
           }, 450);
         }, 600);
+      } else if (move.name === '咬住') {
+        const topChomp = document.createElement('div');
+        const botChomp = document.createElement('div');
+        [topChomp, botChomp].forEach((el, idx) => {
+          el.style.position = 'absolute';
+          el.style.left = `${endX}px`;
+          el.style.top = `${endY + (idx === 0 ? -40 : 40)}px`;
+          el.style.width = '70px';
+          el.style.height = '16px';
+          el.style.border = '3px solid #f8fafc';
+          el.style.background = '#475569';
+          el.style.borderRadius = '4px';
+          el.style.transform = 'translate(-50%, -50%)';
+          el.style.transition = 'all 0.15s ease-in';
+          el.style.zIndex = '40';
+          arena.appendChild(el);
+        });
+
+        setTimeout(() => {
+          topChomp.style.top = `${endY}px`;
+          botChomp.style.top = `${endY}px`;
+          setTimeout(() => {
+            flashDefender(defenderSide);
+            topChomp.remove();
+            botChomp.remove();
+            callback();
+          }, 150);
+        }, 100);
       } else {
         // Default physical attack hit spark
         const star = document.createElement('div');
