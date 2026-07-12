@@ -661,6 +661,7 @@
     // Global Battle BGM
     const battleBGM = new Audio("Trainer Battle - Pokémon Red⧸Blue⧸Yellow Soundtrack.mp3");
     battleBGM.loop = true;
+    battleBGM.volume = 0.15; // Set volume to be quieter (15%)
 
     // Pokedex Configuration
     const POKEMON_DATA = {
@@ -1788,8 +1789,198 @@
       setTimeout(() => { flashOverlay.style.opacity = '0'; }, 80);
     }
 
+    let audioCtx = null;
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      return audioCtx;
+    }
+
+    function playSynthSound(move) {
+      try {
+        const ctx = getAudioContext();
+        if (ctx.state === 'suspended') {
+          ctx.resume();
+        }
+
+        const now = ctx.currentTime;
+
+        if (move.status === 'heal') {
+          // GBA-style sparkly heal sound: rapid pitch slides upwards
+          const osc1 = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+          
+          osc1.type = 'triangle';
+          osc1.frequency.setValueAtTime(300, now);
+          osc1.frequency.exponentialRampToValueAtTime(1200, now + 0.45);
+          
+          gainNode.gain.setValueAtTime(0.15, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+          
+          osc1.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          
+          osc1.start(now);
+          osc1.stop(now + 0.45);
+        }
+        else if (move.status === 'atk-down' || move.status === 'def-up') {
+          // Status down/up chime: retro dual tone sliding down or up
+          const osc = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+          osc.type = 'sine';
+          
+          const isUp = move.status === 'def-up';
+          const startFreq = isUp ? 400 : 800;
+          const endFreq = isUp ? 900 : 300;
+          
+          osc.frequency.setValueAtTime(startFreq, now);
+          osc.frequency.linearRampToValueAtTime(endFreq, now + 0.4);
+          
+          gainNode.gain.setValueAtTime(0.12, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+          
+          osc.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          
+          osc.start(now);
+          osc.stop(now + 0.4);
+        }
+        else if (move.type === 'fire') {
+          // Fire flame sound: White noise burst with quick decay
+          const bufferSize = ctx.sampleRate * 0.5; // 0.5 seconds
+          const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+          }
+          
+          const noise = ctx.createBufferSource();
+          noise.buffer = buffer;
+          
+          // Filter to make it sound like rushing fire (bandpass)
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.setValueAtTime(800, now);
+          filter.frequency.exponentialRampToValueAtTime(150, now + 0.5);
+          
+          const gainNode = ctx.createGain();
+          gainNode.gain.setValueAtTime(0.2, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+          
+          noise.connect(filter);
+          filter.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          
+          noise.start(now);
+          noise.stop(now + 0.5);
+        }
+        else if (move.type === 'water') {
+          // Water bubble splash: rapidly modulating triangle wave pitch
+          const osc = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+          osc.type = 'triangle';
+          
+          osc.frequency.setValueAtTime(200, now);
+          osc.frequency.exponentialRampToValueAtTime(900, now + 0.15);
+          osc.frequency.exponentialRampToValueAtTime(300, now + 0.3);
+          osc.frequency.exponentialRampToValueAtTime(1200, now + 0.45);
+          
+          gainNode.gain.setValueAtTime(0.18, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+          
+          osc.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          
+          osc.start(now);
+          osc.stop(now + 0.45);
+        }
+        else if (move.name === '藤鞭' || move.name === '葉片快刀') {
+          // Vine Whip / Razor Leaf: quick sharp swish and slash
+          const osc = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+          osc.type = 'sawtooth';
+          
+          osc.frequency.setValueAtTime(1000, now);
+          osc.frequency.exponentialRampToValueAtTime(80, now + 0.18);
+          
+          gainNode.gain.setValueAtTime(0.15, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+          
+          osc.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          
+          osc.start(now);
+          osc.stop(now + 0.18);
+        }
+        else if (move.name === '陽光烈焰') {
+          // Solar Beam: Charging hum followed by huge beam blast
+          const osc = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+          osc.type = 'sawtooth';
+          
+          osc.frequency.setValueAtTime(150, now);
+          osc.frequency.linearRampToValueAtTime(800, now + 0.6);
+          osc.frequency.setValueAtTime(600, now + 0.6);
+          
+          gainNode.gain.setValueAtTime(0.08, now);
+          gainNode.gain.linearRampToValueAtTime(0.15, now + 0.6);
+          gainNode.gain.setValueAtTime(0.25, now + 0.6);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 1.2);
+          
+          osc.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          
+          osc.start(now);
+          osc.stop(now + 1.2);
+        }
+        else {
+          // Default normal/physical attack (Tackle, Bite): dull impact thump
+          const osc = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+          osc.type = 'triangle';
+          
+          osc.frequency.setValueAtTime(160, now);
+          osc.frequency.exponentialRampToValueAtTime(10, now + 0.12);
+          
+          gainNode.gain.setValueAtTime(0.25, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+          
+          osc.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          
+          osc.start(now);
+          osc.stop(now + 0.12);
+
+          // Add a tiny noise burst for physical impact crunch
+          setTimeout(() => {
+            try {
+              const bufferSize = ctx.sampleRate * 0.05; // 0.05 seconds
+              const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+              const data = buffer.getChannelData(0);
+              for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+              }
+              const noise = ctx.createBufferSource();
+              noise.buffer = buffer;
+              const noiseGain = ctx.createGain();
+              noiseGain.gain.setValueAtTime(0.1, ctx.currentTime);
+              noiseGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
+              noise.connect(noiseGain);
+              noiseGain.connect(ctx.destination);
+              noise.start();
+              noise.stop(ctx.currentTime + 0.05);
+            } catch (e) {}
+          }, 20);
+        }
+      } catch (err) {
+        console.error("Synthesizer sound error: ", err);
+      }
+    }
+
     // Spawn custom visual effects based on move (coords updated to align with P1/P2 center)
     function playMoveEffect(move, attackerSide, defenderSide, callback) {
+      playSynthSound(move);
       const arena = document.getElementById('battle-arena-card');
       const startX = attackerSide === 'p1' ? 180 : 455;
       const startY = attackerSide === 'p1' ? 230 : 110;
