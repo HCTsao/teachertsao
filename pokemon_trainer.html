@@ -10,6 +10,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
+  <!-- Firebase Compatibility SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  
   <style>
     :root {
       --bg-color: #f8fafc;
@@ -807,35 +811,127 @@
     let currentStudentId = "1";
     let students = null;
 
+    // Firebase Config
+    const firebaseConfig = {
+      apiKey: "AIzaSyCQK6Ex0zHb13uAKwhvHAH6OFGVBiyodts",
+      authDomain: "pokemon-7bd40.firebaseapp.com",
+      projectId: "pokemon-7bd40",
+      storageBucket: "pokemon-7bd40.firebasestorage.app",
+      messagingSenderId: "641379923525",
+      appId: "1:641379923525:web:fda369e1f7c84d6218552c",
+      databaseURL: "https://pokemon-7bd40-default-rtdb.firebaseio.com"
+    };
+
+    let database = null;
+    try {
+      if (typeof firebase !== 'undefined') {
+        firebase.initializeApp(firebaseConfig);
+        database = firebase.database();
+      }
+    } catch (err) {
+      console.warn("Firebase 載入失敗，切換為離線模式：", err);
+    }
+
+    // Shared Sync Handler
+    function handleDataSync(newData) {
+      if (!newData || typeof newData !== 'object' || Array.isArray(newData) || !newData["1"]) return;
+      
+      // Perform structural upgrades if needed
+      for(let id in defaultStudents) {
+        if(!newData[id]) {
+          newData[id] = JSON.parse(JSON.stringify(defaultStudents[id]));
+        }
+        if(!newData[id].pokemons) {
+          newData[id].pokemons = [];
+        }
+        newData[id].pokemons.forEach(poke => {
+          if (poke.points < 300 && (!poke.moves || poke.moves.length === 0)) {
+            initializeDefaultMoves(poke);
+          }
+        });
+      }
+
+      const oldData = JSON.parse(JSON.stringify(students || {}));
+      students = newData;
+      
+      if (document.getElementById('battle-container').style.display === 'block') {
+        updateLobbyDetails();
+      }
+
+      const oldStudent = oldData[currentStudentId];
+      const newStudent = students[currentStudentId];
+      
+      if (oldStudent && newStudent && oldStudent.pokemons.length > 0 && newStudent.pokemons.length > 0) {
+        const oldActiveIdx = (oldStudent.activePokemonIndex !== undefined && oldStudent.activePokemonIndex >= 0 && oldStudent.activePokemonIndex < oldStudent.pokemons.length) ? oldStudent.activePokemonIndex : (oldStudent.pokemons.length - 1);
+        const newActiveIdx = (newStudent.activePokemonIndex !== undefined && newStudent.activePokemonIndex >= 0 && newStudent.activePokemonIndex < newStudent.pokemons.length) ? newStudent.activePokemonIndex : (newStudent.pokemons.length - 1);
+        const oldActive = oldStudent.pokemons[oldActiveIdx];
+        const newActive = newStudent.pokemons[newActiveIdx];
+        
+        if (oldActive.family === newActive.family) {
+          const oldLevel = Math.floor(oldActive.points / 10);
+          const oldStage = getStage(oldLevel);
+          const newLevel = Math.floor(newActive.points / 10);
+          const newStage = getStage(newLevel);
+          
+          // 1. Check for evolution overlays
+          if (newStage > oldStage) {
+            const familyArr = POKEMON_DATA[newActive.family];
+            const oldPoke = familyArr[oldStage];
+            const newPoke = familyArr[newStage];
+            
+            const targetPoints = newStage === 1 ? 100 : 200;
+            const sessionKey = `has_seen_evolution_${newActive.family}_${targetPoints}`;
+            sessionStorage.setItem(sessionKey, 'true');
+
+            if (document.getElementById('evolution-overlay').style.display !== 'flex') {
+              triggerEvolution(newStudent.name, oldPoke, newPoke, () => {
+                syncMovesAndCheckPending(currentStudentId);
+                renderTabs();
+                renderContent();
+              });
+            }
+            return;
+          }
+          
+          // 2. Check for move learning overlays (no evolution, e.g. Lv.1, 2, 3, 15)
+          if (newLevel > oldLevel) {
+            syncMovesAndCheckPending(currentStudentId);
+            renderTabs();
+            renderContent();
+            return;
+          }
+        }
+      }
+      
+      syncMovesAndCheckPending(currentStudentId);
+      renderTabs();
+      renderContent();
+    }
+
     function loadData() {
+      // 1. Load local cache first
       try {
         const rawData = localStorage.getItem('pokemon_trainer_data');
         if (rawData) {
           students = JSON.parse(rawData);
         }
-        // Validate data structure
         if (!students || typeof students !== 'object' || Array.isArray(students) || !students["1"]) {
           students = JSON.parse(JSON.stringify(defaultStudents));
-        } else {
-          // Upgrade schema if migrating from older single-pokemon version
-          for(let id in defaultStudents) {
-            if(!students[id]) {
-              students[id] = JSON.parse(JSON.stringify(defaultStudents[id]));
-            }
-            if(!students[id].pokemons) {
-              students[id].pokemons = [];
-            }
-            // Ensure moves are initialized if not exist on active pokemon
-            students[id].pokemons.forEach(poke => {
-              if (poke.points < 300 && (!poke.moves || poke.moves.length === 0)) {
-                initializeDefaultMoves(poke);
-              }
-            });
-          }
         }
       } catch (e) {
-        console.error("載入資料時發生錯誤：", e);
+        console.error("載入本地資料時發生錯誤：", e);
         students = JSON.parse(JSON.stringify(defaultStudents));
+      }
+
+      // 2. Connect live real-time Firebase listener
+      if (database) {
+        database.ref('students').on('value', (snapshot) => {
+          const val = snapshot.val();
+          if (val) {
+            localStorage.setItem('pokemon_trainer_data', JSON.stringify(val));
+            handleDataSync(val);
+          }
+        });
       }
     }
 
@@ -853,7 +949,11 @@
     function saveData() {
       try {
         localStorage.setItem('pokemon_trainer_data', JSON.stringify(students));
-        // Trigger storage event for same-window updates
+        if (database) {
+          database.ref('students').set(students).catch(err => {
+            console.error("Firebase 寫入失敗：", err);
+          });
+        }
         window.dispatchEvent(new Event('storage'));
       } catch (e) {
         console.error("儲存資料時發生錯誤：", e);
@@ -3081,66 +3181,17 @@
       });
     }
 
-    // Storage Event Listener - Crucial for Real-Time synchronization with teacher actions
+    // Storage Event Listener - Crucial for same-device tab sync
     window.addEventListener('storage', (e) => {
       if (e.key === 'pokemon_trainer_data') {
-        const oldData = JSON.parse(JSON.stringify(students));
-        loadData();
-        
-        if (document.getElementById('battle-container').style.display === 'block') {
-          updateLobbyDetails();
-        }
-
-        const oldStudent = oldData[currentStudentId];
-        const newStudent = students[currentStudentId];
-        
-        if (oldStudent && newStudent && oldStudent.pokemons.length > 0 && newStudent.pokemons.length > 0) {
-          const oldActiveIdx = (oldStudent.activePokemonIndex !== undefined && oldStudent.activePokemonIndex >= 0 && oldStudent.activePokemonIndex < oldStudent.pokemons.length) ? oldStudent.activePokemonIndex : (oldStudent.pokemons.length - 1);
-          const newActiveIdx = (newStudent.activePokemonIndex !== undefined && newStudent.activePokemonIndex >= 0 && newStudent.activePokemonIndex < newStudent.pokemons.length) ? newStudent.activePokemonIndex : (newStudent.pokemons.length - 1);
-          const oldActive = oldStudent.pokemons[oldActiveIdx];
-          const newActive = newStudent.pokemons[newActiveIdx];
-          
-          if (oldActive.family === newActive.family) {
-            const oldLevel = Math.floor(oldActive.points / 10);
-            const oldStage = getStage(oldLevel);
-            const newLevel = Math.floor(newActive.points / 10);
-            const newStage = getStage(newLevel);
-            
-            // 1. Check for evolution overlays
-            if (newStage > oldStage) {
-              const familyArr = POKEMON_DATA[newActive.family];
-              const oldPoke = familyArr[oldStage];
-              const newPoke = familyArr[newStage];
-              
-              // Set the sessionKey so that page-load does not trigger it again
-              const targetPoints = newStage === 1 ? 100 : 200;
-              const sessionKey = `has_seen_evolution_${newActive.family}_${targetPoints}`;
-              sessionStorage.setItem(sessionKey, 'true');
-
-              if (document.getElementById('evolution-overlay').style.display !== 'flex') {
-                triggerEvolution(newStudent.name, oldPoke, newPoke, () => {
-                  // After evolution completes, check for new moves
-                  syncMovesAndCheckPending(currentStudentId);
-                  renderTabs();
-                  renderContent();
-                });
-              }
-              return;
-            }
-            
-            // 2. Check for move learning overlays (no evolution, e.g. Lv.1, 2, 3, 15)
-            if (newLevel > oldLevel) {
-              syncMovesAndCheckPending(currentStudentId);
-              renderTabs();
-              renderContent();
-              return;
-            }
+        try {
+          const rawData = localStorage.getItem('pokemon_trainer_data');
+          if (rawData) {
+            handleDataSync(JSON.parse(rawData));
           }
+        } catch (e) {
+          console.error("Local sync error:", e);
         }
-        
-        syncMovesAndCheckPending(currentStudentId);
-        renderTabs();
-        renderContent();
       }
     });
 
