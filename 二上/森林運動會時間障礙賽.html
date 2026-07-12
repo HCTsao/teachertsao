@@ -2261,7 +2261,27 @@ drawBarriersBackground() {
     }
 };
 
-window.addEventListener('DOMContentLoaded', () => Game.init());
+window.addEventListener('DOMContentLoaded', () => {
+    Game.init();
+    
+    // 全域點擊/觸控事件監聽，用以解鎖並自動播放背景音樂 (BGM)
+    const startBgmOnInteraction = () => {
+        const bgm = document.getElementById('bgm');
+        const slider = document.getElementById('volume-slider');
+        if (bgm && bgm.paused) {
+            const vol = slider ? parseFloat(slider.value) : 0.3;
+            bgm.volume = vol;
+            bgm.play().then(() => {
+                console.log("BGM 自動播放成功！");
+                // 成功播放後，移除此全域事件監聽，避免重複執行
+                document.removeEventListener('click', startBgmOnInteraction);
+                document.removeEventListener('touchstart', startBgmOnInteraction);
+            }).catch(err => console.log("等待使用者點擊解鎖音訊...", err));
+        }
+    };
+    document.addEventListener('click', startBgmOnInteraction);
+    document.addEventListener('touchstart', startBgmOnInteraction);
+});
 </script>
 </body>
 </html>
