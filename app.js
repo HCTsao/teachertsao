@@ -333,6 +333,9 @@ function getToolIcon(name, type) {
     if (name.includes("蛇")) return "fa-solid fa-worm";
     if (name.includes("地鼠")) return "fa-solid fa-hammer";
     if (name.includes("心臟病")) return "fa-solid fa-heart-pulse";
+    if (name.includes("小精靈")) return "fa-solid fa-ghost";
+    if (name.includes("運動會")) return "fa-solid fa-person-running";
+    if (name.includes("鵲橋")) return "fa-solid fa-bridge";
     if (name.includes("聽、說、讀、寫、做")) return "fa-solid fa-coins";
     if (name.includes("幾分之幾")) return "fa-solid fa-pizza-slice";
     if (name.includes("整除")) return "fa-solid fa-divide";
