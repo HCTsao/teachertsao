@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第一課：造句救星 (五星級造句版)</title>
+    <!-- 引入美化樣式庫 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        body { 
+            font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 0;
+        }
+        .red-mark { color: #ef4444; font-weight: bold; text-decoration: underline; }
+        .orange-text { color: #f97316; font-weight: bold; }
+        .star-active { color: #fbbf24; }
+        .star-inactive { color: #cbd5e1; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; border: 1px solid #e2e8f0; }
+        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; vertical-align: top; }
+        th { background-color: #f1f5f9; color: #475569; font-weight: bold; width: 30%; }
+        td { color: #1e293b; background-color: #ffffff; }
+
+        /* 自定義彈窗樣式 */
+        #custom-modal { display: none; }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 flex items-center justify-center">
+
+    <!-- 載入指示器 -->
+    <div id="loading-overlay" class="fixed inset-0 bg-white/80 z-40 flex flex-col items-center justify-center hidden">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+        <p class="text-slate-600 font-bold" id="loading-text">老師正在批改中...</p>
+    </div>
+
+    <div id="app-wrapper" class="max-w-2xl w-full bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
+        <!-- 標題區 -->
+        <div class="bg-blue-600 p-6 text-white text-center">
+            <h1 class="text-2xl font-black tracking-wider">五星級造句救星</h1>
+            <p class="text-blue-100 text-sm mt-1">「事實、想像、感受」寫作鷹架訓練</p>
+        </div>
+
+        <!-- 主要內容呈現區 -->
+        <div id="main-content" class="p-6 md:p-10 min-h-[400px]">
+            <!-- 內容由 JS 填入 -->
+        </div>
+    </div>
+
+    <!-- 自定義訊息彈窗 -->
+    <div id="custom-modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <h3 class="text-xl font-bold text-slate-800 mb-2">系統提示</h3>
+            <p id="modal-message" class="text-slate-600 mb-6 text-sm break-all font-mono"></p>
+            <button onclick="closeModal()" class="w-full py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors">確認</button>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. 常數與設定
+        // ==========================================
+        let apiKey = localStorage.getItem("groq_api_key");
+        if (!apiKey) {
+            apiKey = prompt("這是一個公開網頁，請輸入你的 Groq API Key 以使用教具：");
+            if (apiKey) localStorage.setItem("groq_api_key", apiKey);
+        }
+
+        const WORD_LIST = [
+            { word: '岌岌可危', definition: '形容非常危險。' },
+            { word: '錯落有致', definition: '交錯紛雜但有條理。' },
+            { word: '生生不息', definition: '孳生繁衍而不停止。' },
+            { word: '不著痕跡', definition: '不留任何形跡。' }
+        ];
+
+        let currentWordIndex = null;
+        let scenarioText = "";
+        let lastStudentInput = "";
+
+        window.onload = function() {
+            showMenu();
+        };
+
+        function showMenu() {
+            const mainContent = document.getElementById('main-content');
+            let html = `
+                <div class="text-center mb-6 text-slate-400 text-sm italic">
+                    依據彭遠芬老師「五星級造句法」設計
+                </div>
+                <div class="grid gap-4">
+            `;
+            WORD_LIST.forEach((item, index) => {
+                html += `
+                    <button onclick="startPractice(${index})" class="w-full p-5 bg-white border-2 border-slate-100 hover:border-blue-400 hover:bg-blue-50 rounded-2xl text-left transition-all active:scale-95 flex justify-between items-center group shadow-sm">
+                        <div>
+                            <h2 class="text-xl font-bold text-slate-700 group-hover:text-blue-600">${item.word}</h2>
+                            <p class="text-xs text-slate-400 mt-1">${item.definition}</p>
+                        </div>
+                        <span class="text-slate-300 group-hover:text-blue-400 text-xl">❯</span>
+                    </button>
+                `;
+            });
+            html += `</div>`;
+            mainContent.innerHTML = html;
+        }
+
+        async function startPractice(index) {
+            currentWordIndex = index;
+            const word = WORD_LIST[index].word;
+            
+            toggleLoading(true, "老師正在為你出題...");
+
+            const prompt = `[指令：你是一位專業的國語老師。]\n請針對詞語「${word}」提供一個國小生活化的造句練習情境。要求：1. 情境中絕對不可出現「${word}」這四個字。2. 包含一個逗號與一個句號。`;
+            
+            const result = await callGemini(prompt);
+            
+            toggleLoading(false);
+
+            if (result.startsWith("錯誤：")) {
+                showMessage(result);
+                return;
+            }
+
+            scenarioText = result;
+            renderPracticePage();
+        }
+
+        function renderPracticePage() {
+            const word = WORD_LIST[currentWordIndex].word;
+            const mainContent = document.getElementById('main-content');
+            mainContent.innerHTML = `
+                <div class="space-y-6 animate-in fade-in duration-500">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-2xl font-black text-blue-600">${word}</h2>
+                        <button onclick="showMenu()" class="text-slate-400 hover:text-slate-600 text-sm underline">返回選單</button>
+                    </div>
+
+                    <div class="bg-blue-50 p-5 rounded-2xl border-l-4 border-blue-400 shadow-sm">
+                        <p class="text-blue-900 text-lg font-bold italic">情境：${scenarioText}</p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block text-sm font-bold text-slate-600 ml-1">請根據情境造句：</label>
+                        <textarea id="student-input" class="w-full h-44 p-4 rounded-2xl border-2 border-slate-100 focus:border-blue-500 outline-none transition-all text-lg shadow-inner" placeholder="記得要有事實、想像與感受，並加上句號喔！"></textarea>
+                    </div>
+
+                    <button onclick="submitSentence()" class="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-all">
+                        寫好了，送出批改
+                    </button>
+                </div>
+            `;
+        }
+
+        async function submitSentence() {
+            const input = document.getElementById('student-input').value;
+            if (!input.trim()) {
+                showMessage("請輸入造句後再送出喔！");
+                return;
+            }
+
+            lastStudentInput = input.trim();
+            toggleLoading(true, "老師正在評分與分析中...");
+
+            const word = WORD_LIST[currentWordIndex].word;
+            const prompt = `[指令：你是一位嚴格且專業的國語老師，請執行五星級造句法批改。]\n\n練習情境：${scenarioText}\n學生造句：「${lastStudentInput}」\n目標語詞：${word}\n\n回覆要求：\n1. 標註星星數量 (1-5星)。\n2. 修改處用 <span class='red-mark'>內容</span> 標記，並保留目標詞。\n\n請嚴格按此格式回覆：\n[星星數量]數字\n[修改句子]內容\n[評語]內容\n[參考例句]內容`;
+
+            const result = await callGemini(prompt);
+            
+            toggleLoading(false);
+            renderResultPage(result);
+        }
+
+        function renderResultPage(feedback) {
+            if (feedback.startsWith("錯誤：")) {
+                showMessage(feedback);
+                return;
+            }
+
+            const starMatch = feedback.match(/\[星星數量\]\s*(\d)/);
+            const modifiedMatch = feedback.match(/\[修改句子\]\s*([\s\S]*?)(?=\[|$)/);
+            const commentMatch = feedback.match(/\[評語\]\s*([\s\S]*?)(?=\[|$)/);
+            const exampleMatch = feedback.match(/\[參考例句\]\s*([\s\S]*)/);
+
+            const starCount = starMatch ? parseInt(starMatch[1]) : 0;
+            const modifiedSentence = modifiedMatch ? modifiedMatch[1].trim() : "解析失敗";
+            const comment = commentMatch ? commentMatch[1].trim() : "無評語";
+            const example = exampleMatch ? exampleMatch[1].trim() : "無範例";
+
+            let starsHtml = "";
+            for (let i = 1; i <= 5; i++) {
+                starsHtml += `<span class="text-3xl ${i <= starCount ? 'star-active' : 'star-inactive'}">★</span>`;
+            }
+
+            const mainContent = document.getElementById('main-content');
+            mainContent.innerHTML = `
+                <div class="space-y-6 animate-in zoom-in-95 duration-500">
+                    <div class="bg-white rounded-2xl border-2 border-blue-50 p-6 shadow-sm text-center">
+                        <div class="flex justify-center gap-1 mb-2">${starsHtml}</div>
+                        <p class="text-sm font-bold text-slate-500 mb-6">得分：${starCount} 顆星</p>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="text-left text-base w-full">
+                                <tr><th>原句</th><td>${lastStudentInput}</td></tr>
+                                <tr><th>修改建議</th><td>${modifiedSentence}</td></tr>
+                                <tr><th>老師評語</th><td>${comment}</td></tr>
+                                <tr><th>五星級例句</th><td><span class="orange-text">${example}</span></td></tr>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <button onclick="renderPracticePage()" class="py-3 border-2 border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl font-bold transition-all">再次練習</button>
+                        <button onclick="showMenu()" class="py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md">下一個詞</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==========================================
+        // 4. API 核心 (改用 Groq 端點)
+        // ==========================================
+        async function callGemini(promptText) {
+            const url = `https://api.groq.com/openai/v1/chat/completions`;
+            
+            const payload = {
+                model: "llama-3.3-70b-versatile",
+                messages: [{ role: "user", content: promptText }]
+            };
+
+            for (let i = 0; i < 3; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        return data.choices?.[0]?.message?.content || "伺服器無回應。";
+                    } else {
+                        return `錯誤：${data.error?.message || "未知伺服器錯誤"}`;
+                    }
+                } catch (error) {
+                    if (i === 2) return "錯誤：連線失敗，請檢查網路。";
+                }
+                await new Promise(res => setTimeout(res, 1000));
+            }
+            return "錯誤：連線超時。";
+        }
+
+        // ==========================================
+        // 5. UI 輔助函數
+        // ==========================================
+        function toggleLoading(show, text = "載入中...") {
+            const overlay = document.getElementById('loading-overlay');
+            const loadingText = document.getElementById('loading-text');
+            loadingText.innerText = text;
+            overlay.classList.toggle('hidden', !show);
+            overlay.classList.toggle('flex', show);
+        }
+
+        function showMessage(msg) {
+            document.getElementById('modal-message').innerText = msg;
+            document.getElementById('custom-modal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('custom-modal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
