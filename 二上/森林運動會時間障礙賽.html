@@ -144,7 +144,7 @@
             background: linear-gradient(135deg, #ffd166, #f4a261);
             color: var(--dark-blue); border: none;
             border-radius: 50%; width: 72px; height: 72px;
-            font-size: 1.6rem; font-weight: 900; cursor: pointer;
+            font-size: 1.15rem; font-weight: 900; cursor: pointer;
             box-shadow: 0 6px 18px rgba(244,162,97,0.45);
             transition: transform 0.1s;
             font-family: 'Noto Sans TC', sans-serif;
@@ -844,6 +844,13 @@ const Game = {
     },
 
     start() {
+        const nameInput = document.getElementById('student-name');
+        const name = nameInput ? nameInput.value.trim() : '';
+        if (!name) {
+            alert('請先輸入「學生姓名」喔！');
+            if (nameInput) nameInput.focus();
+            return;
+        }
         this.state = 'RUNNING';
         this.score = 0; this.distance = 0; this.timeElapsed = 0;
         this.hearts = 3; this.lane = 1;
@@ -874,11 +881,11 @@ const Game = {
         // 根據選中的動物更新操作按鈕文字
         const actionBtn = document.getElementById('jump-btn');
         if (this.selectedChar === 'rabbit') {
-            actionBtn.textContent = '跳！';
+            actionBtn.textContent = '跳躍';
         } else if (this.selectedChar === 'turtle') {
-            actionBtn.textContent = '縮殼！';
+            actionBtn.textContent = '縮殼';
         } else if (this.selectedChar === 'cheetah') {
-            actionBtn.textContent = '撞擊！';
+            actionBtn.textContent = '撞擊';
         }
 
         this.updateHearts();
@@ -1025,8 +1032,12 @@ const Game = {
 
         if (this.state === 'RUNNING') {
             let spd = this.baseSpeed;
-            if (this.stunnedTimer > 0) spd = 1.2;
-            this.speed += (spd - this.speed) * 0.1;
+            if (this.stunnedTimer > 0) {
+                spd = 1.2;
+            } else if (this.isActionActive && this.selectedChar === 'cheetah') {
+                spd = 9.0; // 獵豹衝撞時速度提升！
+            }
+            this.speed += (spd - this.speed) * 0.15;
             this.distance += this.speed * (dt / 1000);
             this.scrollOffset += this.speed * (dt / 1000) * 60;
 
@@ -1647,11 +1658,6 @@ showChoice(barrier) {
     },
 
     drawCheetah(ctx, cycle, isStunned, isActionActive) {
-        if (isActionActive) {
-            ctx.scale(1.35, 0.72);
-            ctx.translate(3, 4);
-        }
-
         let bob = Math.sin(cycle * 2.5) * 2;
         ctx.translate(0, bob);
         if (!isStunned) ctx.rotate(0.04 * Math.sin(cycle));
