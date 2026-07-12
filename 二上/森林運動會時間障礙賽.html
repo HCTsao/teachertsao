@@ -398,7 +398,11 @@
             </div>
         </div>
 
-        <button class="btn" id="play-btn">開始跑步！</button><a href="時間障礙賽教師後台.html" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem; font-weight: bold; margin-top: 15px; display: inline-flex; align-items: center; gap: 5px; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.7)'">⚙️ 教師管理後台</a>
+        <div style="display: flex; gap: 12px; width: 85%; max-width: 320px; margin-bottom: 12px;">
+            <button class="btn" id="play-btn" style="flex: 1; margin: 0;">開始跑步！</button>
+            <button class="btn" id="leaderboard-btn" style="background:#ffb703; color:var(--dark-blue); font-weight:900; margin: 0; padding: 0 16px;">🏆 英雄榜</button>
+        </div>
+        <a href="時間障礙賽教師後台.html" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.7)'">⚙️ 教師管理後台</a>
     </div>
 
     <!-- 暫停 -->
@@ -442,6 +446,34 @@
             </div>
             <button class="btn" id="play-again-btn" style="width:100%;">再玩一次</button>
             <button class="btn" id="victory-menu-btn" style="width:100%; margin-top:10px; background:#a8dadc; color:var(--dark-blue);">回選單</button>
+        </div>
+    </div>
+
+    <!-- 英雄榜彈窗 -->
+    <div id="leaderboard-overlay" class="screen-overlay" style="display:none; background:rgba(0,0,0,0.85); z-index: 100;">
+        <div class="overlay-card" style="max-width: 460px; width: 90%; max-height: 85vh; overflow-y: auto;">
+            <div class="overlay-title">🏆 森林英雄榜 🏆</div>
+            
+            <div id="leaderboard-loading" style="padding: 20px; font-weight: bold; color: #fff; text-align: center;">
+                ⏳ 正在讀取排行榜資料...
+            </div>
+            
+            <table id="leaderboard-table" style="width: 100%; border-collapse: collapse; margin: 15px 0; text-align: left; font-size: 0.95rem; display: none; color: #fff;">
+                <thead>
+                    <tr style="background: rgba(255,255,255,0.15); border-bottom: 2px solid rgba(255,255,255,0.3);">
+                        <th style="padding: 10px 8px; text-align: center; width: 55px;">名次</th>
+                        <th style="padding: 10px 8px;">班級座號</th>
+                        <th style="padding: 10px 8px;">姓名</th>
+                        <th style="padding: 10px 8px; text-align: center;">選手</th>
+                        <th style="padding: 10px 8px; text-align: right; width: 75px;">分數</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboard-body">
+                    <!-- 動態注入 -->
+                </tbody>
+            </table>
+            
+            <button class="btn" id="close-leaderboard-btn" style="width: 100%; margin-top: 10px; background: #6c757d; color: #fff;">❌ 關閉</button>
         </div>
     </div>
 </div>
@@ -775,6 +807,10 @@ const Game = {
         });
 
         document.getElementById('play-btn').addEventListener('click', () => this.start());
+        document.getElementById('leaderboard-btn').addEventListener('click', () => this.showLeaderboard());
+        document.getElementById('close-leaderboard-btn').addEventListener('click', () => {
+            document.getElementById('leaderboard-overlay').style.display = 'none';
+        });
         document.getElementById('resume-btn').addEventListener('click', () => this.resume());
         document.getElementById('restart-btn').addEventListener('click', () => this.start());
         document.getElementById('retry-btn').addEventListener('click', () => this.start());
@@ -837,8 +873,9 @@ const Game = {
     },
 
     showScreen(id) {
-        ['start-screen','pause-overlay','gameover-overlay','victory-overlay','choice-overlay'].forEach(s => {
-            document.getElementById(s).style.display = 'none';
+        ['start-screen','pause-overlay','gameover-overlay','victory-overlay','choice-overlay','leaderboard-overlay'].forEach(s => {
+            const el = document.getElementById(s);
+            if (el) el.style.display = 'none';
         });
         if (id) document.getElementById(id).style.display = 'flex';
     },
@@ -976,6 +1013,9 @@ const Game = {
                 // 播放勝利結尾慶祝音
                 playSound('victory');
                 document.getElementById('victory-cheer').textContent = '🏆 榮譽完成！太棒了！';
+
+                // 上傳分數至排行榜
+                this.uploadLeaderboard(finalTotalScore);
 
                 playAgainBtn.disabled = false;
                 menuBtn.disabled = false;
@@ -2077,6 +2117,88 @@ drawBarriersBackground() {
     updateTimerHUD() {
         const sec = Math.ceil(this.timeLeft / 1000);
         document.getElementById('hud-timer').textContent = `⏱️ ${sec}秒`;
+    },
+
+    uploadLeaderboard(finalScore) {
+        if (!db) return;
+        const seat = document.getElementById('student-seat').value.trim() || '無';
+        const name = document.getElementById('student-name').value.trim() || '匿名';
+        
+        db.ref('time_race_leaderboard').push({
+            seat: seat,
+            name: name,
+            score: finalScore,
+            char: this.selectedChar,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+        }).catch(err => console.error("上傳排行失敗：", err));
+    },
+
+    showLeaderboard() {
+        document.getElementById('leaderboard-overlay').style.display = 'flex';
+        document.getElementById('leaderboard-loading').style.display = 'block';
+        document.getElementById('leaderboard-table').style.display = 'none';
+
+        if (!db) {
+            document.getElementById('leaderboard-loading').innerHTML = '⚠️ Firebase 未連線';
+            return;
+        }
+
+        db.ref('time_race_leaderboard')
+            .orderByChild('score')
+            .limitToLast(10)
+            .once('value')
+            .then(snapshot => {
+                const data = snapshot.val();
+                const list = [];
+                if (data) {
+                    Object.keys(data).forEach(key => {
+                        list.push(data[key]);
+                    });
+                }
+                list.sort((a, b) => b.score - a.score);
+
+                const tbody = document.getElementById('leaderboard-body');
+                tbody.innerHTML = '';
+
+                if (list.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:15px; color:#aaa;">📭 尚無排行紀錄，快來挑戰吧！</td></tr>';
+                } else {
+                    list.forEach((item, index) => {
+                        const rank = index + 1;
+                        let rankHtml = '';
+                        if (rank === 1) rankHtml = '🥇';
+                        else if (rank === 2) rankHtml = '🥈';
+                        else if (rank === 3) rankHtml = '🥉';
+                        else rankHtml = `<span style="font-weight:bold;color:#ccc;">${rank}</span>`;
+
+                        const charEmoji = item.char === 'rabbit' ? '🐰' : (item.char === 'turtle' ? '🐢' : '🐆');
+                        
+                        const tr = document.createElement('tr');
+                        tr.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
+                        tr.innerHTML = `
+                            <td style="padding: 10px 8px; text-align: center; font-size: 1.15rem;">${rankHtml}</td>
+                            <td style="padding: 10px 8px;">${this.escapeHtml(item.seat || '無')}</td>
+                            <td style="padding: 10px 8px; font-weight: bold;">${this.escapeHtml(item.name || '匿名')}</td>
+                            <td style="padding: 10px 8px; text-align: center; font-size: 1.25rem;">${charEmoji}</td>
+                            <td style="padding: 10px 8px; text-align: right; font-weight: 900; color: #ffd166;">${item.score}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+
+                document.getElementById('leaderboard-loading').style.display = 'none';
+                document.getElementById('leaderboard-table').style.display = 'table';
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('leaderboard-loading').innerHTML = '⚠️ 載入排行失敗';
+            });
+    },
+
+    escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, s => {
+            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[s];
+        });
     }
 };
 
