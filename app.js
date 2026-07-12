@@ -330,48 +330,55 @@ function init() {
 
 // 動態獲取教具圖示
 function getToolIcon(name, type) {
+    // 遊戲類與具體主題（高優先級）
     if (name.includes("蛇")) return "fa-solid fa-worm";
     if (name.includes("地鼠")) return "fa-solid fa-hammer";
     if (name.includes("心臟病")) return "fa-solid fa-heart-pulse";
     if (name.includes("小精靈")) return "fa-solid fa-ghost";
     if (name.includes("運動會")) return "fa-solid fa-person-running";
     if (name.includes("鵲橋")) return "fa-solid fa-bridge";
-    if (name.includes("聽、說、讀、寫、做")) return "fa-solid fa-coins";
-    if (name.includes("幾分之幾")) return "fa-solid fa-pizza-slice";
-    if (name.includes("整除")) return "fa-solid fa-divide";
-    if (name.includes("餘數")) return "fa-solid fa-calculator";
-    if (name.includes("互換") && name.includes("教學")) return "fa-solid fa-arrow-right-arrow-left";
-    if ((name.includes("互換") && name.includes("遊戲")) || name.includes("分數披薩店")) return "fa-solid fa-trophy";
-    if (name.includes("四邊形")) return "fa-solid fa-draw-polygon";
-    if (name.includes("周長")) return "fa-solid fa-ruler-combined";
-    if (name.includes("面積") && !name.includes("複合")) return "fa-solid fa-border-all";
     if (name.includes("釣魚大師")) return "fa-solid fa-fish";
-    if (name.includes("面積公式")) return "fa-solid fa-shapes";
-    if (name.includes("百分率")) return "fa-solid fa-right-left";
-    if (name.includes("表面積")) return "fa-solid fa-cube";
+    if (name.includes("分數披薩店")) return "fa-solid fa-trophy";
     if (name.includes("大冒險") && !name.includes("除法")) return "fa-solid fa-compass";
-    if (name.includes("積的關係")) return "fa-solid fa-chart-line";
-    if (name.includes("體積")) return "fa-solid fa-cubes";
-    if (name.includes("展開圖")) return "fa-solid fa-box-open";
-    if (name.includes("直徑")) return "fa-solid fa-circle-notch";
-    if (name.includes("圓面積")) return "fa-solid fa-circle";
-    if (name.includes("周長") && name.includes("複合")) return "fa-solid fa-chart-pie";
-    if (name.includes("周長與面積")) return "fa-solid fa-calculator";
-    if (name.includes("面積") && name.includes("複合")) return "fa-solid fa-layer-group";
-    if (name.includes("放大")) return "fa-solid fa-magnifying-glass-plus";
-    if (name.includes("牛吃草")) return "fa-solid fa-cow";
-    if (name.includes("除法篇")) return "fa-solid fa-shield-halved";
     if (name.includes("密碼")) return "fa-solid fa-key";
-    if (name.includes("最大公因數")) return "fa-solid fa-sitemap";
-    if (name.includes("速率")) return "fa-solid fa-gauge-high";
-    if (name.includes("分數的四則")) return "fa-solid fa-plus-minus";
-    if (name.includes("小數的四則")) return "fa-solid fa-calculator";
+    if (name.includes("神兵")) return "fa-solid fa-wand-magic-sparkles";
+    if (name.includes("牛吃草")) return "fa-solid fa-cow";
     if (name.includes("雞兔點點名") && !name.includes("進階")) return "fa-solid fa-egg";
     if (name.includes("雞兔點點名") && name.includes("進階")) return "fa-solid fa-crown";
     if (name.includes("雞兔問題")) return "fa-solid fa-house-chimney";
-    if (name.includes("神兵")) return "fa-solid fa-wand-magic-sparkles";
-    if (name.includes("數線")) return "fa-solid fa-route";
     
+    // 特定關鍵字與複合圖形（必須在基礎幾何前）
+    if (name.includes("面積公式")) return "fa-solid fa-shapes";
+    if (name.includes("表面積")) return "fa-solid fa-cube";
+    if (name.includes("體積")) return "fa-solid fa-cubes";
+    if (name.includes("展開圖")) return "fa-solid fa-box-open";
+    if (name.includes("周長") && name.includes("複合")) return "fa-solid fa-chart-pie";
+    if (name.includes("面積") && name.includes("複合")) return "fa-solid fa-layer-group";
+    
+    // 基礎圖形與測量
+    if (name.includes("四邊形")) return "fa-solid fa-draw-polygon";
+    if (name.includes("周長")) return "fa-solid fa-ruler-combined";
+    if (name.includes("直徑")) return "fa-solid fa-circle-notch";
+    if (name.includes("圓面積")) return "fa-solid fa-circle";
+    if (name.includes("面積")) return "fa-solid fa-border-all";
+    
+    // 運算與概念
+    if (name.includes("聽、說、讀、寫、做")) return "fa-solid fa-coins";
+    if (name.includes("幾分之幾")) return "fa-solid fa-pizza-slice";
+    if (name.includes("百分率")) return "fa-solid fa-percent";
+    if (name.includes("互換")) return "fa-solid fa-arrow-right-arrow-left";
+    if (name.includes("最大公因數")) return "fa-solid fa-sitemap";
+    if (name.includes("除法算式")) return "fa-solid fa-divide";
+    if (name.includes("除法篇")) return "fa-solid fa-shield-halved";
+    if (name.includes("整除")) return "fa-solid fa-divide";
+    if (name.includes("餘數")) return "fa-solid fa-calculator";
+    if (name.includes("積的關係")) return "fa-solid fa-chart-line";
+    if (name.includes("放大")) return "fa-solid fa-magnifying-glass-plus";
+    if (name.includes("速率")) return "fa-solid fa-gauge-high";
+    if (name.includes("四則")) return "fa-solid fa-calculator";
+    if (name.includes("數線")) return "fa-solid fa-route";
+
+    // 預設
     if (type === "遊戲") return "fa-solid fa-gamepad";
     if (type === "評量") return "fa-solid fa-pen-to-square";
     return "fa-solid fa-book-open";
