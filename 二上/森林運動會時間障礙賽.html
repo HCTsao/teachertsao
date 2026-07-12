@@ -694,19 +694,35 @@ function generateQuestion() {
     if (wH1 === hour) wH1 = (hour % 12) + 1; // 防止湊巧相同
     options.push(`${wH1}時${min}分`);
 
-    // 錯誤選項2：「分針直接讀刻度數字」的誘答
-    // 例如 7:40 → 分針指在 8 → 學生誤讀成「8分」而非「40分」
-    let wM2;
-    if (min === 0) {
-        wM2 = 12; // 整點時分針指12，有學生誤讀為12分
+    // 錯誤選項2：如果是剛好5分5分且時針沒有快到下一個刻度(<=30分)，新增一個把時針分針讀顛倒的誘答選項
+    let reversedOption = null;
+    if (min % 5 === 0 && min <= 30) {
+        let revHour = min / 5;
+        if (revHour === 0) revHour = 12;
+        let revMin = hour * 5;
+        if (revMin === 60) revMin = 0;
+        
+        const revChoice = `${revHour}時${revMin}分`;
+        if (revChoice !== correct && revChoice !== `${wH1}時${min}分`) {
+            reversedOption = revChoice;
+        }
+    }
+
+    if (reversedOption) {
+        options.push(reversedOption);
     } else {
-        wM2 = min / 5; // 分針對齊的數字，如40分→指在8→誤讀成8分
+        // 如果不符條件，使用原有的「分針直接讀刻度數字」誘答
+        let wM2;
+        if (min === 0) {
+            wM2 = 12; 
+        } else {
+            wM2 = min / 5; 
+        }
+        if (`${hour}時${wM2}分` === correct || wM2 === min || `${hour}時${wM2}分` === `${wH1}時${min}分`) {
+            wM2 = (min + 15) % 60 || 5;
+        }
+        options.push(`${hour}時${wM2}分`);
     }
-    // 避免與正確答案或選項1相同
-    if (`${hour}時${wM2}分` === correct || wM2 === min) {
-        wM2 = (min + 15) % 60 || 5;
-    }
-    options.push(`${hour}時${wM2}分`);
 
     // 打亂
     for (let i = options.length - 1; i > 0; i--) {
