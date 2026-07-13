@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -199,6 +199,14 @@
     let edges = [];
     let isSquare = false; 
     
+    // 繪圖座標變數 (全域)
+    let drawL = 0;
+    let drawW = 0;
+    let rLeft = 0;
+    let rRight = 0;
+    let rTop = 0;
+    let rBottom = 0;
+    
     // UI 元件
     const mainTitle = document.getElementById('mainTitle');
     const guideText = document.getElementById('guideText');
@@ -219,21 +227,16 @@
         const availableWidth = canvas.width * 0.8; 
         const pixelPerUnit = availableWidth / totalPerimeter;
 
-        const drawL = inputL * pixelPerUnit;
-        const drawW = inputW * pixelPerUnit;
-        const totalDrawLength = (drawL + drawW) * 2;
+        drawL = inputL * pixelPerUnit;
+        drawW = inputW * pixelPerUnit;
 
         // 4. 定義座標
-        const rectCX = canvas.width / 2;
+        const rectCX = canvas.width / 2 - drawL/2; // 將矩形往左移，確保展開後左右對稱置中於畫布
         const rectCY = 150;
-        const rLeft = rectCX - drawL/2;
-        const rRight = rectCX + drawL/2;
-        const rTop = rectCY - drawW/2;
-        const rBottom = rectCY + drawW/2;
-
-        // 直線位置
-        const lineStartX = (canvas.width - totalDrawLength) / 2;
-        const lineY = 320; 
+        rLeft = rectCX - drawL/2;
+        rRight = rectCX + drawL/2;
+        rTop = rectCY - drawW/2;
+        rBottom = rectCY + drawW/2;
 
         // 5. 定義每一邊的資料
         const labelLong = isSquare ? "邊長" : "長";
@@ -248,7 +251,7 @@
                 label: labelLong, val: inputL, 
                 color: isSquare ? squareColors[0] : "#0d6efd",
                 start: { x1: rLeft, y1: rTop, x2: rRight, y2: rTop },
-                end:   { x1: lineStartX, y1: lineY, x2: lineStartX + drawL, y2: lineY },
+                end:   { x1: rRight + drawW + drawL, y1: rBottom, x2: rRight + drawW, y2: rBottom },
                 labelConfig: { rect: { l: {x:0, y:-35}, v: {x:0, y:-10} }, line: { l: {x:0, y:-30}, v: {x:0, y:30} } }
             },
             // Right (Edge 1)
@@ -256,7 +259,7 @@
                 label: labelShort, val: inputW, 
                 color: isSquare ? squareColors[1] : "#dc3545",
                 start: { x1: rRight, y1: rTop, x2: rRight, y2: rBottom },
-                end:   { x1: lineStartX + drawL, y1: lineY, x2: lineStartX + drawL + drawW, y2: lineY },
+                end:   { x1: rRight + drawW, y1: rBottom, x2: rRight, y2: rBottom },
                 labelConfig: { rect: { l: {x:35, y:-10}, v: {x:35, y:15} }, line: { l: {x:0, y:-30}, v: {x:0, y:30} } }
             },
             // Bottom (Edge 2)
@@ -264,7 +267,7 @@
                 label: labelLong, val: inputL, 
                 color: isSquare ? squareColors[2] : "#0d6efd",
                 start: { x1: rRight, y1: rBottom, x2: rLeft, y2: rBottom },
-                end:   { x1: lineStartX + drawL + drawW, y1: lineY, x2: lineStartX + drawL + drawW + drawL, y2: lineY },
+                end:   { x1: rRight, y1: rBottom, x2: rLeft, y2: rBottom },
                 labelConfig: { rect: { l: {x:0, y:40}, v: {x:0, y:15} }, line: { l: {x:0, y:-30}, v: {x:0, y:30} } }
             },
             // Left (Edge 3)
@@ -272,7 +275,7 @@
                 label: labelShort, val: inputW, 
                 color: isSquare ? squareColors[3] : "#dc3545",
                 start: { x1: rLeft, y1: rBottom, x2: rLeft, y2: rTop },
-                end:   { x1: lineStartX + totalDrawLength - drawW, y1: lineY, x2: lineStartX + totalDrawLength, y2: lineY },
+                end:   { x1: rLeft - drawW, y1: rBottom, x2: rLeft, y2: rBottom },
                 labelConfig: { rect: { l: {x:-35, y:-10}, v: {x:-35, y:15} }, line: { l: {x:0, y:-30}, v: {x:0, y:30} } }
             }
         ];
@@ -384,13 +387,40 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
         const easeT = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+        const theta = easeT * Math.PI / 2;
+        const phi = easeT * Math.PI;
 
         // 繪製線段
         edges.forEach((edge, index) => {
-            const cx1 = edge.start.x1 + (edge.end.x1 - edge.start.x1) * easeT;
-            const cy1 = edge.start.y1 + (edge.end.y1 - edge.start.y1) * easeT;
-            const cx2 = edge.start.x2 + (edge.end.x2 - edge.start.x2) * easeT;
-            const cy2 = edge.start.y2 + (edge.end.y2 - edge.start.y2) * easeT;
+            let cx1, cy1, cx2, cy2;
+            
+            if (index === 2) {
+                // Bottom Blue Line (remains still)
+                cx1 = rRight;
+                cy1 = rBottom;
+                cx2 = rLeft;
+                cy2 = rBottom;
+            } else if (index === 3) {
+                // Left Red Line (pivot is rLeft, rBottom, falls to the left)
+                cx1 = rLeft;
+                cy1 = rBottom;
+                cx2 = rLeft - drawW * Math.sin(theta);
+                cy2 = rBottom - drawW * Math.cos(theta);
+            } else if (index === 1) {
+                // Right Red Line (pivot is rRight, rBottom, opens to the right)
+                cx2 = rRight;
+                cy2 = rBottom;
+                cx1 = rRight + drawW * Math.sin(theta);
+                cy1 = rBottom - drawW * Math.cos(theta);
+            } else if (index === 0) {
+                // Top Blue Line (connected to the rotating end of Right Red Line, unfolds straight)
+                const cx1_right = rRight + drawW * Math.sin(theta);
+                const cy1_right = rBottom - drawW * Math.cos(theta);
+                cx2 = cx1_right;
+                cy2 = cy1_right;
+                cx1 = cx2 - drawL * Math.cos(phi);
+                cy1 = cy2 - drawL * Math.sin(phi);
+            }
 
             ctx.beginPath();
             ctx.moveTo(cx1, cy1);
@@ -426,24 +456,20 @@
             if (isSquare) {
                 // 正方形邏輯：Step 3 & 4 顯示大括號
                 if (currentStep >= 3) {
-                    drawBracket(0, 3, "總周長 = 邊長 × 4");
+                    drawBracket(rLeft - drawW, rRight + drawW + drawL, "總周長 = 邊長 × 4");
                 }
             } else {
                 // 長方形邏輯：Step 3 & 4 顯示兩組括號
                 if (currentStep >= 3) {
-                    drawBracket(0, 1, "第一組 (長+寬)");
-                    drawBracket(2, 3, "第二組 (長+寬)");
+                    drawBracket(rLeft - drawW, rRight, "第一組 (長+寬)");
+                    drawBracket(rRight, rRight + drawW + drawL, "第二組 (長+寬)");
                 }
             }
         }
     }
 
-    function drawBracket(startIndex, endIndex, text) {
-        const startEdge = edges[startIndex];
-        const endEdge = edges[endIndex];
-        const x1 = startEdge.end.x1;
-        const x2 = endEdge.end.x2;
-        const y = startEdge.end.y1 + 50; 
+    function drawBracket(x1, x2, text) {
+        const y = rBottom + 50; 
 
         ctx.beginPath();
         ctx.strokeStyle = "#6c757d";
