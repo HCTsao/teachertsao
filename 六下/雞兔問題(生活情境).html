@@ -277,7 +277,7 @@
         }
 
         .question-text {
-            font-size: 1.25rem;
+            font-size: 1.55rem;
             line-height: 1.6;
             font-weight: bold;
         }
@@ -839,27 +839,27 @@
     <div class="steps-ledger">
         <div class="ledger-title">📝 假設法解題步驟紀錄</div>
         <div id="ledger-step-1" class="ledger-step active">
-            <div class="step-num-tag">步驟 1 / 5</div>
+            <div class="step-num-tag">步驟 1 / 5 💭 假設全部的總量</div>
             <div class="step-eq-disp" id="ledger-eq-1">--</div>
             <div class="step-meaning-disp" id="ledger-meaning-1">等待回答中...</div>
         </div>
         <div id="ledger-step-2" class="ledger-step">
-            <div class="step-num-tag">步驟 2 / 5</div>
+            <div class="step-num-tag">步驟 2 / 5 ⚖️ 比較假設與實際的總差</div>
             <div class="step-eq-disp" id="ledger-eq-2">--</div>
             <div class="step-meaning-disp" id="ledger-meaning-2">尚未解鎖</div>
         </div>
         <div id="ledger-step-3" class="ledger-step">
-            <div class="step-num-tag">步驟 3 / 5</div>
+            <div class="step-num-tag">步驟 3 / 5 🔄 單一個體置換的差</div>
             <div class="step-eq-disp" id="ledger-eq-3">--</div>
             <div class="step-meaning-disp" id="ledger-meaning-3">尚未解鎖</div>
         </div>
         <div id="ledger-step-4" class="ledger-step">
-            <div class="step-num-tag">步驟 4 / 5</div>
+            <div class="step-num-tag">步驟 4 / 5 🔢 計算置換次數</div>
             <div class="step-eq-disp" id="ledger-eq-4">--</div>
             <div class="step-meaning-disp" id="ledger-meaning-4">尚未解鎖</div>
         </div>
         <div id="ledger-step-5" class="ledger-step">
-            <div class="step-num-tag">步驟 5 / 5</div>
+            <div class="step-num-tag">步驟 5 / 5 💡 算出另一方的數量</div>
             <div class="step-eq-disp" id="ledger-eq-5">--</div>
             <div class="step-meaning-disp" id="ledger-meaning-5">尚未解鎖</div>
         </div>
@@ -1038,10 +1038,35 @@
         if (audioCtx.state === 'suspended') audioCtx.resume();
     });
 
+    // 語音播放輔助
+    function speakText(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'zh-TW';
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+
     // 監聽鍵盤直接輸入算式，進行格式自動轉換與不安全字元過濾
     document.addEventListener('DOMContentLoaded', () => {
         const eqInput = document.getElementById('equation-input');
         if (eqInput) {
+            // 攔截鍵盤輸入，避免原生輸入與自動替換發生雙重插入 Bug
+            eqInput.addEventListener('keydown', (e) => {
+                if (e.key === '*' || e.key === 'x' || e.key === 'X' || e.key === '/') {
+                    e.preventDefault();
+                    const insertChar = (e.key === '/' ? '÷' : '×');
+                    const start = eqInput.selectionStart;
+                    const end = eqInput.selectionEnd;
+                    const text = eqInput.value;
+                    eqInput.value = text.substring(0, start) + insertChar + text.substring(end);
+                    eqInput.selectionStart = eqInput.selectionEnd = start + 1;
+                    // 手動觸發 input 事件以同步其他綁定的邏輯
+                    eqInput.dispatchEvent(new Event('input'));
+                }
+            });
+
             eqInput.addEventListener('input', (e) => {
                 let val = e.target.value;
                 // 將 * 或 x 或 X 替換為 ×，/ 替換為 ÷
@@ -1430,8 +1455,12 @@
 
     function showHint() {
         playSound('pop');
-        document.getElementById('console-instruction').style.display = 'block';
+        const instructionEl = document.getElementById('console-instruction');
+        instructionEl.style.display = 'block';
         showWordChips();
+        
+        let textToSpeak = instructionEl.innerText || "";
+        speakText(textToSpeak);
     }
 
     function hideFeedback() {

@@ -640,6 +640,26 @@
             // 監聽學生紀錄
             db.ref('records').on('value', (snapshot) => {
                 allRecords = snapshot.val() || {};
+                
+                // 數據庫補正遷移：曹泓棋 -> 4007，謝千慧 -> 1234
+                let needsUpdate = false;
+                const updates = {};
+                Object.keys(allRecords).forEach(key => {
+                    const rec = allRecords[key];
+                    if (rec.teacherName === '曹泓棋' && rec.classPassword !== '4007') {
+                        updates[`/records/${key}/classPassword`] = '4007';
+                        needsUpdate = true;
+                    } else if (rec.teacherName === '謝千慧' && rec.classPassword !== '1234') {
+                        updates[`/records/${key}/classPassword`] = '1234';
+                        needsUpdate = true;
+                    }
+                });
+                if (needsUpdate) {
+                    db.ref().update(updates).then(() => {
+                        console.log("成功補正歷史紀錄中的課堂密碼！");
+                    });
+                }
+
                 document.getElementById('loading-el').style.display = 'none';
                 renderTable();
             }, (error) => {
@@ -787,8 +807,6 @@
                         <div class="step-header">
                             <span>步驟 ${s}</span>
                         </div>
-                        <div class="step-eq">${escapeHtml(stepAns.eq)}</div>
-                        <div class="step-meaning">👉 <b>過關解釋：</b>${escapeHtml(stepAns.meaning)}</div>
                         ${attemptsListHtml}
                     </div>
                 `;
@@ -1121,8 +1139,6 @@
                     stepsHtml += `
                         <div style="border-left: 4px solid #4f46e5; background: #f8fafc; padding: 10px; margin-bottom: 10px; border-radius: 0 8px 8px 0;">
                             <div style="font-weight: bold; font-size: 0.9rem; color: #64748b; margin-bottom: 5px;">步驟 ${s}</div>
-                            <div style="font-family: monospace; font-weight: bold; font-size: 1rem; color: #4f46e5; margin-bottom: 5px;">${escapeHtml(stepAns.eq)}</div>
-                            <div style="font-size: 0.9rem;">👉 <b>過關解釋：</b>${escapeHtml(stepAns.meaning)}</div>
                             ${attemptsListHtml}
                         </div>
                     `;
