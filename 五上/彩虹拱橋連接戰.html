@@ -1392,15 +1392,31 @@
           triggerMatchSuccess(match, v1, v2, el1, el2);
           selectedBubble = null;
         } else {
-          element.classList.add('error-shake');
-          selectedBubble.element.classList.add('error-shake');
-          sound.playError();
+          questionHadMistake = true;
+          logMistakeToFirebase(gameMode === 'basic' ? "基礎挑戰" : "進階挑戰", targetNum, "因數配對錯誤", "乘積為 " + targetNum, `${v1} * ${v2} = ${v1*v2}`);
+          
+          gameState = 'falling';
+          isMatchingAnimationActive = true;
+          
+          let el1 = selectedBubble.element;
+          let el2 = element;
+          el1.classList.remove('selected');
+          el1.classList.add('fade-out');
+          el2.classList.add('fade-out');
+          
+          let idx1 = sortedFactors.indexOf(v1);
+          let idx2 = sortedFactors.indexOf(v2);
+          let targetEl1 = idx1 !== -1 ? document.getElementById(`slot-${idx1}`) : bridgeCanvas;
+          let targetEl2 = idx2 !== -1 ? document.getElementById(`slot-${idx2}`) : bridgeCanvas;
+          
+          animateFlyingBubble(el1, targetEl1, v1);
+          animateFlyingBubble(el2, targetEl2, v2);
+          selectedBubble = null;
           
           setTimeout(() => {
-            element.classList.remove('error-shake', 'selected');
-            selectedBubble.element.classList.remove('error-shake', 'selected');
-            selectedBubble = null;
-          }, 400);
+            isMatchingAnimationActive = false;
+            triggerFallingAnimation();
+          }, 800);
         }
       }
     }
@@ -1429,7 +1445,27 @@
         inputFactor2.value = '';
         inputFactor1.focus();
       } else {
-        shakeInputRow();
+        questionHadMistake = true;
+        logMistakeToFirebase(gameMode === 'basic' ? "基礎挑戰" : "進階挑戰", targetNum, "因數配對錯誤", "乘積為 " + targetNum, `${v1} * ${v2} = ${v1*v2}`);
+        
+        gameState = 'falling';
+        isMatchingAnimationActive = true;
+        
+        let idx1 = sortedFactors.indexOf(v1);
+        let idx2 = sortedFactors.indexOf(v2);
+        let targetEl1 = idx1 !== -1 ? document.getElementById(`slot-${idx1}`) : bridgeCanvas;
+        let targetEl2 = idx2 !== -1 ? document.getElementById(`slot-${idx2}`) : bridgeCanvas;
+        
+        animateFlyingBubble(inputFactor1, targetEl1, v1);
+        animateFlyingBubble(inputFactor2, targetEl2, v2);
+        
+        inputFactor1.value = '';
+        inputFactor2.value = '';
+        
+        setTimeout(() => {
+          isMatchingAnimationActive = false;
+          triggerFallingAnimation();
+        }, 800);
       }
     }
 
