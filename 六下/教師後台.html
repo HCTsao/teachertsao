@@ -603,6 +603,18 @@
                 db.ref('teachers/謝千慧').once('value').then(snap => {
                     if (!snap.exists()) db.ref('teachers/謝千慧').set({ password: '1234', timestamp: Date.now() });
                 });
+
+                // 自動清理先前的亂碼資料 (包含 %)
+                db.ref('teachers').once('value').then(snap => {
+                    const data = snap.val();
+                    if (data) {
+                        Object.keys(data).forEach(k => {
+                            if (k.includes('%')) {
+                                db.ref('teachers/' + k).remove();
+                            }
+                        });
+                    }
+                });
             } catch (e) {
                 console.error("Firebase 初始化失敗：", e);
             }
@@ -905,13 +917,13 @@
                 const card = document.createElement('div');
                 card.className = 'session-card';
                 card.innerHTML = `
-                    <div class="session-title">👨‍🏫 指導教師：${escapeHtml(session.teacherName)}</div>
                     <div class="session-info">
-                        📅 最後作答：${dateStr}<br>
-                        👥 紀錄筆數：共 ${session.records.length} 筆
+                        <strong>👨‍🏫 指導教師：${session.teacherName}</strong><br>
+                        <small>📅 最後作答：${dateStr}</small><br>
+                        <small>👥 紀錄筆數：共 ${session.records.length} 筆</small>
                     </div>
-                    <button class="btn download-btn" onclick="downloadExcel('${session.id}')">
-                        📥 下載此教師 Excel
+                    <button class="btn btn-primary" style="background: #10b981; margin-bottom: 8px; width: 100%; justify-content: center;" onclick="downloadExcel('${session.id}')">
+                        📥 下載詳細歷程 Excel
                     </button>
                     <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="downloadPDF('${session.id}')">
                     📄 下載詳細歷程 PDF
@@ -949,7 +961,7 @@
 
         try {
             // 刪除開課設定
-            await db.ref('teachers/' + encodeURIComponent(teacherName)).remove();
+            await db.ref('teachers/' + teacherName).remove();
             
             // 刪除該老師名下所有的學生紀錄
             const keys = Object.keys(allRecords);
@@ -978,7 +990,7 @@
             
             if (typeof firebase !== 'undefined' && firebase.database) {
                 try {
-                    const snap = await firebase.database().ref('teachers/' + encodeURIComponent(session.teacherName)).once('value');
+                    const snap = await firebase.database().ref('teachers/' + session.teacherName).once('value');
                     if (!snap.exists() || snap.val().password !== pwd) {
                         alert("❌ 密碼錯誤或該教師尚未設定密碼！");
                         return;
@@ -1067,7 +1079,7 @@
             
             if (typeof firebase !== 'undefined' && firebase.database) {
                 try {
-                    const snap = await firebase.database().ref('teachers/' + encodeURIComponent(session.teacherName)).once('value');
+                    const snap = await firebase.database().ref('teachers/' + session.teacherName).once('value');
                     if (!snap.exists() || snap.val().password !== pwd) {
                         alert("❌ 密碼錯誤或該教師尚未設定密碼！");
                         return;
@@ -1233,7 +1245,7 @@
                 alert("Firebase 尚未啟用，無法儲存設定！");
                 return;
             }
-            firebase.database().ref('teachers/' + encodeURIComponent(tName)).set({
+            firebase.database().ref('teachers/' + tName).set({
                 password: tPwd,
                 timestamp: Date.now()
             }).then(() => {
