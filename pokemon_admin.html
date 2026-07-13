@@ -403,7 +403,7 @@
 
             <div style="display: flex; gap: 12px; margin-top: 10px;">
               <button class="btn btn-primary" onclick="saveHomework()"><i class="fa-solid fa-cloud-arrow-up"></i> 儲存今日作業</button>
-              <button class="btn btn-danger" onclick="clearHomework()"><i class="fa-solid fa-trash-can"></i> 清除作業與通知單</button>
+              <button class="btn btn-danger" onclick="clearHomework()"><i class="fa-solid fa-trash-can"></i> 清除今日作業</button>
             </div>
           </div>
         </div>
@@ -428,8 +428,9 @@
             <button class="btn btn-danger" style="position: absolute; bottom: 10px; right: 10px; padding: 6px 12px; font-size: 0.85rem;" onclick="removeNotice()"><i class="fa-solid fa-trash"></i> 移除通知單</button>
           </div>
 
-          <div class="form-group" style="margin-top: 20px;">
-            <button class="btn btn-primary" id="save-notice-btn" onclick="saveNotice()" disabled><i class="fa-solid fa-circle-check"></i> 儲存今日通知單</button>
+          <div class="form-group" style="margin-top: 20px; display: flex; gap: 12px;">
+            <button class="btn btn-primary" id="save-notice-btn" onclick="saveNotice()" disabled style="flex: 1;"><i class="fa-solid fa-circle-check"></i> 儲存今日通知單</button>
+            <button class="btn btn-danger" onclick="clearNotice()" style="flex: 1;"><i class="fa-solid fa-trash"></i> 清除今日通知單</button>
           </div>
         </div>
       </div>
@@ -460,6 +461,74 @@
       "1": { name: "陳洪福", pokemons: [] },
       "2": { name: "蕭廷恩", pokemons: [] },
       "3": { name: "江岳泰", pokemons: [] }
+    };    // 2026 與 2027 國定假日與連假對照表（連假期間一律沿用連假前最後一個上學日）
+    const HOLIDAY_FALLBACKS = {
+      // 2026 元旦
+      "2026-01-01": "2025-12-31",
+      // 2026 農曆春節 (2/14 - 2/22)
+      "2026-02-14": "2026-02-13",
+      "2026-02-15": "2026-02-13",
+      "2026-02-16": "2026-02-13",
+      "2026-02-17": "2026-02-13",
+      "2026-02-18": "2026-02-13",
+      "2026-02-19": "2026-02-13",
+      "2026-02-20": "2026-02-13",
+      "2026-02-21": "2026-02-13",
+      "2026-02-22": "2026-02-13",
+      // 2026 228連假 (2/27 - 3/1)
+      "2026-02-27": "2026-02-26",
+      "2026-02-28": "2026-02-26",
+      "2026-03-01": "2026-02-26",
+      // 2026 兒童與清明連假 (4/3 - 4/6)
+      "2026-04-03": "2026-04-02",
+      "2026-04-04": "2026-04-02",
+      "2026-04-05": "2026-04-02",
+      "2026-04-06": "2026-04-02",
+      // 2026 端午連假 (6/19 - 6/21)
+      "2026-06-19": "2026-06-18",
+      "2026-06-20": "2026-06-18",
+      "2026-06-21": "2026-06-18",
+      // 2026 中秋與教師節連假 (9/25 - 9/28)
+      "2026-09-25": "2026-09-24",
+      "2026-09-26": "2026-09-24",
+      "2026-09-27": "2026-09-24",
+      "2026-09-28": "2026-09-24",
+      // 2026 國慶連假 (10/9 - 10/11)
+      "2026-10-09": "2026-10-08",
+      "2026-10-10": "2026-10-08",
+      "2026-10-11": "2026-10-08",
+
+      // 2027 元旦連假 (1/1 - 1/3)
+      "2027-01-01": "2026-12-31",
+      "2027-01-02": "2026-12-31",
+      "2027-01-03": "2026-12-31",
+      // 2027 農曆春節 (2/4 - 2/10)
+      "2027-02-04": "2027-02-03",
+      "2027-02-05": "2027-02-03",
+      "2027-02-06": "2027-02-03",
+      "2027-02-07": "2027-02-03",
+      "2027-02-08": "2027-02-03",
+      "2027-02-09": "2027-02-03",
+      "2027-02-10": "2027-02-03",
+      // 2027 228連假 (2/27 - 3/1)
+      "2027-02-27": "2027-02-26",
+      "2027-02-28": "2027-02-26",
+      "2027-03-01": "2027-02-26",
+      // 2027 兒童與清明連假 (4/3 - 4/6)
+      "2027-04-03": "2027-04-02",
+      "2027-04-04": "2027-04-02",
+      "2027-04-05": "2027-04-02",
+      "2027-04-06": "2027-04-02",
+      // 2027 端午節 (單日放假)
+      "2027-06-09": "2027-06-08",
+      // 2027 中秋節 (單日放假)
+      "2027-09-15": "2027-09-14",
+      // 2027 國慶連假 (10/9 - 10/11)
+      "2027-10-09": "2027-10-08",
+      "2027-10-10": "2027-10-08",
+      "2027-10-11": "2027-10-08",
+      // 2027/2028跨年連假 (12/31 - 1/2)
+      "2027-12-31": "2027-12-30"
     };
 
     let students = null;
@@ -755,6 +824,15 @@
       const targetDate = document.getElementById('homework-date').value;
       if (!targetDate) return;
 
+      // 國定假日或連假自動引導至連假前最後一個上學日
+      if (HOLIDAY_FALLBACKS[targetDate]) {
+        const queryDate = HOLIDAY_FALLBACKS[targetDate];
+        alert(`您選擇的日期 (${targetDate}) 是國定假日/連假期間，系統將自動為您讀取並操作放假前最後一個上學日 (${queryDate}) 的作業與通知單！`);
+        document.getElementById('homework-date').value = queryDate;
+        loadHomeworkForDate();
+        return;
+      }
+
       // 假日自動引導至星期五
       const parsedDate = new Date(targetDate);
       const dayOfWeek = parsedDate.getDay();
@@ -833,7 +911,7 @@
       }
     }
 
-    // 清除今日作業與通知單
+    // 清除今日作業
     function clearHomework() {
       const targetDate = document.getElementById('homework-date').value;
       if (!targetDate) {
@@ -841,33 +919,57 @@
         return;
       }
 
-      if (confirm(`確定要清除 ${targetDate} 的作業與通知單嗎？`)) {
+      if (confirm(`確定要清除 ${targetDate} 的作業內容嗎？`)) {
         // 從本機資料庫刪除
         delete adminHomeworkDb[targetDate];
+
+        // 同步至 Firebase
+        if (database) {
+          database.ref('homeworkDatabase').set(adminHomeworkDb)
+            .then(() => {
+              alert(`${targetDate} 的作業已清除並同步成功！`);
+              document.getElementById('hw-content').value = '';
+            })
+            .catch(err => alert('清除同步失敗：' + err.message));
+        } else {
+          document.getElementById('hw-content').value = '';
+          alert('作業已從本機快取清除！');
+        }
+      }
+    }
+
+    // 清除今日通知單
+    function clearNotice() {
+      const targetDate = document.getElementById('homework-date').value;
+      if (!targetDate) {
+        alert('請選擇日期！');
+        return;
+      }
+
+      if (confirm(`確定要清除 ${targetDate} 的通知單圖片嗎？`)) {
+        // 從本機資料庫刪除
         delete adminNoticeDb[targetDate];
 
         // 同步至 Firebase
         if (database) {
-          Promise.all([
-            database.ref('homeworkDatabase').set(adminHomeworkDb),
-            database.ref('noticeDatabase').set(adminNoticeDb)
-          ]).then(() => {
-            alert(`${targetDate} 的作業與通知單已清除並同步成功！`);
-            // 重設 UI
-            document.getElementById('hw-content').value = '';
-            document.getElementById('notice-preview-container').style.display = 'none';
-            document.getElementById('notice-preview-img').src = '';
-            document.getElementById('notice-file-input').value = '';
-            currentSelectedFileBase64 = null;
-          }).catch(err => alert('清除同步失敗：' + err.message));
+          database.ref('noticeDatabase').set(adminNoticeDb)
+            .then(() => {
+              alert(`${targetDate} 的通知單已清除並同步成功！`);
+              // 重設 UI
+              document.getElementById('notice-preview-container').style.display = 'none';
+              document.getElementById('notice-preview-img').src = '';
+              document.getElementById('notice-file-input').value = '';
+              currentSelectedFileBase64 = null;
+              // 啟用儲存按鈕
+              document.getElementById('save-notice-btn').disabled = true;
+            })
+            .catch(err => alert('清除同步失敗：' + err.message));
         } else {
-          // 離線模式重設 UI
-          document.getElementById('hw-content').value = '';
           document.getElementById('notice-preview-container').style.display = 'none';
           document.getElementById('notice-preview-img').src = '';
           document.getElementById('notice-file-input').value = '';
           currentSelectedFileBase64 = null;
-          alert('作業已從本機快取清除！');
+          alert('通知單已從本機快取清除！');
         }
       }
     }
