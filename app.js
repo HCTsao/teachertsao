@@ -290,6 +290,13 @@ const toolsData = [
         type: "評量"
     },
     {
+        name: "怎樣解題：年齡問題",
+        category: "六下",
+        path: "六下/怎樣解題：年齡問題.html",
+        desc: "包含倍數關係與年齡和共五種題型，以互動式五步驟引導學生掌握年齡問題的解題心法。",
+        type: "評量"
+    },
+    {
         name: "數學神兵-正負大對決",
         category: "七上",
         path: "七上/數學神兵-正負大對決/index.html",
