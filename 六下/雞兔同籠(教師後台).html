@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Firebase Web SDK (v8.10.1 Namespace version) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <!-- SheetJS for Client-side Excel Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
+    <!-- html2pdf for PDF Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <title>怎樣解題：雞兔問題 - 教師管理後台</title>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            --panel-bg: rgba(255, 255, 255, 0.85);
+            --card-bg: rgba(241, 245, 249, 0.9);
+            --border-glow: rgba(99, 102, 241, 0.15);
+            --border-active: rgba(99, 102, 241, 0.5);
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --error: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft JhengHei", sans-serif;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            background: var(--panel-bg);
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            padding: 30px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            color: var(--text-primary);
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            margin-bottom: 25px;
+        }
+
+        /* Firebase 未設定警示 */
+        .config-warning {
+            background: rgba(245, 158, 11, 0.1);
+            border: 2px dashed var(--warning);
+            color: #b45309;
+            padding: 15px;
+            border-radius: 16px;
+            margin-bottom: 25px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            text-align: left;
+        }
+
+        .config-warning code {
+            background: rgba(0, 0, 0, 0.05);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: Consolas, monospace;
+            font-weight: bold;
+        }
+
+        /* 功能控制列 */
+        .controls-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 15px;
+            border-radius: 12px;
+            border: 2px solid var(--border-glow);
+            background: #fff;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .search-box input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.1);
+        }
+
+        .filter-select {
+            padding: 12px 15px;
+            border-radius: 12px;
+            border: 2px solid var(--border-glow);
+            background: #fff;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            outline: none;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .filter-select:focus {
+            border-color: var(--primary);
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+            border: 2px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .btn-danger:hover {
+            background: var(--error);
+            color: #fff;
+            border-color: var(--error);
+        }
+
+        /* 課程場次卡片 */
+        .sessions-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .session-card {
+            background: rgba(16, 185, 129, 0.05);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: left;
+            flex: 0 0 calc((100% - 30px) / 3);
+            max-width: calc((100% - 30px) / 3);
+            box-sizing: border-box;
+        }
+
+        .session-title {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            color: var(--success);
+            font-weight: bold;
+        }
+
+        .session-info {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .download-btn {
+            background: var(--success);
+            color: white;
+            white-space: nowrap;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .download-btn:hover {
+            background: #059669;
+        }
+
+        /* 數據列表表格 */
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            border-radius: 16px;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            background: #fff;
+            margin-bottom: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.95rem;
+        }
+
+        th, td {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        th {
+            background: #f1f5f9;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: rgba(99, 102, 241, 0.02);
+        }
+
+        .path-badge {
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .path-badge.A {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .path-badge.B {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+        }
+
+        .attempts-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 24px;
+            height: 24px;
+            padding: 0 6px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        .attempts-badge.clean {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .attempts-badge.dirty {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+        }
+
+        .btn-view {
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--primary);
+            background: transparent;
+            color: var(--primary);
+            font-size: 0.85rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-view:hover {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .loading-placeholder {
+            padding: 50px;
+            color: var(--text-secondary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border-glow);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 詳細歷程彈出視窗 (Modal) */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(4px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal-box {
+            background: #fff;
+            width: 100%;
+            max-width: 800px;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            max-height: 90vh;
+        }
+
+        .modal-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+
+        .modal-close {
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            border: none;
+            background: transparent;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+
+        .modal-close:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .modal-body {
+            padding: 25px;
+            overflow-y: auto;
+            text-align: left;
+        }
+
+        .student-summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .summary-card {
+            background: var(--card-bg);
+            padding: 12px 15px;
+            border-radius: 16px;
+            border: 1px solid rgba(0,0,0,0.02);
+        }
+
+        .summary-card .label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .summary-card .value {
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+
+        .step-record-card {
+            background: #fff;
+            border: 1px solid rgba(99, 102, 241, 0.12);
+            border-left: 6px solid var(--primary);
+            border-radius: 16px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .step-record-card.step-1 { border-left-color: #6366f1; }
+        .step-record-card.step-2 { border-left-color: #f59e0b; }
+        .step-record-card.step-3 { border-left-color: #10b981; }
+        .step-record-card.step-4 { border-left-color: #ec4899; }
+        .step-record-card.step-5 { border-left-color: #3b82f6; }
+
+        .step-header {
+            font-weight: bold;
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .step-eq {
+            font-family: "Courier New", Courier, monospace;
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: var(--primary);
+            margin-bottom: 6px;
+            background: rgba(99, 102, 241, 0.05);
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 6px;
+        }
+
+        .step-meaning {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+<body>
+    <img src="https://api.visitorbadge.io/api/visitors?path=hctsao.teachertsao&label=Views&labelColor=%23475569&countColor=%23ea580c" alt="Visitor Counter" style="display: none;">
+    <div class="container">
+        <h1>🎓 怎樣解題：雞兔問題 - 教師管理後台</h1>
+        <div class="subtitle">即時監控全班學生的解題進度與數學思維歷程</div>
+
+        <!-- 💡 Firebase 設定提示 (如尚未設定時顯示) -->
+        <div id="config-banner" class="config-warning">
+            ⚠️ <b>尚未設定 Firebase 資料庫！</b><br>
+            請使用文字編輯器打開此檔案（`教師後台.html`），在第 394 行左右尋找 <code>firebaseConfig</code>，並填入您在 Firebase Console 取得的 Web SDK Config 物件，以啟用即時學生數據監控。
+        </div>
+
+        <!-- 教師開課設定 -->
+        <div class="session-card" style="flex: 1; max-width: 100%; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; background: #e0f2fe; border-color: #7dd3fc;">
+            <div style="flex: 1; min-width: 200px;">
+                <div style="font-size: 0.85rem; color: #0284c7; font-weight: bold; margin-bottom: 5px;">👨‍🏫 教師開課設定</div>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="setup-teacher-name" placeholder="您的教師姓名 (例如：曹泓棋)" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #7dd3fc; outline: none; font-size: 0.95rem;">
+                    <input type="text" id="setup-class-pwd" placeholder="設定課堂密碼 (例如：1234)" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #7dd3fc; outline: none; font-size: 0.95rem;">
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="saveTeacherConfig()" style="background: #0284c7; align-self: flex-end; padding: 10px 20px;">💾 儲存 / 更新開課設定</button>
+        </div>
+
+        <!-- 控制列 -->
+        <div class="controls-row">
+            <div id="search-controls" style="display: none; flex: 1; flex-wrap: wrap; gap: 15px; align-items: center;">
+                <div class="search-box" style="flex: 1; min-width: 250px;">
+                    <input type="text" id="search-input" placeholder="🔍 輸入教師/座號/姓名搜尋...">
+                </div>
+                <select id="scenario-filter" class="filter-select">
+                <option value="all">所有日常情境</option>
+                <option value="便當情境">🍱 便當情境</option>
+                <option value="日月潭纜車">🚠 日月潭纜車</option>
+                <option value="文具購買">✏️ 文具購買</option>
+                <option value="茶葉買賣">🍵 茶葉買賣</option>
+                <option value="存錢筒整理">🐷 存錢筒整理</option>
+                <option value="車輛統計">🚗 車輛統計</option>
+                <option value="農場點點名">🐔 農場點點名</option>
+                <option value="球類採購">🏀 球類採購</option>
+                <option value="校園單車統計">🚲 校園單車統計</option>
+            </select>
+            <button class="btn btn-primary" onclick="loadData()">🔄 重新整理</button>
+            </div>
+            <div style="display: flex; gap: 15px; margin-left: auto;">
+                <button id="unlock-btn" class="btn" style="background: var(--warning); color: #fff;" onclick="unlockAdmin()">🔒 查看所有資料</button>
+                <button class="btn btn-danger" onclick="clearAllData()">🗑️ 清空所有數據</button>
+            </div>
+        </div>
+
+        <!-- 課程場次自動分組與下載 -->
+        <div id="sessions-area" class="sessions-container">
+            <!-- 動態插入 session cards -->
+        </div>
+
+        <!-- 隱藏的詳細資料區域 -->
+        <div id="admin-table-area" style="display: none;">
+            <!-- 表格 -->
+            <div class="table-responsive">
+                <table id="records-table">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">時間</th>
+                        <th style="width: 18%;">教師/座號/姓名</th>
+                        <th style="width: 15%;">挑戰情境</th>
+                        <th style="width: 12%;">題目設定</th>
+                        <th style="width: 10%;">解題路徑</th>
+                        <th style="width: 10%;">答錯次數</th>
+                        <th style="width: 10%;">答題耗時</th>
+                        <th style="width: 10%;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <!-- 動態填入 -->
+                </tbody>
+            </table>
+            
+            <div id="loading-el" class="loading-placeholder">
+                <div class="spinner"></div>
+                <p>正在載入 Firebase 資料庫的學生作答紀錄...</p>
+            </div>
+        </div>
+        
+        <div id="total-count-label" style="text-align: right; color: var(--text-secondary); font-size: 0.85rem; padding-right: 10px;">
+            共計 0 筆作答歷程
+        </div>
+        </div> <!-- end of admin-table-area -->
+    </div>
+
+    <!-- 詳細歷程彈出視窗 (Modal) -->
+    <div id="detail-modal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <span class="modal-title">📋 學生詳細答題歷程</span>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body" id="modal-body-content">
+                <!-- 動態注入 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 💡 老師請在此填入您的 Firebase 設定 (Config)
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyCFNaVRETt862_As1hF7Mfyr22pKM5-lvk",
+            authDomain: "chickenrabbit-ea442.firebaseapp.com",
+            databaseURL: "https://chickenrabbit-ea442-default-rtdb.firebaseio.com",
+            projectId: "chickenrabbit-ea442",
+            storageBucket: "chickenrabbit-ea442.appspot.com",
+            messagingSenderId: "65728951973",
+            appId: "1:65728951973:web:efff912caf5f6f185abf4c"
+        };
+
+        // 初始化 Firebase (僅在有填寫時初始化)
+        let isFirebaseActive = false;
+        let db = null;
+        let allRecords = {}; // 快取所有紀錄
+        let allTeachers = {}; // 快取所有開課老師
+
+        if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "請在此填入您的ApiKey") {
+            try {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.database();
+                isFirebaseActive = true;
+                document.getElementById('config-banner').style.display = 'none';
+                console.log("Firebase 連結成功！");
+                
+
+            } catch (e) {
+                console.error("Firebase 初始化失敗：", e);
+            }
+        }
+
+        // 頁面載入後自動開始監聽
+        window.onload = function() {
+            if (isFirebaseActive) {
+                listenToRecords();
+            } else {
+                document.getElementById('loading-el').innerHTML = `
+                    <p style="color: var(--error); font-weight: bold;">⚠️ 尚未配置 Firebase 連線</p>
+                    <p style="font-size: 0.85rem; margin-top: 10px;">請參照上方虛線區塊說明填入資料庫 Config，即可取得學生作答。</p>
+                `;
+            }
+
+            // 監聽搜尋與過濾事件
+            document.getElementById('search-input').addEventListener('input', renderTable);
+            document.getElementById('scenario-filter').addEventListener('change', renderTable);
+        };
+
+        // 即時監聽資料庫變更
+        function listenToRecords() {
+            if (!isFirebaseActive) return;
+
+            document.getElementById('loading-el').style.display = 'flex';
+
+            // 監聽開課教師清單 (改為監聽 classes 節點)
+            db.ref('classes').on('value', (snapshot) => {
+                allTeachers = snapshot.val() || {};
+                renderTable(); // 教師清單更新時重新渲染
+            });
+
+            // 監聽學生紀錄
+            db.ref('records').on('value', (snapshot) => {
+                allRecords = snapshot.val() || {};
+                
+
+
+                document.getElementById('loading-el').style.display = 'none';
+                renderTable();
+            }, (error) => {
+                console.error("讀取資料失敗", error);
+                document.getElementById('loading-el').innerHTML = `
+                    <p style="color: var(--error);">讀取資料失敗：${error.message}</p>
+                `;
+            });
+        }
+
+        // 手動整理
+        function loadData() {
+            if (!isFirebaseActive) return;
+            listenToRecords();
+        }
+
+        // 渲染表格
+        function renderTable() {
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = "";
+
+            const searchQuery = document.getElementById('search-input').value.trim().toLowerCase();
+            const scenarioFilter = document.getElementById('scenario-filter').value;
+
+            // 將記錄物件轉成陣列並依時間排序 (新 -> 舊)
+            const recordsArray = Object.keys(allRecords).map(key => {
+                return { id: key, ...allRecords[key] };
+            }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            // 自動將資料分組為「場次」並渲染卡片
+            groupedSessions = groupRecordsIntoSessions(recordsArray);
+            renderSessionCards();
+
+            let visibleCount = 0;
+
+            recordsArray.forEach(rec => {
+                // 搜尋與篩選過濾
+                const studentName = (rec.student || "").toLowerCase();
+                const matchesSearch = studentName.includes(searchQuery);
+                const matchesScenario = scenarioFilter === 'all' || rec.scenario === scenarioFilter;
+
+                if (!matchesSearch || !matchesScenario) return;
+
+                visibleCount++;
+                const tr = document.createElement('tr');
+                
+                // 時間格式化 (例如: 10:45:30)
+                const dateObj = new Date(rec.timestamp);
+                const timeStr = dateObj.toLocaleDateString() + ' ' + dateObj.toTimeString().split(' ')[0];
+                
+                // 解題耗時
+                const minutes = Math.floor((rec.durationSeconds || 0) / 60);
+                const seconds = (rec.durationSeconds || 0) % 60;
+                const timeTakenStr = minutes > 0 ? `${minutes}分${seconds}秒` : `${seconds}秒`;
+
+                // 解題路徑樣式
+                const pathText = rec.solvedPath === 'A' ? 'A (便宜)' : (rec.solvedPath === 'B' ? 'B (貴重)' : rec.solvedPath);
+                const pathClass = rec.solvedPath === 'A' || rec.solvedPath === 'B' ? rec.solvedPath : '';
+
+                // 答錯次數樣式
+                const attempts = rec.failedAttempts || 0;
+                const attemptsClass = attempts === 0 ? 'clean' : 'dirty';
+
+                tr.innerHTML = `
+                    <td>${timeStr}</td>
+                    <td style="font-weight: bold; color: var(--primary);">${escapeHtml(rec.teacherName || "未填")}/${escapeHtml(rec.student)}</td>
+                    <td>${rec.scenario}</td>
+                    <td>共 ${rec.totalCount} 個 / ${rec.totalCost} 元</td>
+                    <td><span class="path-badge ${pathClass}">${pathText}</span></td>
+                    <td><span class="attempts-badge ${attemptsClass}">${attempts} 次</span></td>
+                    <td>${timeTakenStr}</td>
+                    <td><button class="btn-view" onclick="viewDetails('${rec.id}')">查看詳細</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('total-count-label').innerText = `共計 ${visibleCount} 筆作答歷程`;
+            
+            if (visibleCount === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 30px;">
+                            📭 目前尚無符合條件的學生作答紀錄。
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // HTML 轉義防護
+        function escapeHtml(string) {
+            return String(string).replace(/[&<>"']/g, function (s) {
+                return {
+                    "&": "&amp;",
+                    "<": "&lt;",
+                    ">": "&gt;",
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[s];
+            });
+        }
+
+        // 查看詳細作答 (Modal)
+        function viewDetails(id) {
+            const rec = allRecords[id];
+            if (!rec) return;
+
+            const modal = document.getElementById('detail-modal');
+            const content = document.getElementById('modal-body-content');
+            
+            const dateObj = new Date(rec.timestamp);
+            const timeStr = dateObj.toLocaleDateString() + ' ' + dateObj.toTimeString().split(' ')[0];
+
+            const minutes = Math.floor((rec.durationSeconds || 0) / 60);
+            const seconds = (rec.durationSeconds || 0) % 60;
+            const timeTakenStr = minutes > 0 ? `${minutes}分${seconds}秒` : `${seconds}秒`;
+
+            const pathText = rec.solvedPath === 'A' ? 'A (假設全部便宜)' : (rec.solvedPath === 'B' ? 'B (假設全部貴重)' : rec.solvedPath);
+
+            let stepsHtml = "";
+            for (let s = 1; s <= 5; s++) {
+                const stepAns = rec.stepAnswers && rec.stepAnswers[s] ? rec.stepAnswers[s] : { eq: "無數據", meaning: "無數據", attempts: [] };
+                
+                let attemptsListHtml = "";
+                if (stepAns.attempts && stepAns.attempts.length > 0) {
+                    attemptsListHtml = `<div style="margin-top: 10px; font-size: 0.85rem; border-top: 1px dotted #ccc; padding-top: 8px;">`;
+                    attemptsListHtml += `<b>💡 所有嘗試歷程：</b><ol style="padding-left: 20px; margin-top: 5px;">`;
+                    stepAns.attempts.forEach((att, idx) => {
+                        const statusColor = att.valid ? 'var(--success)' : 'var(--error)';
+                        const statusTag = att.valid ? '【答對】' : '【答錯/不完整】';
+                        attemptsListHtml += `
+                            <li style="margin-bottom: 6px;">
+                                <span style="font-family: monospace; font-weight: bold; color: var(--primary);">${escapeHtml(att.eq)}</span>
+                                <span style="color: var(--text-secondary); margin-left: 10px;">解釋：</span><span>${escapeHtml(att.meaning)}</span>
+                                <span style="color: ${statusColor}; font-weight: bold; margin-left: 8px;">${statusTag}</span>
+
+                            </li>
+                        `;
+                    });
+                    attemptsListHtml += `</ol></div>`;
+                }
+
+                stepsHtml += `
+                    <div class="step-record-card step-${s}">
+                        <div class="step-header">
+                            <span>步驟 ${s}</span>
+                        </div>
+                        ${attemptsListHtml}
+                    </div>
+                `;
+            }
+
+            content.innerHTML = `
+                <div class="student-summary-cards">
+                    <div class="summary-card">
+                        <div class="label">教師/座號/姓名</div>
+                        <div class="value" style="color: var(--primary);">${escapeHtml(rec.teacherName || "未填")}/${escapeHtml(rec.student)}</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="label">答題耗時 / 錯題</div>
+                        <div class="value">${timeTakenStr} / <span style="color: ${rec.failedAttempts > 0 ? 'var(--error)' : 'var(--success)'}">${rec.failedAttempts || 0}次錯</span></div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="label">挑戰情境</div>
+                        <div class="value">${rec.scenario} (共 ${rec.totalCount} 個)</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="label">採用路徑</div>
+                        <div class="value">${pathText}</div>
+                    </div>
+                </div>
+                
+                <h3 style="font-size: 1.05rem; font-weight: bold; margin-bottom: 12px; border-bottom: 2px solid var(--border-glow); padding-bottom: 8px;">👣 解題步驟記錄</h3>
+                ${stepsHtml}
+            `;
+
+            modal.style.display = "flex";
+        }
+
+        function closeModal() {
+            document.getElementById('detail-modal').style.display = "none";
+        }
+
+        // 清空所有作答數據
+        function clearAllData() {
+            if (!isFirebaseActive) return;
+
+            const pw = prompt("⚠️ 警告：這將會永久清空資料庫中「所有學生」的解題紀錄！\n請輸入密碼以確認清空：");
+            if (pw === null) return; // 點擊取消
+
+            if (pw === "0987912307") {
+                db.ref('records').set(null)
+                    .then(() => {
+                        alert("✨ 已成功清空所有學生作答數據！");
+                    })
+                    .catch((err) => {
+                        alert("清空失敗：" + err.message);
+                    });
+            } else {
+                alert("❌ 密碼錯誤，拒絕清空數據！");
+            }
+        }
+
+        // --- 純前端 Excel 分組與下載邏輯 ---
+        let groupedSessions = [];
+
+        function groupRecordsIntoSessions(recordsArray) {
+            const sessionsMap = {};
+            
+            // 1. 先把所有開課老師加入 map (現在 allTeachers 的 key 是 classPassword)
+            Object.keys(allTeachers).forEach(pwd => {
+                const classData = allTeachers[pwd];
+                sessionsMap[pwd] = {
+                    id: 'session_' + pwd,
+                    teacherName: classData.teacherName,
+                    classPassword: pwd,
+                    records: [],
+                    startTime: new Date(classData.timestamp || Date.now()),
+                    endTime: new Date(classData.timestamp || Date.now())
+                };
+            });
+
+            // 2. 把學生紀錄掛上去
+            if (recordsArray && recordsArray.length > 0) {
+                recordsArray.forEach(rec => {
+                    const pwd = (rec.classPassword || "").trim();
+                    if (!pwd) return; // 無課堂密碼的舊資料或訪客不打包
+                    
+                    if (!sessionsMap[pwd]) {
+                        // 紀錄裡的密碼不在目前的 classes 節點中 (可能是被刪除的課堂殘留紀錄)
+                        sessionsMap[pwd] = {
+                            id: 'session_' + pwd,
+                            teacherName: rec.teacherName || "未知教師",
+                            classPassword: pwd,
+                            records: [],
+                            startTime: new Date(rec.timestamp),
+                            endTime: new Date(rec.timestamp)
+                        };
+                    }
+                    
+                    const session = sessionsMap[pwd];
+                    session.records.push(rec);
+                    
+                    const recTime = new Date(rec.timestamp);
+                    if (recTime < session.startTime) session.startTime = recTime;
+                    if (recTime > session.endTime) session.endTime = recTime;
+                });
+            }
+            
+            // 轉換為陣列，依據最後作答/開課時間新到舊排序
+            const sessions = Object.values(sessionsMap).sort((a, b) => b.endTime - a.endTime);
+            return sessions;
+        }
+
+        function renderSessionCards() {
+            const container = document.getElementById('sessions-area');
+            if (!container) return;
+            container.innerHTML = "";
+            
+            if (groupedSessions.length === 0) return;
+            
+            groupedSessions.forEach(session => {
+                const dateStr = session.endTime.toLocaleDateString();
+                
+                const card = document.createElement('div');
+                card.className = 'session-card';
+                card.innerHTML = `
+                    <div class="session-info">
+                        <strong>👨‍🏫 指導教師：${session.teacherName}</strong><br>
+                        <small>📅 最後作答：${dateStr}</small><br>
+                        <small>👥 紀錄筆數：共 ${session.records.length} 筆</small>
+                    </div>
+                    <button class="btn btn-primary" style="background: #10b981; margin-bottom: 8px; width: 100%; justify-content: center;" onclick="downloadExcel('${session.id}')">
+                        📥 下載詳細歷程 Excel
+                    </button>
+                    <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="downloadPDF('${session.id}')">
+                    📄 下載詳細歷程 PDF
+                </button>
+                <button class="btn btn-danger" style="width: 100%; justify-content: center; margin-top: 8px; padding: 6px; font-size: 0.85rem;" onclick="deleteSession('${session.classPassword}', '${session.teacherName}')">
+                    ❌ 刪除開課資料
+                </button>
+            `;
+            
+            container.appendChild(card);
+        });
+    }
+
+    // 刪除開課設定與紀錄
+    async function deleteSession(classPassword, teacherName) {
+        const pwd = prompt(`請輸入「${teacherName}」的課堂密碼（或管理員密碼）以刪除開課資料：`);
+        if (pwd === null) return;
+        
+        if (pwd !== "0987912307" && pwd !== classPassword) {
+            alert("❌ 密碼錯誤！無法刪除。");
+            return;
+        }
+
+        if (!confirm(`確定要刪除「${teacherName}」的開課設定與所有相關的學生資料嗎？\n(⚠️ 此動作無法復原)`)) return;
+
+        try {
+            // 刪除開課設定
+            await db.ref('classes/' + classPassword).remove();
+            
+            // 刪除該老師名下所有的學生紀錄
+            const keys = Object.keys(allRecords);
+            const updates = {};
+            keys.forEach(k => {
+                if (allRecords[k].classPassword === classPassword) {
+                    updates[k] = null;
+                }
+            });
+            if (Object.keys(updates).length > 0) {
+                await db.ref('records').update(updates);
+            }
+            alert(`✅ 已成功刪除該堂課的開課設定與所有學生資料！`);
+        } catch (err) {
+            console.error("刪除失敗", err);
+            alert("刪除失敗，請檢查連線狀態。");
+        }
+    }
+
+    async function downloadExcel(sessionId) {
+            const session = groupedSessions.find(s => s.id === sessionId);
+            if (!session) return alert("找不到場次資料！");
+
+            const pwd = prompt(`請輸入「${session.teacherName}」的課堂密碼以授權下載 Excel：`);
+            if (pwd === null) return;
+            
+            if (typeof firebase !== 'undefined' && firebase.database) {
+                try {
+                    const snap = await firebase.database().ref('teachers/' + session.teacherName).once('value');
+                    if (!snap.exists() || snap.val().password !== pwd) {
+                        alert("❌ 密碼錯誤或該教師尚未設定密碼！");
+                        return;
+                    }
+                } catch (e) {
+                    alert("連線驗證失敗，請檢查網路！");
+                    return;
+                }
+            }
+
+            if (typeof XLSX === 'undefined') {
+                alert("Excel 套件尚未載入完成，請稍候再試。");
+                return;
+            }
+            
+            const sheetData = [];
+            // 擴充欄位加入詳細答錯紀錄
+            sheetData.push([
+                '作答時間', '指導教師', '座號姓名', '挑戰情境', '題目設定', '解題路徑', '總答錯數', '答題耗時(秒)', '過關狀態',
+                '步驟1答錯紀錄', '步驟2答錯紀錄', '步驟3答錯紀錄', '步驟4答錯紀錄', '步驟5答錯紀錄'
+            ]);
+            
+            // 準備要放入 Excel 的資料，依照作答時間遞增 (舊 -> 新)
+            const exportRecords = [...session.records].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+            exportRecords.forEach(rec => {
+                const dateObj = new Date(rec.timestamp);
+                const timeStr = dateObj.toLocaleDateString() + ' ' + dateObj.toTimeString().split(' ')[0];
+                const pathText = rec.solvedPath === 'A' ? 'A (便宜)' : (rec.solvedPath === 'B' ? 'B (貴重)' : rec.solvedPath);
+                
+                // 整理各步驟的答錯紀錄
+                const errLogs = ["", "", "", "", ""];
+                if (rec.stepAnswers) {
+                    for (let s = 1; s <= 5; s++) {
+                        const stepAns = rec.stepAnswers[s];
+                        if (stepAns && stepAns.attempts && stepAns.attempts.length > 0) {
+                            // 只抓出答錯的嘗試紀錄
+                            const invalidAttempts = stepAns.attempts.filter(att => !att.valid);
+                            if (invalidAttempts.length > 0) {
+                                errLogs[s-1] = invalidAttempts.map((att, idx) => 
+                                    `[${idx+1}] 算式: ${att.eq} | 解釋: ${att.meaning}`
+                                ).join('\n');
+                            }
+                        }
+                    }
+                }
+                
+                sheetData.push([
+                    timeStr,
+                    rec.teacherName || '',
+                    rec.student || '',
+                    rec.scenario || '',
+                    '共 ' + rec.totalCount + ' 個 / ' + rec.totalCost + ' 元',
+                    pathText,
+                    rec.failedAttempts || 0,
+                    rec.durationSeconds || 0,
+                    (rec.failedAttempts === 0 ? '無錯過關' : '有錯過關'),
+                    errLogs[0], errLogs[1], errLogs[2], errLogs[3], errLogs[4]
+                ]);
+            });
+            
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(sheetData);
+            
+            // 欄寬設定
+            ws['!cols'] = [
+                {wch: 20}, {wch: 15}, {wch: 20}, {wch: 15}, {wch: 20}, 
+                {wch: 15}, {wch: 10}, {wch: 15}, {wch: 15},
+                {wch: 40}, {wch: 40}, {wch: 40}, {wch: 40}, {wch: 40} // 步驟答錯紀錄加寬
+            ];
+            
+            XLSX.utils.book_append_sheet(wb, ws, "作答紀錄");
+            
+            const dateStr = session.endTime.toLocaleDateString().replace(/\//g, '-');
+            const filename = `${session.teacherName}_雞兔問題紀錄_${dateStr}.xlsx`;
+            
+            XLSX.writeFile(wb, filename);
+        }
+
+        async function downloadPDF(sessionId) {
+            const session = groupedSessions.find(s => s.id === sessionId);
+            if (!session) return alert("找不到場次資料！");
+
+            const pwd = prompt(`請輸入「${session.teacherName}」的課堂密碼以授權產生 PDF：`);
+            if (pwd === null) return;
+            
+            if (typeof firebase !== 'undefined' && firebase.database) {
+                try {
+                    const snap = await firebase.database().ref('teachers/' + session.teacherName).once('value');
+                    if (!snap.exists() || snap.val().password !== pwd) {
+                        alert("❌ 密碼錯誤或該教師尚未設定密碼！");
+                        return;
+                    }
+                } catch (e) {
+                    alert("連線驗證失敗，請檢查網路！");
+                    return;
+                }
+            }
+
+            if (typeof html2pdf === 'undefined') {
+                alert("PDF 套件尚未載入完成，請稍候再試。");
+                return;
+            }
+            
+            // 建立一個隱藏的容器來放置 PDF 內容
+            const container = document.createElement('div');
+            container.style.padding = '20px';
+            container.style.backgroundColor = '#fff';
+            container.style.color = '#000';
+            container.style.fontFamily = 'sans-serif';
+            
+            // 準備要放入 PDF 的資料，依照作答時間遞增 (舊 -> 新)
+            const exportRecords = [...session.records].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+            exportRecords.forEach((rec, index) => {
+                const dateObj = new Date(rec.timestamp);
+                const timeStr = dateObj.toLocaleDateString() + ' ' + dateObj.toTimeString().split(' ')[0];
+                const minutes = Math.floor((rec.durationSeconds || 0) / 60);
+                const seconds = (rec.durationSeconds || 0) % 60;
+                const timeTakenStr = minutes > 0 ? `${minutes}分${seconds}秒` : `${seconds}秒`;
+                const pathText = rec.solvedPath === 'A' ? 'A (假設全部便宜)' : (rec.solvedPath === 'B' ? 'B (假設全部貴重)' : rec.solvedPath);
+                
+                // 產生每個步驟的 HTML
+                let stepsHtml = "";
+                for (let s = 1; s <= 5; s++) {
+                    const stepAns = rec.stepAnswers && rec.stepAnswers[s] ? rec.stepAnswers[s] : { eq: "無數據", meaning: "無數據", attempts: [] };
+                    
+                    let attemptsListHtml = "";
+                    if (stepAns.attempts && stepAns.attempts.length > 0) {
+                        attemptsListHtml = `<div style="margin-top: 5px; font-size: 0.8rem; border-top: 1px dotted #ccc; padding-top: 5px;">`;
+                        attemptsListHtml += `<b>💡 所有嘗試歷程：</b><ul style="padding-left: 20px; margin-top: 3px; margin-bottom: 0;">`;
+                        stepAns.attempts.forEach((att) => {
+                            const statusTag = att.valid ? '【答對】' : '【答錯/不完整】';
+                            const statusColor = att.valid ? '#10b981' : '#ef4444';
+                            attemptsListHtml += `
+                                <li style="margin-bottom: 3px;">
+                                    <span style="font-family: monospace; font-weight: bold; color: #4f46e5;">${escapeHtml(att.eq)}</span>
+                                    <span style="color: #64748b; margin-left: 5px;">解釋：</span><span>${escapeHtml(att.meaning)}</span>
+                                    <span style="color: ${statusColor}; font-weight: bold; margin-left: 5px;">${statusTag}</span>
+                                </li>
+                            `;
+                        });
+                        attemptsListHtml += `</ul></div>`;
+                    }
+
+                    stepsHtml += `
+                        <div style="border-left: 4px solid #4f46e5; background: #f8fafc; padding: 10px; margin-bottom: 10px; border-radius: 0 8px 8px 0;">
+                            <div style="font-weight: bold; font-size: 0.9rem; color: #64748b; margin-bottom: 5px;">步驟 ${s}</div>
+                            ${attemptsListHtml}
+                        </div>
+                    `;
+                }
+
+                // 將這位學生的區塊加入 container
+                const studentDiv = document.createElement('div');
+                // 確保除了最後一頁外，每位學生強制換頁
+                if (index < exportRecords.length - 1) {
+                    studentDiv.style.pageBreakAfter = 'always';
+                }
+                
+                studentDiv.innerHTML = `
+                    <h2 style="text-align: center; color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 20px;">📋 學生詳細答題歷程</h2>
+                    
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">
+                        <div style="flex: 1; min-width: 120px; background: #f1f5f9; padding: 10px; border-radius: 8px;">
+                            <div style="font-size: 0.75rem; color: #64748b;">教師/座號/姓名</div>
+                            <div style="font-size: 1rem; font-weight: bold; color: #4f46e5;">${escapeHtml(rec.teacherName || "未填")}/${escapeHtml(rec.student)}</div>
+                        </div>
+                        <div style="flex: 1; min-width: 120px; background: #f1f5f9; padding: 10px; border-radius: 8px;">
+                            <div style="font-size: 0.75rem; color: #64748b;">答題時間 / 耗時</div>
+                            <div style="font-size: 1rem; font-weight: bold;">${timeStr} / ${timeTakenStr}</div>
+                        </div>
+                        <div style="flex: 1; min-width: 120px; background: #f1f5f9; padding: 10px; border-radius: 8px;">
+                            <div style="font-size: 0.75rem; color: #64748b;">挑戰情境 / 錯題</div>
+                            <div style="font-size: 1rem; font-weight: bold;">${rec.scenario} / <span style="color: ${rec.failedAttempts > 0 ? '#ef4444' : '#10b981'}">${rec.failedAttempts || 0}次錯</span></div>
+                        </div>
+                    </div>
+                    
+                    <h3 style="font-size: 1rem; font-weight: bold; margin-bottom: 10px; color: #1e293b;">👣 解題步驟記錄</h3>
+                    ${stepsHtml}
+                `;
+                
+                container.appendChild(studentDiv);
+            });
+
+            // 顯示載入提示
+            const loadingOverlay = document.createElement('div');
+            loadingOverlay.style.position = 'fixed';
+            loadingOverlay.style.top = '0';
+            loadingOverlay.style.left = '0';
+            loadingOverlay.style.width = '100%';
+            loadingOverlay.style.height = '100%';
+            loadingOverlay.style.background = 'rgba(0,0,0,0.7)';
+            loadingOverlay.style.color = 'white';
+            loadingOverlay.style.display = 'flex';
+            loadingOverlay.style.flexDirection = 'column';
+            loadingOverlay.style.alignItems = 'center';
+            loadingOverlay.style.justifyContent = 'center';
+            loadingOverlay.style.zIndex = '9999';
+            loadingOverlay.style.fontSize = '1.2rem';
+            loadingOverlay.innerHTML = `
+                <div class="spinner" style="margin-bottom: 20px;"></div>
+                <div>正在產生全班詳細紀錄 PDF，請稍候...</div>
+                <div style="font-size: 0.9rem; color: #cbd5e1; margin-top: 10px;">資料量較大時可能需要數秒鐘</div>
+            `;
+            document.body.appendChild(loadingOverlay);
+
+            // 執行 PDF 產出
+            const dateStr = session.endTime.toLocaleDateString().replace(/\//g, '-');
+            const filename = `${session.teacherName}_詳細答題紀錄_${dateStr}.pdf`;
+
+            const opt = {
+                margin:       10,
+                filename:     filename,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().from(container).set(opt).save().then(() => {
+                document.body.removeChild(loadingOverlay);
+            }).catch(err => {
+                console.error("PDF 產生失敗", err);
+                alert("PDF 產生失敗，請檢查主控台錯誤訊息。");
+                document.body.removeChild(loadingOverlay);
+            });
+        }
+
+        // 解鎖詳細資料
+        function unlockAdmin() {
+            const pwd = prompt("請輸入管理員密碼 (用以查看所有資料)：");
+            if (pwd === "0987912307") {
+                document.getElementById('search-controls').style.display = 'flex';
+                document.getElementById('admin-table-area').style.display = 'block';
+                document.getElementById('unlock-btn').style.display = 'none';
+            } else if (pwd !== null) {
+                alert("密碼錯誤！");
+            }
+        }
+
+        // 儲存教師開課設定
+        function saveTeacherConfig() {
+            const tName = document.getElementById('setup-teacher-name').value.trim();
+            const tPwd = document.getElementById('setup-class-pwd').value.trim();
+            if (!tName || !tPwd) {
+                alert("請完整輸入「教師姓名」與「課堂密碼」！");
+                return;
+            }
+            if (!isFirebaseActive) {
+                alert("Firebase 尚未啟用，無法儲存設定！");
+                return;
+            }
+            
+            // 檢查密碼是否已經被使用
+            firebase.database().ref('classes/' + tPwd).once('value').then(snap => {
+                if (snap.exists()) {
+                    alert("❌ 此課堂密碼已經被使用了！請更換一組新的密碼。");
+                    return;
+                }
+                
+                // 寫入新課堂
+                firebase.database().ref('classes/' + tPwd).set({
+                    teacherName: tName,
+                    timestamp: Date.now()
+                }).then(() => {
+                    alert(`✅ 成功建立課堂！\n\n教師姓名：${tName}\n課堂密碼：${tPwd}\n\n請將【課堂密碼】提供給學生輸入，才能將資料正確拋轉進您的後台。`);
+                    document.getElementById('setup-teacher-name').value = '';
+                    document.getElementById('setup-class-pwd').value = '';
+                }).catch(err => {
+                    console.error("寫入開課設定失敗：", err);
+                    alert("儲存失敗，請檢查網路連線。");
+                });
+            }).catch(err => {
+                console.error("檢查密碼失敗：", err);
+                alert("驗證密碼失敗，請檢查網路。");
+            });
+        }
+    </script>
+</body>
+</html>

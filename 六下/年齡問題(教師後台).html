@@ -10,7 +10,7 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
     <!-- html2pdf for PDF Export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <title>怎樣解題：雞兔問題 - 教師管理後台</title>
+    <title>怎樣解題：年齡問題 - 教師管理後台</title>
     <style>
         :root {
             --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
@@ -470,13 +470,13 @@
 <body>
     <img src="https://api.visitorbadge.io/api/visitors?path=hctsao.teachertsao&label=Views&labelColor=%23475569&countColor=%23ea580c" alt="Visitor Counter" style="display: none;">
     <div class="container">
-        <h1>🎓 怎樣解題：雞兔問題 - 教師管理後台</h1>
+        <h1>🎓 怎樣解題：年齡問題 - 教師管理後台</h1>
         <div class="subtitle">即時監控全班學生的解題進度與數學思維歷程</div>
 
         <!-- 💡 Firebase 設定提示 (如尚未設定時顯示) -->
         <div id="config-banner" class="config-warning">
             ⚠️ <b>尚未設定 Firebase 資料庫！</b><br>
-            請使用文字編輯器打開此檔案（`教師後台.html`），在第 394 行左右尋找 <code>firebaseConfig</code>，並填入您在 Firebase Console 取得的 Web SDK Config 物件，以啟用即時學生數據監控。
+            請使用文字編輯器打開此檔案（`年齡問題(教師後台).html`），在第 394 行左右尋找 <code>firebaseConfig</code>，並填入您在 Firebase Console 取得的 Web SDK Config 物件，以啟用即時學生數據監控。
         </div>
 
         <!-- 教師開課設定 -->
@@ -498,17 +498,13 @@
                     <input type="text" id="search-input" placeholder="🔍 輸入教師/座號/姓名搜尋...">
                 </div>
                 <select id="scenario-filter" class="filter-select">
-                <option value="all">所有日常情境</option>
-                <option value="便當情境">🍱 便當情境</option>
-                <option value="日月潭纜車">🚠 日月潭纜車</option>
-                <option value="文具購買">✏️ 文具購買</option>
-                <option value="茶葉買賣">🍵 茶葉買賣</option>
-                <option value="存錢筒整理">🐷 存錢筒整理</option>
-                <option value="車輛統計">🚗 車輛統計</option>
-                <option value="農場點點名">🐔 農場點點名</option>
-                <option value="球類採購">🏀 球類採購</option>
-                <option value="校園單車統計">🚲 校園單車統計</option>
-            </select>
+                    <option value="all">所有年齡題型</option>
+                    <option value="年齡問題_題型1">題型 1 (已知倍數，問幾年前)</option>
+                    <option value="年齡問題_題型2">題型 2 (已知倍數，問幾年後)</option>
+                    <option value="年齡問題_題型3">題型 3 (已知倍數，問幾歲)</option>
+                    <option value="年齡問題_題型4">題型 4 (已知年齡和，問幾年後)</option>
+                    <option value="年齡問題_題型5">題型 5 (已知年齡和，問幾年前)</option>
+                </select>
             <button class="btn btn-primary" onclick="loadData()">🔄 重新整理</button>
             </div>
             <div style="display: flex; gap: 15px; margin-left: auto;">
@@ -597,13 +593,7 @@
                 document.getElementById('config-banner').style.display = 'none';
                 console.log("Firebase 連結成功！");
                 
-                // 以課堂密碼為 Key 的新結構預設資料
-                db.ref('classes/4007').once('value').then(snap => {
-                    if (!snap.exists()) db.ref('classes/4007').set({ teacherName: '曹泓棋', timestamp: Date.now() });
-                });
-                db.ref('classes/1234').once('value').then(snap => {
-                    if (!snap.exists()) db.ref('classes/1234').set({ teacherName: '謝千慧', timestamp: Date.now() });
-                });
+
             } catch (e) {
                 console.error("Firebase 初始化失敗：", e);
             }
@@ -641,24 +631,7 @@
             db.ref('records').on('value', (snapshot) => {
                 allRecords = snapshot.val() || {};
                 
-                // 數據庫補正遷移：曹泓棋 -> 4007，謝千慧 -> 1234
-                let needsUpdate = false;
-                const updates = {};
-                Object.keys(allRecords).forEach(key => {
-                    const rec = allRecords[key];
-                    if (rec.teacherName === '曹泓棋' && rec.classPassword !== '4007') {
-                        updates[`/records/${key}/classPassword`] = '4007';
-                        needsUpdate = true;
-                    } else if (rec.teacherName === '謝千慧' && rec.classPassword !== '1234') {
-                        updates[`/records/${key}/classPassword`] = '1234';
-                        needsUpdate = true;
-                    }
-                });
-                if (needsUpdate) {
-                    db.ref().update(updates).then(() => {
-                        console.log("成功補正歷史紀錄中的課堂密碼！");
-                    });
-                }
+
 
                 document.getElementById('loading-el').style.display = 'none';
                 renderTable();
@@ -687,6 +660,8 @@
             // 將記錄物件轉成陣列並依時間排序 (新 -> 舊)
             const recordsArray = Object.keys(allRecords).map(key => {
                 return { id: key, ...allRecords[key] };
+            }).filter(rec => {
+                return rec.scenario && rec.scenario.includes("年齡問題");
             }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
             // 自動將資料分組為「場次」並渲染卡片
@@ -723,11 +698,14 @@
                 const attempts = rec.failedAttempts || 0;
                 const attemptsClass = attempts === 0 ? 'clean' : 'dirty';
 
+                const isSumType = rec.scenario.includes('題型4') || rec.scenario.includes('題型5');
+                const setupDesc = isSumType ? `年齡和 / 相隔 ${rec.totalCost} 年` : `${rec.totalCount} 倍 / 相隔 ${rec.totalCost} 年`;
+
                 tr.innerHTML = `
                     <td>${timeStr}</td>
                     <td style="font-weight: bold; color: var(--primary);">${escapeHtml(rec.teacherName || "未填")}/${escapeHtml(rec.student)}</td>
                     <td>${rec.scenario}</td>
-                    <td>共 ${rec.totalCount} 個 / ${rec.totalCost} 元</td>
+                    <td>${setupDesc}</td>
                     <td><span class="path-badge ${pathClass}">${pathText}</span></td>
                     <td><span class="attempts-badge ${attemptsClass}">${attempts} 次</span></td>
                     <td>${timeTakenStr}</td>
@@ -824,7 +802,7 @@
                     </div>
                     <div class="summary-card">
                         <div class="label">挑戰情境</div>
-                        <div class="value">${rec.scenario} (共 ${rec.totalCount} 個)</div>
+                        <div class="value">${rec.scenario} (${rec.scenario.includes('題型4') || rec.scenario.includes('題型5') ? '年齡和' : rec.totalCount + ' 倍'} / 相隔 ${rec.totalCost} 年)</div>
                     </div>
                     <div class="summary-card">
                         <div class="label">採用路徑</div>
@@ -1043,7 +1021,7 @@
                     rec.teacherName || '',
                     rec.student || '',
                     rec.scenario || '',
-                    '共 ' + rec.totalCount + ' 個 / ' + rec.totalCost + ' 元',
+                    (rec.scenario.includes('題型4') || rec.scenario.includes('題型5') ? '年齡和' : rec.totalCount + ' 倍') + ' / ' + rec.totalCost + ' 年',
                     pathText,
                     rec.failedAttempts || 0,
                     rec.durationSeconds || 0,
@@ -1065,7 +1043,7 @@
             XLSX.utils.book_append_sheet(wb, ws, "作答紀錄");
             
             const dateStr = session.endTime.toLocaleDateString().replace(/\//g, '-');
-            const filename = `${session.teacherName}_雞兔問題紀錄_${dateStr}.xlsx`;
+            const filename = `${session.teacherName}_年齡問題紀錄_${dateStr}.xlsx`;
             
             XLSX.writeFile(wb, filename);
         }
