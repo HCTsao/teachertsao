@@ -1525,137 +1525,10 @@
             }
         }
 
-        // 動態更新水面中殘留魚隻的正確性狀態（不更改顔色，魚隻保持原本外觀）
-        function updateRemainingFishesCorrectness(correctVal, isLCM = false) {
-            fishes.forEach(fish => {
-                if (isLCM) {
-                    if (fish.isL3Denominator) {
-                        fish.isCorrect = (fish.fraction === correctVal);
-                    }
-                } else {
-                    if (!fish.isL3Denominator && fish.fraction && typeof fish.fraction === 'object') {
-                        const val = fish.fraction.n / fish.fraction.d;
-                        fish.isCorrect = (Math.abs(val - correctVal) < 0.0001);
-                    }
-                }
-            });
-        }
-
-        // 輔助函數：產生分數 f 的所有等値分數，確保排除 k=1 且必定產生正確答案
-        function buildEquivFish(f, lcm, group, spX) {
-            const result = [];
-            
-            // 1. 保證先塞入正確答案 (分母為 lcm 的等值分數)
-            const correctK = lcm / f.d;
-            if (correctK >= 2) {
-                const correctFrac = { n: f.n * correctK, d: lcm };
-                const fish = new Fish(correctFrac, true, spX, false, 0);
-                fish.fractionGroup = group;
-                result.push(fish);
-            }
-
-            // 2. 生成其他錯誤 of equivalent fractions (分母不是公倍數，且排除原分數 k=1)
-            const maxFish = 2; // 每組最多 2 隻魚 (1 隻正確，1 隻錯誤)
-            let k = 2;
-            let band = 1;
-            while (result.length < maxFish && k <= 30) {
-                if (k !== correctK) {
-                    const denom = f.d * k;
-                    // 排除公倍數 (denom % lcm === 0)
-                    if (denom % lcm !== 0) {
-                        const eqFrac = { n: f.n * k, d: denom };
-                        const fish = new Fish(eqFrac, false, spX, false, band % 4);
-                        fish.fractionGroup = group;
-                        result.push(fish);
-                        band++;
-                    }
-                }
-                k++;
-            }
-            return result;
-        }
-
-        // 題幹再現輔助函數
-        function renderStemForStage() {
-            // 决定題幹顯示：已通分的用 tf，尚未通分的用 f
-            const showF1 = (level3ConvertedGroup === 1 || level3ConvertedGroup === 3) ? mathData.tf1 : mathData.f1;
-            const showF2 = (level3ConvertedGroup === 2 || level3ConvertedGroup === 3) ? mathData.tf2 : mathData.f2;
-
-            const isMultipleRelation = (mathData.lcm === mathData.f1.d || mathData.lcm === mathData.f2.d);
-
-            let f1IsGreen = false;
-            let f2IsGreen = false;
-
-            if (level3ConvertedGroup === 3) {
-                f1IsGreen = true;
-                f2IsGreen = true;
-            } else if (!isMultipleRelation) {
-                // 如果不是倍數關係，普通的兩階段可以各自在通分後變綠
-                if (level3ConvertedGroup === 1) f1IsGreen = true;
-                if (level3ConvertedGroup === 2) f2IsGreen = true;
-            }
-
-            const f1Color = f1IsGreen ? 'text-emerald-400 border-emerald-400 font-bold' : 'text-white border-white';
-            const f2Color = f2IsGreen ? 'text-emerald-400 border-emerald-400 font-bold' : 'text-white border-white';
-
-            if (level3ConvertedGroup === 3) {
-                questionLabel.innerHTML = `兩個分數已通分完成！`;
-            } else {
-                questionLabel.innerHTML = `請把分數通分，釣起分母是最小公倍數的魚：`;
-            }
-
-            questionDisplay.innerHTML = `
-                <div class="flex items-center gap-5 text-xl font-bold font-mono">
-                    <div class="flex flex-col items-center">
-                        <span class="border-b-2 px-2 leading-none pb-1 ${f1Color}">${showF1.n}</span>
-                        <span class="leading-none pt-1 ${f1Color}">${showF1.d}</span>
-                    </div>
-                    <div class="text-xl text-slate-400 font-bold">與</div>
-                    <div class="flex flex-col items-center">
-                        <span class="border-b-2 px-2 leading-none pb-1 ${f2Color}">${showF2.n}</span>
-                        <span class="leading-none pt-1 ${f2Color}">${showF2.d}</span>
-                    </div>
-                </div>
-            `;
-        }
-
-        // 開始新的數學問題 (changeStem 為 true 時才更換新題目題幹)
-        function nextQuestion(changeStem = true) {
-            const initialSpawn = (fishes.length === 0);
-            
-            // 移除已釣起的魚與已離開的魚
-            fishes = fishes.filter(fish => !fish.isCaught && !fish.isGone);
-            
-            // 若要更換題幹，讓用不到的既存魚群加速游走
-            if (changeStem) {
-                fishes.forEach(fish => {
-                    fish.isLeaving = true;
-                    fish.speed = Math.max(4.5, fish.speed * 4);
-                });
-            }
-            
-            const spawnX = initialSpawn ? null : 'side';
-            hook.caughtFish = null;
-            hook.state = 'idle';
-
-
+        // 渲染題目面板 UI
+        function renderQuestionUI() {
             if (currentLevel === 1) {
-                // 擴分之海 (擴分關卡)
-                if (changeStem) {
-                    mathData = MathGenerator.generateExpansion();
-                    currentBaseFraction = mathData.base; // 擴分底數 (e.g. 3/5)
-                    usedMultipliers = [mathData.multiplier]; // 記錄已使用的倍數
-                } else {
-                    // 保持底數，但挑選另一個未使用的倍數 (e.g. 2, 3, 4, 5, 6, 7)
-                    const availableMultipliers = [2, 3, 4, 5, 6, 7].filter(m => !usedMultipliers.includes(m));
-                    const multiplier = availableMultipliers.length > 0 ? availableMultipliers[Math.floor(Math.random() * availableMultipliers.length)] : MathGenerator.randomInt(3, 7);
-                    usedMultipliers.push(multiplier);
-                    mathData = MathGenerator.generateExpansion(currentBaseFraction, multiplier);
-                }
-                
-                // 渲染 UI 題目 (顯示擴分算式)
                 questionLabel.innerHTML = `將分數進行擴分，並釣起正確的魚：`;
-                
                 let targetStemHTML = '';
                 if (mathData.questionType === 'denominator') {
                     targetStemHTML = `
@@ -1672,7 +1545,6 @@
                         </div>
                     `;
                 }
-
                 questionDisplay.innerHTML = `
                     <div class="flex items-center gap-3 text-xl font-bold font-mono">
                         <div class="flex flex-col items-center">
@@ -1683,66 +1555,8 @@
                         ${targetStemHTML}
                     </div>
                 `;
-
-                const correctItem = mathData.optionsPool.find(p => p.isCorrect);
-                const incorrectList = mathData.optionsPool.filter(p => !p.isCorrect);
-
-                // 更新水面中既存的舊魚正確性
-                const correctVal = mathData.correctFraction.n / mathData.correctFraction.d;
-                updateRemainingFishesCorrectness(correctVal, false);
-
-                // 分配 4 個車道，保證魚隻絕不垂直重合，且隨機錯開起點
-                const yBands = [0, 1, 2, 3].sort(() => 0.5 - Math.random());
-                
-                // 生成 2 隻正確魚
-                fishes.push(new Fish(correctItem, true, spawnX, false, yBands[0]));
-                fishes.push(new Fish(correctItem, true, spawnX, false, yBands[1]));
-
-                // 生成 2 隻錯誤魚
-                const selectedIncorrect = incorrectList.sort(() => 0.5 - Math.random()).slice(0, 2);
-                while (selectedIncorrect.length < 2) {
-                    const fallbackFrac = { ...correctItem };
-                    if (mathData.questionType === 'denominator') {
-                        fallbackFrac.d = correctItem.d + (selectedIncorrect.length + 1) * 3;
-                    } else {
-                        fallbackFrac.n = correctItem.n + (selectedIncorrect.length + 1) * 2;
-                    }
-                    fallbackFrac.isCorrect = false;
-                    fallbackFrac.val = fallbackFrac.n / fallbackFrac.d;
-                    selectedIncorrect.push(fallbackFrac);
-                }
-                fishes.push(new Fish(selectedIncorrect[0], false, spawnX, false, yBands[2]));
-                fishes.push(new Fish(selectedIncorrect[1], false, spawnX, false, yBands[3]));
-
             } else if (currentLevel === 2) {
-                // 約分之海 (約分關卡)
-                if (changeStem) {
-                    mathData = MathGenerator.generateReduction();
-                    currentBaseFraction = mathData.simplestFraction;
-                    currentMultiplier = mathData.multiplier;
-                    usedMultipliers = [mathData.divisor];
-                } else {
-                    // 根據當前的乘數，取得所有合法的除數(因數)
-                    let allDivisors = [2, 3, 6];
-                    if (currentMultiplier === 8) allDivisors = [2, 4, 8];
-                    else if (currentMultiplier === 12) allDivisors = [2, 3, 4, 6, 12];
-
-                    // 過濾掉已經使用過的除數
-                    const availableDivisors = allDivisors.filter(d => !usedMultipliers.includes(d));
-
-                    if (availableDivisors.length > 0) {
-                        const divisor = availableDivisors[Math.floor(Math.random() * availableDivisors.length)];
-                        usedMultipliers.push(divisor);
-                        mathData = MathGenerator.generateReduction(currentBaseFraction, currentMultiplier, divisor);
-                    } else {
-                        // 如果沒有可以約分的公因數了，請直接換題幹
-                        nextQuestion(true);
-                        return; // 中斷當前執行，避免後續繼續以舊數據渲染
-                    }
-                }
-                
                 questionLabel.innerHTML = `將分數進行約分，並釣起正確的魚：`;
-                
                 let targetStemHTML = '';
                 if (mathData.questionType === 'denominator') {
                     targetStemHTML = `
@@ -1753,6 +1567,36 @@
                     `;
                 } else {
                     targetStemHTML = `
+                        <div class="flex flex-col items-center">
+                            <span class="border-b-2 border-white px-3 leading-none pb-1 text-sky-400 font-black">?</span>
+                            <span class="leading-none pt-1">${mathData.correctFraction.d}</span>
+                        </div>
+                    `;
+                }
+                questionDisplay.innerHTML = `
+                    <div class="flex items-center gap-3 text-xl font-bold font-mono">
+                        <div class="flex flex-col items-center">
+                            <span class="border-b-2 border-white px-2 leading-none pb-1">${mathData.base.n}</span>
+                            <span class="leading-none pt-1">${mathData.base.d}</span>
+                        </div>
+                        <div class="text-2xl text-yellow-400">=</div>
+                        ${targetStemHTML}
+                    </div>
+                `;
+            } else {
+                renderStemForStage();
+            }
+        }
+
+        // 開始新的數學問題
+        function nextQuestion(changeStem = true) {
+            const initialSpawn = (fishes.length === 0);
+            
+            fishes = fishes.filter(fish => !fish.isCaught && !fish.isGone);
+            
+            hook.caughtFish = null;
+            hook.state = 'idle';
+
                         <div class="flex flex-col items-center">
                             <span class="border-b-2 border-white px-3 leading-none pb-1 text-sky-400 font-black">?</span>
                             <span class="leading-none pt-1">${mathData.correctFraction.d}</span>
@@ -2117,7 +1961,7 @@
                 // 碰撞偵測 (魚隻)
                 for (let i = 0; i < fishes.length; i++) {
                     const fish = fishes[i];
-                    if (fish.isCaught) continue;
+                    if (fish.isCaught || fish.isNext) continue;
 
                     // 計算魚與魚鉤中心點距離
                     const dist = Math.hypot(hook.x - fish.x, hook.y - fish.y);
@@ -2206,47 +2050,39 @@
                 
                 if (currentLevel === 3) {
                     if (level3Stage === 1) {
-                        // Stage 1: 釣起分母=LCM 的魚 → 記錄哪一組，題幹更新其中一個分數
                         const group = caughtFish.fractionGroup || 0;
-                        level3ConvertedGroup = group;
-                        level3Stage = 2;
+                        if (shadowState.level3ConvertedGroup !== group) {
+                            shadowState.level3ConvertedGroup = group;
+                        }
+                        shadowState.level3Stage = 2;
+                        
                         addFloatingText('✓ 第一個通分! +10', fx, fy, '#10b981', 20);
                         score += 10;
-                        nextQuestion(false);
+                        nextQuestion();
                     } else {
-                        // Stage 2: 釣起另一個分數的分母=LCM 的魚 → 兩個分數全部通分，通分完成！
-                        level3ConvertedGroup = 3; // 3 代表兩個已全部通分
                         addFloatingText('✓ 通分完成! +20', fx, fy, '#10b981', 20);
                         score += 20;
 
-                        // 通分成功，直接停留 3 秒讓既存魚加速游走退場，之後換題
+                        level3ConvertedGroup = 3; 
                         level3Delaying = true;
-                        // 讓所有用不到的既存魚快速游走退場，營造動態感
                         fishes.forEach(fish => {
-                            fish.isLeaving = true;
-                            fish.speed = Math.max(4.5, fish.speed * 4);
+                            if (!fish.isNext) {
+                                fish.isLeaving = true;
+                                fish.speed = Math.max(4.5, fish.speed * 4);
+                            }
                         });
-                        renderStemForStage(); // 讓題幹即時更新為兩個通分完的高亮分數
-                        
+                        renderStemForStage();
+
                         setTimeout(() => {
-                            level3Stage = 1;
-                            level3ConvertedGroup = 0;
                             level3Delaying = false;
-                            nextQuestion(true); // 換全新大題幹
+                            nextQuestion();
                         }, 3000);
                     }
                 } else {
-                    // 關卡一、三 (單階段關卡：擴分、約分)
                     addFloatingText(`✓ 答對! 得分 +${points}`, fx, fy, '#10b981', 20);
                     score += points;
                     
-                    stemProgress++;
-                    if (stemProgress >= 3) {
-                        stemProgress = 0;
-                        nextQuestion(true); // 答對 3 次，換新題幹
-                    } else {
-                        nextQuestion(false); // 未滿 3 次，只重新洗牌水面魚群，不換題幹
-                    }
+                    nextQuestion();
                 }
                 
                 // 更新難度顯示
@@ -2643,17 +2479,31 @@
             currentLevel = level;
             score = 0;
             lives = 3;
-            stemProgress = 0; // 重置題幹進度
-            currentBaseFraction = null; // 重置當前底數
-            currentMultiplier = 6; // 重置當前倍數
-            usedMultipliers = []; // 重置已用過的倍數 / 約分因數
-            level3Stage = 1; // 關卡3專用重置
-            level3ConvertedGroup = 0;
             level3Delaying = false;
             fishes = [];
             sharks = [];
             particles = [];
             floatingTexts = [];
+
+            // 重置 realState 和 shadowState
+            realState = {
+                stemProgress: 0,
+                currentBaseFraction: null,
+                currentMultiplier: 6,
+                usedMultipliers: [],
+                level3Stage: 1,
+                level3ConvertedGroup: 0
+            };
+            shadowState = {
+                stemProgress: 0,
+                currentBaseFraction: null,
+                currentMultiplier: 6,
+                usedMultipliers: [],
+                level3Stage: 1,
+                level3ConvertedGroup: 0
+            };
+            mathData = null;
+            nextMathData = null;
             
             // 介面初始化
             hudScore.innerText = '000';
@@ -2692,6 +2542,53 @@
 
             lastTime = performance.now();
             requestAnimationFrame(gameLoop);
+        }
+
+        // 結束遊戲並結算 (生命值耗盡才會觸發)
+        // 顯示結算畫面排行榜
+        function showLeaderboardInResultScreen() {
+            const containerEl = document.getElementById('result-leaderboard-container');
+            const listEl = document.getElementById('result-leaderboard-list');
+            if (!containerEl || !listEl) return;
+
+            containerEl.classList.remove('hidden');
+            listEl.innerHTML = '<li>載入中...</li>';
+
+            if (isFirebaseActive && database) {
+                database.ref('FractionFishing/leaderboard/l' + currentLevel).orderByChild('score').limitToLast(10).once('value', snapshot => {
+                    let list = [];
+                    snapshot.forEach(child => {
+                        list.push(child.val());
+                    });
+                    list.sort((a, b) => b.score - a.score);
+                    
+                    listEl.innerHTML = '';
+                    if (list.length === 0) {
+                        listEl.innerHTML = '<li>目前無排行紀錄。</li>';
+                        return;
+                    }
+                    list.forEach((item, index) => {
+                        let li = document.createElement('li');
+                        li.className = 'py-0.5 border-b border-slate-800/40 flex justify-between';
+                        li.innerHTML = `<span>${index+1}. ${item.name}</span><span class="text-yellow-400 font-bold">${item.score}分</span>`;
+                        listEl.appendChild(li);
+                    });
+                });
+            } else {
+                let localLeaderboard = JSON.parse(localStorage.getItem(`fishing_leaderboard_l${currentLevel}`) || '[]');
+                localLeaderboard.sort((a, b) => b.score - a.score);
+                listEl.innerHTML = '';
+                if (localLeaderboard.length === 0) {
+                    listEl.innerHTML = '<li>目前無排行紀錄。</li>';
+                    return;
+                }
+                localLeaderboard.slice(0, 10).forEach((item, index) => {
+                    let li = document.createElement('li');
+                    li.className = 'py-0.5 border-b border-slate-800/40 flex justify-between';
+                    li.innerHTML = `<span>${index+1}. ${item.name}</span><span class="text-yellow-400 font-bold">${item.score}分</span>`;
+                    listEl.appendChild(li);
+                });
+            }
         }
 
         // 結束遊戲並結算 (生命值耗盡才會觸發)
@@ -2735,24 +2632,137 @@
             if (bgMusic) {
                 bgMusic.pause();
             }
+
+            // 串聯 Firebase 得分榜
+            if (isFirebaseActive && database) {
+                try {
+                    database.ref('FractionFishing/leaderboard/l' + currentLevel).push({
+                        name: studentName,
+                        score: score,
+                        timestamp: firebase.database.ServerValue.TIMESTAMP
+                    });
+                } catch (e) {
+                    console.error("Firebase score push failed:", e);
+                }
+            } else {
+                try {
+                    let localLeaderboard = JSON.parse(localStorage.getItem(`fishing_leaderboard_l${currentLevel}`) || '[]');
+                    localLeaderboard.push({
+                        name: studentName,
+                        score: score,
+                        timestamp: Date.now()
+                    });
+                    localLeaderboard.sort((a, b) => b.score - a.score);
+                    localStorage.setItem(`fishing_leaderboard_l${currentLevel}`, JSON.stringify(localLeaderboard.slice(0, 10)));
+                } catch (e) {
+                    console.error("LocalStorage leaderboard save failed:", e);
+                }
+            }
+            showLeaderboardInResultScreen();
         }
 
         // ==========================================
         // 11. 各按鈕控制事件監聽 (User Interactions)
         // ==========================================
         
+        // 儲存學生資料
+        function saveStudentName() {
+            const inputClass = document.getElementById('student-class').value.trim();
+            const inputSeat = document.getElementById('student-seat').value.trim();
+            const inputName = document.getElementById('student-name').value.trim();
+            
+            let formattedName = "";
+            if (inputClass) formattedName += inputClass + " ";
+            if (inputSeat) formattedName += inputSeat + "號 ";
+            formattedName += inputName ? inputName : "訪客";
+            
+            studentName = formattedName.trim();
+        }
+
         // 關卡選擇按鈕
         document.getElementById('btn-select-l1').addEventListener('click', (e) => {
             e.stopPropagation();
+            saveStudentName();
             startGame(1);
         });
         document.getElementById('btn-select-l2').addEventListener('click', (e) => {
             e.stopPropagation();
+            saveStudentName();
             startGame(2);
         });
         document.getElementById('btn-select-l3').addEventListener('click', (e) => {
             e.stopPropagation();
+            saveStudentName();
             startGame(3);
+        });
+
+        // 獨立英雄榜彈窗事件
+        let activeLeaderboardTab = 1;
+        function showLeaderboardOverlay(level = 1) {
+            activeLeaderboardTab = level;
+            const overlay = document.getElementById('overlay-leaderboard');
+            overlay.classList.remove('hidden');
+
+            for (let i = 1; i <= 3; i++) {
+                const btn = document.getElementById(`btn-tab-l${i}`);
+                if (i === level) {
+                    btn.className = 'flex-1 py-1.5 text-xs font-bold rounded-lg bg-sky-600 text-white transition-all';
+                } else {
+                    btn.className = 'flex-1 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:text-slate-200 transition-all';
+                }
+            }
+
+            const listEl = document.getElementById('overlay-leaderboard-list');
+            listEl.innerHTML = '<li>載入中...</li>';
+
+            if (isFirebaseActive && database) {
+                database.ref('FractionFishing/leaderboard/l' + level).orderByChild('score').limitToLast(10).once('value', snapshot => {
+                    let list = [];
+                    snapshot.forEach(child => {
+                        list.push(child.val());
+                    });
+                    list.sort((a, b) => b.score - a.score);
+                    
+                    listEl.innerHTML = '';
+                    if (list.length === 0) {
+                        listEl.innerHTML = '<li>目前無排行紀錄。</li>';
+                        return;
+                    }
+                    list.forEach((item, index) => {
+                        let li = document.createElement('li');
+                        li.className = 'py-1 border-b border-slate-800 flex justify-between text-sm';
+                        li.innerHTML = `<span>${index+1}. ${item.name}</span><span class="text-yellow-400 font-bold">${item.score}分</span>`;
+                        listEl.appendChild(li);
+                    });
+                });
+            } else {
+                let localLeaderboard = JSON.parse(localStorage.getItem(`fishing_leaderboard_l${level}`) || '[]');
+                localLeaderboard.sort((a, b) => b.score - a.score);
+                listEl.innerHTML = '';
+                if (localLeaderboard.length === 0) {
+                    listEl.innerHTML = '<li>目前無排行紀錄。</li>';
+                    return;
+                }
+                localLeaderboard.slice(0, 10).forEach((item, index) => {
+                    let li = document.createElement('li');
+                    li.className = 'py-1 border-b border-slate-800 flex justify-between text-sm';
+                    li.innerHTML = `<span>${index+1}. ${item.name}</span><span class="text-yellow-400 font-bold">${item.score}分</span>`;
+                    listEl.appendChild(li);
+                });
+            }
+        }
+
+        document.getElementById('btn-show-leaderboard').addEventListener('click', (e) => {
+            e.stopPropagation();
+            showLeaderboardOverlay(1);
+        });
+
+        document.getElementById('btn-tab-l1').addEventListener('click', () => showLeaderboardOverlay(1));
+        document.getElementById('btn-tab-l2').addEventListener('click', () => showLeaderboardOverlay(2));
+        document.getElementById('btn-tab-l3').addEventListener('click', () => showLeaderboardOverlay(3));
+
+        document.getElementById('btn-close-leaderboard').addEventListener('click', () => {
+            document.getElementById('overlay-leaderboard').classList.add('hidden');
         });
 
         // 暫停與繼續按鈕
