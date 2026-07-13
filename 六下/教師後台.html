@@ -6,6 +6,8 @@
     <!-- Firebase Web SDK (v8.10.1 Namespace version) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <!-- SheetJS for Client-side Excel Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
     <title>雞兔問題(生活情境) - 教師管理後台</title>
     <style>
         :root {
@@ -168,6 +170,50 @@
             background: var(--error);
             color: #fff;
             border-color: var(--error);
+        }
+
+        /* 課程場次卡片 */
+        .sessions-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .session-card {
+            background: rgba(16, 185, 129, 0.05);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: left;
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .session-title {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            color: var(--success);
+            font-weight: bold;
+        }
+
+        .session-info {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .download-btn {
+            background: var(--success);
+            color: white;
+            white-space: nowrap;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .download-btn:hover {
+            background: #059669;
         }
 
         /* 數據列表表格 */
@@ -433,7 +479,7 @@
         <!-- 控制列 -->
         <div class="controls-row">
             <div class="search-box">
-                <input type="text" id="search-input" placeholder="🔍 輸入班級/座號/姓名搜尋...">
+                <input type="text" id="search-input" placeholder="🔍 輸入教師/座號/姓名搜尋...">
             </div>
             <select id="scenario-filter" class="filter-select">
                 <option value="all">所有日常情境</option>
@@ -451,13 +497,18 @@
             <button class="btn btn-danger" onclick="clearAllData()">🗑️ 清空所有數據</button>
         </div>
 
+        <!-- 課程場次自動分組與下載 -->
+        <div id="sessions-area" class="sessions-container">
+            <!-- 動態插入 session cards -->
+        </div>
+
         <!-- 表格 -->
         <div class="table-responsive">
             <table id="records-table">
                 <thead>
                     <tr>
                         <th style="width: 15%;">時間</th>
-                        <th style="width: 18%;">班級/座號/姓名</th>
+                        <th style="width: 18%;">教師/座號/姓名</th>
                         <th style="width: 15%;">挑戰情境</th>
                         <th style="width: 12%;">題目設定</th>
                         <th style="width: 10%;">解題路徑</th>
@@ -577,6 +628,10 @@
                 return { id: key, ...allRecords[key] };
             }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
+            // 自動將資料分組為「場次」並渲染卡片
+            groupedSessions = groupRecordsIntoSessions(recordsArray);
+            renderSessionCards();
+
             let visibleCount = 0;
 
             recordsArray.forEach(rec => {
@@ -609,7 +664,7 @@
 
                 tr.innerHTML = `
                     <td>${timeStr}</td>
-                    <td style="font-weight: bold; color: var(--primary);">${escapeHtml(rec.student)}</td>
+                    <td style="font-weight: bold; color: var(--primary);">${escapeHtml(rec.teacherName || "未填")}/${escapeHtml(rec.student)}</td>
                     <td>${rec.scenario}</td>
                     <td>共 ${rec.totalCount} 個 / ${rec.totalCost} 元</td>
                     <td><span class="path-badge ${pathClass}">${pathText}</span></td>
@@ -701,8 +756,8 @@
             content.innerHTML = `
                 <div class="student-summary-cards">
                     <div class="summary-card">
-                        <div class="label">班級/座號/姓名</div>
-                        <div class="value" style="color: var(--primary);">${escapeHtml(rec.student)}</div>
+                        <div class="label">教師/座號/姓名</div>
+                        <div class="value" style="color: var(--primary);">${escapeHtml(rec.teacherName || "未填")}/${escapeHtml(rec.student)}</div>
                     </div>
                     <div class="summary-card">
                         <div class="label">答題耗時 / 錯題</div>
@@ -747,6 +802,141 @@
             } else {
                 alert("❌ 密碼錯誤，拒絕清空數據！");
             }
+        }
+
+        // --- 純前端 Excel 分組與下載邏輯 ---
+        let groupedSessions = [];
+
+        function groupRecordsIntoSessions(recordsArray) {
+            if (!recordsArray || recordsArray.length === 0) return [];
+            
+            const sessionsMap = {};
+            
+            recordsArray.forEach(rec => {
+                const teacherName = (rec.teacherName || "").trim();
+                // 需求：沒有填寫教師姓名的紀錄，直接略過不打包
+                if (!teacherName) return;
+                
+                if (!sessionsMap[teacherName]) {
+                    sessionsMap[teacherName] = {
+                        id: 'session_' + encodeURIComponent(teacherName),
+                        teacherName: teacherName,
+                        records: [],
+                        startTime: new Date(rec.timestamp),
+                        endTime: new Date(rec.timestamp)
+                    };
+                }
+                
+                const session = sessionsMap[teacherName];
+                session.records.push(rec);
+                
+                const recTime = new Date(rec.timestamp);
+                if (recTime < session.startTime) session.startTime = recTime;
+                if (recTime > session.endTime) session.endTime = recTime;
+            });
+            
+            // 轉換為陣列，依據最後作答時間新到舊排序
+            const sessions = Object.values(sessionsMap).sort((a, b) => b.endTime - a.endTime);
+            return sessions;
+        }
+
+        function renderSessionCards() {
+            const container = document.getElementById('sessions-area');
+            if (!container) return;
+            container.innerHTML = "";
+            
+            if (groupedSessions.length === 0) return;
+            
+            groupedSessions.forEach(session => {
+                const dateStr = session.endTime.toLocaleDateString();
+                
+                const card = document.createElement('div');
+                card.className = 'session-card';
+                card.innerHTML = `
+                    <div class="session-title">👨‍🏫 指導教師：${escapeHtml(session.teacherName)}</div>
+                    <div class="session-info">
+                        📅 最後作答：${dateStr}<br>
+                        👥 紀錄筆數：共 ${session.records.length} 筆
+                    </div>
+                    <button class="btn download-btn" onclick="downloadExcel('${session.id}')">
+                        📥 下載此教師 Excel
+                    </button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function downloadExcel(sessionId) {
+            if (typeof XLSX === 'undefined') {
+                alert("Excel 套件尚未載入完成，請稍候再試。");
+                return;
+            }
+
+            const session = groupedSessions.find(s => s.id === sessionId);
+            if (!session) return alert("找不到場次資料！");
+            
+            const sheetData = [];
+            // 擴充欄位加入詳細答錯紀錄
+            sheetData.push([
+                '作答時間', '指導教師', '座號姓名', '挑戰情境', '題目設定', '解題路徑', '總答錯數', '答題耗時(秒)', '過關狀態',
+                '步驟1答錯紀錄', '步驟2答錯紀錄', '步驟3答錯紀錄', '步驟4答錯紀錄', '步驟5答錯紀錄'
+            ]);
+            
+            // 準備要放入 Excel 的資料，依照作答時間遞增 (舊 -> 新)
+            const exportRecords = [...session.records].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+            exportRecords.forEach(rec => {
+                const dateObj = new Date(rec.timestamp);
+                const timeStr = dateObj.toLocaleDateString() + ' ' + dateObj.toTimeString().split(' ')[0];
+                const pathText = rec.solvedPath === 'A' ? 'A (便宜)' : (rec.solvedPath === 'B' ? 'B (貴重)' : rec.solvedPath);
+                
+                // 整理各步驟的答錯紀錄
+                const errLogs = ["", "", "", "", ""];
+                if (rec.stepAnswers) {
+                    for (let s = 1; s <= 5; s++) {
+                        const stepAns = rec.stepAnswers[s];
+                        if (stepAns && stepAns.attempts && stepAns.attempts.length > 0) {
+                            // 只抓出答錯的嘗試紀錄
+                            const invalidAttempts = stepAns.attempts.filter(att => !att.valid);
+                            if (invalidAttempts.length > 0) {
+                                errLogs[s-1] = invalidAttempts.map((att, idx) => 
+                                    `[${idx+1}] 算式: ${att.eq} | 解釋: ${att.meaning} ${att.reason ? '| 提示: ' + att.reason : ''}`
+                                ).join('\n');
+                            }
+                        }
+                    }
+                }
+                
+                sheetData.push([
+                    timeStr,
+                    rec.teacherName || '',
+                    rec.student || '',
+                    rec.scenario || '',
+                    '共 ' + rec.totalCount + ' 個 / ' + rec.totalCost + ' 元',
+                    pathText,
+                    rec.failedAttempts || 0,
+                    rec.durationSeconds || 0,
+                    (rec.failedAttempts === 0 ? '無錯過關' : '有錯過關'),
+                    errLogs[0], errLogs[1], errLogs[2], errLogs[3], errLogs[4]
+                ]);
+            });
+            
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(sheetData);
+            
+            // 欄寬設定
+            ws['!cols'] = [
+                {wch: 20}, {wch: 15}, {wch: 20}, {wch: 15}, {wch: 20}, 
+                {wch: 15}, {wch: 10}, {wch: 15}, {wch: 15},
+                {wch: 40}, {wch: 40}, {wch: 40}, {wch: 40}, {wch: 40} // 步驟答錯紀錄加寬
+            ];
+            
+            XLSX.utils.book_append_sheet(wb, ws, "作答紀錄");
+            
+            const dateStr = session.endTime.toLocaleDateString().replace(/\//g, '-');
+            const filename = `${session.teacherName}_雞兔問題紀錄_${dateStr}.xlsx`;
+            
+            XLSX.writeFile(wb, filename);
         }
     </script>
 </body>

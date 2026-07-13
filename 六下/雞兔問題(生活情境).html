@@ -798,10 +798,14 @@
     </div>
 
     <div class="slider-wrapper" style="margin-top: 15px; margin-bottom: 20px;">
-        <div class="slider-header" style="margin-bottom: 8px;">
-            <span class="input-label" style="font-size: 1rem; font-weight: bold;">輸入班級座號姓名 (必填)：</span>
+        <div class="slider-header" style="margin-bottom: 12px;">
+            <span class="input-label" style="font-size: 1rem; font-weight: bold;">請填寫基本資料：</span>
         </div>
-        <input type="text" id="student-name-input" placeholder="例如：60108紅旗老師" style="width: 100%; padding: 12px; border-radius: 12px; border: 2px solid var(--border-glow); background: rgba(255, 255, 255, 0.7); color: var(--text-primary); font-size: 1rem; box-sizing: border-box; outline: none; transition: border-color 0.3s;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border-glow)'">
+        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+            <input type="text" id="teacher-name-input" placeholder="教師姓名 (非必填)" style="flex: 1; padding: 12px; border-radius: 12px; border: 2px solid var(--border-glow); background: rgba(255, 255, 255, 0.7); color: var(--text-primary); font-size: 1rem; box-sizing: border-box; outline: none; transition: border-color 0.3s;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border-glow)'">
+            <input type="text" id="seat-number-input" placeholder="座號 (非必填)" style="width: 120px; padding: 12px; border-radius: 12px; border: 2px solid var(--border-glow); background: rgba(255, 255, 255, 0.7); color: var(--text-primary); font-size: 1rem; box-sizing: border-box; outline: none; transition: border-color 0.3s;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border-glow)'">
+        </div>
+        <input type="text" id="student-name-input" placeholder="學生姓名 (必填)" style="width: 100%; padding: 12px; border-radius: 12px; border: 2px solid var(--border-glow); background: rgba(255, 255, 255, 0.7); color: var(--text-primary); font-size: 1rem; box-sizing: border-box; outline: none; transition: border-color 0.3s;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border-glow)'">
     </div>
 
     <button class="btn" onclick="startGame()">開始出題練習</button>
@@ -1239,14 +1243,25 @@
 
     // --- 啟動與重設流程 ---
     function startGame() {
-        const studentName = document.getElementById('student-name-input').value.trim();
-        if (!studentName) {
+        const teacherName = document.getElementById('teacher-name-input').value.trim();
+        const seatNumber = document.getElementById('seat-number-input').value.trim();
+        const nameInput = document.getElementById('student-name-input').value.trim();
+        
+        if (!nameInput) {
             playSound('wrong');
-            alert("請先輸入您的『班級座號姓名』喔！");
+            alert("請先輸入您的『學生姓名』喔！");
             document.getElementById('student-name-input').focus();
             return;
         }
-        gameState.studentName = studentName;
+        
+        // 組合顯示用的學生名稱
+        let displayName = nameInput;
+        if (seatNumber) {
+            displayName = seatNumber + " " + displayName;
+        }
+
+        gameState.teacherName = teacherName;
+        gameState.studentName = displayName;
         gameState.startTime = Date.now();
 
         generateProblem();
@@ -2010,6 +2025,7 @@
         
         // 建立上傳紀錄物件
         const record = {
+            teacherName: gameState.teacherName || "",
             student: gameState.studentName || "未知學生",
             timestamp: new Date().toISOString(),
             scenario: gameState.scenario.title,
