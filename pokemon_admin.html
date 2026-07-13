@@ -396,25 +396,14 @@
           </div>
 
           <div class="homework-form">
-            <div class="subject-input-group">
-              <span class="subject-label-badge badge-chinese">國語</span>
-              <textarea id="hw-chinese" class="homework-textarea" placeholder="請輸入國語作業內容..."></textarea>
-            </div>
-            <div class="subject-input-group">
-              <span class="subject-label-badge badge-math">數學</span>
-              <textarea id="hw-math" class="homework-textarea" placeholder="請輸入數學作業內容..."></textarea>
-            </div>
-            <div class="subject-input-group">
-              <span class="subject-label-badge badge-english">英文</span>
-              <textarea id="hw-english" class="homework-textarea" placeholder="請輸入英文/英語作業內容..."></textarea>
-            </div>
-            <div class="subject-input-group">
-              <span class="subject-label-badge badge-memo">備忘</span>
-              <textarea id="hw-memo" class="homework-textarea" placeholder="請輸入備忘事項內容..."></textarea>
+            <div class="form-group">
+              <label for="hw-content">作業內容 (可自由輸入多行文字，直接按 Enter 換行)</label>
+              <textarea id="hw-content" class="homework-textarea" style="height: 220px;" placeholder="例如：&#10;1. 國語甲本生字第 1~3 頁&#10;2. 數學習作第 3、4 頁&#10;3. 發下視力篩檢通知單，請家長確認簽字"></textarea>
             </div>
 
-            <div class="form-group" style="margin-top: 10px;">
+            <div style="display: flex; gap: 12px; margin-top: 10px;">
               <button class="btn btn-primary" onclick="saveHomework()"><i class="fa-solid fa-cloud-arrow-up"></i> 儲存今日作業</button>
+              <button class="btn btn-danger" onclick="clearHomework()"><i class="fa-solid fa-trash-can"></i> 清除作業與通知單</button>
             </div>
           </div>
         </div>
@@ -766,21 +755,43 @@
       const targetDate = document.getElementById('homework-date').value;
       if (!targetDate) return;
 
-      // 1. 載入作業
-      const todayHw = adminHomeworkDb[targetDate] || [];
-      
-      // 清空
-      document.getElementById('hw-chinese').value = '';
-      document.getElementById('hw-math').value = '';
-      document.getElementById('hw-english').value = '';
-      document.getElementById('hw-memo').value = '';
+      // 假日自動引導至星期五
+      const parsedDate = new Date(targetDate);
+      const dayOfWeek = parsedDate.getDay();
+      if (dayOfWeek === 6) { // 星期六 -> 沿用星期五
+        const fri = new Date(parsedDate);
+        fri.setDate(parsedDate.getDate() - 1);
+        const y = fri.getFullYear();
+        const m = String(fri.getMonth() + 1).padStart(2, '0');
+        const d = String(fri.getDate()).padStart(2, '0');
+        const queryDate = `${y}-${m}-${d}`;
+        alert(`您選擇的是星期六，系統將自動為您讀取並操作該週星期五 (${queryDate}) 的作業與通知單！`);
+        document.getElementById('homework-date').value = queryDate;
+        loadHomeworkForDate();
+        return;
+      } else if (dayOfWeek === 0) { // 星期日 -> 沿用星期五
+        const fri = new Date(parsedDate);
+        fri.setDate(parsedDate.getDate() - 2);
+        const y = fri.getFullYear();
+        const m = String(fri.getMonth() + 1).padStart(2, '0');
+        const d = String(fri.getDate()).padStart(2, '0');
+        const queryDate = `${y}-${m}-${d}`;
+        alert(`您選擇的是星期日，系統將自動為您讀取並操作該週星期五 (${queryDate}) 的作業與通知單！`);
+        document.getElementById('homework-date').value = queryDate;
+        loadHomeworkForDate();
+        return;
+      }
 
-      todayHw.forEach(item => {
-        if (item.type === '國語') document.getElementById('hw-chinese').value = item.content;
-        else if (item.type === '數學') document.getElementById('hw-math').value = item.content;
-        else if (item.type === '英文' || item.type === '英語') document.getElementById('hw-english').value = item.content;
-        else if (item.type === '備忘') document.getElementById('hw-memo').value = item.content;
-      });
+      // 1. 載入作業
+      const todayHw = adminHomeworkDb[targetDate];
+      const textarea = document.getElementById('hw-content');
+      
+      if (Array.isArray(todayHw)) {
+        // 相容舊的分科陣列資料格式
+        textarea.value = todayHw.map(item => `${item.type}: ${item.content}`).join('\n');
+      } else {
+        textarea.value = todayHw || '';
+      }
 
       // 2. 載入通知單預覽
       const noticeSrc = adminNoticeDb[targetDate];
@@ -809,25 +820,55 @@
         return;
       }
 
-      const list = [];
-      const chinese = document.getElementById('hw-chinese').value.trim();
-      const math = document.getElementById('hw-math').value.trim();
-      const english = document.getElementById('hw-english').value.trim();
-      const memo = document.getElementById('hw-memo').value.trim();
+      const content = document.getElementById('hw-content').value.trim();
 
-      if (chinese) list.push({ type: '國語', content: chinese });
-      if (math) list.push({ type: '數學', content: math });
-      if (english) list.push({ type: '英文', content: english });
-      if (memo) list.push({ type: '備忘', content: memo });
-
-      // 更新本地跟 Firebase
-      adminHomeworkDb[targetDate] = list;
+      // 更新本地跟 Firebase (直接存成純文字)
+      adminHomeworkDb[targetDate] = content;
       if (database) {
         database.ref('homeworkDatabase').set(adminHomeworkDb)
           .then(() => alert(`${targetDate} 作業儲存並同步成功！`))
           .catch(err => alert('同步失敗：' + err.message));
       } else {
         alert('作業已儲存於本機快取！');
+      }
+    }
+
+    // 清除今日作業與通知單
+    function clearHomework() {
+      const targetDate = document.getElementById('homework-date').value;
+      if (!targetDate) {
+        alert('請選擇日期！');
+        return;
+      }
+
+      if (confirm(`確定要清除 ${targetDate} 的作業與通知單嗎？`)) {
+        // 從本機資料庫刪除
+        delete adminHomeworkDb[targetDate];
+        delete adminNoticeDb[targetDate];
+
+        // 同步至 Firebase
+        if (database) {
+          Promise.all([
+            database.ref('homeworkDatabase').set(adminHomeworkDb),
+            database.ref('noticeDatabase').set(adminNoticeDb)
+          ]).then(() => {
+            alert(`${targetDate} 的作業與通知單已清除並同步成功！`);
+            // 重設 UI
+            document.getElementById('hw-content').value = '';
+            document.getElementById('notice-preview-container').style.display = 'none';
+            document.getElementById('notice-preview-img').src = '';
+            document.getElementById('notice-file-input').value = '';
+            currentSelectedFileBase64 = null;
+          }).catch(err => alert('清除同步失敗：' + err.message));
+        } else {
+          // 離線模式重設 UI
+          document.getElementById('hw-content').value = '';
+          document.getElementById('notice-preview-container').style.display = 'none';
+          document.getElementById('notice-preview-img').src = '';
+          document.getElementById('notice-file-input').value = '';
+          currentSelectedFileBase64 = null;
+          alert('作業已從本機快取清除！');
+        }
       }
     }
 

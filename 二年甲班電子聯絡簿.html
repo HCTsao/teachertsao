@@ -563,27 +563,38 @@
       // 1. 更新頂部日期顯示板 (僅顯示民國)
       document.getElementById('dateRoc').textContent = `民國 ${rocYear} 年 ${month} 月 ${day} 日 (${dayName})`;
       
-      // 2. 判斷今日作業
+      // 2. 判斷今日作業（若假日，一律沿用禮拜五）
       const dateStr = formatDateString(date);
       const homeworkContainer = document.getElementById('homeworkContainer');
       
+      let queryDateStr = dateStr;
+      const dayOfWeek = date.getDay();
+      if (dayOfWeek === 6) { // 星期六 -> 沿用星期五
+        const fri = new Date(date);
+        fri.setDate(date.getDate() - 1);
+        queryDateStr = formatDateString(fri);
+      } else if (dayOfWeek === 0) { // 星期日 -> 沿用星期五
+        const fri = new Date(date);
+        fri.setDate(date.getDate() - 2);
+        queryDateStr = formatDateString(fri);
+      }
+
       // 暑假區間判定：115.07.02 (2026-07-02) 到 115.08.27 (2026-08-27)
       const startDate = new Date("2026-07-02T00:00:00");
       const endDate = new Date("2026-08-27T23:59:59");
       
-      if (date >= startDate && date <= endDate) {
-        // 顯示暑假無作業，僅顯示指定文字，無其他輔助說明
-        homeworkContainer.innerHTML = `
-          <div class="no-homework-card">
-            <div class="no-homework-icon"><i class="fa-solid fa-umbrella-beach"></i></div>
-            <h3 class="no-homework-title">暑假期間，請記得完成暑假作業</h3>
-          </div>
-        `;
-      } else {
-        // 暑假外：渲染作業
-        const todayHomework = homeworkDatabase[dateStr];
-        
-        if (todayHomework && todayHomework.length > 0) {
+      const todayHomework = homeworkDatabase[queryDateStr];
+      const hasContent = todayHomework && (
+        (typeof todayHomework === 'string' && todayHomework.trim().length > 0) ||
+        (Array.isArray(todayHomework) && todayHomework.length > 0)
+      );
+
+      if (hasContent) {
+        // 渲染作業
+        let html = '';
+        if (typeof todayHomework === 'string') {
+          html = `<div style="white-space: pre-wrap; font-size: 1.1rem; color: var(--text-dark); line-height: 1.8; font-weight: 500; padding: 15px 20px; background: white; border-radius: 14px; border: 1px solid #f1f5f9; word-break: break-all; text-align: left; box-shadow: inset 0 2px 4px rgba(0,0,0,0.01);">${todayHomework}</div>`;
+        } else if (Array.isArray(todayHomework)) {
           let listHtml = '<ul class="homework-list">';
           todayHomework.forEach((item, index) => {
             let tagClass = 'tag-memo';
@@ -599,23 +610,33 @@
             `;
           });
           listHtml += '</ul>';
-          homeworkContainer.innerHTML = listHtml;
+          html = listHtml;
+        }
+        homeworkContainer.innerHTML = html;
+      } else {
+        // 今日無作業或被清除，顯示預設文字
+        if (date >= startDate && date <= endDate) {
+          homeworkContainer.innerHTML = `
+            <div class="no-homework-card">
+              <div class="no-homework-icon"><i class="fa-solid fa-umbrella-beach"></i></div>
+              <h3 class="no-homework-title">暑假期間，請記得完成暑假作業</h3>
+            </div>
+          `;
         } else {
-          // 非暑假，但老師尚未發布當天作業（例如週末或未來日期）
           homeworkContainer.innerHTML = `
             <div class="no-homework-card" style="background: radial-gradient(circle at top right, #f0fdf4 0%, #dcfce7 100%); border-color: #bbf7d0;">
-              <div class="no-homework-icon" style="color: #22c55e;"><i class="fa-solid fa-circle-check"></i></div>
-              <h3 class="no-homework-title" style="color: #15803d; font-size: 1.2rem;">今日無作業</h3>
+              <div class="no-homework-icon" style="color: #22c55e;"><i class="fa-solid fa-book-open"></i></div>
+              <h3 class="no-homework-title" style="color: #15803d; font-size: 1.2rem;">今日無作業，請記得多閱讀</h3>
             </div>
           `;
         }
       }
 
-      // 3. 通知單區塊自動隱藏邏輯
+      // 3. 通知單區塊自動隱藏邏輯（若假日，一律沿用禮拜五）
       const noticeCard = document.getElementById('noticeCard');
       const noticeImg = document.getElementById('noticeImg');
       const noticeImgContainer = document.getElementById('noticeImgContainer');
-      const noticeImgSrc = noticeDatabase[dateStr];
+      const noticeImgSrc = noticeDatabase[queryDateStr];
       
       if (noticeImgSrc) {
         // 當日有通知單：顯示區塊並載入圖片
