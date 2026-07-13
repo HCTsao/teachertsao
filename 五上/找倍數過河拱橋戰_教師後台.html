@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>農夫過河：依序找倍數 - 教師管理後台</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+  <!-- Firebase Compatibility SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  <style>
+    :root {
+      --font-body: 'Noto Sans TC', sans-serif;
+      --color-primary: #0f172a;
+      --color-accent: #2563eb;
+      --color-success: #16a34a;
+      --color-danger: #dc2626;
+      --color-bg: #f8fafc;
+      --color-card: #ffffff;
+      --color-border: #e2e8f0;
+      --color-text-main: #334155;
+      --color-text-muted: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background-color: var(--color-bg);
+      color: var(--color-text-main);
+      padding: 30px;
+    }
+
+    .dashboard-container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* --- Navigation header --- */
+    .top-left-nav {
+      margin-bottom: 25px;
+      display: flex;
+      gap: 10px;
+    }
+    .top-left-nav a {
+      background: #ffffff;
+      color: #333;
+      border: 1px solid var(--color-border);
+      padding: 8px 16px;
+      border-radius: 30px;
+      font-size: 0.95rem;
+      font-weight: bold;
+      text-decoration: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      transition: all 0.2s;
+    }
+    .top-left-nav a:hover {
+      background: #f1f5f9;
+      transform: translateY(-1px);
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      border-bottom: 2px solid var(--color-border);
+      padding-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 900;
+      color: var(--color-primary);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .btn-danger {
+      background-color: var(--color-danger);
+      color: #fff;
+      box-shadow: 0 4px 10px rgba(220, 38, 38, 0.2);
+    }
+
+    .btn-danger:hover {
+      background-color: #b91c1c;
+      transform: translateY(-1px);
+    }
+
+    /* --- Stats cards --- */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .stats-card {
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .stats-card h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stats-card .value {
+      font-size: 2.2rem;
+      font-weight: 900;
+      color: var(--color-primary);
+    }
+
+    .stats-card .desc {
+      font-size: 0.85rem;
+      color: var(--color-text-muted);
+    }
+
+    /* --- Tabs --- */
+    .tabs-bar {
+      display: flex;
+      border-bottom: 2px solid var(--color-border);
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .tab-btn {
+      padding: 12px 24px;
+      font-size: 1.1rem;
+      font-weight: 800;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--color-text-muted);
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .tab-btn:hover {
+      color: var(--color-primary);
+    }
+
+    .tab-btn.active {
+      color: var(--color-accent);
+      border-bottom-color: var(--color-accent);
+    }
+
+    .tab-content {
+      display: none;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* --- Table & Card Layout --- */
+    .card {
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+      border-radius: 16px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      padding: 24px;
+      overflow: hidden;
+    }
+
+    .table-container {
+      overflow-x: auto;
+      margin-top: 15px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+      text-align: left;
+    }
+
+    th, td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    th {
+      background-color: #f8fafc;
+      font-weight: 800;
+      color: var(--color-primary);
+    }
+
+    tr:hover {
+      background-color: #f8fafc;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: bold;
+    }
+
+    .badge-error {
+      background-color: #fee2e2;
+      color: var(--color-danger);
+    }
+
+    .badge-success {
+      background-color: #dcfce7;
+      color: var(--color-success);
+    }
+
+    .status-banner {
+      background-color: #ffedd5;
+      border: 1px solid #fed7aa;
+      color: #9a3412;
+      padding: 12px 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      font-weight: bold;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-container">
+    <!-- Top Left Nav -->
+    <div class="top-left-nav">
+      <a href="../index.html">🏠 回首頁</a>
+      <a href="找倍數過河拱橋戰.html">🎮 進入遊戲</a>
+    </div>
+
+    <!-- DB Offline Banner -->
+    <div class="status-banner" id="status-banner">
+      ⚠️ Firebase 資料庫連線失敗，目前顯示的是本機 LocalStorage 離線資料。
+    </div>
+
+    <header>
+      <h1>👨‍🏫 農夫過河：依序找倍數 - 管理後台</h1>
+      <button class="btn btn-danger" id="btn-clear-db">🧹 清除所有紀錄</button>
+    </header>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+      <div class="stats-card">
+        <h3>累計遊玩人數</h3>
+        <div class="value" id="stats-total-players">0</div>
+        <div class="desc">人已登錄總積分</div>
+      </div>
+      <div class="stats-card">
+        <h3>全體平均分數</h3>
+        <div class="value" id="stats-avg-score">0</div>
+        <div class="desc">分 (滿分視限時完成剩餘時間而定)</div>
+      </div>
+      <div class="stats-card">
+        <h3>常見出錯題目數字</h3>
+        <div class="value" id="stats-most-failed-base">-</div>
+        <div class="desc">學生答錯次數最多的數字</div>
+      </div>
+    </div>
+
+    <!-- Tabs Menu -->
+    <div class="tabs-bar">
+      <button class="tab-btn active" data-tab="tab-mistakes">學生答錯紀錄 (Mistakes)</button>
+      <button class="tab-btn" data-tab="tab-leaderboard">全班積分英雄榜 (Leaderboard)</button>
+    </div>
+
+    <!-- Tab Mistakes -->
+    <div class="tab-content active" id="tab-mistakes">
+      <div class="card">
+        <h2>❌ 學生答錯題目紀錄表</h2>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>時間</th>
+                <th>學生姓名</th>
+                <th>關卡類型</th>
+                <th>目標數字</th>
+                <th>錯誤原因</th>
+                <th>預期正確值</th>
+                <th>學生輸入的內容</th>
+              </tr>
+            </thead>
+            <tbody id="mistakes-table-body">
+              <tr><td colspan="7" style="text-align: center;">載入資料中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Leaderboard -->
+    <div class="tab-content" id="tab-leaderboard">
+      <div class="card">
+        <h2>🏆 學生總積分榜</h2>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>排名</th>
+                <th>時間</th>
+                <th>學生姓名</th>
+                <th>總積分</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard-table-body">
+              <tr><td colspan="4" style="text-align: center;">載入資料中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // Firebase 連線設定 (與遊戲檔案一致)
+    // ==========================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyCFNaVRETt062_As1hF7Mfyr22pKMG-lvk",
+      authDomain: "chickenrabbit-ea442.firebaseapp.com",
+      databaseURL: "https://chickenrabbit-ea442-default-rtdb.firebaseio.com",
+      projectId: "chickenrabbit-ea442",
+      storageBucket: "chickenrabbit-ea442.firebasestorage.app",
+      messagingSenderId: "65728951973",
+      appId: "1:65728951973:web:666b1c64cfb3a7fa5abf4c"
+    };
+
+    let database = null;
+    let isFirebaseActive = false;
+
+    try {
+      if (typeof firebase !== 'undefined') {
+        firebase.initializeApp(firebaseConfig);
+        database = firebase.database();
+        isFirebaseActive = true;
+        console.log("Firebase Realtime Database 連線成功！");
+      }
+    } catch (e) {
+      console.warn("Firebase 載入失敗，切換為離線模式：", e);
+      document.getElementById('status-banner').style.display = 'block';
+    }
+
+    // --- Tab Switching ---
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    // --- Data Binding & Database Listeners ---
+    function initDataLoad() {
+      if (isFirebaseActive) {
+        // Listen mistakes
+        database.ref('LCM/mistakes').on('value', snapshot => {
+          let mistakesList = [];
+          snapshot.forEach(child => {
+            mistakesList.push(child.val());
+          });
+          mistakesList.reverse(); // Newest first
+          renderMistakes(mistakesList);
+          updateStatistics(mistakesList, null);
+        });
+
+        // Listen leaderboard
+        database.ref('LCM/leaderboard').on('value', snapshot => {
+          let leaderboardList = [];
+          snapshot.forEach(child => {
+            leaderboardList.push(child.val());
+          });
+          leaderboardList.sort((a, b) => b.score - a.score);
+          renderLeaderboard(leaderboardList);
+          updateStatistics(null, leaderboardList);
+        });
+      } else {
+        // Fallback local storage
+        loadLocalData();
+      }
+    }
+
+    function loadLocalData() {
+      let mistakesList = JSON.parse(localStorage.getItem('LCM_mistakes') || '[]');
+      let leaderboardList = JSON.parse(localStorage.getItem('LCM_leaderboard') || '[]');
+      
+      mistakesList.reverse();
+      leaderboardList.sort((a,b) => b.score - a.score);
+
+      renderMistakes(mistakesList);
+      renderLeaderboard(leaderboardList);
+      updateStatistics(mistakesList, leaderboardList);
+    }
+
+    // --- Rendering Functions ---
+    function renderMistakes(list) {
+      const tbody = document.getElementById('mistakes-table-body');
+      tbody.innerHTML = '';
+
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--color-text-muted);">目前無任何答錯紀錄。</td></tr>';
+        return;
+      }
+
+      list.forEach(item => {
+        let tr = document.createElement('tr');
+        let dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString() : '-';
+        tr.innerHTML = `
+          <td style="font-size: 0.85rem; color: var(--color-text-muted);">${dateStr}</td>
+          <td style="font-weight: bold; color: var(--color-primary);">${item.name}</td>
+          <td><span class="badge ${item.type === '最小公倍數與公倍數挑戰' ? 'badge-success' : 'badge-error'}">${item.type}</span></td>
+          <td style="font-family: monospace; font-weight: bold;">${item.base}</td>
+          <td>${item.errorType}</td>
+          <td style="color: var(--color-success); font-weight: bold; font-family: monospace;">${item.expectedVal}</td>
+          <td style="color: var(--color-danger); font-weight: bold; font-family: monospace;">${item.userInputVal}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderLeaderboard(list) {
+      const tbody = document.getElementById('leaderboard-table-body');
+      tbody.innerHTML = '';
+
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--color-text-muted);">目前無任何積分成績。</td></tr>';
+        return;
+      }
+
+      list.forEach((item, idx) => {
+        let tr = document.createElement('tr');
+        let dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString() : '-';
+        tr.innerHTML = `
+          <td style="font-weight: 800; color: var(--color-accent);">${idx + 1}</td>
+          <td style="font-size: 0.85rem; color: var(--color-text-muted);">${dateStr}</td>
+          <td style="font-weight: bold;">${item.name}</td>
+          <td style="font-weight: bold; color: var(--color-success);">${item.score}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Cache metrics locally for cross-reference updates
+    let cacheMistakes = [];
+    let cacheLeaderboard = [];
+
+    function updateStatistics(mistakes, leaderboard) {
+      if (mistakes) cacheMistakes = mistakes;
+      if (leaderboard) cacheLeaderboard = leaderboard;
+
+      // 1. Total players
+      document.getElementById('stats-total-players').innerText = cacheLeaderboard.length;
+
+      // 2. Average score
+      if (cacheLeaderboard.length > 0) {
+        let sum = cacheLeaderboard.reduce((acc, curr) => acc + (curr.score || 0), 0);
+        let avg = Math.round(sum / cacheLeaderboard.length);
+        document.getElementById('stats-avg-score').innerText = avg;
+      } else {
+        document.getElementById('stats-avg-score').innerText = '0';
+      }
+
+      // 3. Most failed base number
+      if (cacheMistakes.length > 0) {
+        let freq = {};
+        cacheMistakes.forEach(m => {
+          let b = m.base;
+          if (b) {
+            freq[b] = (freq[b] || 0) + 1;
+          }
+        });
+        
+        let maxBase = '-';
+        let maxCount = 0;
+        for (let b in freq) {
+          if (freq[b] > maxCount) {
+            maxCount = freq[b];
+            maxBase = b;
+          }
+        }
+        
+        document.getElementById('stats-most-failed-base').innerText = maxBase !== '-' ? `${maxBase} (${maxCount} 次)` : '-';
+      } else {
+        document.getElementById('stats-most-failed-base').innerText = '-';
+      }
+    }
+
+    // --- Clean DB Action ---
+    document.getElementById('btn-clear-db').addEventListener('click', () => {
+      let pwd = prompt("🔒 請輸入管理密碼以清除所有學生紀錄：");
+      if (pwd !== "0987912307") {
+        alert("❌ 密碼錯誤，拒絕清除數據！");
+        return;
+      }
+
+      let conf1 = confirm("⚠️ 警告：您即將清空所有的學生作答錯誤紀錄以及積分排行榜！此操作無法復原，是否繼續？");
+      if (conf1) {
+        let conf2 = confirm("🔒 請再次確認：是否確定清空 Firebase 中 LCM 資料庫節點的所有數據？");
+        if (conf2) {
+          if (isFirebaseActive) {
+            database.ref('LCM').remove()
+              .then(() => {
+                alert("✅ Firebase LCM 資料庫已成功清空！");
+              })
+              .catch(err => {
+                alert("❌ 清除失敗：" + err.message);
+              });
+          } else {
+            localStorage.removeItem('LCM_mistakes');
+            localStorage.removeItem('LCM_leaderboard');
+            alert("✅ 本機離線資料已成功清空！");
+            loadLocalData();
+          }
+        }
+      }
+    });
+
+    initDataLoad();
+  </script>
+</body>
+</html>

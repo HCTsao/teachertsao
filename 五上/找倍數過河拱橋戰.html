@@ -722,7 +722,7 @@
   <!-- Top Navigation -->
   <div class="top-left-nav">
     <a href="../index.html">🏠 回首頁</a>
-    <button id="btn-top-menu">📋 回主選單</button>
+    <button id="btn-top-menu" onclick="handleTopMenuClick()">📋 回主選單</button>
   </div>
 
   <!-- Game Container -->
@@ -839,6 +839,9 @@
         </div>
 
         <button class="btn-primary" id="btn-start-game" style="width: 100%;">啟動過河大冒險 🌠</button>
+        <div style="margin-top: 15px; text-align: center;">
+          <a href="找倍數過河拱橋戰_教師後台.html" style="font-size: 0.9rem; color: #d97706; text-decoration: none; font-weight: bold; border-bottom: 2px dashed #d97706; transition: color 0.2s, border-color 0.2s;" onmouseover="this.style.color='#b45309'; this.style.borderColor='#b45309';" onmouseout="this.style.color='#d97706'; this.style.borderColor='#d97706';">👨‍🏫 進入教師管理後台</a>
+        </div>
       </div>
     </div>
 
@@ -891,7 +894,7 @@
 
         <div style="display: flex; gap: 15px; justify-content: center; width: 100%;">
           <button class="btn-primary" id="btn-enter-lcm" style="display: none; background: linear-gradient(to right, #d97706, #ca8a04);">解鎖隱藏關：公倍數戰 🔓</button>
-          <button class="btn-primary" id="btn-back-to-menu" style="background: #6c757d; box-shadow: none;">返回主選單 🏠</button>
+          <button class="btn-primary" id="btn-back-to-menu" onclick="handleTopMenuClick()" style="background: #6c757d; box-shadow: none;">返回主選單 🏠</button>
         </div>
       </div>
     </div>
@@ -937,13 +940,13 @@
     // Firebase 連線設定 (HighGrade 專案)
     // ==========================================
     const firebaseConfig = {
-      apiKey: "AIzaSyCFNaVRETt862_As1hF7Mfyr22pKM5-lvk", // 沿用本機現有 API 金鑰
+      apiKey: "AIzaSyCFNaVRETt062_As1hF7Mfyr22pKMG-lvk",
       authDomain: "chickenrabbit-ea442.firebaseapp.com",
       databaseURL: "https://chickenrabbit-ea442-default-rtdb.firebaseio.com",
       projectId: "chickenrabbit-ea442",
-      storageBucket: "chickenrabbit-ea442.appspot.com",
+      storageBucket: "chickenrabbit-ea442.firebasestorage.app",
       messagingSenderId: "65728951973",
-      appId: "1:65728951973:web:efff912caf5f6f185abf4c"
+      appId: "1:65728951973:web:666b1c64cfb3a7fa5abf4c"
     };
 
     let database = null;
@@ -959,6 +962,61 @@
     } catch (e) {
       console.warn("Firebase 初始化失敗，已自動啟用離線LocalStorage存取模式：", e);
     }
+
+    // Global helper to safely return to game main menu
+    window.handleTopMenuClick = function() {
+      console.log("handleTopMenuClick executed!");
+      
+      // Stop timer and animations
+      try {
+        if (typeof sound !== 'undefined' && sound && sound.playClick) {
+          sound.playClick();
+        }
+      } catch (e) {}
+
+      try {
+        if (typeof timerInterval !== 'undefined' && timerInterval) {
+          clearInterval(timerInterval);
+        }
+        if (typeof countdownInterval !== 'undefined' && countdownInterval) {
+          clearInterval(countdownInterval);
+          countdownInterval = null;
+        }
+      } catch (e) {}
+
+      // Hide all overlays
+      const overlays = [
+        'clear-overlay', 'failure-overlay', 'victory-session-overlay',
+        'lcm-clear-overlay', 'lcm-select-overlay', 'lcm-extra-overlay'
+      ];
+      overlays.forEach(id => {
+        try {
+          const el = document.getElementById(id);
+          if (el) el.classList.remove('active');
+        } catch (e) {}
+      });
+
+      // Restore inputs
+      try {
+        const btnSubmit = document.getElementById('btn-submit');
+        const inputMultiple = document.getElementById('input-multiple');
+        const promptLabel = document.getElementById('prompt-label');
+        if (btnSubmit) btnSubmit.style.display = 'inline-block';
+        if (inputMultiple) inputMultiple.style.display = 'inline-block';
+        if (promptLabel) promptLabel.style.display = 'inline-block';
+      } catch (e) {}
+
+      // Reset phase flags
+      try {
+        inLCMPhase = false;
+      } catch (e) {}
+
+      // Show starting menu
+      try {
+        const menuOverlay = document.getElementById('menu-overlay');
+        if (menuOverlay) menuOverlay.classList.add('active');
+      } catch (e) {}
+    };
 
     // --- Synthesized Sound Engine via Web Audio API ---
     class SoundEngine {
@@ -2012,19 +2070,50 @@
 
     function saveScoreToLeaderboard() {
       if (isFirebaseActive) {
-        database.ref('LCM/leaderboard').push({
-          name: studentName,
-          className: studentClass,
-          seatNumber: studentSeat,
-          score: sessionTotalScore,
-          timestamp: firebase.database.ServerValue.TIMESTAMP
+        database.ref('LCM/leaderboard').orderByChild('score').limitToLast(10).once('value', snapshot => {
+          let scores = [];
+          snapshot.forEach(child => {
+            scores.push(child.val().score);
+          });
+          
+          let qualifies = false;
+          if (scores.length < 10) {
+            qualifies = true;
+          } else {
+            let minScore = Math.min(...scores);
+            if (sessionTotalScore > minScore) {
+              qualifies = true;
+            }
+          }
+          
+          if (qualifies) {
+            database.ref('LCM/leaderboard').push({
+              name: studentName,
+              className: studentClass,
+              seatNumber: studentSeat,
+              score: sessionTotalScore,
+              timestamp: firebase.database.ServerValue.TIMESTAMP
+            });
+          }
         });
       } else {
         // Fallback local storage leaderboard
         let localData = JSON.parse(localStorage.getItem('LCM_leaderboard') || '[]');
-        localData.push({ name: studentName, className: studentClass, seatNumber: studentSeat, score: sessionTotalScore, timestamp: Date.now() });
-        localData.sort((a,b) => b.score - a.score);
-        localStorage.setItem('LCM_leaderboard', JSON.stringify(localData.slice(0, 15)));
+        let qualifies = false;
+        if (localData.length < 10) {
+          qualifies = true;
+        } else {
+          let minScore = Math.min(...localData.map(x => x.score));
+          if (sessionTotalScore > minScore) {
+            qualifies = true;
+          }
+        }
+        
+        if (qualifies) {
+          localData.push({ name: studentName, className: studentClass, seatNumber: studentSeat, score: sessionTotalScore, timestamp: Date.now() });
+          localData.sort((a,b) => b.score - a.score);
+          localStorage.setItem('LCM_leaderboard', JSON.stringify(localData.slice(0, 10)));
+        }
       }
     }
 
@@ -2466,31 +2555,7 @@
       advanceToNextLevel();
     });
 
-    btnBackToMenu.addEventListener('click', () => {
-      sound.playClick();
-      victorySessionOverlay.classList.remove('active');
-      menuOverlay.classList.add('active');
-    });
 
-    btnTopMenu.addEventListener('click', () => {
-      sound.playClick();
-      if (timerInterval) clearInterval(timerInterval);
-      if (countdownInterval) {
-        clearInterval(countdownInterval);
-        countdownInterval = null;
-      }
-      clearOverlay.classList.remove('active');
-      failureOverlay.classList.remove('active');
-      victorySessionOverlay.classList.remove('active');
-      lcmClearOverlay.classList.remove('active');
-      lcmSelectOverlay.classList.remove('active');
-      lcmExtraOverlay.classList.remove('active');
-      
-      btnSubmit.style.display = 'inline-block';
-      inputMultiple.style.display = 'inline-block';
-      
-      menuOverlay.classList.add('active');
-    });
 
     document.querySelectorAll('.btn-level').forEach(btn => {
       btn.addEventListener('click', () => {
