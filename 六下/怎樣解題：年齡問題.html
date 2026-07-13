@@ -113,9 +113,14 @@
         /* 題型選擇卡片 */
         .scenario-grid {
             display: grid;
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, 1fr);
             gap: 12px;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
+        }
+        @media (max-width: 600px) {
+            .scenario-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .scenario-card {
@@ -737,8 +742,8 @@
             background: var(--panel-bg);
             border: 2px solid var(--border-glow);
             border-radius: 24px;
-            width: 90%;
-            max-width: 750px;
+            width: 95%;
+            max-width: 950px;
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
             overflow: hidden;
             display: flex;
@@ -813,8 +818,10 @@
         }
 
         .track-dropzone {
-            min-width: 420px;
-            min-height: 58px;
+            width: 580px;
+            min-width: 580px;
+            max-width: 580px;
+            min-height: 110px;
             background: rgba(255, 255, 255, 0.8);
             border: 2px solid var(--border-glow);
             border-radius: 12px;
@@ -910,6 +917,71 @@
             transform: scale(0.95);
         }
 
+        .label-dropzone {
+            min-width: 100px;
+            height: 34px;
+            border: 2px dashed var(--border-glow);
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.6);
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            transition: all 0.2s;
+            padding: 0 8px;
+            user-select: none;
+        }
+        .label-dropzone.dragover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+        .dropped-label-chip {
+            background: var(--primary);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 4px rgba(99, 102, 241, 0.25);
+        }
+        .remove-label-btn {
+            cursor: pointer;
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.8);
+            margin-left: 2px;
+        }
+        .remove-label-btn:hover {
+            color: white;
+        }
+        .draggable-label-chip {
+            background: #fff;
+            border: 1px solid var(--border-glow);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            color: var(--primary);
+            cursor: grab;
+            user-select: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .draggable-label-chip:active {
+            cursor: grabbing;
+            transform: scale(0.95);
+        }
+
+        .dropped-label-chip.absolute-label {
+            position: absolute;
+            cursor: grab;
+        }
+        .dropped-label-chip.absolute-label:active {
+            cursor: grabbing;
+        }
+
         .modal-footer {
             display: flex;
             justify-content: flex-end;
@@ -930,7 +1002,12 @@
         }
 
         .btn-sm.btn-clear {
-            background: var(--error);
+            background: transparent;
+            color: var(--error);
+            border: none;
+            box-shadow: none;
+            padding: 4px 8px;
+            font-weight: bold;
         }
 
         .btn-sm:hover {
@@ -983,7 +1060,7 @@
 <!-- 1. 啟動設定畫面 -->
 <div id="setup-screen">
     <h1>👴 怎樣解題：年齡問題</h1>
-    <div class="subtitle">康軒版六年級下學期 5-3 怎樣解題</div>
+    <div class="subtitle">康軒版六年級下學期 5-3 年齡問題</div>
     
     <div class="section-title">選擇挑戰題型：</div>
     <div class="scenario-grid">
@@ -1017,12 +1094,15 @@
                 <span class="scenario-name">5. 已知兩人年齡和，問幾年前？</span>
             </div>
         </div>
-        <div class="scenario-card" onclick="selectType('random')">
-            <span class="scenario-icon">🎲</span>
-            <div class="scenario-info">
-                <span class="scenario-name">隨機出題</span>
-            </div>
+    </div>
+
+    <!-- 自訂倍數範圍滑桿 (適用於題型 1, 2, 3) -->
+    <div id="ratio-select-wrapper" style="margin-top: 15px; margin-bottom: 15px; display: block;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label class="input-label" style="font-size: 1rem; font-weight: bold; color: var(--text-primary);">選擇倍數關係：</label>
+            <span id="ratio-val-display" style="font-size: 1.1rem; font-weight: bold; color: var(--primary);">3 倍</span>
         </div>
+        <input type="range" id="user-ratio-slider" min="2" max="8" value="3" style="width: 100%; height: 6px; background: var(--border-glow); border-radius: 3px; outline: none; cursor: pointer; accent-color: var(--primary);" oninput="document.getElementById('ratio-val-display').innerText = this.value + ' 倍'">
     </div>
 
     <div class="slider-wrapper" style="margin-top: 15px; margin-bottom: 20px;">
@@ -1031,7 +1111,7 @@
         </div>
         <div style="display: flex; flex-direction: column; gap: 10px;">
             <div style="display: flex; flex-direction: column; gap: 5px;">
-                <button type="button" class="btn" style="background: var(--primary); padding: 12px; font-size: 1rem; border: none; color: white; border-radius: 12px; cursor: pointer;" onclick="promptClassPassword()">
+                <button type="button" class="btn" style="background: #eab308; padding: 12px; font-size: 1rem; border: none; color: #1e293b; font-weight: bold; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(234, 179, 8, 0.2);" onclick="promptClassPassword()">
                     🔑 輸入課堂密碼 (如果是自行練習，可以不輸入哦！)
                 </button>
                 <div id="class-status-text" style="font-size: 0.85rem; text-align: center; margin-bottom: 5px;"></div>
@@ -1072,17 +1152,17 @@
             <div class="step-meaning-disp" id="ledger-meaning-1">等待回答中...</div>
         </div>
         <div id="ledger-step-2" class="ledger-step">
-            <div class="step-num-tag" id="ledger-step-title-2">步驟 2 / 4 ⚖️ 計算倍數差</div>
+            <div class="step-num-tag" id="ledger-step-title-2">步驟 2 / 4 ⚖️</div>
             <div class="step-eq-disp" id="ledger-eq-2">--</div>
             <div class="step-meaning-disp" id="ledger-meaning-2">尚未解鎖</div>
         </div>
         <div id="ledger-step-3" class="ledger-step">
-            <div class="step-num-tag" id="ledger-step-title-3">步驟 3 / 4 🔄 計算該時間點年輕者歲數</div>
+            <div class="step-num-tag" id="ledger-step-title-3">步驟 3 / 4 🔄</div>
             <div class="step-eq-disp" id="ledger-eq-3">--</div>
             <div class="step-meaning-disp" id="ledger-meaning-3">尚未解鎖</div>
         </div>
         <div id="ledger-step-4" class="ledger-step">
-            <div class="step-num-tag" id="ledger-step-title-4">步驟 4 / 4 💡 算出相隔年份</div>
+            <div class="step-num-tag" id="ledger-step-title-4">步驟 4 / 4 💡</div>
             <div class="step-eq-disp" id="ledger-eq-4">--</div>
             <div class="step-meaning-disp" id="ledger-meaning-4">尚未解鎖</div>
         </div>
@@ -1092,7 +1172,6 @@
     <div class="right-panel">
         <div class="active-step-header">
             <div class="step-badge" id="console-step-badge">步驟 1</div>
-            <div class="input-label" style="font-weight: bold; color: var(--success);">引導作答系統</div>
         </div>
         
         <div id="console-instruction" class="active-step-instruction">
@@ -1152,7 +1231,7 @@
         <!-- 動作按鈕 -->
         <div class="submit-row">
             <button class="clear-btn" onclick="clearActiveInputs()">清除重填</button>
-            <button class="hint-btn" onclick="showHint()">查看提示</button>
+            <button class="hint-btn" id="btn-show-hint" onclick="showHint()">查看提示</button>
             <button class="btn" onclick="submitStepAnswer()">送出檢查</button>
         </div>
     </div>
@@ -1169,50 +1248,64 @@
         <div class="modal-body">
             <p id="segment-instruction-text" class="modal-instruction">請用拖曳或點選的方式，畫出兩人的線段圖：</p>
             
-            <div class="tracks-container">
-                <!-- 較年輕者 track -->
-                <div style="margin-bottom: 20px;">
-                    <span class="track-label" id="track-label-younger">小萱：</span>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <div class="track-dropzone" id="track-younger" ondragover="allowDrop(event)" ondragleave="event.currentTarget.classList.remove('dragover')" ondrop="handleDrop(event, 'younger')">
-                            <!-- 放置線段單元 -->
-                        </div>
-                        <button class="btn-sm btn-clear" onclick="clearTrack('younger')">🗑️ 清空</button>
-                    </div>
-                    <div id="label-younger" style="text-align: left; font-weight: bold; color: var(--primary); font-size: 0.9rem; margin-top: 4px; min-height: 1.2em;"></div>
+            <!-- Whiteboard Tool Bar -->
+            <div style="display: flex; gap: 12px; margin-bottom: 12px; align-items: center; background: rgba(255,255,255,0.06); padding: 8px 16px; border-radius: 12px; border: 1px solid var(--border-glow); flex-wrap: wrap;">
+                <span style="font-size: 0.85rem; font-weight: bold; color: var(--text-primary);">🎨 畫布工具：</span>
+                <button class="btn-sm" id="btn-mode-drag" onclick="setCanvasMode('drag')" style="background: var(--primary); padding: 6px 12px;">✋ 拖拉</button>
+                <button class="btn-sm" id="btn-mode-draw" onclick="setCanvasMode('draw')" style="background: var(--text-secondary); padding: 6px 12px;">✏️ 手繪</button>
+                <button class="btn-sm btn-clear" onclick="clearWhiteboard()">🧹 清除筆跡</button>
+                <button class="btn-sm btn-clear" onclick="clearAbsoluteLabels()">🗑️ 清除標籤</button>
+                <div style="display: flex; align-items: center; gap: 6px; margin-left: 10px;">
+                    <span style="font-size: 0.8rem; color: var(--text-secondary);">畫筆顏色:</span>
+                    <input type="color" id="brush-color" value="#ef4444" style="width: 28px; height: 28px; border: none; border-radius: 50%; cursor: pointer; background: transparent;" title="更換畫筆顏色">
                 </div>
-                <!-- 較年長者 track -->
-                <div style="margin-bottom: 12px;">
-                    <span class="track-label" id="track-label-elder">阿姨：</span>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <div class="track-dropzone" id="track-elder" ondragover="allowDrop(event)" ondragleave="event.currentTarget.classList.remove('dragover')" ondrop="handleDrop(event, 'elder')">
-                            <!-- 放置線段單元 -->
-                        </div>
-                        <button class="btn-sm btn-clear" onclick="clearTrack('elder')">🗑️ 清空</button>
-                    </div>
-                    <div id="label-elder" style="text-align: left; font-weight: bold; color: var(--primary); font-size: 0.9rem; margin-top: 4px; min-height: 1.2em;"></div>
-                    <!-- 差額標籤（步驟2：倍數；步驟3：倍數+歲數） -->
-                    <div id="label-diff" style="text-align: left; font-weight: bold; color: var(--error); font-size: 0.9rem; margin-top: 2px; min-height: 1.2em;"></div>
-                </div>
-                
-                <!-- 標示與回饋畫布上的浮動層 -->
-                <div id="segment-labels-area"></div>
             </div>
 
-            <!-- 可拖曳的段落來源區 -->
-            <div id="segment-source-area" class="source-area" style="margin-top: 20px;">
-                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 10px;">👇 請按住下方「工」字形線段，拖曳至上方兩人的框框中：</p>
-                <div class="draggable-segment" draggable="true" ondragstart="handleDragStart(event)" id="segment-template">
-                    <div class="segment-unit">
-                        <div class="segment-unit-line"></div>
+            <div class="tracks-container" id="whiteboard-container" style="position: relative; overflow: visible; min-height: 280px; border: 1px solid var(--border-glow); border-radius: 16px; padding: 15px;" ondragover="allowDrop(event)" ondragleave="event.currentTarget.classList.remove('dragover')" ondrop="handleCanvasDrop(event)">
+                <!-- HTML5 Canvas for drawing -->
+                <canvas id="whiteboard-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; border-radius: 16px;"></canvas>
+
+                <!-- 較年輕者 track (水平排列，畫布在右側) -->
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 25px; position: relative;">
+                    <span class="track-label" id="track-label-younger" style="min-width: 80px; font-weight: bold; text-align: right;">小萱：</span>
+                    <div class="track-dropzone" id="track-younger" ondragover="allowDrop(event)" ondragleave="event.currentTarget.classList.remove('dragover')" ondrop="handleDrop(event, 'younger')">
+                        <!-- 放置線段單元 -->
+                    </div>
+                    <button class="btn-sm btn-clear" onclick="clearTrack('younger')" style="position: relative; z-index: 10;">🗑️ 清除</button>
+                </div>
+                <!-- 較年長者 track (水平排列，畫布在右側) -->
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px; position: relative;">
+                    <span class="track-label" id="track-label-elder" style="min-width: 80px; font-weight: bold; text-align: right;">阿姨：</span>
+                    <div class="track-dropzone" id="track-elder" ondragover="allowDrop(event)" ondragleave="event.currentTarget.classList.remove('dragover')" ondrop="handleDrop(event, 'elder')">
+                        <!-- 放置線段單元 -->
+                    </div>
+                    <button class="btn-sm btn-clear" onclick="clearTrack('elder')" style="position: relative; z-index: 10;">🗑️ 清除</button>
+                </div>
+            </div>
+
+            <!-- 可拖曳的段落與標籤來源區 -->
+            <div id="segment-source-area" class="source-area" style="margin-top: 20px; align-items: flex-start; width: 100%;">
+                <p style="font-size: 0.95rem; color: var(--text-primary); margin-bottom: 12px; font-weight: bold;">👇 按住可以拉到上面：</p>
+                <div id="source-row" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap; width: 100%; background: rgba(255,255,255,0.4); padding: 12px; border-radius: 12px; border: 1px solid var(--border-glow);">
+                    <!-- 1. Segments Template -->
+                    <div class="draggable-segment" draggable="true" ondragstart="handleDragStart(event)" id="segment-template" style="padding: 6px 12px;">
+                        <div class="segment-unit">
+                            <div class="segment-unit-line"></div>
+                        </div>
+                    </div>
+                    <!-- Vertical Divider -->
+                    <div style="width: 1px; height: 35px; background: rgba(0,0,0,0.1); margin: 0 5px;"></div>
+                    <!-- 2. Draggable Labels Pool (sorted) -->
+                    <div id="label-chips-pool" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <!-- 動態生成標籤卡 -->
                     </div>
                 </div>
             </div>
             
-            <div id="segment-feedback" style="margin-top: 15px; text-align: center; font-weight: bold; min-height: 24px;"></div>
+            <div id="segment-feedback" style="margin-top: 10px; text-align: center; font-weight: bold; min-height: 20px;"></div>
         </div>
         <div class="modal-footer">
-            <button class="btn" id="btn-draw-done" onclick="finishDrawing()">畫完了！</button>
+            <button class="btn btn-secondary" onclick="closeSegmentModal()">關閉並回到答題區</button>
         </div>
     </div>
 </div>
@@ -1333,30 +1426,31 @@
     document.addEventListener('DOMContentLoaded', () => {
         const eqInput = document.getElementById('equation-input');
         if (eqInput) {
-            // 攔截鍵盤輸入，避免原生輸入與自動替換發生雙重插入 Bug
-            eqInput.addEventListener('keydown', (e) => {
-                if (e.key === '*' || e.key === 'x' || e.key === 'X' || e.key === '/') {
-                    e.preventDefault();
-                    const insertChar = (e.key === '/' ? '÷' : '×');
-                    const start = eqInput.selectionStart;
-                    const end = eqInput.selectionEnd;
-                    const text = eqInput.value;
-                    eqInput.value = text.substring(0, start) + insertChar + text.substring(end);
-                    eqInput.selectionStart = eqInput.selectionEnd = start + 1;
-                    // 手動觸發 input 事件以同步其他綁定的邏輯
-                    eqInput.dispatchEvent(new Event('input'));
+            eqInput.addEventListener('input', (e) => {
+                const target = e.target;
+                let val = target.value;
+                
+                // 檢查是否需要進行替換或過濾，避免無限迴圈
+                const replaced = val.replace(/\*/g, '×').replace(/x/gi, '×').replace(/\//g, '÷')
+                                    .replace(/[^0-9+\-×÷=()\s]/g, '');
+                
+                if (val !== replaced) {
+                    const start = target.selectionStart;
+                    const end = target.selectionEnd;
+                    const originalLen = val.length;
+                    
+                    setTimeout(() => {
+                        target.value = replaced;
+                        // 修正游標位置，避免跳到最尾端
+                        const lenDiff = replaced.length - originalLen;
+                        target.setSelectionRange(start + lenDiff, end + lenDiff);
+                    }, 0);
                 }
             });
-
-            eqInput.addEventListener('input', (e) => {
-                let val = e.target.value;
-                // 將 * 或 x 或 X 替換為 ×，/ 替換為 ÷
-                val = val.replace(/\*/g, '×').replace(/x/gi, '×').replace(/\//g, '÷');
-                // 過濾只允許數字、運算符、括號、等號、空格
-                val = val.replace(/[^0-9+\-×÷=()\s]/g, '');
-                e.target.value = val;
-            });
         }
+        
+        // 初始狀態選擇題型 1
+        selectType(1);
     });
 
     // --- 題型生成核心資料 ---
@@ -1395,14 +1489,21 @@
                      document.querySelector(`.scenario-card[onclick="selectType('${type}')"]`);
         if (card) card.classList.add('active');
         playSound('pop');
+
+        // 控制倍數選擇框的顯示
+        const ratioWrapper = document.getElementById('ratio-select-wrapper');
+        if (ratioWrapper) {
+            if (type === 1 || type === 2 || type === 3) {
+                ratioWrapper.style.display = 'block';
+            } else {
+                ratioWrapper.style.display = 'none';
+            }
+        }
     }
 
     // 生成題目邏輯與整數合理性確保
     function generateAgeProblem() {
         let type = selectedTypeKey;
-        if (type === 'random') {
-            type = Math.floor(Math.random() * 5) + 1;
-        }
         gameState.type = type;
 
         // 隨機選擇角色
@@ -1414,38 +1515,66 @@
 
         const min_D = chars.isAdultChild ? 18 : 2;
 
+        // 取得使用者設定的倍數
+        const userRatioSlider = document.getElementById('user-ratio-slider');
+        let chosenRatio = userRatioSlider ? parseInt(userRatioSlider.value) : 3;
+        if (!chars.isAdultChild) {
+            // 兄弟姊妹的倍數關係限制在最大 5 倍，防止年齡差距超過 18 歲
+            chosenRatio = Math.min(chosenRatio, 5);
+        }
+
         if (type === 1) {
             // 已知兩人倍數關係，問幾年前？
-            // R: 倍數, Y_target: 當時年輕人歲數, yearsAgo: 幾年前
-            ratio = [2, 3, 4, 5][Math.floor(Math.random() * 4)];
-            let min_Y = chars.isAdultChild ? Math.ceil(18 / (ratio - 1)) : 2;
-            let Y_target = Math.floor(Math.random() * 10) + min_Y;
-            years = Math.floor(Math.random() * 12) + 1; // 1 ~ 12 年前
-            youngerAge = Y_target + years;
-            let D = Y_target * (ratio - 1);
-            elderAge = youngerAge + D;
+            let attempt = 0;
+            let Y_target, D;
+            do {
+                ratio = chosenRatio;
+                let min_Y = chars.isAdultChild ? Math.ceil(18 / (ratio - 1)) : 2;
+                let max_Y = chars.isAdultChild ? 15 : Math.floor(18 / (ratio - 1));
+                if (max_Y < min_Y) max_Y = min_Y;
+                Y_target = Math.floor(Math.random() * (max_Y - min_Y + 1)) + min_Y;
+                years = Math.floor(Math.random() * 12) + 1; // 1 ~ 12 年前
+                youngerAge = Y_target + years;
+                D = Y_target * (ratio - 1);
+                elderAge = youngerAge + D;
+                attempt++;
+            } while (!chars.isAdultChild && D > 18 && attempt < 100);
             
             p = { elderAge, youngerAge, ratio, yearsAgo: years, ageDiff: D, targetYoungerAge: Y_target, targetElderAge: Y_target * ratio };
         } else if (type === 2) {
             // 已知兩人倍數關係，問幾年後？
-            ratio = [2, 3, 4, 5][Math.floor(Math.random() * 4)];
-            let min_Y = chars.isAdultChild ? Math.ceil(18 / (ratio - 1)) : 2;
-            let Y_target = Math.floor(Math.random() * 10) + min_Y + 2; 
-            youngerAge = Math.floor(Math.random() * (Y_target - min_Y)) + 1; 
-            years = Y_target - youngerAge;
-            let D = Y_target * (ratio - 1);
-            elderAge = youngerAge + D;
+            let attempt = 0;
+            let Y_target, D;
+            do {
+                ratio = chosenRatio;
+                let min_Y = chars.isAdultChild ? Math.ceil(18 / (ratio - 1)) : 2;
+                let max_Y = chars.isAdultChild ? 15 : Math.floor(18 / (ratio - 1));
+                if (max_Y < min_Y) max_Y = min_Y;
+                Y_target = Math.floor(Math.random() * (max_Y - min_Y + 1)) + min_Y + 2; 
+                youngerAge = Math.floor(Math.random() * (Y_target - min_Y)) + 1; 
+                years = Y_target - youngerAge;
+                D = Y_target * (ratio - 1);
+                elderAge = youngerAge + D;
+                attempt++;
+            } while (!chars.isAdultChild && D > 18 && attempt < 100);
             
             p = { elderAge, youngerAge, ratio, yearsAfter: years, ageDiff: D, targetYoungerAge: Y_target, targetElderAge: Y_target * ratio };
         } else if (type === 3) {
             // 已知兩人倍數關係，問幾歲？
-            ratio = [2, 3, 4, 5][Math.floor(Math.random() * 4)];
-            let min_Y = chars.isAdultChild ? Math.ceil(18 / (ratio - 1)) : 2;
-            let Y_target = Math.floor(Math.random() * 10) + min_Y + 2;
-            youngerAge = Math.floor(Math.random() * (Y_target - min_Y)) + 1; 
-            years = Y_target - youngerAge;
-            let D = Y_target * (ratio - 1);
-            elderAge = youngerAge + D;
+            let attempt = 0;
+            let Y_target, D;
+            do {
+                ratio = chosenRatio;
+                let min_Y = chars.isAdultChild ? Math.ceil(18 / (ratio - 1)) : 2;
+                let max_Y = chars.isAdultChild ? 15 : Math.floor(18 / (ratio - 1));
+                if (max_Y < min_Y) max_Y = min_Y;
+                Y_target = Math.floor(Math.random() * (max_Y - min_Y + 1)) + min_Y + 2;
+                youngerAge = Math.floor(Math.random() * (Y_target - min_Y)) + 1; 
+                years = Y_target - youngerAge;
+                D = Y_target * (ratio - 1);
+                elderAge = youngerAge + D;
+                attempt++;
+            } while (!chars.isAdultChild && D > 18 && attempt < 100);
             
             p = { elderAge, youngerAge, ratio, yearsAfter: years, ageDiff: D, targetYoungerAge: Y_target, targetElderAge: Y_target * ratio };
         } else if (type === 4) {
@@ -1506,9 +1635,9 @@
         if (type <= 3) {
             mainTitle.innerText = "📝 倍數分析解題步驟紀錄";
             document.getElementById('ledger-step-title-1').innerText = "步驟 1 / 4 💭";
-            document.getElementById('ledger-step-title-2').innerText = "步驟 2 / 4 ⚖️ 計算目標狀態的倍數差";
-            document.getElementById('ledger-step-title-3').innerText = "步驟 3 / 4 🔄 計算該時間點年輕者的歲數";
-            document.getElementById('ledger-step-title-4').innerText = type === 3 ? "步驟 4 / 4 💡 計算相隔的年份作為答案" : "步驟 4 / 4 💡 算出相隔的年份作為答案";
+            document.getElementById('ledger-step-title-2').innerText = "步驟 2 / 4 ⚖️";
+            document.getElementById('ledger-step-title-3').innerText = "步驟 3 / 4 🔄";
+            document.getElementById('ledger-step-title-4').innerText = "步驟 4 / 4 💡";
         } else {
             mainTitle.innerText = "📝 年齡和分析解題步驟紀錄";
             document.getElementById('ledger-step-title-1').innerText = "步驟 1 / 4 💭";
@@ -1614,9 +1743,13 @@
             if (step === 1) {
                 instruction = `不論過幾年，兩人的「年齡差」都永遠不變。請算出 ${chars.elder} 和 ${chars.younger} 的年齡差。`;
             } else if (step === 2) {
-                instruction = `請畫出線段圖，觀察 ${chars.elder} 和 ${chars.younger} 差了幾倍？`;
+                instruction = `${chars.elder}的年齡是${chars.younger}的${p.ratio}倍，要怎麼畫成線段圖？他們相差幾倍？`;
             } else if (step === 3) {
-                instruction = `兩人的年齡差是 ${p.ageDiff} 歲，也是 ${chars.younger} 的 ${p.ratio - 1} 倍，那當時 ${chars.younger} 是幾歲？`;
+                if (p.ratio === 2) {
+                    instruction = `兩人的年齡差是 ${p.ageDiff} 歲，也是 ${chars.younger} 的 1 倍，那當時 ${chars.younger} 是幾歲？（本步驟直接輸入年齡即可）`;
+                } else {
+                    instruction = `兩人的年齡差是 ${p.ageDiff} 歲，也是 ${chars.younger} 的 ${p.ratio - 1} 倍，那當時 ${chars.younger} 是幾歲？`;
+                }
             } else if (step === 4) {
                 if (type === 1) {
                     instruction = `今年 ${chars.younger} 是 ${p.youngerAge} 歲，當時是 ${p.targetYoungerAge} 歲，這是「幾年前」？`;
@@ -1637,17 +1770,37 @@
                 instruction = `年齡總和共差 ${Math.abs(p.targetSum - p.currentSum)} 歲，每年兩人合計增減 2 歲，總共相隔幾年？`;
             }
         }
-
         document.getElementById('console-instruction').innerText = instruction;
-        document.getElementById('console-instruction').style.display = gameState.failedAttempts >= 1 ? 'block' : 'none';
+        
+        // 動態調整算式輸入框標籤與 Placeholder (2倍第3步)
+        const eqLabel = document.querySelector('label[for="equation-input"]');
+        const eqInput = document.getElementById('equation-input');
+        if (eqLabel && eqInput) {
+            if (type <= 3 && step === 3 && p.ratio === 2) {
+                eqLabel.innerText = "👉 請寫下此步驟的年齡：";
+                eqInput.placeholder = "請直接輸入年齡數字";
+            } else {
+                eqLabel.innerText = "👉 寫下此步驟的算式：";
+                eqInput.placeholder = "請輸入完整的算式";
+            }
+        }
+        
+        // 每次更新步驟時，重設按鈕文字為「查看提示」
+        const hintBtn = document.getElementById('btn-show-hint');
+        if (hintBtn) {
+            hintBtn.innerText = "查看提示";
+        }
         
         clearActiveInputs();
         hideFeedback();
         
         if (gameState.failedAttempts >= 1) {
+            document.getElementById('console-instruction').style.display = 'block';
             showWordChips();
         } else {
+            document.getElementById('console-instruction').style.display = 'none';
             hideWordChips();
+            document.getElementById('chips-pool-el').innerHTML = "";
         }
     }
 
@@ -1663,6 +1816,17 @@
         
         if (type <= 3 && (step === 2 || step === 3)) {
             openSegmentModal();
+            // 第一次點擊後將按鈕字樣修改為 ｢查看線段圖｣
+            const hintBtn = document.getElementById('btn-show-hint');
+            if (hintBtn) {
+                hintBtn.innerText = "查看線段圖";
+            }
+            // 一併顯示拼圖提示與步驟說明文字
+            showWordChips();
+            const instructionEl = document.getElementById('console-instruction');
+            instructionEl.style.display = 'block';
+            let textToSpeak = instructionEl.innerText || "";
+            speakText(textToSpeak);
             return;
         }
 
@@ -1760,32 +1924,36 @@
         if (type <= 3) {
             // 倍數題型拼圖
             if (step === 1) {
-                chips = [`${chars.elder}${p.elderAge}歲`, `減掉${chars.younger}${p.youngerAge}歲`, `兩人相差${p.ageDiff}歲`];
+                chips = [`${chars.elder}${p.elderAge}歲，`, `減掉${chars.younger}${p.youngerAge}歲，`, `兩人相差${p.ageDiff}歲。`];
             } else if (step === 2) {
                 chips = [`${chars.elder}${p.ratio}段，`, `減掉${chars.younger}1段，`, `兩人差了${p.ratio - 1}段。`];
             } else if (step === 3) {
-                chips = [`兩人差${p.ageDiff}歲，`, `平分成${p.ratio - 1}段，`, `一段是${p.targetYoungerAge}歲，`, `也就是${chars.younger}的年齡。`];
+                if (p.ratio === 2) {
+                    chips = [`${chars.younger}的1倍是${p.targetYoungerAge}歲，`, `所以${chars.younger}就是${p.targetYoungerAge}歲。`];
+                } else {
+                    chips = [`兩人差${p.ageDiff}歲，`, `平分成${p.ratio - 1}段，`, `一段是${p.targetYoungerAge}歲，`, `也就是${chars.younger}的年齡。`];
+                }
             } else if (step === 4) {
                 if (type === 1) {
-                    chips = [`今年${chars.younger}${p.youngerAge}歲`, `減掉當時${p.targetYoungerAge}歲`, `所以經過了${p.yearsAgo}年`];
+                    chips = [`今年${chars.younger}${p.youngerAge}歲，`, `減掉當時${p.targetYoungerAge}歲，`, `所以經過了${p.yearsAgo}年。`];
                 } else {
-                    chips = [`當時${p.targetYoungerAge}歲`, `減掉今年${chars.younger}${p.youngerAge}歲`, `所以相隔了${p.yearsAfter}年`];
+                    chips = [`當時${p.targetYoungerAge}歲，`, `減掉今年${chars.younger}${p.youngerAge}歲，`, `所以相隔了${p.yearsAfter}年。`];
                 }
             }
         } else {
             // 年齡和題型拼圖
             if (step === 1) {
-                chips = [`今年${chars.elder}${p.elderAge}歲`, `加上${chars.younger}${p.youngerAge}歲`, `今年年齡和是${p.currentSum}歲`];
+                chips = [`今年${chars.elder}${p.elderAge}歲，`, `加上${chars.younger}${p.youngerAge}歲，`, `今年年齡和是${p.currentSum}歲。`];
             } else if (step === 2) {
-                chips = [`目標年齡和${p.targetSum}歲`, `與今年年齡和${p.currentSum}歲`, `相差${Math.abs(p.targetSum - p.currentSum)}歲`];
+                chips = [`目標年齡和${p.targetSum}歲，`, `與今年年齡和${p.currentSum}歲，`, `相差${Math.abs(p.targetSum - p.currentSum)}歲。`];
             } else if (step === 3) {
-                chips = [`因為每年每人長1歲`, `所以兩人每年`, `共增減2歲`];
+                chips = [`因為每年每人長1歲，`, `所以兩人每年，`, `共增減2歲。`];
             } else if (step === 4) {
                 const term = type === 4 ? "後" : "前";
                 if (type === 4) {
-                    chips = [`年齡和相差${Math.abs(p.targetSum - p.currentSum)}歲`, `每年增加2歲`, `所以經過了${p.yearsAfter}年`];
+                    chips = [`年齡和相差${Math.abs(p.targetSum - p.currentSum)}歲，`, `每年增加2歲，`, `所以經過了${p.yearsAfter}年。`];
                 } else {
-                    chips = [`年齡和相差${Math.abs(p.targetSum - p.currentSum)}歲`, `每年減少2歲`, `所以是${p.yearsAgo}年前`];
+                    chips = [`年齡和相差${Math.abs(p.targetSum - p.currentSum)}歲，`, `每年減少2歲，`, `所以是${p.yearsAgo}年前。`];
                 }
             }
         }
@@ -1813,6 +1981,26 @@
 
     // --- 語意與算式驗證器 ---
     function validateStepAnswer(eqInput, meaningInput) {
+        const type = gameState.type;
+        const p = gameState.param;
+        const chars = gameState.chars;
+        const step = gameState.currentStep;
+        const text = meaningInput.trim();
+
+        // 1. 如果是 2 倍且為步驟 3，只要求輸入年齡數值，不作等式算式解析
+        if (type <= 3 && step === 3 && p.ratio === 2) {
+            const inputVal = parseInt(eqInput.trim());
+            if (isNaN(inputVal) || inputVal !== p.targetYoungerAge) {
+                return { valid: false, reason: `年齡輸入錯誤喔！這步可以直接寫出當時的年齡：${p.targetYoungerAge}` };
+            }
+            const hasYounger = new RegExp(chars.younger).test(text);
+            const hasAge = /歲|是/.test(text);
+            if (!hasYounger || !hasAge) {
+                return { valid: false, reason: `引導：請在解釋中說明此數字代表「${chars.younger}」就是 ${p.targetYoungerAge} 歲喔！` };
+            }
+            return { valid: true, normalizedEq: `${p.targetYoungerAge}`, meaningDesc: `當時${chars.younger}是 ${p.targetYoungerAge} 歲` };
+        }
+
         const parsed = parseEquation(eqInput);
         if (!parsed) {
             return { valid: false, reason: "算式格式有誤（例如必須包含 '='，且等號兩邊的值要相等，乘法用 ×，除法用 ÷ 喔！）" };
@@ -1979,6 +2167,18 @@
         if (step < 4) {
             gameState.currentStep++;
             gameState.failedAttempts = 0;
+            gameState.segmentsDrawn = false;
+            clearAbsoluteLabels();
+            clearWhiteboard();
+            closeSegmentModal();
+            
+            // 強制隱藏提示說明與字詞卡，確保新步驟預設收起提示
+            document.getElementById('console-instruction').style.display = 'none';
+            if (document.getElementById('word-chips')) {
+                document.getElementById('word-chips').style.display = 'none';
+            }
+            const pool = document.getElementById('chips-pool-el');
+            if (pool) pool.innerHTML = "";
             
             const nextLedgerEl = document.getElementById(`ledger-step-${gameState.currentStep}`);
             nextLedgerEl.className = "ledger-step active";
@@ -2079,61 +2279,51 @@
         
         document.getElementById('track-label-younger').innerText = `${chars.younger}：`;
         document.getElementById('track-label-elder').innerText = `${chars.elder}：`;
-        // 清空倍數標示
-        document.getElementById('label-younger').innerText = '';
-        document.getElementById('label-elder').innerText = '';
-        document.getElementById('label-diff').innerText = '';
         
         const instructionText = document.getElementById('segment-instruction-text');
-        const btnDone = document.getElementById('btn-draw-done');
-        const sourceArea = document.getElementById('segment-source-area');
+        const labelsPool = document.getElementById('label-chips-pool');
+        labelsPool.innerHTML = "";
         
         if (step === 2) {
-            btnDone.style.display = 'block';
-            sourceArea.style.display = 'block';
-            // 清空舊的作答，重新讓學生畫
-            if (!gameState.segmentsDrawn) {
-                document.getElementById('track-younger').innerHTML = "";
-                document.getElementById('track-elder').innerHTML = "";
-                document.getElementById('label-younger').innerText = '';
-                document.getElementById('label-elder').innerText = '';
-                document.getElementById('label-diff').innerText = '';
-            }
-            instructionText.innerText = `【請拼出線段圖】請拖曳，為 ${chars.younger} 拼出 1 段線段，為 ${chars.elder} 拼出 ${p.ratio} 段線段，然後點選「畫完了！」。`;
+            instructionText.innerText = `${chars.elder}的年齡是${chars.younger}的${p.ratio}倍，要怎麼畫成線段圖？他們相差幾倍？`;
+            
+            // 幾倍依照數字大小排序排列
+            const rawLabels = ["1倍", `${p.ratio}倍`, `${p.ratio - 1}倍`];
+            const uniqueLabels = [...new Set(rawLabels)];
+            uniqueLabels.sort((a, b) => parseInt(a) - parseInt(b));
+            
+            uniqueLabels.forEach(lbl => {
+                const chip = document.createElement('div');
+                chip.className = 'draggable-label-chip';
+                chip.draggable = true;
+                chip.innerText = lbl;
+                chip.ondragstart = (e) => handleLabelDragStart(e, lbl);
+                labelsPool.appendChild(chip);
+            });
             document.getElementById('segment-feedback').innerText = "";
         } else if (step === 3) {
-            btnDone.style.display = 'none';
-            sourceArea.style.display = 'none';
-            // 強制畫出正確線段
-            const youngerZone = document.getElementById('track-younger');
-            const elderZone = document.getElementById('track-elder');
-            youngerZone.innerHTML = "";
-            elderZone.innerHTML = "";
+            instructionText.innerText = `兩人的年齡差是${p.ageDiff}歲，對應到相差的${p.ratio - 1}倍，請在線段圖標示出來。`;
             
-            // Younger 1 segment
-            const uY = document.createElement('div');
-            uY.className = 'segment-unit';
-            uY.innerHTML = '<div class="segment-unit-line"></div>';
-            youngerZone.appendChild(uY);
+            // 排序歲數與倍數標籤
+            const rawLabels = [`${p.ratio - 1}倍`, `${p.ageDiff}歲`];
+            rawLabels.sort((a, b) => parseInt(a) - parseInt(b));
             
-            // Elder R segments
-            for (let i = 0; i < p.ratio; i++) {
-                const uE = document.createElement('div');
-                uE.className = 'segment-unit';
-                uE.innerHTML = '<div class="segment-unit-line"></div>';
-                elderZone.appendChild(uE);
-            }
-            
-            gameState.segmentsDrawn = true;
-            instructionText.innerText = `【線段圖提示】觀察下圖，年齡差 ${p.ageDiff} 歲，就是 ${chars.younger} 的 ${p.ratio - 1} 倍。`;
+            rawLabels.forEach(lbl => {
+                const chip = document.createElement('div');
+                chip.className = 'draggable-label-chip';
+                chip.draggable = true;
+                chip.innerText = lbl;
+                chip.ondragstart = (e) => handleLabelDragStart(e, lbl);
+                labelsPool.appendChild(chip);
+            });
             document.getElementById('segment-feedback').innerText = "";
-            document.getElementById('label-younger').innerText = '';
-            document.getElementById('label-elder').innerText = '';
-            document.getElementById('label-diff').innerText = '';
         }
         
         // 稍微延遲讓 DOM 渲染後定位 markup
-        setTimeout(updateSegmentMarkups, 100);
+        setTimeout(() => {
+            updateSegmentMarkups();
+            initWhiteboard();
+        }, 150);
     }
     
     function closeSegmentModal() {
@@ -2141,7 +2331,7 @@
     }
     
     function addSegmentToTrack(track) {
-        if (gameState.currentStep !== 2) return;
+        if (gameState.currentStep !== 2 && gameState.currentStep !== 3) return;
         const zone = document.getElementById(`track-${track}`);
         
         const unit = document.createElement('div');
@@ -2149,7 +2339,7 @@
         unit.innerHTML = '<div class="segment-unit-line"></div>';
         
         unit.onclick = () => {
-            if (gameState.currentStep === 2) {
+            if (gameState.currentStep === 2 || gameState.currentStep === 3) {
                 unit.remove();
                 playSound('pop');
                 updateSegmentMarkups();
@@ -2162,15 +2352,188 @@
     }
     
     function clearTrack(track) {
-        if (gameState.currentStep !== 2) return;
-        document.getElementById(`track-${track}`).innerHTML = "";
+        if (gameState.currentStep !== 2 && gameState.currentStep !== 3) return;
+        const trackEl = document.getElementById(`track-${track}`);
+        if (!trackEl) return;
+        
+        // 1. 清除軌道上的線段
+        trackEl.innerHTML = "";
+        
+        // 2. 計算該列與其下方標籤的垂直邊界範圍
+        const container = document.getElementById('whiteboard-container');
+        const rect = trackEl.getBoundingClientRect();
+        const cRect = container.getBoundingClientRect();
+        const topBound = rect.top - cRect.top - 15;
+        const bottomBound = rect.bottom - cRect.top + 45; // 包含軌道下方拖曳的標籤
+        
+        // 3. 一併清除高度落在此區域內的絕對定位標籤
+        const labels = document.querySelectorAll('.absolute-label');
+        labels.forEach(lbl => {
+            const topVal = parseFloat(lbl.style.top);
+            if (!isNaN(topVal) && topVal >= topBound && topVal <= bottomBound) {
+                lbl.remove();
+            }
+        });
+        
+        // 4. 一併清除此高度區間內的 canvas 白板筆跡
+        const canvas = document.getElementById('whiteboard-canvas');
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, topBound, canvas.width, bottomBound - topBound);
+        }
+        
         playSound('pop');
         updateSegmentMarkups();
     }
     
+    let canvasMode = 'drag'; // 'drag' or 'draw'
+    let draggedLabelElement = null;
+
+    function setCanvasMode(mode) {
+        canvasMode = mode;
+        const btnDrag = document.getElementById('btn-mode-drag');
+        const btnDraw = document.getElementById('btn-mode-draw');
+        const canvas = document.getElementById('whiteboard-canvas');
+        
+        if (mode === 'drag') {
+            btnDrag.style.background = 'var(--primary)';
+            btnDraw.style.background = 'var(--text-secondary)';
+            canvas.style.pointerEvents = 'none';
+        } else {
+            btnDrag.style.background = 'var(--text-secondary)';
+            btnDraw.style.background = 'var(--primary)';
+            canvas.style.pointerEvents = 'auto';
+        }
+    }
+
+    function initWhiteboard() {
+        const canvas = document.getElementById('whiteboard-canvas');
+        const container = document.getElementById('whiteboard-container');
+        if (!canvas || !container) return;
+
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = document.getElementById('brush-color').value;
+        
+        let drawing = false;
+        
+        canvas.onmousedown = (e) => {
+            if (canvasMode !== 'draw') return;
+            drawing = true;
+            ctx.beginPath();
+            ctx.moveTo(e.offsetX, e.offsetY);
+        };
+        
+        canvas.onmousemove = (e) => {
+            if (canvasMode !== 'draw' || !drawing) return;
+            ctx.lineTo(e.offsetX, e.offsetY);
+            ctx.stroke();
+        };
+        
+        canvas.onmouseup = () => { drawing = false; };
+        canvas.onmouseleave = () => { drawing = false; };
+        
+        // Touch support
+        canvas.ontouchstart = (e) => {
+            if (canvasMode !== 'draw') return;
+            drawing = true;
+            ctx.beginPath();
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
+            e.preventDefault();
+        };
+        
+        canvas.ontouchmove = (e) => {
+            if (canvasMode !== 'draw' || !drawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
+            ctx.stroke();
+            e.preventDefault();
+        };
+        
+        canvas.ontouchend = () => { drawing = false; };
+
+        document.getElementById('brush-color').onchange = (e) => {
+            ctx.strokeStyle = e.target.value;
+        };
+    }
+
+    function clearWhiteboard() {
+        const canvas = document.getElementById('whiteboard-canvas');
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    }
+
+    // Drag/Drop API Support for Labels
+    function handleLabelDragStart(e, labelText) {
+        if (gameState.currentStep !== 2 && gameState.currentStep !== 3) {
+            e.preventDefault();
+            return;
+        }
+        e.dataTransfer.setData('text/plain', 'label:' + labelText);
+    }
+    
+    function handleCanvasDrop(e) {
+        e.preventDefault();
+        const container = document.getElementById('whiteboard-container');
+        container.classList.remove('dragover');
+        
+        const data = e.dataTransfer.getData('text/plain');
+        const rect = container.getBoundingClientRect();
+        
+        // 使用滑鼠放開的精準位置（減去半寬與半高以實現對中）
+        const x = e.clientX - rect.left - 40;
+        const y = e.clientY - rect.top - 18;
+        
+        if (data === 'moved-label' && draggedLabelElement) {
+            draggedLabelElement.style.left = x + 'px';
+            draggedLabelElement.style.top = y + 'px';
+            draggedLabelElement = null;
+            playSound('pop');
+        } else if (data.startsWith('label:')) {
+            const labelText = data.substring(6);
+            createAbsoluteLabel(labelText, x, y);
+        }
+    }
+    
+    function createAbsoluteLabel(labelText, x, y) {
+        const container = document.getElementById('whiteboard-container');
+        const chip = document.createElement('div');
+        chip.className = 'dropped-label-chip absolute-label';
+        chip.style.left = x + 'px';
+        chip.style.top = y + 'px';
+        chip.style.zIndex = '10';
+        chip.draggable = true;
+        
+        // 標籤本身不帶 x 關閉按鈕，改由上排按鈕統一清除
+        chip.innerText = labelText;
+        
+        chip.ondragstart = (e) => {
+            draggedLabelElement = chip;
+            e.dataTransfer.setData('text/plain', 'moved-label');
+        };
+        
+        container.appendChild(chip);
+        playSound('pop');
+    }
+    
+    function clearAbsoluteLabels() {
+        const labels = document.querySelectorAll('.absolute-label');
+        labels.forEach(lbl => lbl.remove());
+    }
+
     // Drag/Drop API Support
     function handleDragStart(e) {
-        if (gameState.currentStep !== 2) {
+        if (gameState.currentStep !== 2 && gameState.currentStep !== 3) {
             e.preventDefault();
             return;
         }
@@ -2185,101 +2548,19 @@
     function handleDrop(e, track) {
         e.preventDefault();
         e.currentTarget.classList.remove('dragover');
-        if (gameState.currentStep !== 2) return;
-        addSegmentToTrack(track);
-    }
-    
-    function finishDrawing() {
-        const youngerCount = document.getElementById('track-younger').children.length;
-        const elderCount = document.getElementById('track-elder').children.length;
+        if (gameState.currentStep !== 2 && gameState.currentStep !== 3) return;
         
-        const p = gameState.param;
-        const chars = gameState.chars;
-        const fb = document.getElementById('segment-feedback');
-        
-        if (youngerCount === 1 && elderCount === p.ratio) {
-            gameState.segmentsDrawn = true;
-            playSound('correct');
-            fb.style.color = 'var(--success)';
-            fb.innerText = `🎉 畫得完全正確！`;
-            
-            // 在線段下方顯示倍數標示，置中對齊線段
-            const youngerZone = document.getElementById('track-younger');
-            const elderZone = document.getElementById('track-elder');
-            
-            const labelY = document.getElementById('label-younger');
-            const labelE = document.getElementById('label-elder');
-            const labelD = document.getElementById('label-diff');
-
-            // 計算倍數標示置中偏移
-            const yWidth = youngerZone.scrollWidth;
-            const eWidth = elderZone.scrollWidth;
-            const unitWidth = 70; // approximate each segment width
-
-            labelY.style.textAlign = 'left';
-            labelY.style.paddingLeft = `${Math.max(0, (yWidth / 2) - 12)}px`;
-            labelY.innerText = '1倍';
-
-            labelE.style.textAlign = 'left';
-            labelE.style.paddingLeft = `${Math.max(0, (eWidth / 2) - 18)}px`;
-            labelE.innerText = `${p.ratio}倍`;
-
-            // 差額標示（從第2段到最後，置中在多出來的段落）
-            const diffStart = unitWidth; // skip first segment
-            const diffWidth = (p.ratio - 1) * unitWidth;
-            labelD.style.paddingLeft = `${Math.max(0, diffStart + (diffWidth / 2) - 18)}px`;
-            labelD.style.textAlign = 'left';
-            labelD.innerText = `${p.ratio - 1}倍`;
-            
-            setTimeout(() => {
-                alert(`畫對囉！\n\n現在請觀察：${chars.elder}（${p.ratio}倍）比 ${chars.younger}（1倍）多出了幾段（幾倍）？\n\n關閉視窗後，請在算式欄輸入相差的倍數（例如：${p.ratio} - 1 = ${p.ratio - 1}）。`);
-                closeSegmentModal();
-                showWordChips();
-            }, 800);
-        } else {
-            playSound('wrong');
-            fb.style.color = 'var(--error)';
-            fb.innerText = `❌ 段數不對喔！${chars.younger} 應該是 1 段，${chars.elder} 應該是 ${p.ratio} 段。目前拼了：${chars.younger} ${youngerCount}段，${chars.elder} ${elderCount}段。`;
+        const data = e.dataTransfer.getData('text/plain');
+        if (data === 'segment') {
+            addSegmentToTrack(track);
+        } else if (data.startsWith('label:') || data === 'moved-label') {
+            // 轉導給 canvas 進行精準絕對定位
+            handleCanvasDrop(e);
         }
     }
     
     function updateSegmentMarkups() {
-        // 步驟 3：用 CSS 標籤顯示差額的倍數與歲數，置中對齊差額那幾段
-        const step = gameState.currentStep;
-        if (step !== 3) return;
-        if (!gameState.segmentsDrawn) return;
-
-        const p = gameState.param;
-        const elderZone = document.getElementById('track-elder');
-        const labelD = document.getElementById('label-diff');
-
-        // 重置並計算差額標籤位置
-        const unitWidth = 70; // px per segment unit (approx)
-        const diffStart = unitWidth;
-        const diffWidth = (p.ratio - 1) * unitWidth;
-        const centerOffset = diffStart + (diffWidth / 2);
-
-        // 清除舊的差額標示，改用兩行
-        labelD.innerHTML = '';
-
-        // 上方：歲數（紅色），下方：倍數（主色）
-        const ageSpan = document.createElement('span');
-        ageSpan.style.color = 'var(--error)';
-        ageSpan.style.display = 'block';
-        ageSpan.style.textAlign = 'left';
-        ageSpan.style.paddingLeft = `${Math.max(0, centerOffset - 18)}px`;
-        ageSpan.innerText = `${p.ageDiff}歲`;
-
-        const ratioSpan = document.createElement('span');
-        ratioSpan.style.color = 'var(--primary)';
-        ratioSpan.style.display = 'block';
-        ratioSpan.style.textAlign = 'left';
-        ratioSpan.style.paddingLeft = `${Math.max(0, centerOffset - 18)}px`;
-        ratioSpan.innerText = `${p.ratio - 1}倍`;
-
-        // 上面放歲數，下面放倍數
-        labelD.appendChild(ageSpan);
-        labelD.appendChild(ratioSpan);
+        // 空函數：現已改由學生自主拖曳標籤，無須系統自動標示圖層
     }
 
 </script>
