@@ -1005,13 +1005,13 @@
     // Firebase 連線設定 (HighGrade 專案)
     // ==========================================
     const firebaseConfig = {
-      apiKey: "AIzaSyCFNaVRETt862_As1hF7Mfyr22pKM5-lvk",
+      apiKey: "AIzaSyCFNaVRETt062_As1hF7Mfyr22pKMG-lvk",
       authDomain: "chickenrabbit-ea442.firebaseapp.com",
       databaseURL: "https://chickenrabbit-ea442-default-rtdb.firebaseio.com",
       projectId: "chickenrabbit-ea442",
-      storageBucket: "chickenrabbit-ea442.appspot.com",
+      storageBucket: "chickenrabbit-ea442.firebasestorage.app",
       messagingSenderId: "65728951973",
-      appId: "1:65728951973:web:efff912caf5f6f185abf4c"
+      appId: "1:65728951973:web:eb52738ca86ed7175abf4c"
     };
 
     let database = null;
@@ -2065,20 +2065,35 @@
     function saveScoreToLeaderboard() {
       try {
         if (isFirebaseActive) {
-          database.ref('GCD/leaderboard').push({
-            name: studentName,
-            score: sessionTotalScore,
-            timestamp: firebase.database.ServerValue.TIMESTAMP
+          database.ref('GCD/leaderboard').orderByChild('score').limitToLast(10).once('value', snapshot => {
+            let list = [];
+            snapshot.forEach(child => {
+              list.push(child.val().score);
+            });
+            // 若榜單不足10筆，或是目前分數高於或等於榜單中的最低分，則寫入 Firebase 榜單
+            let isTop10 = list.length < 10 || sessionTotalScore >= Math.min(...list);
+            if (isTop10) {
+              database.ref('GCD/leaderboard').push({
+                name: studentName,
+                score: sessionTotalScore,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+              });
+            }
           });
         } else {
           let localLeaderboard = JSON.parse(localStorage.getItem('GCD_leaderboard') || '[]');
-          localLeaderboard.push({
-            name: studentName,
-            score: sessionTotalScore,
-            timestamp: Date.now()
-          });
-          localLeaderboard.sort((a, b) => b.score - a.score);
-          localStorage.setItem('GCD_leaderboard', JSON.stringify(localLeaderboard.slice(0, 15)));
+          let scores = localLeaderboard.map(item => item.score);
+          // 本機排行若不足10筆，或目前分數高於等於本機最低分
+          let isTop10 = scores.length < 10 || sessionTotalScore >= (scores.length > 0 ? Math.min(...scores) : 0);
+          if (isTop10) {
+            localLeaderboard.push({
+              name: studentName,
+              score: sessionTotalScore,
+              timestamp: Date.now()
+            });
+            localLeaderboard.sort((a, b) => b.score - a.score);
+            localStorage.setItem('GCD_leaderboard', JSON.stringify(localLeaderboard.slice(0, 10)));
+          }
         }
       } catch (e) {
         console.error("Firebase leaderboard save error: ", e);
