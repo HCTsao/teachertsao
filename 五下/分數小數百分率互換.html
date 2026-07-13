@@ -372,9 +372,9 @@
         // --- Math Data ---
         const mathData = [
             // 1/2 系列
-            { val: 0.5, frac: "1/2", dec: "0.5", perc: "50%", isAdvanced: false },
+            { val: 0.5, frac: "1/2", dec: "0.5", perc: "50%", isAdvanced: false, lurePartner: "9/24" },
             // 1/4 系列
-            { val: 0.25, frac: "1/4", dec: "0.25", perc: "25%", isAdvanced: false },
+            { val: 0.25, frac: "1/4", dec: "0.25", perc: "25%", isAdvanced: false, lurePartner: "8/24" },
             { val: 0.75, frac: "3/4", dec: "0.75", perc: "75%", isAdvanced: false },
             // 1/5 系列
             { val: 0.2, frac: "1/5", dec: "0.2", perc: "20%", isAdvanced: false },
@@ -383,7 +383,7 @@
             { val: 0.8, frac: "4/5", dec: "0.8", perc: "80%", isAdvanced: false },
             // 1/8 系列
             { val: 0.125, frac: "1/8", dec: "0.125", perc: "12.5%", isAdvanced: false },
-            { val: 0.375, frac: "3/8", dec: "0.375", perc: "37.5%", isAdvanced: false },
+            { val: 0.375, frac: "3/8", dec: "0.375", perc: "37.5%", isAdvanced: false, lurePartner: "12/40" },
             { val: 0.625, frac: "5/8", dec: "0.625", perc: "62.5%", isAdvanced: false },
             { val: 0.875, frac: "7/8", dec: "0.875", perc: "87.5%", isAdvanced: false },
             // 1/10 系列
@@ -426,7 +426,15 @@
             { val: 0.32, frac: "8/25", dec: "0.32", perc: "32%", isAdvanced: true },
             { val: 0.36, frac: "9/25", dec: "0.36", perc: "36%", isAdvanced: true },
             { val: 0.44, frac: "11/25", dec: "0.44", perc: "44%", isAdvanced: true },
-            { val: 0.48, frac: "12/25", dec: "0.48", perc: "48%", isAdvanced: true }
+            { val: 0.48, frac: "12/25", dec: "0.48", perc: "48%", isAdvanced: true },
+
+            // ⚠️ 學生易錯/未約分題組 (約分誘答題)
+            { val: 0.375, frac: "12/32", dec: "0.375", perc: "37.5%", isAdvanced: true, lurePartner: "1/3" },
+            { val: 0.333, frac: "1/3", dec: "0.33", perc: "33.3%", isAdvanced: true, lurePartner: "12/32" },
+            { val: 0.333, frac: "8/24", dec: "0.33", perc: "33.3%", isAdvanced: true, lurePartner: "1/4" },
+            { val: 0.333, frac: "6/18", dec: "0.33", perc: "33.3%", isAdvanced: true, lurePartner: "1/4" },
+            { val: 0.3, frac: "12/40", dec: "0.3", perc: "30%", isAdvanced: true, lurePartner: "3/8" },
+            { val: 0.375, frac: "9/24", dec: "0.375", perc: "37.5%", isAdvanced: true, lurePartner: "1/2" }
         ];
 
         // --- State Variables ---
@@ -630,8 +638,27 @@
                 }
             }
 
-            // Shuffle eligible data and pick required number of pairs
-            const selectedItems = [...eligibleData].sort(() => 0.5 - Math.random()).slice(0, numPairs);
+            // Shuffle eligible data and pick required number of pairs with lure partners
+            let shuffled = [...eligibleData].sort(() => 0.5 - Math.random());
+            let selectedItems = [];
+            
+            for (let i = 0; i < shuffled.length; i++) {
+                if (selectedItems.length >= numPairs) break;
+                const item = shuffled[i];
+                if (selectedItems.includes(item)) continue;
+                
+                selectedItems.push(item);
+                
+                // If this item has a lure partner, try to select it as well to set up the distractor on board
+                if (item.lurePartner && selectedItems.length < numPairs) {
+                    const partner = eligibleData.find(x => x.frac === item.lurePartner);
+                    if (partner && !selectedItems.includes(partner)) {
+                        selectedItems.push(partner);
+                    }
+                }
+            }
+            // Ensure exact count
+            selectedItems = selectedItems.slice(0, numPairs);
 
             let deckTop = [];
             let deckBottom = [];
