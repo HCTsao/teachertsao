@@ -502,7 +502,7 @@
                 <option value="日月潭纜車">🚠 日月潭纜車</option>
                 <option value="文具購買">✏️ 文具購買</option>
                 <option value="茶葉買賣">🍵 茶葉買賣</option>
-                <option value="存錢筒整理">🪙 存錢筒整理</option>
+                <option value="存錢筒整理">🐷 存錢筒整理</option>
                 <option value="車輛統計">🚗 車輛統計</option>
                 <option value="農場點點名">🐔 農場點點名</option>
                 <option value="球類採購">🏀 球類採購</option>
@@ -586,6 +586,7 @@
         let isFirebaseActive = false;
         let db = null;
         let allRecords = {}; // 快取所有紀錄
+        let allTeachers = {}; // 快取所有開課老師
 
         if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "請在此填入您的ApiKey") {
             try {
@@ -623,10 +624,19 @@
             document.getElementById('scenario-filter').addEventListener('change', renderTable);
         };
 
-        // 監聽 Realtime Database 變化
+        // 即時監聽資料庫變更
         function listenToRecords() {
+            if (!isFirebaseActive) return;
+
             document.getElementById('loading-el').style.display = 'flex';
-            
+
+            // 監聽開課教師清單
+            db.ref('teachers').on('value', (snapshot) => {
+                allTeachers = snapshot.val() || {};
+                renderTable(); // 教師清單更新時重新渲染
+            });
+
+            // 監聽學生紀錄
             db.ref('records').on('value', (snapshot) => {
                 allRecords = snapshot.val() || {};
                 document.getElementById('loading-el').style.display = 'none';
@@ -838,34 +848,46 @@
         let groupedSessions = [];
 
         function groupRecordsIntoSessions(recordsArray) {
-            if (!recordsArray || recordsArray.length === 0) return [];
-            
             const sessionsMap = {};
             
-            recordsArray.forEach(rec => {
-                const teacherName = (rec.teacherName || "").trim();
-                // 需求：沒有填寫教師姓名的紀錄，直接略過不打包
-                if (!teacherName) return;
-                
-                if (!sessionsMap[teacherName]) {
-                    sessionsMap[teacherName] = {
-                        id: 'session_' + encodeURIComponent(teacherName),
-                        teacherName: teacherName,
-                        records: [],
-                        startTime: new Date(rec.timestamp),
-                        endTime: new Date(rec.timestamp)
-                    };
-                }
-                
-                const session = sessionsMap[teacherName];
-                session.records.push(rec);
-                
-                const recTime = new Date(rec.timestamp);
-                if (recTime < session.startTime) session.startTime = recTime;
-                if (recTime > session.endTime) session.endTime = recTime;
+            // 1. 先把所有開課老師加入 map
+            Object.keys(allTeachers).forEach(teacherName => {
+                sessionsMap[teacherName] = {
+                    id: 'session_' + encodeURIComponent(teacherName),
+                    teacherName: teacherName,
+                    records: [],
+                    startTime: new Date(allTeachers[teacherName].timestamp || Date.now()),
+                    endTime: new Date(allTeachers[teacherName].timestamp || Date.now())
+                };
             });
+
+            // 2. 把學生紀錄掛上去
+            if (recordsArray && recordsArray.length > 0) {
+                recordsArray.forEach(rec => {
+                    const teacherName = (rec.teacherName || "").trim();
+                    if (!teacherName) return; // 無教師不打包
+                    
+                    if (!sessionsMap[teacherName]) {
+                        // 如果有學生的紀錄，但是老師不在 teachers 節點中 (可能被刪除或舊資料)
+                        sessionsMap[teacherName] = {
+                            id: 'session_' + encodeURIComponent(teacherName),
+                            teacherName: teacherName,
+                            records: [],
+                            startTime: new Date(rec.timestamp),
+                            endTime: new Date(rec.timestamp)
+                        };
+                    }
+                    
+                    const session = sessionsMap[teacherName];
+                    session.records.push(rec);
+                    
+                    const recTime = new Date(rec.timestamp);
+                    if (recTime < session.startTime) session.startTime = recTime;
+                    if (recTime > session.endTime) session.endTime = recTime;
+                });
+            }
             
-            // 轉換為陣列，依據最後作答時間新到舊排序
+            // 轉換為陣列，依據最後作答/開課時間新到舊排序
             const sessions = Object.values(sessionsMap).sort((a, b) => b.endTime - a.endTime);
             return sessions;
         }
@@ -891,15 +913,63 @@
                     <button class="btn download-btn" onclick="downloadExcel('${session.id}')">
                         📥 下載此教師 Excel
                     </button>
-                    <button class="btn download-btn" style="margin-top: 10px; background: #3b82f6;" onclick="downloadPDF('${session.id}')">
-                        📄 下載詳細歷程 PDF
-                    </button>
-                `;
-                container.appendChild(card);
-            });
+                    <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="downloadPDF('${session.id}')">
+                    📄 下載詳細歷程 PDF
+                </button>
+                <button class="btn btn-danger" style="width: 100%; justify-content: center; margin-top: 8px; padding: 6px; font-size: 0.85rem;" onclick="deleteSession('${session.teacherName}')">
+                    ❌ 刪除開課資料
+                </button>
+            `;
+            
+            container.appendChild(card);
+        });
+    }
+
+    // 刪除開課設定與紀錄
+    async function deleteSession(teacherName) {
+        const pwd = prompt(`請輸入「${teacherName}」的課堂密碼（或管理員密碼）以刪除開課資料：`);
+        if (pwd === null) return;
+        
+        if (pwd !== "0987912307") {
+            if (typeof firebase !== 'undefined' && firebase.database) {
+                try {
+                    const snap = await firebase.database().ref('teachers/' + encodeURIComponent(teacherName)).once('value');
+                    if (!snap.exists() || snap.val().password !== pwd) {
+                        alert("❌ 密碼錯誤！無法刪除。");
+                        return;
+                    }
+                } catch (e) {
+                    alert("連線驗證失敗，請檢查網路！");
+                    return;
+                }
+            }
         }
 
-        async function downloadExcel(sessionId) {
+        if (!confirm(`確定要刪除「${teacherName}」的開課設定與所有相關的學生資料嗎？\n(⚠️ 此動作無法復原)`)) return;
+
+        try {
+            // 刪除開課設定
+            await db.ref('teachers/' + encodeURIComponent(teacherName)).remove();
+            
+            // 刪除該老師名下所有的學生紀錄
+            const keys = Object.keys(allRecords);
+            const updates = {};
+            keys.forEach(k => {
+                if (allRecords[k].teacherName === teacherName) {
+                    updates[k] = null;
+                }
+            });
+            if (Object.keys(updates).length > 0) {
+                await db.ref('records').update(updates);
+            }
+            alert(`✅ 已成功刪除「${teacherName}」的開課設定與所有學生資料！`);
+        } catch (err) {
+            console.error("刪除失敗", err);
+            alert("刪除失敗，請檢查連線狀態。");
+        }
+    }
+
+    async function downloadExcel(sessionId) {
             const session = groupedSessions.find(s => s.id === sessionId);
             if (!session) return alert("找不到場次資料！");
 
