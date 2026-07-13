@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>鵲橋相會：配對法找因數</title>
+  <!-- Firebase Compatibility SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
   <style>
     /* --- CSS Variables & Design Tokens --- */
@@ -791,8 +794,10 @@
     <header>
       <div class="hud-left">
         <div class="hud-panel level-indicator">模式: <span id="hud-level-txt">基礎挑戰</span></div>
+        <div class="hud-panel timer-panel" style="display:none;" id="hud-timer-container">時間: <span id="hud-timer-txt">120s</span></div>
       </div>
       <div class="hud-right">
+        <div class="hud-panel score-panel" style="display:none;" id="hud-score-container">得分: <span id="hud-score-txt">0分</span></div>
         <div class="hud-panel progress-panel">題號: <span id="hud-progress-txt">1 / 5</span></div>
         <button class="btn-icon" id="btn-mute" title="開關聲音">🔊</button>
       </div>
@@ -867,6 +872,11 @@
         <h2>🌌 鵲橋相會：配對法找因數</h2>
         <p>歡迎來到銀河！請使用<b>「配對法」</b>找出目標數的因數。兩兩配對成功，就能召喚喜鵲搭建鵲橋，讓牛郎與織女在銀河相聚喔！</p>
         
+        <div style="margin-bottom: 20px; text-align: left; width: 100%;">
+          <label for="student-name" style="display: block; font-size: 0.95rem; color: #94a3b8; font-weight: 700; margin-bottom: 8px;">👤 學生姓名 Student Name:</label>
+          <input type="text" id="student-name" placeholder="請輸入姓名 (預設為訪客)" style="width: 100%; padding: 12px 16px; border-radius: 12px; border: 2px solid #334155; background: #0f172a; color: #fff; font-size: 1rem; font-family: var(--font-body); font-weight: 700; transition: border-color 0.2s;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#334155'">
+        </div>
+        
         <div class="level-grid">
           <button class="btn-level selected" data-mode="basic">
             <h3>基礎挑戰</h3>
@@ -880,6 +890,9 @@
         </div>
 
         <button class="btn-primary" id="btn-start-game">啟動鵲橋大冒險 🌠</button>
+        <div style="margin-top: 15px; text-align: center;">
+          <a href="彩虹拱橋連接戰_教師後台.html" style="color: #94a3b8; text-decoration: none; font-size: 0.9rem; font-weight: bold; opacity: 0.8; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">⚙️ 教師管理後台</a>
+        </div>
       </div>
     </div>
 
@@ -971,6 +984,33 @@
       }
     }
 
+    // ==========================================
+    // Firebase 連線設定 (HighGrade 專案)
+    // ==========================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyCFNaVRETt862_As1hF7Mfyr22pKM5-lvk",
+      authDomain: "chickenrabbit-ea442.firebaseapp.com",
+      databaseURL: "https://chickenrabbit-ea442-default-rtdb.firebaseio.com",
+      projectId: "chickenrabbit-ea442",
+      storageBucket: "chickenrabbit-ea442.appspot.com",
+      messagingSenderId: "65728951973",
+      appId: "1:65728951973:web:efff912caf5f6f185abf4c"
+    };
+
+    let database = null;
+    let isFirebaseActive = false;
+
+    try {
+      if (typeof firebase !== 'undefined') {
+        firebase.initializeApp(firebaseConfig);
+        database = firebase.database();
+        isFirebaseActive = true;
+        console.log("Firebase Realtime Database 連線成功 (GCD 資料庫)！");
+      }
+    } catch (e) {
+      console.warn("Firebase 初始化失敗，已自動啟用離線LocalStorage存取模式：", e);
+    }
+
     const sound = new SoundEngine();
 
     let gameMode = 'basic';
@@ -983,6 +1023,14 @@
     let gameState = 'playing';
     let countdownInterval = null;
     let isMatchingAnimationActive = false;
+
+    // 全域統計與計時變數
+    let studentName = "訪客";
+    let sessionTotalScore = 0;
+    let correctOnFirstTryCount = 0;
+    let secondsElapsed = 0;
+    let questionTimerInterval = null;
+    let questionHadMistake = false; // 紀錄當前題目是否有過任何失誤（含超時）
 
     // Common Factor Phase variables
     let inCommonFactorPhase = false;
@@ -1007,6 +1055,10 @@
     const btnMute = document.getElementById('btn-mute');
     const hudLevelTxt = document.getElementById('hud-level-txt');
     const hudProgressTxt = document.getElementById('hud-progress-txt');
+    const hudTimerTxt = document.getElementById('hud-timer-txt');
+    const hudTimerContainer = document.getElementById('hud-timer-container');
+    const hudScoreTxt = document.getElementById('hud-score-txt');
+    const hudScoreContainer = document.getElementById('hud-score-container');
     const targetValue = document.getElementById('target-value');
     const bubblesContainer = document.getElementById('bubbles-container');
     const basicInputPanel = document.getElementById('basic-input-panel');
@@ -1094,6 +1146,30 @@
       matchedPairs = [];
       isMatchingAnimationActive = false;
       magpies = []; // Reset magpies array
+
+      questionHadMistake = false;
+      secondsElapsed = 0;
+      hudTimerTxt.innerText = "120s";
+      hudTimerTxt.style.color = "#38bdf8";
+
+      if (questionTimerInterval) clearInterval(questionTimerInterval);
+      questionTimerInterval = setInterval(() => {
+        secondsElapsed++;
+        let remaining = 120 - secondsElapsed;
+        if (remaining <= 0) {
+          clearInterval(questionTimerInterval);
+          hudTimerTxt.innerText = "0s";
+          hudTimerTxt.style.color = "#ef4444";
+          triggerTimeOutFailure();
+        } else {
+          hudTimerTxt.innerText = `${remaining}s`;
+          if (remaining <= 30) {
+            hudTimerTxt.style.color = "#ef4444";
+          } else {
+            hudTimerTxt.style.color = "#38bdf8";
+          }
+        }
+      }, 1000);
       
       document.getElementById('pool-msg-overlay').style.display = 'none';
       centerStone.style.display = 'none'; // Unify center layout, hide old center stone
@@ -1600,6 +1676,14 @@
         return;
       }
       if (matchedPairs.length === factorPairs.length) {
+        if (questionTimerInterval) clearInterval(questionTimerInterval);
+        if (!questionHadMistake) {
+          correctOnFirstTryCount++;
+          let qScore = Math.max(0, 120 - secondsElapsed) * 10;
+          sessionTotalScore += qScore;
+        }
+        hudScoreTxt.innerText = `${sessionTotalScore}分`;
+
         gameState = 'building_bridge';
         setTimeout(buildMagpieBridgeAnimation, 600);
       }
@@ -1715,6 +1799,7 @@
     function showClearScreen() {
       isFailMode = false;
       if (countdownInterval) clearInterval(countdownInterval);
+      if (questionTimerInterval) clearInterval(questionTimerInterval);
       clearOverlay.classList.add('active');
       
       let needCountdown = !inCommonFactorPhase && currentQuestionIndex < 4;
@@ -1731,6 +1816,9 @@
           clearBadge.innerText = "👑";
           clearMsg.innerText = "恭喜你！不僅找完了所有因數，還成功解決了公因數與最大公因數的所有挑戰！牛郎織女將永遠感謝你！";
           btnNextLevel.innerText = `返回主選單 🏠`;
+          
+          saveScoreToLeaderboard();
+          showLeaderboardInClearScreen();
         }
       } else {
         if(currentQuestionIndex < 4) {
@@ -1739,10 +1827,20 @@
           clearMsg.innerText = "太棒了！你成功找出了這個數字的所有因數，幫助喜鵲搭好這段橋！準備前往下一個挑戰吧！";
           btnNextLevel.innerText = `下一關挑戰 (${countdown}s) ➔`;
         } else {
-          clearTitle.innerText = "五題因數挑戰完成！開啟隱藏關卡";
-          clearBadge.innerText = "✨";
-          clearMsg.innerText = "太厲害了！你已順利幫所有數字配對完因數。接下來，喜鵲將發起最後的【公因數與最大公因數】挑戰！";
-          btnNextLevel.innerText = `進入公因數挑戰 ➔`;
+          if (correctOnFirstTryCount >= 3) {
+            clearTitle.innerText = "五題因數挑戰完成！開啟隱藏關卡";
+            clearBadge.innerText = "✨";
+            clearMsg.innerText = `太厲害了！你已順利首試答對 ${correctOnFirstTryCount} 題（達 3 題門檻）。接下來，喜鵲將發起最後的【公因數與最大公因數】挑戰！`;
+            btnNextLevel.innerText = `進入公因數挑戰 ➔`;
+          } else {
+            clearTitle.innerText = "因數挑戰完成！未滿足解鎖條件 🔒";
+            clearBadge.innerText = "🔒";
+            clearMsg.innerText = `你完成了 5 題因數挑戰，但首試無失誤答對僅 ${correctOnFirstTryCount} 題（未達 3 題門檻），無法開啟隱藏關卡。繼續加油！`;
+            btnNextLevel.innerText = `返回主選單 🏠`;
+            
+            saveScoreToLeaderboard();
+            showLeaderboardInClearScreen();
+          }
         }
       }
 
@@ -1756,6 +1854,122 @@
             btnNextLevel.innerText = `下一關挑戰 (${countdown}s) ➔`;
           }
         }, 1000);
+      }
+    }
+
+    function triggerTimeOutFailure() {
+      questionHadMistake = true;
+      if (inCommonFactorPhase) {
+        let commonFactorNumA = commonFactorTargets[commonFactorQuestionIndex][0];
+        let commonFactorNumB = commonFactorTargets[commonFactorQuestionIndex][1];
+        logMistakeToFirebase("公因數挑戰", `${commonFactorNumA}, ${commonFactorNumB}`, "答題超時", "無", "無");
+        document.getElementById('common-factor-overlay').classList.remove('active');
+      } else {
+        logMistakeToFirebase(gameMode === 'basic' ? "基礎挑戰" : (gameMode === 'advanced' ? "進階挑戰" : "地獄挑戰"), targetNum, "答題超時", "無", "無");
+      }
+      gameState = 'falling';
+      triggerFallingAnimation();
+    }
+
+    function logMistakeToFirebase(type, base, errorType, expectedVal, userInputVal) {
+      try {
+        if (isFirebaseActive) {
+          database.ref('GCD/mistakes').push({
+            name: studentName,
+            type: type,
+            base: base,
+            errorType: errorType,
+            expectedVal: expectedVal,
+            userInputVal: userInputVal,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+          });
+        } else {
+          // Local storage fallback
+          let localMistakes = JSON.parse(localStorage.getItem('GCD_mistakes') || '[]');
+          localMistakes.push({
+            name: studentName,
+            type: type,
+            base: base,
+            errorType: errorType,
+            expectedVal: expectedVal,
+            userInputVal: userInputVal,
+            timestamp: Date.now()
+          });
+          localStorage.setItem('GCD_mistakes', JSON.stringify(localMistakes));
+        }
+      } catch (e) {
+        console.error("Firebase mistake logging error: ", e);
+      }
+    }
+
+    function saveScoreToLeaderboard() {
+      try {
+        if (isFirebaseActive) {
+          database.ref('GCD/leaderboard').push({
+            name: studentName,
+            score: sessionTotalScore,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+          });
+        } else {
+          let localLeaderboard = JSON.parse(localStorage.getItem('GCD_leaderboard') || '[]');
+          localLeaderboard.push({
+            name: studentName,
+            score: sessionTotalScore,
+            timestamp: Date.now()
+          });
+          localLeaderboard.sort((a, b) => b.score - a.score);
+          localStorage.setItem('GCD_leaderboard', JSON.stringify(localLeaderboard.slice(0, 15)));
+        }
+      } catch (e) {
+        console.error("Firebase leaderboard save error: ", e);
+      }
+    }
+
+    function showLeaderboardInClearScreen() {
+      let containerHtml = `<div style="margin-top: 15px; background: rgba(15, 23, 42, 0.4); border-radius: 12px; padding: 12px; max-height: 150px; overflow-y: auto; text-align: left;">
+        <h4 style="color: #ffd043; text-align: center; margin-bottom: 8px; font-weight: 800;">🏆 英雄榜 (Leaderboard) 🏆</h4>
+        <ol id="clear-leaderboard-list" style="padding-left: 20px; font-size: 0.9rem; color: #fff;">
+          <li>載入中...</li>
+        </ol>
+      </div>`;
+      
+      clearMsg.innerHTML += containerHtml;
+      const listEl = document.getElementById('clear-leaderboard-list');
+      
+      if (isFirebaseActive) {
+        database.ref('GCD/leaderboard').orderByChild('score').limitToLast(10).once('value', snapshot => {
+          let list = [];
+          snapshot.forEach(child => {
+            list.push(child.val());
+          });
+          list.sort((a, b) => b.score - a.score);
+          
+          listEl.innerHTML = '';
+          if (list.length === 0) {
+            listEl.innerHTML = '<li>目前無排行紀錄。</li>';
+            return;
+          }
+          list.forEach((item, index) => {
+            let li = document.createElement('li');
+            li.style.marginBottom = '4px';
+            li.innerHTML = `<span style="font-weight:bold; color:#e2e8f0;">${index+1}. ${item.name}</span> - <span style="color:#ffd043; font-weight:900;">${item.score}分</span>`;
+            listEl.appendChild(li);
+          });
+        });
+      } else {
+        let localLeaderboard = JSON.parse(localStorage.getItem('GCD_leaderboard') || '[]');
+        localLeaderboard.sort((a, b) => b.score - a.score);
+        listEl.innerHTML = '';
+        if (localLeaderboard.length === 0) {
+          listEl.innerHTML = '<li>目前無排行紀錄。</li>';
+          return;
+        }
+        localLeaderboard.slice(0, 10).forEach((item, index) => {
+          let li = document.createElement('li');
+          li.style.marginBottom = '4px';
+          li.innerHTML = `<span style="font-weight:bold; color:#e2e8f0;">${index+1}. ${item.name}</span> - <span style="color:#ffd043; font-weight:900;">${item.score}分</span>`;
+          listEl.appendChild(li);
+        });
       }
     }
 
@@ -1990,6 +2204,15 @@
         bgm.volume = 0.4;
         bgm.play().catch(e => console.log('BGM play blocked', e));
       }
+      let inputName = document.getElementById('student-name').value.trim();
+      studentName = inputName ? inputName : "訪客";
+
+      sessionTotalScore = 0;
+      correctOnFirstTryCount = 0;
+      hudScoreTxt.innerText = "0分";
+      hudScoreContainer.style.display = 'block';
+      hudTimerContainer.style.display = 'block';
+
       menuOverlay.classList.remove('active');
       document.getElementById('common-factor-overlay').classList.remove('active');
       inCommonFactorPhase = false;
@@ -2100,16 +2323,26 @@
             inCommonFactorPhase = false;
             commonFactorQuestionIndex = 0;
             menuOverlay.classList.add('active');
+            hudScoreContainer.style.display = 'none';
+            hudTimerContainer.style.display = 'none';
           }
         } else {
           if (currentQuestionIndex < 4) {
             currentQuestionIndex++;
             startNewGame();
           } else {
-            generateCommonFactorPairs();
-            commonFactorQuestionIndex = 0;
-            inCommonFactorPhase = true;
-            startCommonFactorQuestion();
+            if (correctOnFirstTryCount >= 3) {
+              generateCommonFactorPairs();
+              commonFactorQuestionIndex = 0;
+              inCommonFactorPhase = true;
+              startCommonFactorQuestion();
+            } else {
+              inCommonFactorPhase = false;
+              commonFactorQuestionIndex = 0;
+              menuOverlay.classList.add('active');
+              hudScoreContainer.style.display = 'none';
+              hudTimerContainer.style.display = 'none';
+            }
           }
         }
       }
@@ -2121,13 +2354,24 @@
     btnSubmitPair.addEventListener('click', submitAdvancedPair);
 
     btnFinishHell.addEventListener('click', () => {
-      if (gameState !== 'playing') return;
+      if (gameState !== 'playing' || isMatchingAnimationActive) return;
       sound.playClick();
 
       if (matchedPairs.length === factorPairs.length) {
+        if (questionTimerInterval) clearInterval(questionTimerInterval);
+        if (!questionHadMistake) {
+          correctOnFirstTryCount++;
+          let qScore = Math.max(0, 120 - secondsElapsed) * 10;
+          sessionTotalScore += qScore;
+        }
+        hudScoreTxt.innerText = `${sessionTotalScore}分`;
+
         gameState = 'building_bridge';
         buildMagpieBridgeAnimation();
       } else {
+        questionHadMistake = true;
+        logMistakeToFirebase("地獄挑戰", targetNum, "我找完了檢查不通過（漏找或找錯）", sortedFactors.join(','), matchedPairs.map(p => `${p.f1}*${p.f2}`).join(','));
+        
         gameState = 'falling';
         triggerFallingAnimation();
       }
@@ -2136,10 +2380,13 @@
     document.getElementById('btn-top-menu').addEventListener('click', () => {
       sound.playClick();
       if (countdownInterval) clearInterval(countdownInterval);
+      if (questionTimerInterval) clearInterval(questionTimerInterval);
       menuOverlay.classList.add('active');
       clearOverlay.classList.remove('active');
       document.getElementById('common-factor-overlay').classList.remove('active');
       inCommonFactorPhase = false;
+      hudScoreContainer.style.display = 'none';
+      hudTimerContainer.style.display = 'none';
     });
 
     document.getElementById('btn-submit-cf-overlay').addEventListener('click', submitCommonFactors);
@@ -2190,6 +2437,30 @@
       commonFactorStep = 'select_factors';
       selectedGCF = null;
       magpies = [];
+
+      questionHadMistake = false;
+      secondsElapsed = 0;
+      hudTimerTxt.innerText = "120s";
+      hudTimerTxt.style.color = "#38bdf8";
+
+      if (questionTimerInterval) clearInterval(questionTimerInterval);
+      questionTimerInterval = setInterval(() => {
+        secondsElapsed++;
+        let remaining = 120 - secondsElapsed;
+        if (remaining <= 0) {
+          clearInterval(questionTimerInterval);
+          hudTimerTxt.innerText = "0s";
+          hudTimerTxt.style.color = "#ef4444";
+          triggerTimeOutFailure();
+        } else {
+          hudTimerTxt.innerText = `${remaining}s`;
+          if (remaining <= 30) {
+            hudTimerTxt.style.color = "#ef4444";
+          } else {
+            hudTimerTxt.style.color = "#38bdf8";
+          }
+        }
+      }, 1000);
 
       document.getElementById('pool-msg-overlay').style.display = 'none';
       centerStone.style.display = 'none';
@@ -2309,6 +2580,9 @@
       if (gameState !== 'playing') return;
       sound.playClick();
 
+      let commonFactorNumA = commonFactorTargets[commonFactorQuestionIndex][0];
+      let commonFactorNumB = commonFactorTargets[commonFactorQuestionIndex][1];
+
       if (commonFactorStep === 'select_factors') {
         let isCorrect = selectedCommonFactors.length === correctCommonFactors.length &&
                         selectedCommonFactors.every(x => correctCommonFactors.includes(x));
@@ -2333,17 +2607,12 @@
             }
           });
         } else {
-          sound.playError();
-          const container = document.getElementById('cf-bubbles-container');
-          container.querySelectorAll('.bubble').forEach(b => {
-            let val = parseInt(b.innerText);
-            let isCommon = correctCommonFactors.includes(val);
-            let isSel = selectedCommonFactors.includes(val);
-            if ((isSel && !isCommon) || (!isSel && isCommon)) {
-              b.classList.add('error-shake');
-              setTimeout(() => b.classList.remove('error-shake'), 400);
-            }
-          });
+          questionHadMistake = true;
+          logMistakeToFirebase("公因數挑戰", `${commonFactorNumA}, ${commonFactorNumB}`, "公因數選錯", correctCommonFactors.join(','), selectedCommonFactors.join(','));
+          
+          gameState = 'falling';
+          document.getElementById('common-factor-overlay').classList.remove('active');
+          triggerFallingAnimation();
         }
       } else if (commonFactorStep === 'select_gcf') {
         if (!selectedGCF) {
@@ -2352,19 +2621,23 @@
         }
 
         if (selectedGCF === correctGCF) {
+          if (questionTimerInterval) clearInterval(questionTimerInterval);
+          if (!questionHadMistake) {
+            let qScore = Math.max(0, 120 - secondsElapsed) * 10;
+            sessionTotalScore += qScore;
+          }
+          hudScoreTxt.innerText = `${sessionTotalScore}分`;
+
           gameState = 'building_bridge';
           document.getElementById('common-factor-overlay').classList.remove('active');
           buildMagpieBridgeAnimation();
         } else {
-          sound.playError();
-          const container = document.getElementById('cf-bubbles-container');
-          container.querySelectorAll('.bubble').forEach(b => {
-            let val = parseInt(b.innerText);
-            if (val === selectedGCF) {
-              b.classList.add('error-shake');
-              setTimeout(() => b.classList.remove('error-shake'), 400);
-            }
-          });
+          questionHadMistake = true;
+          logMistakeToFirebase("公因數挑戰", `${commonFactorNumA}, ${commonFactorNumB}`, "最大公因數選錯", correctGCF, selectedGCF);
+          
+          gameState = 'falling';
+          document.getElementById('common-factor-overlay').classList.remove('active');
+          triggerFallingAnimation();
         }
       }
     }
