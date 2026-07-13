@@ -478,6 +478,18 @@
             請使用文字編輯器打開此檔案（`教師後台.html`），在第 394 行左右尋找 <code>firebaseConfig</code>，並填入您在 Firebase Console 取得的 Web SDK Config 物件，以啟用即時學生數據監控。
         </div>
 
+        <!-- 教師開課設定 -->
+        <div class="session-card" style="margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; background: #e0f2fe; border-color: #7dd3fc;">
+            <div style="flex: 1; min-width: 200px;">
+                <div style="font-size: 0.85rem; color: #0284c7; font-weight: bold; margin-bottom: 5px;">👨‍🏫 教師開課設定</div>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="setup-teacher-name" placeholder="您的教師姓名 (例如：曹泓棋)" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #7dd3fc; outline: none; font-size: 0.95rem;">
+                    <input type="text" id="setup-class-pwd" placeholder="設定課堂密碼 (例如：1234)" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #7dd3fc; outline: none; font-size: 0.95rem;">
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="saveTeacherConfig()" style="background: #0284c7; align-self: flex-end; padding: 10px 20px;">💾 儲存 / 更新開課設定</button>
+        </div>
+
         <!-- 控制列 -->
         <div class="controls-row">
             <div id="search-controls" style="display: none; flex: 1; flex-wrap: wrap; gap: 15px; align-items: center;">
@@ -1084,6 +1096,29 @@
                 console.error("PDF 產生失敗", err);
                 alert("PDF 產生失敗，請檢查主控台錯誤訊息。");
                 document.body.removeChild(loadingOverlay);
+            });
+        // 儲存教師開課設定
+        function saveTeacherConfig() {
+            const tName = document.getElementById('setup-teacher-name').value.trim();
+            const tPwd = document.getElementById('setup-class-pwd').value.trim();
+            if (!tName || !tPwd) {
+                alert("請完整輸入「教師姓名」與「課堂密碼」！");
+                return;
+            }
+            if (!isFirebaseActive) {
+                alert("Firebase 尚未啟用，無法儲存設定！");
+                return;
+            }
+            firebase.database().ref('teachers/' + encodeURIComponent(tName)).set({
+                password: tPwd,
+                timestamp: Date.now()
+            }).then(() => {
+                alert(`✅ 成功建立課堂！\n\n教師姓名：${tName}\n課堂密碼：${tPwd}\n\n請將此資訊提供給學生輸入，才能將資料正確拋轉進您的後台。`);
+                document.getElementById('setup-teacher-name').value = '';
+                document.getElementById('setup-class-pwd').value = '';
+            }).catch(err => {
+                console.error("寫入開課設定失敗：", err);
+                alert("儲存失敗，請檢查網路連線。");
             });
         }
     </script>
