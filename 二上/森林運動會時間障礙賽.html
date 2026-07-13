@@ -322,6 +322,7 @@
                 <span class="heart-icon" id="heart-2">❤️</span>
                 <span class="heart-icon" id="heart-3">❤️</span>
             </div>
+            <div class="hud-card" id="hud-energy" style="font-weight:900; color:#ffd166; transition: all 0.2s;">⚡⚡⚡</div>
             <div class="hud-card" id="hud-timer">⏱️ 180秒</div>
             <div class="hud-card" id="hud-score">⭐ 0分</div>
         </div>
@@ -788,6 +789,10 @@ const Game = {
     isJumping: false,
     isActionActive: false,
     actionTimer: 0,
+    
+    // 能量機制
+    energy: 3,
+    energyCooldown: 0,
 
     // 答題回饋
     floatingTexts: [],
@@ -911,22 +916,25 @@ const Game = {
     },
 
     jump() {
-        if (this.stunnedTimer > 0) return;
+        if (this.stunnedTimer > 0 || this.energy <= 0) return;
         if (this.selectedChar === 'rabbit') {
             if (this.isJumping) return;
             this.isJumping = true;
             this.playerJumpVel = 14; // 初速度（向上）
             playSound('jump');
+            this.useEnergy();
         } else if (this.selectedChar === 'turtle') {
             if (this.isActionActive) return;
             this.isActionActive = true;
             this.actionTimer = 800; // 縮殼持續時間 (毫秒)
             playSound('jump');
+            this.useEnergy();
         } else if (this.selectedChar === 'cheetah') {
             if (this.isActionActive) return;
             this.isActionActive = true;
             this.actionTimer = 600; // 撞擊衝刺持續時間 (毫秒)
             playSound('jump');
+            this.useEnergy();
         }
     },
 
@@ -963,6 +971,8 @@ const Game = {
         this.isJumping = false;
         this.isActionActive = false;
         this.actionTimer = 0;
+        this.energy = 3;
+        this.energyCooldown = 0;
         this.floatingTexts = [];
         this.flashAlpha = 0;
         this.finishLineY = null;   // 終點線 Y 座標
@@ -985,6 +995,7 @@ const Game = {
 
         this.updateHearts();
         this.updateTimerHUD();     // 更新 HUD 計時顯示
+        this.updateEnergyHUD();    // 初始化能量顯示
         this.showScreen(null);
         this.lastTime = performance.now();
         requestAnimationFrame(t => this.loop(t));
@@ -1136,6 +1147,17 @@ const Game = {
                 spd = 9.0; // 獵豹衝撞時速度提升！
             }
             this.speed += (spd - this.speed) * 0.15;
+
+            // 能量冷卻/休息時間更新
+            if (this.energy <= 0 && this.energyCooldown > 0) {
+                this.energyCooldown -= dt;
+                this.updateEnergyHUD(); // 動態更新秒數
+                if (this.energyCooldown <= 0) {
+                    this.energy = 3;
+                    this.energyCooldown = 0;
+                    this.updateEnergyHUD();
+                }
+            }
             this.distance += this.speed * (dt / 1000);
             this.scrollOffset += this.speed * (dt / 1000) * 60;
 
@@ -2258,6 +2280,39 @@ drawBarriersBackground() {
         return String(str).replace(/[&<>"']/g, s => {
             return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[s];
         });
+    },
+
+    useEnergy() {
+        this.energy--;
+        if (this.energy === 0) {
+            this.energyCooldown = 5000; // 5秒
+        }
+        this.updateEnergyHUD();
+    },
+
+    updateEnergyHUD() {
+        const el = document.getElementById('hud-energy');
+        if (!el) return;
+        
+        const actionBtn = document.getElementById('jump-btn');
+        if (this.energy > 0) {
+            el.innerHTML = '⚡'.repeat(this.energy);
+            el.style.color = '#ffd166';
+            el.style.background = 'rgba(0, 0, 0, 0.4)';
+            if (actionBtn) {
+                actionBtn.style.opacity = '1';
+                actionBtn.style.pointerEvents = 'auto';
+            }
+        } else {
+            const sec = Math.ceil(this.energyCooldown / 1000);
+            el.innerHTML = `⏳ 休息中 (${sec}s)`;
+            el.style.color = '#e76f51';
+            el.style.background = 'rgba(231, 111, 81, 0.25)';
+            if (actionBtn) {
+                actionBtn.style.opacity = '0.4';
+                actionBtn.style.pointerEvents = 'none';
+            }
+        }
     }
 };
 
