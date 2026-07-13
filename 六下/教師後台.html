@@ -511,7 +511,7 @@
             <button class="btn btn-primary" onclick="loadData()">🔄 重新整理</button>
             </div>
             <div style="display: flex; gap: 15px; margin-left: auto;">
-                <button id="unlock-btn" class="btn" style="background: var(--warning); color: #fff;" onclick="unlockAdmin()">🔒 解鎖詳細資料</button>
+                <button id="unlock-btn" class="btn" style="background: var(--warning); color: #fff;" onclick="unlockAdmin()">🔒 查看所有資料</button>
                 <button class="btn btn-danger" onclick="clearAllData()">🗑️ 清空所有數據</button>
             </div>
         </div>
@@ -594,6 +594,14 @@
                 isFirebaseActive = true;
                 document.getElementById('config-banner').style.display = 'none';
                 console.log("Firebase 連結成功！");
+                
+                // 自動預設兩位老師的課堂密碼
+                db.ref('teachers/曹泓棋').once('value').then(snap => {
+                    if (!snap.exists()) db.ref('teachers/曹泓棋').set({ password: '4007', timestamp: Date.now() });
+                });
+                db.ref('teachers/謝千慧').once('value').then(snap => {
+                    if (!snap.exists()) db.ref('teachers/謝千慧').set({ password: '1234', timestamp: Date.now() });
+                });
             } catch (e) {
                 console.error("Firebase 初始化失敗：", e);
             }
@@ -891,14 +899,30 @@
             });
         }
 
-        function downloadExcel(sessionId) {
+        async function downloadExcel(sessionId) {
+            const session = groupedSessions.find(s => s.id === sessionId);
+            if (!session) return alert("找不到場次資料！");
+
+            const pwd = prompt(`請輸入「${session.teacherName}」的課堂密碼以授權下載 Excel：`);
+            if (pwd === null) return;
+            
+            if (typeof firebase !== 'undefined' && firebase.database) {
+                try {
+                    const snap = await firebase.database().ref('teachers/' + encodeURIComponent(session.teacherName)).once('value');
+                    if (!snap.exists() || snap.val().password !== pwd) {
+                        alert("❌ 密碼錯誤或該教師尚未設定密碼！");
+                        return;
+                    }
+                } catch (e) {
+                    alert("連線驗證失敗，請檢查網路！");
+                    return;
+                }
+            }
+
             if (typeof XLSX === 'undefined') {
                 alert("Excel 套件尚未載入完成，請稍候再試。");
                 return;
             }
-
-            const session = groupedSessions.find(s => s.id === sessionId);
-            if (!session) return alert("找不到場次資料！");
             
             const sheetData = [];
             // 擴充欄位加入詳細答錯紀錄
@@ -964,14 +988,30 @@
             XLSX.writeFile(wb, filename);
         }
 
-        function downloadPDF(sessionId) {
+        async function downloadPDF(sessionId) {
+            const session = groupedSessions.find(s => s.id === sessionId);
+            if (!session) return alert("找不到場次資料！");
+
+            const pwd = prompt(`請輸入「${session.teacherName}」的課堂密碼以授權產生 PDF：`);
+            if (pwd === null) return;
+            
+            if (typeof firebase !== 'undefined' && firebase.database) {
+                try {
+                    const snap = await firebase.database().ref('teachers/' + encodeURIComponent(session.teacherName)).once('value');
+                    if (!snap.exists() || snap.val().password !== pwd) {
+                        alert("❌ 密碼錯誤或該教師尚未設定密碼！");
+                        return;
+                    }
+                } catch (e) {
+                    alert("連線驗證失敗，請檢查網路！");
+                    return;
+                }
+            }
+
             if (typeof html2pdf === 'undefined') {
                 alert("PDF 套件尚未載入完成，請稍候再試。");
                 return;
             }
-
-            const session = groupedSessions.find(s => s.id === sessionId);
-            if (!session) return alert("找不到場次資料！");
             
             // 建立一個隱藏的容器來放置 PDF 內容
             const container = document.createElement('div');
@@ -1097,6 +1137,20 @@
                 alert("PDF 產生失敗，請檢查主控台錯誤訊息。");
                 document.body.removeChild(loadingOverlay);
             });
+        }
+
+        // 解鎖詳細資料
+        function unlockAdmin() {
+            const pwd = prompt("請輸入管理員密碼 (用以查看所有資料)：");
+            if (pwd === "0987912307") {
+                document.getElementById('search-controls').style.display = 'flex';
+                document.getElementById('admin-table-area').style.display = 'block';
+                document.getElementById('unlock-btn').style.display = 'none';
+            } else if (pwd !== null) {
+                alert("密碼錯誤！");
+            }
+        }
+
         // 儲存教師開課設定
         function saveTeacherConfig() {
             const tName = document.getElementById('setup-teacher-name').value.trim();
