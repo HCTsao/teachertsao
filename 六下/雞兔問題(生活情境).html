@@ -802,9 +802,13 @@
             <span class="input-label" style="font-size: 1rem; font-weight: bold;">請填寫基本資料：</span>
         </div>
         <div style="display: flex; flex-direction: column; gap: 10px;">
-            <div style="display: flex; gap: 10px;">
-                <input type="text" id="teacher-name-input" placeholder="教師姓名" style="flex: 1; padding: 12px; border-radius: 12px; border: 2px solid var(--border-glow); background: rgba(255, 255, 255, 0.7); color: var(--text-primary); font-size: 1rem; box-sizing: border-box; outline: none; transition: border-color 0.3s;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border-glow)'">
-                <input type="text" id="class-password-input" placeholder="課堂密碼" style="flex: 1; padding: 12px; border-radius: 12px; border: 2px solid var(--border-glow); background: rgba(255, 255, 255, 0.7); color: var(--text-primary); font-size: 1rem; box-sizing: border-box; outline: none; transition: border-color 0.3s;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border-glow)'">
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <button type="button" class="btn" style="background: var(--primary); padding: 12px; font-size: 1rem; border: none; color: white; border-radius: 12px; cursor: pointer;" onclick="promptClassPassword()">
+                    🔑 輸入課堂密碼 (建立專屬紀錄)
+                </button>
+                <div id="class-status-text" style="font-size: 0.85rem; color: var(--text-secondary); text-align: center; margin-bottom: 5px;">
+                    如果是自行練習，可以不輸入哦！
+                </div>
             </div>
             <div style="display: flex; gap: 10px;">
                 <input type="text" id="seat-number-input" placeholder="座號" style="flex: 1; padding: 12px; border-radius: 12px; border: 2px solid var(--border-glow); background: rgba(255, 255, 255, 0.7); color: var(--text-primary); font-size: 1rem; box-sizing: border-box; outline: none; transition: border-color 0.3s;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border-glow)'">
@@ -1246,45 +1250,53 @@
         document.getElementById('question-text-el').innerHTML = qText;
     }
 
+    let verifiedClassPassword = "";
+    let verifiedTeacherName = "";
+
+    function promptClassPassword() {
+        const pwd = prompt("請輸入老師提供的「課堂密碼」：");
+        if (!pwd) return;
+        
+        if (typeof firebase === 'undefined' || !firebase.database) {
+            alert("系統尚未連線到資料庫，無法驗證密碼！");
+            return;
+        }
+
+        firebase.database().ref('classes/' + pwd).once('value')
+            .then(snapshot => {
+                if (snapshot.exists()) {
+                    const data = snapshot.val();
+                    verifiedTeacherName = data.teacherName;
+                    verifiedClassPassword = pwd;
+                    
+                    const statusEl = document.getElementById('class-status-text');
+                    statusEl.innerHTML = `✅ 已成功連線至 <b>${verifiedTeacherName}</b> 老師的課堂！`;
+                    statusEl.style.color = '#10b981'; // success color
+                } else {
+                    alert("❌ 查無此課堂密碼！請確認密碼是否正確，或是老師尚未開課。");
+                    verifiedClassPassword = "";
+                    verifiedTeacherName = "";
+                    const statusEl = document.getElementById('class-status-text');
+                    statusEl.innerHTML = `如果是自行練習，可以不輸入哦！`;
+                    statusEl.style.color = 'var(--text-secondary)';
+                }
+            })
+            .catch(err => {
+                console.error("密碼驗證失敗：", err);
+                alert("網路連線錯誤，請重試。");
+            });
+    }
+
     // --- 啟動與重設流程 ---
     function startGame() {
-        const teacherName = document.getElementById('teacher-name-input').value.trim();
-        const classPassword = document.getElementById('class-password-input').value.trim();
         const seatNumber = document.getElementById('seat-number-input').value.trim();
         const nameInput = document.getElementById('student-name-input').value.trim();
         
-        if (teacherName) {
-            // 需要驗證密碼
-            if (typeof firebase === 'undefined' || !firebase.database) {
-                alert("系統尚未連線到資料庫，無法驗證教師密碼！");
-                return;
-            }
-            firebase.database().ref('teachers/' + teacherName).once('value')
-                .then(snapshot => {
-                    if (snapshot.exists()) {
-                        const data = snapshot.val();
-                        if (data.password !== classPassword) {
-                            alert("❌ 課堂密碼錯誤！請重新確認後再試。");
-                            return;
-                        }
-                        // 密碼正確，放行
-                        proceedToGame(teacherName, seatNumber, nameInput);
-                    } else {
-                        alert("❌ 查無此教師，請確認「教師姓名」是否正確，或是老師尚未開課！");
-                        return;
-                    }
-                })
-                .catch(err => {
-                    console.error("密碼驗證失敗：", err);
-                    alert("網路連線錯誤，請重試。");
-                });
-        } else {
-            // 未輸入教師姓名，直接放行 (當作訪客)
-            proceedToGame(teacherName, seatNumber, nameInput);
-        }
+        // 直接放行，如果有驗證過密碼，verifiedTeacherName 會有值，否則就是空字串 (訪客)
+        proceedToGame(verifiedTeacherName, verifiedClassPassword, seatNumber, nameInput);
     }
 
-    function proceedToGame(teacherName, seatNumber, nameInput) {
+    function proceedToGame(teacherName, classPassword, seatNumber, nameInput) {
         // 組合顯示用的學生名稱
         let displayName = nameInput || "訪客";
         if (seatNumber) {
@@ -1292,6 +1304,7 @@
         }
 
         gameState.teacherName = teacherName;
+        gameState.classPassword = classPassword;
         gameState.studentName = displayName;
         gameState.startTime = Date.now();
 
@@ -2057,6 +2070,7 @@
         // 建立上傳紀錄物件
         const record = {
             teacherName: gameState.teacherName || "",
+            classPassword: gameState.classPassword || "",
             student: gameState.studentName || "未知學生",
             timestamp: new Date().toISOString(),
             scenario: gameState.scenario.title,

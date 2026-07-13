@@ -597,24 +597,12 @@
                 document.getElementById('config-banner').style.display = 'none';
                 console.log("Firebase 連結成功！");
                 
-                // 自動預設兩位老師的課堂密碼
-                db.ref('teachers/曹泓棋').once('value').then(snap => {
-                    if (!snap.exists()) db.ref('teachers/曹泓棋').set({ password: '4007', timestamp: Date.now() });
+                // 以課堂密碼為 Key 的新結構預設資料
+                db.ref('classes/4007').once('value').then(snap => {
+                    if (!snap.exists()) db.ref('classes/4007').set({ teacherName: '曹泓棋', timestamp: Date.now() });
                 });
-                db.ref('teachers/謝千慧').once('value').then(snap => {
-                    if (!snap.exists()) db.ref('teachers/謝千慧').set({ password: '1234', timestamp: Date.now() });
-                });
-
-                // 自動清理先前的亂碼資料 (包含 %)
-                db.ref('teachers').once('value').then(snap => {
-                    const data = snap.val();
-                    if (data) {
-                        Object.keys(data).forEach(k => {
-                            if (k.includes('%')) {
-                                db.ref('teachers/' + k).remove();
-                            }
-                        });
-                    }
+                db.ref('classes/1234').once('value').then(snap => {
+                    if (!snap.exists()) db.ref('classes/1234').set({ teacherName: '謝千慧', timestamp: Date.now() });
                 });
             } catch (e) {
                 console.error("Firebase 初始化失敗：", e);
@@ -643,8 +631,8 @@
 
             document.getElementById('loading-el').style.display = 'flex';
 
-            // 監聽開課教師清單
-            db.ref('teachers').on('value', (snapshot) => {
+            // 監聽開課教師清單 (改為監聽 classes 節點)
+            db.ref('classes').on('value', (snapshot) => {
                 allTeachers = snapshot.val() || {};
                 renderTable(); // 教師清單更新時重新渲染
             });
@@ -863,35 +851,38 @@
         function groupRecordsIntoSessions(recordsArray) {
             const sessionsMap = {};
             
-            // 1. 先把所有開課老師加入 map
-            Object.keys(allTeachers).forEach(teacherName => {
-                sessionsMap[teacherName] = {
-                    id: 'session_' + encodeURIComponent(teacherName),
-                    teacherName: teacherName,
+            // 1. 先把所有開課老師加入 map (現在 allTeachers 的 key 是 classPassword)
+            Object.keys(allTeachers).forEach(pwd => {
+                const classData = allTeachers[pwd];
+                sessionsMap[pwd] = {
+                    id: 'session_' + pwd,
+                    teacherName: classData.teacherName,
+                    classPassword: pwd,
                     records: [],
-                    startTime: new Date(allTeachers[teacherName].timestamp || Date.now()),
-                    endTime: new Date(allTeachers[teacherName].timestamp || Date.now())
+                    startTime: new Date(classData.timestamp || Date.now()),
+                    endTime: new Date(classData.timestamp || Date.now())
                 };
             });
 
             // 2. 把學生紀錄掛上去
             if (recordsArray && recordsArray.length > 0) {
                 recordsArray.forEach(rec => {
-                    const teacherName = (rec.teacherName || "").trim();
-                    if (!teacherName) return; // 無教師不打包
+                    const pwd = (rec.classPassword || "").trim();
+                    if (!pwd) return; // 無課堂密碼的舊資料或訪客不打包
                     
-                    if (!sessionsMap[teacherName]) {
-                        // 如果有學生的紀錄，但是老師不在 teachers 節點中 (可能被刪除或舊資料)
-                        sessionsMap[teacherName] = {
-                            id: 'session_' + encodeURIComponent(teacherName),
-                            teacherName: teacherName,
+                    if (!sessionsMap[pwd]) {
+                        // 紀錄裡的密碼不在目前的 classes 節點中 (可能是被刪除的課堂殘留紀錄)
+                        sessionsMap[pwd] = {
+                            id: 'session_' + pwd,
+                            teacherName: rec.teacherName || "未知教師",
+                            classPassword: pwd,
                             records: [],
                             startTime: new Date(rec.timestamp),
                             endTime: new Date(rec.timestamp)
                         };
                     }
                     
-                    const session = sessionsMap[teacherName];
+                    const session = sessionsMap[pwd];
                     session.records.push(rec);
                     
                     const recTime = new Date(rec.timestamp);
@@ -929,7 +920,7 @@
                     <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="downloadPDF('${session.id}')">
                     📄 下載詳細歷程 PDF
                 </button>
-                <button class="btn btn-danger" style="width: 100%; justify-content: center; margin-top: 8px; padding: 6px; font-size: 0.85rem;" onclick="deleteSession('${session.teacherName}')">
+                <button class="btn btn-danger" style="width: 100%; justify-content: center; margin-top: 8px; padding: 6px; font-size: 0.85rem;" onclick="deleteSession('${session.classPassword}', '${session.teacherName}')">
                     ❌ 刪除開課資料
                 </button>
             `;
@@ -939,43 +930,33 @@
     }
 
     // 刪除開課設定與紀錄
-    async function deleteSession(teacherName) {
+    async function deleteSession(classPassword, teacherName) {
         const pwd = prompt(`請輸入「${teacherName}」的課堂密碼（或管理員密碼）以刪除開課資料：`);
         if (pwd === null) return;
         
-        if (pwd !== "0987912307") {
-            if (typeof firebase !== 'undefined' && firebase.database) {
-                try {
-                    const snap = await firebase.database().ref('teachers/' + encodeURIComponent(teacherName)).once('value');
-                    if (!snap.exists() || snap.val().password !== pwd) {
-                        alert("❌ 密碼錯誤！無法刪除。");
-                        return;
-                    }
-                } catch (e) {
-                    alert("連線驗證失敗，請檢查網路！");
-                    return;
-                }
-            }
+        if (pwd !== "0987912307" && pwd !== classPassword) {
+            alert("❌ 密碼錯誤！無法刪除。");
+            return;
         }
 
         if (!confirm(`確定要刪除「${teacherName}」的開課設定與所有相關的學生資料嗎？\n(⚠️ 此動作無法復原)`)) return;
 
         try {
             // 刪除開課設定
-            await db.ref('teachers/' + teacherName).remove();
+            await db.ref('classes/' + classPassword).remove();
             
             // 刪除該老師名下所有的學生紀錄
             const keys = Object.keys(allRecords);
             const updates = {};
             keys.forEach(k => {
-                if (allRecords[k].teacherName === teacherName) {
+                if (allRecords[k].classPassword === classPassword) {
                     updates[k] = null;
                 }
             });
             if (Object.keys(updates).length > 0) {
                 await db.ref('records').update(updates);
             }
-            alert(`✅ 已成功刪除「${teacherName}」的開課設定與所有學生資料！`);
+            alert(`✅ 已成功刪除該堂課的開課設定與所有學生資料！`);
         } catch (err) {
             console.error("刪除失敗", err);
             alert("刪除失敗，請檢查連線狀態。");
@@ -1246,16 +1227,29 @@
                 alert("Firebase 尚未啟用，無法儲存設定！");
                 return;
             }
-            firebase.database().ref('teachers/' + tName).set({
-                password: tPwd,
-                timestamp: Date.now()
-            }).then(() => {
-                alert(`✅ 成功建立課堂！\n\n教師姓名：${tName}\n課堂密碼：${tPwd}\n\n請將此資訊提供給學生輸入，才能將資料正確拋轉進您的後台。`);
-                document.getElementById('setup-teacher-name').value = '';
-                document.getElementById('setup-class-pwd').value = '';
+            
+            // 檢查密碼是否已經被使用
+            firebase.database().ref('classes/' + tPwd).once('value').then(snap => {
+                if (snap.exists()) {
+                    alert("❌ 此課堂密碼已經被使用了！請更換一組新的密碼。");
+                    return;
+                }
+                
+                // 寫入新課堂
+                firebase.database().ref('classes/' + tPwd).set({
+                    teacherName: tName,
+                    timestamp: Date.now()
+                }).then(() => {
+                    alert(`✅ 成功建立課堂！\n\n教師姓名：${tName}\n課堂密碼：${tPwd}\n\n請將【課堂密碼】提供給學生輸入，才能將資料正確拋轉進您的後台。`);
+                    document.getElementById('setup-teacher-name').value = '';
+                    document.getElementById('setup-class-pwd').value = '';
+                }).catch(err => {
+                    console.error("寫入開課設定失敗：", err);
+                    alert("儲存失敗，請檢查網路連線。");
+                });
             }).catch(err => {
-                console.error("寫入開課設定失敗：", err);
-                alert("儲存失敗，請檢查網路連線。");
+                console.error("檢查密碼失敗：", err);
+                alert("驗證密碼失敗，請檢查網路。");
             });
         }
     </script>
