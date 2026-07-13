@@ -349,6 +349,12 @@
       box-shadow: 0 0 15px rgba(99, 102, 241, 0.8), inset 0 0 10px rgba(255,255,255,0.4);
     }
 
+    .slot.filled.error-slot {
+      border: 3px solid #fca5a5;
+      background: #dc2626;
+      box-shadow: 0 0 15px rgba(220, 38, 38, 0.8), inset 0 0 10px rgba(255,180,180,0.4);
+    }
+
     #hell-matched-row .slot {
       position: relative;
       transform: none;
@@ -872,20 +878,31 @@
         <h2>🌌 鵲橋相會：配對法找因數</h2>
         <p>歡迎來到銀河！請使用<b>「配對法」</b>找出目標數的因數。兩兩配對成功，就能召喚喜鵲搭建鵲橋，讓牛郎與織女在銀河相聚喔！</p>
         
+        <div style="margin-bottom: 15px; text-align: left; width: 100%; display: flex; gap: 10px;">
+          <div style="flex: 1;">
+            <label for="student-class" style="display: block; font-size: 0.95rem; color: #94a3b8; font-weight: 700; margin-bottom: 8px;">🏫 班級 Class:</label>
+            <input type="text" id="student-class" placeholder="例如：501" style="width: 100%; padding: 12px 16px; border-radius: 12px; border: 2px solid #334155; background: #0f172a; color: #fff; font-size: 1rem; font-family: var(--font-body); font-weight: 700; transition: border-color 0.2s;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#334155'">
+          </div>
+          <div style="flex: 1;">
+            <label for="student-seat" style="display: block; font-size: 0.95rem; color: #94a3b8; font-weight: 700; margin-bottom: 8px;">🔢 座號 Seat:</label>
+            <input type="text" id="student-seat" placeholder="座號" style="width: 100%; padding: 12px 16px; border-radius: 12px; border: 2px solid #334155; background: #0f172a; color: #fff; font-size: 1rem; font-family: var(--font-body); font-weight: 700; transition: border-color 0.2s;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#334155'">
+          </div>
+        </div>
+        
         <div style="margin-bottom: 20px; text-align: left; width: 100%;">
           <label for="student-name" style="display: block; font-size: 0.95rem; color: #94a3b8; font-weight: 700; margin-bottom: 8px;">👤 學生姓名 Student Name:</label>
           <input type="text" id="student-name" placeholder="請輸入姓名 (預設為訪客)" style="width: 100%; padding: 12px 16px; border-radius: 12px; border: 2px solid #334155; background: #0f172a; color: #fff; font-size: 1rem; font-family: var(--font-body); font-weight: 700; transition: border-color 0.2s;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#334155'">
         </div>
         
-        <div class="level-grid">
-          <button class="btn-level selected" data-mode="basic">
-            <h3>基礎挑戰</h3>
+        <div class="level-grid" style="flex-wrap: nowrap; gap: 8px;">
+          <button class="btn-level selected" data-mode="basic" style="min-width: 80px; padding: 15px 8px;">
+            <h3>基礎</h3>
           </button>
-          <button class="btn-level" data-mode="advanced">
-            <h3>進階挑戰</h3>
+          <button class="btn-level" data-mode="advanced" style="min-width: 80px; padding: 15px 8px;">
+            <h3>進階</h3>
           </button>
-          <button class="btn-level" data-mode="hell">
-            <h3>地獄挑戰</h3>
+          <button class="btn-level" data-mode="hell" style="min-width: 80px; padding: 15px 8px;">
+            <h3>困難</h3>
           </button>
         </div>
 
@@ -1032,6 +1049,7 @@
     let questionTimerInterval = null;
     let questionHadMistake = false; // 紀錄當前題目是否有過任何失誤（含超時）
     let filledSlots = [];
+    let placedValues = [];
 
     // Common Factor Phase variables
     let inCommonFactorPhase = false;
@@ -1191,6 +1209,7 @@
       });
       sortedFactors.sort((a, b) => a - b);
       filledSlots = Array(sortedFactors.length).fill(false);
+      placedValues = [];
 
       cowherdBox.style.left = '12%';
       cowherdBox.style.bottom = '30%';
@@ -1267,6 +1286,45 @@
       slot.style.top = `${topPct}%`;
       slot.innerText = '?';
       slotsOverlay.appendChild(slot);
+    }
+
+    // 更新橋上所有已放置插槽的數值與樣式，確保是由兩端(最左、最右)向內依序排列
+    function updateBridgeSlots() {
+      // 先清空所有插槽
+      for (let i = 0; i < sortedFactors.length; i++) {
+        let slot = document.getElementById(`slot-${i}`);
+        if (slot) {
+          slot.className = 'slot';
+          slot.innerText = '?';
+        }
+      }
+      
+      let N = sortedFactors.length;
+      let M = placedValues.length;
+      let sortedCurrent = placedValues.slice().sort((a, b) => a - b);
+      
+      let leftCount = Math.ceil(M / 2);
+      let rightCount = Math.floor(M / 2);
+      
+      // 填入左側插槽
+      for (let i = 0; i < leftCount; i++) {
+        let slot = document.getElementById(`slot-${i}`);
+        if (slot) {
+          slot.className = 'slot filled';
+          slot.innerText = sortedCurrent[i];
+        }
+      }
+      
+      // 填入右側插槽
+      for (let i = 0; i < rightCount; i++) {
+        let slotIdx = N - rightCount + i;
+        let valIdx = leftCount + i;
+        let slot = document.getElementById(`slot-${slotIdx}`);
+        if (slot) {
+          slot.className = 'slot filled';
+          slot.innerText = sortedCurrent[valIdx];
+        }
+      }
     }
 
     function getDistractors(targetNum, needed) {
@@ -1395,7 +1453,7 @@
           selectedBubble = null;
         } else {
           questionHadMistake = true;
-          logMistakeToFirebase(gameMode === 'basic' ? "基礎挑戰" : "進階挑戰", targetNum, "因數配對錯誤", "乘積為 " + targetNum, `${v1} * ${v2} = ${v1*v2}`);
+          logMistakeToFirebase(gameMode === 'basic' ? "基礎" : "進階", targetNum, "因數配對錯誤", "乘積為 " + targetNum, `${v1} * ${v2} = ${v1*v2}`);
           
           isMatchingAnimationActive = true;
           
@@ -1405,29 +1463,32 @@
           el1.classList.add('fade-out');
           el2.classList.add('fade-out');
           
-          let idx1 = filledSlots.indexOf(false);
-          if (idx1 !== -1) filledSlots[idx1] = true;
-          let idx2 = filledSlots.indexOf(false);
-          if (idx2 !== -1) filledSlots[idx2] = true;
+          let val1 = Math.min(v1, v2);
+          let val2 = Math.max(v1, v2);
           
-          let targetEl1 = idx1 !== -1 ? document.getElementById(`slot-${idx1}`) : bridgeCanvas;
-          let targetEl2 = idx2 !== -1 ? document.getElementById(`slot-${idx2}`) : bridgeCanvas;
+          let N = sortedFactors.length;
+          let M = placedValues.length;
           
-          animateFlyingBubble(el1, targetEl1, v1);
-          animateFlyingBubble(el2, targetEl2, v2);
+          placedValues.push(val1);
+          placedValues.push(val2);
+          let newM = M + 2;
+          let leftCount = Math.ceil(newM / 2);
+          let rightCount = Math.floor(newM / 2);
+          let targetIdx1 = leftCount - 1;
+          let targetIdx2 = N - rightCount;
+          
+          let targetEl1 = document.getElementById(`slot-${targetIdx1}`);
+          let targetEl2 = document.getElementById(`slot-${targetIdx2}`);
+          
+          animateFlyingBubble(el1, targetEl1, val1);
+          animateFlyingBubble(el2, targetEl2, val2);
           selectedBubble = null;
           
           setTimeout(() => {
-            if (idx1 !== -1 && targetEl1) {
-              targetEl1.className = 'slot filled';
-              targetEl1.innerText = v1;
-              createExplosion(targetEl1.getBoundingClientRect());
-            }
-            if (idx2 !== -1 && targetEl2) {
-              targetEl2.className = 'slot filled';
-              targetEl2.innerText = v2;
-              createExplosion(targetEl2.getBoundingClientRect());
-            }
+            updateBridgeSlots();
+            
+            if (targetEl1) createExplosion(targetEl1.getBoundingClientRect());
+            if (targetEl2) createExplosion(targetEl2.getBoundingClientRect());
             
             matchedPairs.push({ id: 'dummy-' + Date.now(), f1: v1, f2: v2, isDummy: true });
             isMatchingAnimationActive = false;
@@ -1462,35 +1523,38 @@
         inputFactor1.focus();
       } else {
         questionHadMistake = true;
-        logMistakeToFirebase(gameMode === 'basic' ? "基礎挑戰" : "進階挑戰", targetNum, "因數配對錯誤", "乘積為 " + targetNum, `${v1} * ${v2} = ${v1*v2}`);
+        logMistakeToFirebase(gameMode === 'basic' ? "基礎" : "進階", targetNum, "因數配對錯誤", "乘積為 " + targetNum, `${v1} * ${v2} = ${v1*v2}`);
         
         isMatchingAnimationActive = true;
         
-        let idx1 = filledSlots.indexOf(false);
-        if (idx1 !== -1) filledSlots[idx1] = true;
-        let idx2 = filledSlots.indexOf(false);
-        if (idx2 !== -1) filledSlots[idx2] = true;
+        let val1 = Math.min(v1, v2);
+        let val2 = Math.max(v1, v2);
         
-        let targetEl1 = idx1 !== -1 ? document.getElementById(`slot-${idx1}`) : bridgeCanvas;
-        let targetEl2 = idx2 !== -1 ? document.getElementById(`slot-${idx2}`) : bridgeCanvas;
+        let N = sortedFactors.length;
+        let M = placedValues.length;
         
-        animateFlyingBubble(inputFactor1, targetEl1, v1);
-        animateFlyingBubble(inputFactor2, targetEl2, v2);
+        placedValues.push(val1);
+        placedValues.push(val2);
+        let newM = M + 2;
+        let leftCount = Math.ceil(newM / 2);
+        let rightCount = Math.floor(newM / 2);
+        let targetIdx1 = leftCount - 1;
+        let targetIdx2 = N - rightCount;
+        
+        let targetEl1 = document.getElementById(`slot-${targetIdx1}`);
+        let targetEl2 = document.getElementById(`slot-${targetIdx2}`);
+        
+        animateFlyingBubble(inputFactor1, targetEl1, val1);
+        animateFlyingBubble(inputFactor2, targetEl2, val2);
         
         inputFactor1.value = '';
         inputFactor2.value = '';
         
         setTimeout(() => {
-          if (idx1 !== -1 && targetEl1) {
-            targetEl1.className = 'slot filled';
-            targetEl1.innerText = v1;
-            createExplosion(targetEl1.getBoundingClientRect());
-          }
-          if (idx2 !== -1 && targetEl2) {
-            targetEl2.className = 'slot filled';
-            targetEl2.innerText = v2;
-            createExplosion(targetEl2.getBoundingClientRect());
-          }
+          updateBridgeSlots();
+          
+          if (targetEl1) createExplosion(targetEl1.getBoundingClientRect());
+          if (targetEl2) createExplosion(targetEl2.getBoundingClientRect());
           
           matchedPairs.push({ id: 'dummy-' + Date.now(), f1: v1, f2: v2, isDummy: true });
           isMatchingAnimationActive = false;
@@ -1511,6 +1575,13 @@
       sound.playSuccess();
       
       createScoreIndicator(originEl2);
+
+      let val1 = Math.min(v1, v2);
+      let val2 = Math.max(v1, v2);
+      placedValues.push(val1);
+      if (!match.isSquare) {
+        placedValues.push(val2);
+      }
 
       if (gameMode === 'hell') {
         let leftGroup = document.getElementById('hell-left-group');
@@ -1559,44 +1630,38 @@
         return;
       }
 
-      let idx1 = sortedFactors.indexOf(v1);
-      let idx2 = sortedFactors.indexOf(v2);
-      let minIdx = Math.min(idx1, idx2);
-      let maxIdx = Math.max(idx1, idx2);
-
+      let N = sortedFactors.length;
+      let M = placedValues.length;
+      let targetIdx1, targetIdx2;
+      
       if (match.isSquare) {
-        let centerSlot = document.getElementById(`slot-${minIdx}`);
-        animateFlyingBubble(originEl1, centerSlot, v1);
+        targetIdx1 = Math.ceil(M / 2) - 1;
+        
+        let centerSlot = document.getElementById(`slot-${targetIdx1}`);
+        animateFlyingBubble(originEl1, centerSlot, val1);
+        
         setTimeout(() => {
-          if (centerSlot) {
-            centerSlot.className = 'slot filled';
-            centerSlot.innerText = v1;
-            createExplosion(centerSlot.getBoundingClientRect());
-          }
+          updateBridgeSlots();
+          if (centerSlot) createExplosion(centerSlot.getBoundingClientRect());
           isMatchingAnimationActive = false;
           checkGameProgress();
         }, 800);
       } else {
-        let leftSlot = document.getElementById(`slot-${minIdx}`);
-        let rightSlot = document.getElementById(`slot-${maxIdx}`);
-
-        let leftVal = match.f1 === v1 ? v1 : v2;
-        let rightVal = match.f1 === v1 ? v2 : v1;
-
-        animateFlyingBubble(originEl1, leftSlot, leftVal);
-        animateFlyingBubble(originEl2, rightSlot, rightVal);
-
+        let leftCount = Math.ceil(M / 2);
+        let rightCount = Math.floor(M / 2);
+        targetIdx1 = leftCount - 1;
+        targetIdx2 = N - rightCount;
+        
+        let leftSlot = document.getElementById(`slot-${targetIdx1}`);
+        let rightSlot = document.getElementById(`slot-${targetIdx2}`);
+        
+        animateFlyingBubble(originEl1, leftSlot, val1);
+        animateFlyingBubble(originEl2, rightSlot, val2);
+        
         setTimeout(() => {
-          if (leftSlot) {
-            leftSlot.className = 'slot filled';
-            leftSlot.innerText = leftVal;
-            createExplosion(leftSlot.getBoundingClientRect());
-          }
-          if (rightSlot) {
-            rightSlot.className = 'slot filled';
-            rightSlot.innerText = rightVal;
-            createExplosion(rightSlot.getBoundingClientRect());
-          }
+          updateBridgeSlots();
+          if (leftSlot) createExplosion(leftSlot.getBoundingClientRect());
+          if (rightSlot) createExplosion(rightSlot.getBoundingClientRect());
           isMatchingAnimationActive = false;
           checkGameProgress();
         }, 800);
@@ -1743,6 +1808,14 @@
       }
       if (matchedPairs.length === factorPairs.length) {
         if (questionTimerInterval) clearInterval(questionTimerInterval);
+        
+        // 檢查最終橋上的數字集合是否與目標數的全部因數完全相同（不限配對順序）
+        let hasAllCorrectFactors = placedValues.length === sortedFactors.length &&
+                                   placedValues.slice().sort((a,b)=>a-b).every((val, idx) => val === sortedFactors[idx]);
+        if (hasAllCorrectFactors) {
+          questionHadMistake = false;
+        }
+
         if (!questionHadMistake) {
           correctOnFirstTryCount++;
           let qScore = Math.max(0, 120 - secondsElapsed) * 10;
@@ -1751,7 +1824,25 @@
         hudScoreTxt.innerText = `${sessionTotalScore}分`;
 
         gameState = 'building_bridge';
-        setTimeout(buildMagpieBridgeAnimation, 600);
+
+        if (questionHadMistake) {
+          // 配對有錯誤 → 不召喚喜鵲，牛郎織女直接走到草地邊緣隨即墜河
+          basicInputPanel.style.display = 'none';
+          advancedInputPanel.style.display = 'none';
+          let poolMsg = document.getElementById('pool-msg-overlay');
+          poolMsg.style.display = 'flex';
+          poolMsg.innerHTML = '😔 因數配對有誤...';
+          hellMatchedRow.style.display = 'none';
+          slotsOverlay.style.display = 'block';
+
+          setTimeout(() => {
+            gameState = 'falling';
+            triggerFallingAnimation(false);
+          }, 600);
+        } else {
+          // 全對 → 正常召喚喜鵲
+          setTimeout(buildMagpieBridgeAnimation, 600);
+        }
       }
     }
 
@@ -1759,7 +1850,9 @@
       basicInputPanel.style.display = 'none';
       advancedInputPanel.style.display = 'none';
       if (document.getElementById('common-factor-overlay')) document.getElementById('common-factor-overlay').classList.remove('active');
-      document.getElementById('pool-msg-overlay').style.display = 'flex';
+      let poolMsg = document.getElementById('pool-msg-overlay');
+      poolMsg.style.display = 'flex';
+      poolMsg.innerHTML = '🕊️ 召喚成群喜鵲！鵲橋正在搭建中... 🕊️';
       hellMatchedRow.style.display = 'none';
       slotsOverlay.style.display = 'block';
 
@@ -1819,7 +1912,7 @@
           weaverBox.style.left = `${leftW}%`;
           weaverBox.style.bottom = `${bottomW}%`;
 
-          if (step % 6 === 0) {
+          if (step % 6 === 0 && !questionHadMistake) {
             createExplosion(cowherdBox.getBoundingClientRect());
             createExplosion(weaverBox.getBoundingClientRect());
           }
@@ -1827,43 +1920,36 @@
           step++;
           requestAnimationFrame(walkFrame);
         } else {
-          if (questionHadMistake) {
-            cowherdBox.style.left = '48%';
-            weaverBox.style.left = '52%';
-            gameState = 'falling';
-            triggerFallingAnimation(true);
-          } else {
-            cowherdBox.innerHTML = getCowherdSVG('idle');
-            weaverBox.innerHTML = getWeaverGirlSVG('idle');
-            
-            let rectC = cowherdBox.getBoundingClientRect();
-            let rectW = weaverBox.getBoundingClientRect();
-            let centerRect = {
-              left: (rectC.left + rectW.left) / 2,
-              top: (rectC.top + rectW.top) / 2,
-              width: 0, height: 0
-            };
-            let containerRect = document.querySelector('.game-container').getBoundingClientRect();
-            let meetX = (centerRect.left - containerRect.left) / (window.currentScale || 1);
-            let meetY = (centerRect.top - containerRect.top) / (window.currentScale || 1);
-            
-            sound.playVictory();
-            
-            // Generate 3 floating hearts at the meeting point
-            createHearts(meetX, meetY, 3);
-            
-            for(let i=0; i<10; i++) {
-              setTimeout(() => {
-                createExplosion({
-                  left: centerRect.left + (Math.random()*80 - 40),
-                  top: centerRect.top + (Math.random()*40 - 20),
-                  width: 0, height: 0
-                });
-              }, i * 150);
-            }
-
-            setTimeout(showClearScreen, 1200);
+          cowherdBox.innerHTML = getCowherdSVG('idle');
+          weaverBox.innerHTML = getWeaverGirlSVG('idle');
+          
+          let rectC = cowherdBox.getBoundingClientRect();
+          let rectW = weaverBox.getBoundingClientRect();
+          let centerRect = {
+            left: (rectC.left + rectW.left) / 2,
+            top: (rectC.top + rectW.top) / 2,
+            width: 0, height: 0
+          };
+          let containerRect = document.querySelector('.game-container').getBoundingClientRect();
+          let meetX = (centerRect.left - containerRect.left) / (window.currentScale || 1);
+          let meetY = (centerRect.top - containerRect.top) / (window.currentScale || 1);
+          
+          sound.playVictory();
+          
+          // Generate 3 floating hearts at the meeting point
+          createHearts(meetX, meetY, 3);
+          
+          for(let i=0; i<10; i++) {
+            setTimeout(() => {
+              createExplosion({
+                left: centerRect.left + (Math.random()*80 - 40),
+                top: centerRect.top + (Math.random()*40 - 20),
+                width: 0, height: 0
+              });
+            }, i * 150);
           }
+
+          setTimeout(showClearScreen, 1200);
         }
       }
       walkFrame();
@@ -1873,6 +1959,7 @@
       isFailMode = false;
       if (countdownInterval) clearInterval(countdownInterval);
       if (questionTimerInterval) clearInterval(questionTimerInterval);
+      clearMsg.style.textAlign = 'center';
       clearOverlay.classList.add('active');
       
       let needCountdown = !inCommonFactorPhase && currentQuestionIndex < 4;
@@ -1938,7 +2025,7 @@
         logMistakeToFirebase("公因數挑戰", `${commonFactorNumA}, ${commonFactorNumB}`, "答題超時", "無", "無");
         document.getElementById('common-factor-overlay').classList.remove('active');
       } else {
-        logMistakeToFirebase(gameMode === 'basic' ? "基礎挑戰" : (gameMode === 'advanced' ? "進階挑戰" : "地獄挑戰"), targetNum, "答題超時", "無", "無");
+        logMistakeToFirebase(gameMode === 'basic' ? "基礎" : (gameMode === 'advanced' ? "進階" : "困難"), targetNum, "答題超時", "無", "無");
       }
       gameState = 'falling';
       triggerFallingAnimation();
@@ -2049,27 +2136,29 @@
     function showFailureScreen() {
       isFailMode = true;
       if (inCommonFactorPhase) {
+        clearMsg.style.textAlign = 'center';
         clearTitle.innerText = "挑戰失敗，墜入銀河！ 🌊";
         clearBadge.innerText = "😭";
         clearMsg.innerText = "公因數或最大公因數回答錯誤，喜鵲沒有來。";
-        btnNextLevel.innerText = "重新挑戰本題 ➔";
+        btnNextLevel.innerText = "再挑戰一次 ➔";
       } else {
+        clearMsg.style.textAlign = 'left';
         clearTitle.innerText = "配對錯誤，墜入銀河！ 🌊";
         clearBadge.innerText = "😭";
         
         let examplePairs = calculateFactorPairs(targetNum);
-        let guideHtml = `因數找法提示：建議使用<b>「配對法」</b>，由小到大一組一組兩兩配對。<br>例如找出 <b>${targetNum}</b> 的所有因數：<br><div style="margin: 8px 0; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 8px; font-family: monospace; line-height: 1.5; text-align: left;">`;
+        let guideHtml = `請用<b>「配對法」</b>兩兩一組找出因數，例如找出 <b>${targetNum}</b> 的因數：<br><div style="margin: 8px 0; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 8px; font-family: monospace; line-height: 1.5; text-align: left;">`;
         examplePairs.forEach(p => {
           if (p.isSquare) {
-            guideHtml += `✨ ${p.f1} × ${p.f1} = ${targetNum} (因數有 ${p.f1})<br>`;
+            guideHtml += `✨ ${p.f1}x${p.f1}=${targetNum} (${p.f1}是${targetNum}的因數)<br>`;
           } else {
-            guideHtml += `✨ ${p.f1} × ${p.f2} = ${targetNum} (因數有 ${p.f1}, ${p.f2})<br>`;
+            guideHtml += `✨ ${p.f1}x${p.f2}=${targetNum} (${p.f1}、${p.f2}是${targetNum}的因數)<br>`;
           }
         });
-        guideHtml += `</div>由 1 開始依序往後檢查，直到乘積相遇，這樣就不會選錯或漏掉囉！`;
+        guideHtml += `</div>由1開始依序往後檢查，直到數字相遇，這樣就不會漏掉囉！`;
         
         clearMsg.innerHTML = guideHtml;
-        btnNextLevel.innerText = "重新挑戰本題 ➔";
+        btnNextLevel.innerText = "再挑戰一次 ➔";
       }
 
       if (countdownInterval) clearInterval(countdownInterval);
@@ -2291,8 +2380,16 @@
         bgm.volume = 0.4;
         bgm.play().catch(e => console.log('BGM play blocked', e));
       }
+      let inputClass = document.getElementById('student-class').value.trim();
+      let inputSeat = document.getElementById('student-seat').value.trim();
       let inputName = document.getElementById('student-name').value.trim();
-      studentName = inputName ? inputName : "訪客";
+      
+      let formattedName = "";
+      if (inputClass) formattedName += inputClass + " ";
+      if (inputSeat) formattedName += inputSeat + "號 ";
+      formattedName += inputName ? inputName : "訪客";
+      
+      studentName = formattedName.trim();
 
       sessionTotalScore = 0;
       correctOnFirstTryCount = 0;
@@ -2364,7 +2461,7 @@
       shuffle(sessionTargets);
       
       currentQuestionIndex = 0;
-      hudLevelTxt.innerText = gameMode === 'basic' ? "基礎挑戰" : (gameMode === 'advanced' ? "進階挑戰" : "地獄挑戰");
+      hudLevelTxt.innerText = gameMode === 'basic' ? "基礎" : (gameMode === 'advanced' ? "進階" : "困難");
       
       startNewGame();
     });
@@ -2397,8 +2494,16 @@
       if (isFailMode) {
         isFailMode = false;
         if (inCommonFactorPhase) {
+          sessionTotalScore = Math.max(0, sessionTotalScore - 100);
+          hudScoreTxt.innerText = `${sessionTotalScore}分`;
           startCommonFactorQuestion();
         } else {
+          // 題號 +1，但題目保持原題
+          if (currentQuestionIndex < 4) {
+            let sameTarget = sessionTargets[currentQuestionIndex];
+            currentQuestionIndex++;
+            sessionTargets[currentQuestionIndex] = sameTarget;
+          }
           startNewGame();
         }
       } else {
@@ -2444,23 +2549,38 @@
       if (gameState !== 'playing' || isMatchingAnimationActive) return;
       sound.playClick();
 
-      if (matchedPairs.length === factorPairs.length) {
+      // 檢查地獄挑戰的數字集合是否與目標數的全部因數完全相同（不限配對順序）
+      let hasAllCorrectFactors = placedValues.length === sortedFactors.length &&
+                                 placedValues.slice().sort((a,b)=>a-b).every((val, idx) => val === sortedFactors[idx]);
+      if (hasAllCorrectFactors) {
+        questionHadMistake = false;
+      }
+
+      if (matchedPairs.length === factorPairs.length && !questionHadMistake) {
         if (questionTimerInterval) clearInterval(questionTimerInterval);
-        if (!questionHadMistake) {
-          correctOnFirstTryCount++;
-          let qScore = Math.max(0, 120 - secondsElapsed) * 10;
-          sessionTotalScore += qScore;
-        }
+        correctOnFirstTryCount++;
+        let qScore = Math.max(0, 120 - secondsElapsed) * 10;
+        sessionTotalScore += qScore;
         hudScoreTxt.innerText = `${sessionTotalScore}分`;
 
         gameState = 'building_bridge';
         buildMagpieBridgeAnimation();
       } else {
         questionHadMistake = true;
-        logMistakeToFirebase("地獄挑戰", targetNum, "我找完了檢查不通過（漏找或找錯）", sortedFactors.join(','), matchedPairs.map(p => `${p.f1}*${p.f2}`).join(','));
+        logMistakeToFirebase("困難", targetNum, "我找完了檢查不通過（漏找或找錯）", sortedFactors.join(','), matchedPairs.map(p => `${p.f1}*${p.f2}`).join(','));
         
-        gameState = 'falling';
-        triggerFallingAnimation();
+        basicInputPanel.style.display = 'none';
+        advancedInputPanel.style.display = 'none';
+        let poolMsg = document.getElementById('pool-msg-overlay');
+        poolMsg.style.display = 'flex';
+        poolMsg.innerHTML = '😔 因數配對有誤...';
+        hellMatchedRow.style.display = 'none';
+        slotsOverlay.style.display = 'block';
+
+        setTimeout(() => {
+          gameState = 'falling';
+          triggerFallingAnimation(false);
+        }, 600);
       }
     });
 
