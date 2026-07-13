@@ -406,7 +406,7 @@
     </div>
 
     <!-- 通知單區塊 -->
-    <div class="glass-card notice-card" id="noticeCard">
+    <div class="glass-card notice-card" id="noticeCard" style="display: none;">
       <h2 class="section-title notices">
         <i class="fa-solid fa-images"></i> 通知單
       </h2>
@@ -478,31 +478,6 @@
     // 📸 預設通知單資料庫
     let noticeDatabase = {};
 
-    // 實時監聽 Firebase
-    if (database) {
-      // 1. 作業監聽
-      database.ref('homeworkDatabase').on('value', (snapshot) => {
-        const val = snapshot.val();
-        if (val) {
-          homeworkDatabase = val;
-          renderContactBook(currentTargetDate);
-        } else {
-          // 如果為空，發佈初始預設值
-          database.ref('homeworkDatabase').set(homeworkDatabase);
-        }
-      });
-
-      // 2. 通知單監聽
-      database.ref('noticeDatabase').on('value', (snapshot) => {
-        const val = snapshot.val();
-        if (val) {
-          noticeDatabase = val;
-          renderContactBook(currentTargetDate);
-        } else {
-          database.ref('noticeDatabase').set(noticeDatabase);
-        }
-      });
-    }
 
     // 教師後台密碼驗證 Modal
     function showAdminPasswordModal() {
@@ -674,8 +649,33 @@
 
     // 頁面初次載入時自動初始化
     window.addEventListener('DOMContentLoaded', () => {
-      // 執行初次渲染（使用系統今日時間）
-      renderContactBook(currentTargetDate);
+      // 實時監聽 Firebase (確保 DOM 元素皆已就緒後載入資料)
+      if (database) {
+        // 1. 作業監聽
+        database.ref('homeworkDatabase').on('value', (snapshot) => {
+          const val = snapshot.val();
+          if (val) {
+            homeworkDatabase = val;
+            renderContactBook(currentTargetDate);
+          } else {
+            database.ref('homeworkDatabase').set(homeworkDatabase);
+          }
+        });
+
+        // 2. 通知單監聽
+        database.ref('noticeDatabase').on('value', (snapshot) => {
+          const val = snapshot.val();
+          if (val) {
+            noticeDatabase = val;
+            renderContactBook(currentTargetDate);
+          } else {
+            database.ref('noticeDatabase').set(noticeDatabase);
+          }
+        });
+      } else {
+        // 執行初次渲染（使用系統今日時間）
+        renderContactBook(currentTargetDate);
+      }
     });
   </script>
 </body>
