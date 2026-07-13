@@ -8,6 +8,8 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <!-- SheetJS for Client-side Excel Export -->
     <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
+    <!-- html2pdf for PDF Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <title>雞兔問題(生活情境) - 教師管理後台</title>
     <style>
         :root {
@@ -861,6 +863,9 @@
                     <button class="btn download-btn" onclick="downloadExcel('${session.id}')">
                         📥 下載此教師 Excel
                     </button>
+                    <button class="btn download-btn" style="margin-top: 10px; background: #3b82f6;" onclick="downloadPDF('${session.id}')">
+                        📄 下載詳細歷程 PDF
+                    </button>
                 `;
                 container.appendChild(card);
             });
@@ -937,6 +942,142 @@
             const filename = `${session.teacherName}_雞兔問題紀錄_${dateStr}.xlsx`;
             
             XLSX.writeFile(wb, filename);
+        }
+
+        function downloadPDF(sessionId) {
+            if (typeof html2pdf === 'undefined') {
+                alert("PDF 套件尚未載入完成，請稍候再試。");
+                return;
+            }
+
+            const session = groupedSessions.find(s => s.id === sessionId);
+            if (!session) return alert("找不到場次資料！");
+            
+            // 建立一個隱藏的容器來放置 PDF 內容
+            const container = document.createElement('div');
+            container.style.padding = '20px';
+            container.style.backgroundColor = '#fff';
+            container.style.color = '#000';
+            container.style.fontFamily = 'sans-serif';
+            
+            // 準備要放入 PDF 的資料，依照作答時間遞增 (舊 -> 新)
+            const exportRecords = [...session.records].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+            exportRecords.forEach((rec, index) => {
+                const dateObj = new Date(rec.timestamp);
+                const timeStr = dateObj.toLocaleDateString() + ' ' + dateObj.toTimeString().split(' ')[0];
+                const minutes = Math.floor((rec.durationSeconds || 0) / 60);
+                const seconds = (rec.durationSeconds || 0) % 60;
+                const timeTakenStr = minutes > 0 ? `${minutes}分${seconds}秒` : `${seconds}秒`;
+                const pathText = rec.solvedPath === 'A' ? 'A (假設全部便宜)' : (rec.solvedPath === 'B' ? 'B (假設全部貴重)' : rec.solvedPath);
+                
+                // 產生每個步驟的 HTML
+                let stepsHtml = "";
+                for (let s = 1; s <= 5; s++) {
+                    const stepAns = rec.stepAnswers && rec.stepAnswers[s] ? rec.stepAnswers[s] : { eq: "無數據", meaning: "無數據", attempts: [] };
+                    
+                    let attemptsListHtml = "";
+                    if (stepAns.attempts && stepAns.attempts.length > 0) {
+                        attemptsListHtml = `<div style="margin-top: 5px; font-size: 0.8rem; border-top: 1px dotted #ccc; padding-top: 5px;">`;
+                        attemptsListHtml += `<b>💡 所有嘗試歷程：</b><ul style="padding-left: 20px; margin-top: 3px; margin-bottom: 0;">`;
+                        stepAns.attempts.forEach((att) => {
+                            const statusTag = att.valid ? '【答對】' : '【答錯/不完整】';
+                            const statusColor = att.valid ? '#10b981' : '#ef4444';
+                            attemptsListHtml += `
+                                <li style="margin-bottom: 3px;">
+                                    <span style="font-family: monospace; font-weight: bold; color: #4f46e5;">${escapeHtml(att.eq)}</span>
+                                    <span style="color: #64748b; margin-left: 5px;">解釋：</span><span>${escapeHtml(att.meaning)}</span>
+                                    <span style="color: ${statusColor}; font-weight: bold; margin-left: 5px;">${statusTag}</span>
+                                    ${att.reason ? `<div style="color: #b45309; font-size: 0.75rem; margin-top: 2px;">提示：${escapeHtml(att.reason)}</div>` : ''}
+                                </li>
+                            `;
+                        });
+                        attemptsListHtml += `</ul></div>`;
+                    }
+
+                    stepsHtml += `
+                        <div style="border-left: 4px solid #4f46e5; background: #f8fafc; padding: 10px; margin-bottom: 10px; border-radius: 0 8px 8px 0;">
+                            <div style="font-weight: bold; font-size: 0.9rem; color: #64748b; margin-bottom: 5px;">步驟 ${s}</div>
+                            <div style="font-family: monospace; font-weight: bold; font-size: 1rem; color: #4f46e5; margin-bottom: 5px;">${escapeHtml(stepAns.eq)}</div>
+                            <div style="font-size: 0.9rem;">👉 <b>過關解釋：</b>${escapeHtml(stepAns.meaning)}</div>
+                            ${attemptsListHtml}
+                        </div>
+                    `;
+                }
+
+                // 將這位學生的區塊加入 container
+                const studentDiv = document.createElement('div');
+                // 確保除了最後一頁外，每位學生強制換頁
+                if (index < exportRecords.length - 1) {
+                    studentDiv.style.pageBreakAfter = 'always';
+                }
+                
+                studentDiv.innerHTML = `
+                    <h2 style="text-align: center; color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 20px;">📋 學生詳細答題歷程</h2>
+                    
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">
+                        <div style="flex: 1; min-width: 120px; background: #f1f5f9; padding: 10px; border-radius: 8px;">
+                            <div style="font-size: 0.75rem; color: #64748b;">教師/座號/姓名</div>
+                            <div style="font-size: 1rem; font-weight: bold; color: #4f46e5;">${escapeHtml(rec.teacherName || "未填")}/${escapeHtml(rec.student)}</div>
+                        </div>
+                        <div style="flex: 1; min-width: 120px; background: #f1f5f9; padding: 10px; border-radius: 8px;">
+                            <div style="font-size: 0.75rem; color: #64748b;">答題時間 / 耗時</div>
+                            <div style="font-size: 1rem; font-weight: bold;">${timeStr} / ${timeTakenStr}</div>
+                        </div>
+                        <div style="flex: 1; min-width: 120px; background: #f1f5f9; padding: 10px; border-radius: 8px;">
+                            <div style="font-size: 0.75rem; color: #64748b;">挑戰情境 / 錯題</div>
+                            <div style="font-size: 1rem; font-weight: bold;">${rec.scenario} / <span style="color: ${rec.failedAttempts > 0 ? '#ef4444' : '#10b981'}">${rec.failedAttempts || 0}次錯</span></div>
+                        </div>
+                    </div>
+                    
+                    <h3 style="font-size: 1rem; font-weight: bold; margin-bottom: 10px; color: #1e293b;">👣 解題步驟記錄</h3>
+                    ${stepsHtml}
+                `;
+                
+                container.appendChild(studentDiv);
+            });
+
+            // 顯示載入提示
+            const loadingOverlay = document.createElement('div');
+            loadingOverlay.style.position = 'fixed';
+            loadingOverlay.style.top = '0';
+            loadingOverlay.style.left = '0';
+            loadingOverlay.style.width = '100%';
+            loadingOverlay.style.height = '100%';
+            loadingOverlay.style.background = 'rgba(0,0,0,0.7)';
+            loadingOverlay.style.color = 'white';
+            loadingOverlay.style.display = 'flex';
+            loadingOverlay.style.flexDirection = 'column';
+            loadingOverlay.style.alignItems = 'center';
+            loadingOverlay.style.justifyContent = 'center';
+            loadingOverlay.style.zIndex = '9999';
+            loadingOverlay.style.fontSize = '1.2rem';
+            loadingOverlay.innerHTML = `
+                <div class="spinner" style="margin-bottom: 20px;"></div>
+                <div>正在產生全班詳細紀錄 PDF，請稍候...</div>
+                <div style="font-size: 0.9rem; color: #cbd5e1; margin-top: 10px;">資料量較大時可能需要數秒鐘</div>
+            `;
+            document.body.appendChild(loadingOverlay);
+
+            // 執行 PDF 產出
+            const dateStr = session.endTime.toLocaleDateString().replace(/\//g, '-');
+            const filename = `${session.teacherName}_詳細答題紀錄_${dateStr}.pdf`;
+
+            const opt = {
+                margin:       10,
+                filename:     filename,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().from(container).set(opt).save().then(() => {
+                document.body.removeChild(loadingOverlay);
+            }).catch(err => {
+                console.error("PDF 產生失敗", err);
+                alert("PDF 產生失敗，請檢查主控台錯誤訊息。");
+                document.body.removeChild(loadingOverlay);
+            });
         }
     </script>
 </body>
