@@ -10,6 +10,9 @@
     <script src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
+    <!-- Firebase CDN -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Noto+Sans+TC:wght@400;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
@@ -68,6 +71,26 @@
     <div id="root"></div>
 
     <script type="text/babel">
+        // --- Firebase Config ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCfg0RqupJq1ZpUkZVJdVuUODQd2C-hGuw",
+            authDomain: "mathgame-eb605.firebaseapp.com",
+            databaseURL: "https://mathgame-eb605-default-rtdb.firebaseio.com",
+            projectId: "mathgame-eb605",
+            storageBucket: "mathgame-eb605.firebasestorage.app",
+            messagingSenderId: "128497079299",
+            appId: "1:128497079299:web:d88fd651b9ae18cda2aa36"
+        };
+        let db = null;
+        try {
+            if (typeof firebase !== 'undefined') {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.database();
+            }
+        } catch(e) {
+            console.error("Firebase init failed:", e);
+        }
+
         const { useState, useEffect, useRef } = React;
 
         // Custom Web Audio API synthesizer for 8-bit retro arcade SFX
@@ -270,6 +293,13 @@
             const [finalTimeBonus, setFinalTimeBonus] = useState(0);
             const [finalElapsedTime, setFinalElapsedTime] = useState(0);
             const [isVictory, setIsVictory] = useState(false);
+            
+            // Firebase Leaderboard States
+            const [leaderboard, setLeaderboard] = useState([]);
+            const [isNewRecord, setIsNewRecord] = useState(false);
+            const [playerName, setPlayerName] = useState('');
+            const [isSubmitted, setIsSubmitted] = useState(false);
+
             const canvasRef   = useRef(null);
             const animRef     = useRef(null);
             const gRef        = useRef(null);   // mutable game-state object
@@ -278,6 +308,42 @@
             const gameTickRef       = useRef(null);
             const lastQuestionRef   = useRef({ left: 0, right: 0 });
 
+            // --- Firebase Leaderboard Logic ---
+            const fetchLeaderboard = () => {
+                if (!db) return;
+                try {
+                    db.ref('pacman_leaderboard').orderByChild('score').limitToLast(10).once('value', (snapshot) => {
+                        const data = [];
+                        snapshot.forEach((childSnapshot) => {
+                            data.push({ id: childSnapshot.key, ...childSnapshot.val() });
+                        });
+                        // Sort descending
+                        data.sort((a, b) => b.score - a.score);
+                        setLeaderboard(data);
+                    });
+                } catch(e) {
+                    console.error("Fetch leaderboard error:", e);
+                }
+            };
+
+            const submitScore = () => {
+                if (!db || !playerName.trim() || isSubmitted) return;
+                try {
+                    db.ref('pacman_leaderboard').push({
+                        name: playerName.trim().substring(0, 10) || '無名英雄',
+                        score: finalPacmanScore,
+                        timestamp: firebase.database.ServerValue.TIMESTAMP
+                    });
+                    setIsSubmitted(true);
+                    fetchLeaderboard(); // refresh list
+                } catch(e) {
+                    console.error("Submit score error:", e);
+                }
+            };
+
+            useEffect(() => {
+                fetchLeaderboard();
+            }, []);
 
             // ─── Canvas game loop ──────────────────────────────────────────
             useEffect(() => {
@@ -586,9 +652,14 @@
                                 setFinalPacmanScore(totalVal);
                                 setIsVictory(false);
 
-                                if (totalVal > pacmanHighScore) {
+                                if (totalVal > pacmanHighScore && totalVal > 0) {
                                     localStorage.setItem('pacman_highscore', totalVal.toString());
                                     setPacmanHighScore(totalVal);
+                                    setIsNewRecord(true);
+                                    setIsSubmitted(false);
+                                    setPlayerName('');
+                                } else {
+                                    setIsNewRecord(false);
                                 }
                                 setTimeout(() => setGameState('reward_gameover'), 800);
                             } else {
@@ -698,9 +769,14 @@
                         setFinalPacmanScore(totalVal);
                         setIsVictory(true);
 
-                        if (totalVal > pacmanHighScore) {
+                        if (totalVal > pacmanHighScore && totalVal > 0) {
                             localStorage.setItem('pacman_highscore', totalVal.toString());
                             setPacmanHighScore(totalVal);
+                            setIsNewRecord(true);
+                            setIsSubmitted(false);
+                            setPlayerName('');
+                        } else {
+                            setIsNewRecord(false);
                         }
                         setTimeout(() => {
                             setGameState('reward_gameover');
@@ -1212,10 +1288,49 @@
                                     </div>
                                 </div>
 
-                                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 w-full">
                                     <div className="text-slate-500 text-[14px] uppercase tracking-wider arcade-font mb-1">歷史最高紀錄</div>
                                     <div className="text-2xl font-black text-yellow-400 arcade-font">{pacmanHighScore}</div>
                                 </div>
+
+                                {isNewRecord && !isSubmitted && (
+                                    <div className="bg-gradient-to-r from-amber-500/20 to-orange-600/20 p-5 rounded-xl border border-amber-500/50 w-full space-y-3 shadow-lg glow-rose">
+                                        <div className="text-amber-400 font-bold arcade-font text-[14px] animate-pulse">🎉 恭喜打破紀錄！</div>
+                                        <div className="text-slate-300 text-[10px] arcade-font mb-2">留下大名參與全服排行</div>
+                                        <input 
+                                            type="text" 
+                                            maxLength="8"
+                                            value={playerName}
+                                            onChange={(e) => setPlayerName(e.target.value)}
+                                            placeholder="您的名字 (最多8字)"
+                                            className="w-full bg-slate-900 border-2 border-amber-500/50 rounded-lg p-3 text-center text-slate-100 font-bold focus:outline-none focus:border-amber-400 arcade-font text-[12px]"
+                                        />
+                                        <button 
+                                            onClick={submitScore}
+                                            disabled={!playerName.trim()}
+                                            className="w-full py-3 mt-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:bg-slate-700 text-slate-950 font-black rounded-lg transition-colors arcade-font text-[14px] cursor-pointer"
+                                        >
+                                            送出成績
+                                        </button>
+                                    </div>
+                                )}
+                                
+                                {leaderboard.length > 0 && (
+                                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 w-full text-left max-h-[280px] overflow-y-auto">
+                                        <div className="text-center text-emerald-400 text-[14px] font-bold arcade-font mb-4">🏅 英雄榜 TOP 10</div>
+                                        <div className="space-y-2">
+                                            {leaderboard.map((entry, idx) => (
+                                                <div key={entry.id} className="flex justify-between items-center bg-slate-900 px-3 py-2.5 rounded border border-slate-800/80">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-slate-500 text-[10px] w-5 text-right arcade-font">{idx + 1}.</span>
+                                                        <span className="text-slate-200 text-[13px] font-bold truncate max-w-[150px]">{entry.name}</span>
+                                                    </div>
+                                                    <span className="text-yellow-400 text-[12px] arcade-font font-black">{entry.score}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                 <button onClick={() => { playSfx('chomp'); setGameState('menu'); }}
                                     className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-extrabold rounded-2xl shadow-lg transition-all hover:scale-105 active:scale-95 text-lg">
