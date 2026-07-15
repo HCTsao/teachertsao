@@ -1276,6 +1276,9 @@
     }
     // 鍵盤輸入事件優化
     document.addEventListener('DOMContentLoaded', () => {
+        // 動態初始化本地金鑰
+        initApiKey();
+        
         const eqInput = document.getElementById('equation-input');
         if (eqInput) {
             eqInput.addEventListener('input', (e) => {
@@ -1494,6 +1497,27 @@
     // --- Firebase 課堂連線驗證 ---
     let verifiedClassPassword = "";
     let verifiedTeacherName = "";
+    let classApiKey = ""; // 動態自本地端加載，避免硬編碼金鑰
+
+    async function initApiKey() {
+        let key = localStorage.getItem('groq_api_key');
+        if (!key) {
+            try {
+                const res = await fetch('../groq_apikey.txt');
+                if (res.ok) {
+                    const text = await res.text();
+                    key = text.trim();
+                    if (key) {
+                        localStorage.setItem('groq_api_key', key);
+                    }
+                }
+            } catch (e) {}
+        }
+        if (key) {
+            classApiKey = key;
+        }
+    }
+
     function promptClassPassword() {
         const pwd = prompt("請輸入老師提供的「課堂密碼」：");
         if (!pwd) return;
@@ -1507,6 +1531,9 @@
                     const data = snapshot.val();
                     verifiedTeacherName = data.teacherName;
                     verifiedClassPassword = pwd;
+                    if (data.apiKey) {
+                        classApiKey = data.apiKey;
+                    }
                     const statusEl = document.getElementById('class-status-text');
                     statusEl.innerHTML = `✅ 已成功連線至 <b>${verifiedTeacherName}</b> 老師的課堂！`;
                     statusEl.style.color = '#10b981';
@@ -1990,8 +2017,76 @@
         }
         return { valid: false, reason: "驗證發生未知錯誤，請檢視輸入是否正確。" };
     }
+    // --- 外部 AI 診斷引擎 ---
+    async function validateAnswerWithAI(eqInput, meaningInput, step) {
+        if (!classApiKey) return null;
+
+        const sc = gameState.scenario;
+        const P1 = sc.item1.age;
+        const P2 = sc.item2.age;
+        const N = gameState.targetMultiple;
+        const T = gameState.targetDiff || gameState.targetSum;
+
+        const promptSystem = `你是一個數學教學助理，負責評估國小六年級學生在解「年齡問題（假設法）」時，當前解題步驟的『算式』與『算式意涵（解釋）』是否正確。
+請依據提供的題目情境、當前步驟、以及學生的輸入進行判斷。
+
+題目情境:
+- 標題: ${sc.title}
+- 品項1 (如大人的姓名): ${sc.item1.name} (年齡: ${P1})
+- 品項2 (如小孩的姓名): ${sc.item2.name} (年齡: ${P2})
+- 目標倍數關係: ${N}
+- 實際總值/目標差: ${T}
+
+評估規則:
+1. 學生當前挑戰步驟 ${step} / 4。
+2. 請先利用數學邏輯檢查學生的『算式』是否符合年齡問題的解法。
+3. 檢查學生的『算式意涵』是否與算式匹配，且語意正確。
+4. 如果學生的算式合理，應該判為 true。
+5. 若判定為不通過，請提供具體的引導提示，引導學生思考；若通過，reason 可為空。
+
+回傳格式必須為唯一的 JSON 物件，包含三個屬性：
+1. "valid": 布林值 (true 代表通過，false 代表不通過)
+2. "reason": 字串 (若不通過，請提供溫和鼓勵的引導提示；若通過則留空)
+3. "normalizedEq": 字串 (整理後的標準算式，例如 10*2=20 寫成 10 × 2 = 20)`;
+
+        const promptUser = `當前挑戰步驟: 步驟 ${step}
+學生的算式: ${eqInput}
+學生的意涵解釋: ${meaningInput}`;
+
+        try {
+            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${classApiKey}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    model: "llama-3.3-70b-versatile",
+                    messages: [
+                        { role: "system", content: promptSystem },
+                        { role: "user", content: promptUser }
+                    ],
+                    response_format: { type: "json_object" },
+                    temperature: 0.1
+                })
+            });
+
+            if (!response.ok) throw new Error("HTTP error " + response.status);
+            const data = await response.json();
+            const result = JSON.parse(data.choices[0].message.content);
+            return {
+                valid: !!result.valid,
+                reason: result.reason || "",
+                normalizedEq: result.normalizedEq || eqInput
+            };
+        } catch (e) {
+            console.error("AI 評估出錯，將使用本地檢測引擎:", e);
+            return null;
+        }
+    }
+
     // --- 提交與步驟切換控制 ---
-    function submitStepAnswer() {
+    async function submitStepAnswer() {
         const eqInput = document.getElementById('equation-input').value;
         const meaningInput = document.getElementById('meaning-input').value;
         if (!eqInput || !meaningInput) {
@@ -1999,7 +2094,30 @@
             showFeedback('error', "請輸入完整的「算式」與「解釋涵義」喔！");
             return;
         }
-        const res = validateStepAnswer(eqInput, meaningInput);
+
+        // 取得提交按鈕元件顯示 AI 檢查狀態
+        const submitBtn = document.querySelector('.submit-row button');
+        const originalText = submitBtn.innerText;
+        submitBtn.disabled = true;
+        submitBtn.innerText = "AI 正在檢查中...";
+
+        let res = validateStepAnswer(eqInput, meaningInput);
+
+        // 如果本地規則沒過且有金鑰，發送 AI 檢查進行二次確認或引導
+        if (!res.valid && classApiKey) {
+            try {
+                const aiRes = await validateAnswerWithAI(eqInput, meaningInput, step);
+                if (aiRes) {
+                    res = aiRes;
+                }
+            } catch (err) {
+                console.error("AI 評估遭遇錯誤，退回本地引擎:", err);
+            }
+        }
+
+        submitBtn.disabled = false;
+        submitBtn.innerText = originalText;
+
         const step = gameState.currentStep;
         if (!gameState.stepAnswers[step]) {
             gameState.stepAnswers[step] = { eq: "", meaning: "", attempts: [] };

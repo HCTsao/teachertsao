@@ -483,9 +483,10 @@
         <div class="session-card" style="flex: 1; max-width: 100%; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; background: #e0f2fe; border-color: #7dd3fc;">
             <div style="flex: 1; min-width: 200px;">
                 <div style="font-size: 0.85rem; color: #0284c7; font-weight: bold; margin-bottom: 5px;">👨‍🏫 教師開課設定</div>
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="setup-teacher-name" placeholder="您的教師姓名 (例如：曹泓棋)" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #7dd3fc; outline: none; font-size: 0.95rem;">
-                    <input type="text" id="setup-class-pwd" placeholder="設定課堂密碼 (例如：1234)" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #7dd3fc; outline: none; font-size: 0.95rem;">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <input type="text" id="setup-teacher-name" placeholder="您的教師姓名 (例如：曹泓棋)" style="flex: 1; min-width: 180px; padding: 10px; border-radius: 8px; border: 1px solid #7dd3fc; outline: none; font-size: 0.95rem;">
+                    <input type="text" id="setup-class-pwd" placeholder="設定課堂密碼 (例如：1234)" style="flex: 1; min-width: 150px; padding: 10px; border-radius: 8px; border: 1px solid #7dd3fc; outline: none; font-size: 0.95rem;">
+                    <input type="password" id="setup-api-key" placeholder="Groq API Key (選填，可自動讀取本地金鑰)" style="flex: 1.5; min-width: 250px; padding: 10px; border-radius: 8px; border: 1px solid #7dd3fc; outline: none; font-size: 0.95rem;">
                 </div>
             </div>
             <button class="btn btn-primary" onclick="saveTeacherConfig()" style="background: #0284c7; align-self: flex-end; padding: 10px 20px;">💾 儲存 / 更新開課設定</button>
@@ -593,7 +594,13 @@
                 document.getElementById('config-banner').style.display = 'none';
                 console.log("Firebase 連結成功！");
                 
-
+                // 以課堂密碼為 Key 的新結構預設資料 (不寫入硬編碼的 API key)
+                db.ref('classes/4007').once('value').then(snap => {
+                    if (!snap.exists()) db.ref('classes/4007').set({ teacherName: '曹泓棋', timestamp: Date.now() });
+                });
+                db.ref('classes/1234').once('value').then(snap => {
+                    if (!snap.exists()) db.ref('classes/1234').set({ teacherName: '謝千慧', timestamp: Date.now() });
+                });
             } catch (e) {
                 console.error("Firebase 初始化失敗：", e);
             }
@@ -613,7 +620,30 @@
             // 監聽搜尋與過濾事件
             document.getElementById('search-input').addEventListener('input', renderTable);
             document.getElementById('scenario-filter').addEventListener('change', renderTable);
+
+            // 自動載入本地金鑰填入欄位
+            initApiKeyForTeacher();
         };
+
+        async function initApiKeyForTeacher() {
+            let key = localStorage.getItem('groq_api_key');
+            if (!key) {
+                try {
+                    const res = await fetch('../groq_apikey.txt');
+                    if (res.ok) {
+                        const text = await res.text();
+                        key = text.trim();
+                        if (key) {
+                            localStorage.setItem('groq_api_key', key);
+                        }
+                    }
+                } catch (e) {}
+            }
+            if (key) {
+                const el = document.getElementById('setup-api-key');
+                if (el) el.value = key;
+            }
+        }
 
         // 即時監聽資料庫變更
         function listenToRecords() {
@@ -1213,6 +1243,7 @@
         function saveTeacherConfig() {
             const tName = document.getElementById('setup-teacher-name').value.trim();
             const tPwd = document.getElementById('setup-class-pwd').value.trim();
+            const tApiKey = document.getElementById('setup-api-key').value.trim();
             if (!tName || !tPwd) {
                 alert("請完整輸入「教師姓名」與「課堂密碼」！");
                 return;
@@ -1229,9 +1260,10 @@
                     return;
                 }
                 
-                // 寫入新課堂
+                // 寫入新課堂 (含 API Key)
                 firebase.database().ref('classes/' + tPwd).set({
                     teacherName: tName,
+                    apiKey: tApiKey,
                     timestamp: Date.now()
                 }).then(() => {
                     alert(`✅ 成功建立課堂！\n\n教師姓名：${tName}\n課堂密碼：${tPwd}\n\n請將【課堂密碼】提供給學生輸入，才能將資料正確拋轉進您的後台。`);
