@@ -2104,10 +2104,10 @@
         submitBtn.disabled = true;
         submitBtn.innerText = "AI 正在檢查中...";
 
-        let res = validateStepAnswer(eqInput, meaningInput);
+        let res = null;
 
-        // 如果本地規則沒過且有金鑰，發送 AI 檢查進行二次確認或引導
-        if (!res.valid && classApiKey) {
+        // 版本 (2) 有輸入 API KEY，一律直接使用 AI 判斷
+        if (classApiKey) {
             try {
                 const aiRes = await validateAnswerWithAI(eqInput, meaningInput, step);
                 if (aiRes) {
@@ -2116,6 +2116,11 @@
             } catch (err) {
                 console.error("AI 評估遭遇錯誤，退回本地引擎:", err);
             }
+        }
+
+        // 版本 (1) 沒有輸入 API KEY，或 AI 連線發生錯誤時，維持原有架構走本地端判斷
+        if (!res) {
+            res = validateStepAnswer(eqInput, meaningInput);
         }
 
         submitBtn.disabled = false;
@@ -2152,8 +2157,23 @@
         // 答對了
         playSound('correct');
         
-        if (step === 1 && res.path) {
-            gameState.solvedPath = res.path;
+        if (step === 1) {
+            if (res.path) {
+                gameState.solvedPath = res.path;
+            } else {
+                // 安全防護：如果 AI 通過但忘記回傳 path 屬性，用本地引擎推算假設路徑
+                const sc = gameState.scenario;
+                const P1 = sc.item1.price;
+                const P2 = sc.item2.price;
+                const parsed = parseEquation(eqInput);
+                if (parsed) {
+                    if (parsed.numbers.includes(P1)) {
+                        gameState.solvedPath = 'A';
+                    } else if (parsed.numbers.includes(P2)) {
+                        gameState.solvedPath = 'B';
+                    }
+                }
+            }
         }
 
         gameState.stepAnswers[step].eq = res.normalizedEq;

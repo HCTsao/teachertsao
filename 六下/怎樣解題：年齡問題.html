@@ -2095,16 +2095,18 @@
             return;
         }
 
+        const step = gameState.currentStep;
+
         // 取得提交按鈕元件顯示 AI 檢查狀態
         const submitBtn = document.querySelector('.submit-row button');
         const originalText = submitBtn.innerText;
         submitBtn.disabled = true;
         submitBtn.innerText = "AI 正在檢查中...";
 
-        let res = validateStepAnswer(eqInput, meaningInput);
+        let res = null;
 
-        // 如果本地規則沒過且有金鑰，發送 AI 檢查進行二次確認或引導
-        if (!res.valid && classApiKey) {
+        // 版本 (2) 有輸入 API KEY，一律直接使用 AI 判斷
+        if (classApiKey) {
             try {
                 const aiRes = await validateAnswerWithAI(eqInput, meaningInput, step);
                 if (aiRes) {
@@ -2115,10 +2117,13 @@
             }
         }
 
+        // 版本 (1) 沒有輸入 API KEY，或 AI 連線發生錯誤時，維持原有架構走本地端判斷
+        if (!res) {
+            res = validateStepAnswer(eqInput, meaningInput);
+        }
+
         submitBtn.disabled = false;
         submitBtn.innerText = originalText;
-
-        const step = gameState.currentStep;
         if (!gameState.stepAnswers[step]) {
             gameState.stepAnswers[step] = { eq: "", meaning: "", attempts: [] };
         }
