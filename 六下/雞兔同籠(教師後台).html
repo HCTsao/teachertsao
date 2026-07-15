@@ -691,9 +691,11 @@
             const searchQuery = document.getElementById('search-input').value.trim().toLowerCase();
             const scenarioFilter = document.getElementById('scenario-filter').value;
 
-            // 將記錄物件轉成陣列並依時間排序 (新 -> 舊)
+            // 將記錄物件轉成陣列並篩選屬於「雞兔問題」的紀錄（排除以「年齡問題」開頭的情境）
             const recordsArray = Object.keys(allRecords).map(key => {
                 return { id: key, ...allRecords[key] };
+            }).filter(rec => {
+                return !rec.scenario || !rec.scenario.startsWith("年齡問題");
             }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
             // 自動將資料分組為「場次」並渲染卡片
@@ -883,6 +885,7 @@
                     id: 'session_' + pwd,
                     teacherName: classData.teacherName,
                     classPassword: pwd,
+                    apiKey: classData.apiKey || "",
                     records: [],
                     startTime: new Date(classData.timestamp || Date.now()),
                     endTime: new Date(classData.timestamp || Date.now())
@@ -936,6 +939,7 @@
                 card.innerHTML = `
                     <div class="session-info">
                         <strong>👨‍🏫 指導教師：${session.teacherName}</strong><br>
+                        <small>🤖 AI 評估：${session.apiKey ? '<span style="color: #10b981; font-weight: bold;">已啟用</span>' : `<a href="javascript:void(0)" onclick="updateClassApiKey('${session.classPassword}')" style="color: #3b82f6; text-decoration: underline; font-weight: bold; cursor: pointer;">未啟用 (點此設定)</a>`}</small><br>
                         <small>📅 最後作答：${dateStr}</small><br>
                         <small>👥 紀錄筆數：共 ${session.records.length} 筆</small>
                     </div>
@@ -952,6 +956,28 @@
             
             container.appendChild(card);
         });
+    }
+
+    // 更新課堂 API Key
+    async function updateClassApiKey(classPassword) {
+        const key = prompt("請輸入此課堂的 Groq API Key：");
+        if (key === null) return; // 取消輸入
+        
+        const trimmedKey = key.trim();
+        if (!isFirebaseActive) {
+            alert("Firebase 尚未連線，無法更新金鑰！");
+            return;
+        }
+
+        try {
+            await db.ref('classes/' + classPassword).update({
+                apiKey: trimmedKey
+            });
+            alert("✅ API Key 更新成功！學生的作答已啟用 AI 協同評估機制。");
+        } catch (e) {
+            console.error("更新金鑰失敗:", e);
+            alert("❌ 更新失敗，請檢查網路連線。");
+        }
     }
 
     // 刪除開課設定與紀錄

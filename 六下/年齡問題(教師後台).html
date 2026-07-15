@@ -594,13 +594,7 @@
                 document.getElementById('config-banner').style.display = 'none';
                 console.log("Firebase 連結成功！");
                 
-                // 以課堂密碼為 Key 的新結構預設資料 (不寫入硬編碼的 API key)
-                db.ref('classes/4007').once('value').then(snap => {
-                    if (!snap.exists()) db.ref('classes/4007').set({ teacherName: '曹泓棋', timestamp: Date.now() });
-                });
-                db.ref('classes/1234').once('value').then(snap => {
-                    if (!snap.exists()) db.ref('classes/1234').set({ teacherName: '謝千慧', timestamp: Date.now() });
-                });
+                // 年齡問題獨立節點：age_classes / age_records，不與雞兔問題共用
             } catch (e) {
                 console.error("Firebase 初始化失敗：", e);
             }
@@ -651,14 +645,14 @@
 
             document.getElementById('loading-el').style.display = 'flex';
 
-            // 監聽開課教師清單 (改為監聽 classes 節點)
-            db.ref('classes').on('value', (snapshot) => {
+            // 監聽開課教師清單 (年齡問題獨立節點: age_classes)
+            db.ref('age_classes').on('value', (snapshot) => {
                 allTeachers = snapshot.val() || {};
                 renderTable(); // 教師清單更新時重新渲染
             });
 
-            // 監聽學生紀錄
-            db.ref('records').on('value', (snapshot) => {
+            // 監聽學生紀錄 (年齡問題獨立節點: age_records)
+            db.ref('age_records').on('value', (snapshot) => {
                 allRecords = snapshot.val() || {};
                 
 
@@ -859,7 +853,7 @@
             if (pw === null) return; // 點擊取消
 
             if (pw === "0987912307") {
-                db.ref('records').set(null)
+                db.ref('age_records').set(null)
                     .then(() => {
                         alert("✨ 已成功清空所有學生作答數據！");
                     })
@@ -884,6 +878,7 @@
                     id: 'session_' + pwd,
                     teacherName: classData.teacherName,
                     classPassword: pwd,
+                    apiKey: classData.apiKey || "",
                     records: [],
                     startTime: new Date(classData.timestamp || Date.now()),
                     endTime: new Date(classData.timestamp || Date.now())
@@ -937,6 +932,7 @@
                 card.innerHTML = `
                     <div class="session-info">
                         <strong>👨‍🏫 指導教師：${session.teacherName}</strong><br>
+                        <small>🤖 AI 評估：${session.apiKey ? '<span style="color: #10b981; font-weight: bold;">已啟用</span>' : `<a href="javascript:void(0)" onclick="updateClassApiKey('${session.classPassword}')" style="color: #3b82f6; text-decoration: underline; font-weight: bold; cursor: pointer;">未啟用 (點此設定)</a>`}</small><br>
                         <small>📅 最後作答：${dateStr}</small><br>
                         <small>👥 紀錄筆數：共 ${session.records.length} 筆</small>
                     </div>
@@ -955,6 +951,28 @@
         });
     }
 
+    // 更新課堂 API Key
+    async function updateClassApiKey(classPassword) {
+        const key = prompt("請輸入此課堂的 Groq API Key：");
+        if (key === null) return; // 取消輸入
+        
+        const trimmedKey = key.trim();
+        if (!isFirebaseActive) {
+            alert("Firebase 尚未連線，無法更新金鑰！");
+            return;
+        }
+
+        try {
+            await db.ref('age_classes/' + classPassword).update({
+                apiKey: trimmedKey
+            });
+            alert("✅ API Key 更新成功！學生的作答已啟用 AI 協同評估機制。");
+        } catch (e) {
+            console.error("更新金鑰失敗:", e);
+            alert("❌ 更新失敗，請檢查網路連線。");
+        }
+    }
+
     // 刪除開課設定與紀錄
     async function deleteSession(classPassword, teacherName) {
         const pwd = prompt(`請輸入「${teacherName}」的課堂密碼（或管理員密碼）以刪除開課資料：`);
@@ -969,7 +987,7 @@
 
         try {
             // 刪除開課設定
-            await db.ref('classes/' + classPassword).remove();
+            await db.ref('age_classes/' + classPassword).remove();
             
             // 刪除該老師名下所有的學生紀錄
             const keys = Object.keys(allRecords);
@@ -980,7 +998,7 @@
                 }
             });
             if (Object.keys(updates).length > 0) {
-                await db.ref('records').update(updates);
+                await db.ref('age_records').update(updates);
             }
             alert(`✅ 已成功刪除該堂課的開課設定與所有學生資料！`);
         } catch (err) {
@@ -1253,15 +1271,15 @@
                 return;
             }
             
-            // 檢查密碼是否已經被使用
-            firebase.database().ref('classes/' + tPwd).once('value').then(snap => {
+            // 檢查密碼是否已經被使用（在年齡問題獨立節點中查詢）
+            firebase.database().ref('age_classes/' + tPwd).once('value').then(snap => {
                 if (snap.exists()) {
                     alert("❌ 此課堂密碼已經被使用了！請更換一組新的密碼。");
                     return;
                 }
                 
-                // 寫入新課堂 (含 API Key)
-                firebase.database().ref('classes/' + tPwd).set({
+                // 寫入新課堂 (含 API Key) 到年齡問題獨立節點
+                firebase.database().ref('age_classes/' + tPwd).set({
                     teacherName: tName,
                     apiKey: tApiKey,
                     timestamp: Date.now()
