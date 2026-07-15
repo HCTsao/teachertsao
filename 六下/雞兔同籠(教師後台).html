@@ -486,7 +486,6 @@
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     <input type="text" id="setup-teacher-name" placeholder="您的教師姓名 (例如：曹泓棋)" autocomplete="off" style="flex: 1; min-width: 180px; padding: 10px; border-radius: 8px; border: 1px solid #7dd3fc; outline: none; font-size: 0.95rem;">
                     <input type="text" id="setup-class-pwd" placeholder="設定課堂密碼 (例如：1234)" autocomplete="off" style="flex: 1; min-width: 150px; padding: 10px; border-radius: 8px; border: 1px solid #7dd3fc; outline: none; font-size: 0.95rem;">
-                    <input type="text" id="setup-api-key" placeholder="Groq API Key(選填)" autocomplete="off" style="flex: 1.5; min-width: 250px; padding: 10px; border-radius: 8px; border: 1px solid #7dd3fc; outline: none; font-size: 0.95rem;">
                 </div>
             </div>
             <button class="btn btn-primary" onclick="saveTeacherConfig()" style="background: #0284c7; align-self: flex-end; padding: 10px 20px;">💾 儲存 / 更新開課設定</button>
@@ -624,19 +623,7 @@
             // 監聽搜尋與過濾事件
             document.getElementById('search-input').addEventListener('input', renderTable);
             document.getElementById('scenario-filter').addEventListener('change', renderTable);
-
-            // 自動載入本地金鑰填入欄位
-            initApiKeyForTeacher();
         };
-
-        async function initApiKeyForTeacher() {
-            // 防止瀏覽器自動填入 API Key 欄位
-            const apiKeyInput = document.getElementById('setup-api-key');
-            if (apiKeyInput) {
-                apiKeyInput.value = '';
-                apiKeyInput.setAttribute('autocomplete', 'new-password');
-            }
-        }
 
         // 即時監聽資料庫變更
         function listenToRecords() {
@@ -874,7 +861,6 @@
                     id: 'session_' + pwd,
                     teacherName: classData.teacherName,
                     classPassword: pwd,
-                    apiKey: classData.apiKey || "",
                     records: [],
                     startTime: new Date(classData.timestamp || Date.now()),
                     endTime: new Date(classData.timestamp || Date.now())
@@ -928,7 +914,6 @@
                 card.innerHTML = `
                     <div class="session-info">
                         <strong>👨‍🏫 指導教師：${session.teacherName}</strong><br>
-                        <small>🤖 AI 評估：${session.apiKey ? '<span style="color: #10b981; font-weight: bold;">已啟用</span>' : `<a href="javascript:void(0)" onclick="updateClassApiKey('${session.classPassword}')" style="color: #3b82f6; text-decoration: underline; font-weight: bold; cursor: pointer;">未啟用 (點此設定)</a>`}</small><br>
                         <small>📅 最後作答：${dateStr}</small><br>
                         <small>👥 紀錄筆數：共 ${session.records.length} 筆</small>
                     </div>
@@ -945,28 +930,6 @@
             
             container.appendChild(card);
         });
-    }
-
-    // 更新課堂 API Key
-    async function updateClassApiKey(classPassword) {
-        const key = prompt("請輸入此課堂的 Groq API Key：");
-        if (key === null) return; // 取消輸入
-        
-        const trimmedKey = key.trim();
-        if (!isFirebaseActive) {
-            alert("Firebase 尚未連線，無法更新金鑰！");
-            return;
-        }
-
-        try {
-            await db.ref('classes/' + classPassword).update({
-                apiKey: trimmedKey
-            });
-            alert("✅ API Key 更新成功！學生的作答已啟用 AI 協同評估機制。");
-        } catch (e) {
-            console.error("更新金鑰失敗:", e);
-            alert("❌ 更新失敗，請檢查網路連線。");
-        }
     }
 
     // 刪除開課設定與紀錄
@@ -1257,7 +1220,6 @@
         function saveTeacherConfig() {
             const tName = document.getElementById('setup-teacher-name').value.trim();
             const tPwd = document.getElementById('setup-class-pwd').value.trim();
-            const tApiKey = document.getElementById('setup-api-key').value.trim();
             if (!tName || !tPwd) {
                 alert("請完整輸入「教師姓名」與「課堂密碼」！");
                 return;
@@ -1274,10 +1236,9 @@
                     return;
                 }
                 
-                // 寫入新課堂 (含 API Key)
+                // 寫入新課堂
                 firebase.database().ref('classes/' + tPwd).set({
                     teacherName: tName,
-                    apiKey: tApiKey,
                     timestamp: Date.now()
                 }).then(() => {
                     alert(`✅ 成功建立課堂！\n\n教師姓名：${tName}\n課堂密碼：${tPwd}\n\n請將【課堂密碼】提供給學生輸入，才能將資料正確拋轉進您的後台。`);
