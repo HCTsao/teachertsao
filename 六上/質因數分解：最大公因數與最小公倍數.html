@@ -23,6 +23,14 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+        .mode-btn {
+            transition: all 0.2s;
+        }
+        .mode-btn.selected {
+            background-color: #4f46e5 !important;
+            color: white !important;
+            transform: scale(1.05);
+        }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen flex items-center justify-center p-4">
@@ -60,6 +68,23 @@
                         <li>3. 共同的質因數與非共同的因數相乘，即為「最小公倍數」。</li>
                     </ul>
                 </div>
+                
+                <!-- 選單模式 -->
+                <div class="space-y-3">
+                    <p class="text-slate-600 font-medium">選擇練習模式：</p>
+                    <div class="grid grid-cols-3 gap-3">
+                        <button onclick="selectMode('hcf')" id="mode-hcf" class="mode-btn bg-white border-2 border-indigo-200 text-indigo-700 font-bold py-3 px-4 rounded-xl hover:border-indigo-400 transition-all">
+                            最大公因數
+                        </button>
+                        <button onclick="selectMode('lcm')" id="mode-lcm" class="mode-btn bg-white border-2 border-indigo-200 text-indigo-700 font-bold py-3 px-4 rounded-xl hover:border-indigo-400 transition-all">
+                            最小公倍數
+                        </button>
+                        <button onclick="selectMode('both')" id="mode-both" class="mode-btn selected bg-indigo-500 border-2 border-indigo-500 text-white font-bold py-3 px-4 rounded-xl hover:border-indigo-600 transition-all">
+                            綜合練習
+                        </button>
+                    </div>
+                </div>
+
                 <button onclick="startGame()" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-4 rounded-xl transition-all shadow-lg text-xl transform hover:scale-[1.02]">
                     開始挑戰
                 </button>
@@ -89,15 +114,8 @@
                     </div>
 
                     <div id="step2-controls" class="hidden space-y-4 bg-slate-50 p-6 rounded-2xl border-2 border-indigo-100">
-                        <div class="grid grid-cols-1 gap-6">
-                            <div class="space-y-2">
-                                <label class="block text-sm font-bold text-slate-700">最大公因數</label>
-                                <input id="input-hcf" type="text" placeholder="例如: 2x2" class="w-full p-4 rounded-xl border-2 border-blue-200 focus:border-blue-500 outline-none text-center font-mono text-xl shadow-inner bg-white">
-                            </div>
-                            <div class="space-y-2">
-                                <label class="block text-sm font-bold text-slate-700">最小公倍數</label>
-                                <input id="input-lcm" type="text" placeholder="例如: 2x2x3x7" class="w-full p-4 rounded-xl border-2 border-purple-200 focus:border-purple-500 outline-none text-center font-mono text-xl shadow-inner bg-white">
-                            </div>
+                        <div class="grid grid-cols-1 gap-6" id="input-fields-container">
+                            <!-- 動態生成輸入欄位 -->
                         </div>
                         <button onclick="checkFinal()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg mt-4 text-lg">
                             檢查答案
@@ -106,10 +124,14 @@
 
                     <div id="feedback-controls" class="hidden text-center space-y-4">
                         <div id="feedback-msg" class="p-4 rounded-xl font-bold text-lg"></div>
+                        <div id="hint-box" class="hidden bg-amber-50 p-4 rounded-xl border-2 border-amber-200 text-left">
+                            <p class="text-amber-800 font-bold mb-2">💡 思考提示：</p>
+                            <p id="hint-text" class="text-amber-700"></p>
+                        </div>
                         <div class="bg-slate-50 p-6 rounded-2xl text-left space-y-3 border border-slate-200">
                             <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">正確答案：</p>
-                            <p class="text-slate-700">最大公因數：<span id="correct-hcf" class="font-mono font-bold text-blue-600"></span></p>
-                            <p class="text-slate-700">最小公倍數：<span id="correct-lcm" class="font-mono font-bold text-purple-600"></span></p>
+                            <p id="correct-hcf-line" class="text-slate-700">最大公因數：<span id="correct-hcf" class="font-mono font-bold text-blue-600"></span></p>
+                            <p id="correct-lcm-line" class="text-slate-700">最小公倍數：<span id="correct-lcm" class="font-mono font-bold text-purple-600"></span></p>
                         </div>
                         <button onclick="generateProblem()" class="w-full bg-slate-800 hover:bg-slate-900 text-white px-8 py-4 rounded-xl font-bold shadow-xl">
                             下一題
@@ -142,8 +164,17 @@
         let timeLeft = 60;
         let gameActive = false;
         let timerInterval = null;
+        let gameMode = 'both'; // 'hcf', 'lcm', 'both'
 
         const primes = [2, 3, 5, 7];
+
+        function selectMode(mode) {
+            gameMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            document.getElementById('mode-' + mode).classList.add('selected');
+        }
 
         function startGame() {
             score = 0;
@@ -225,9 +256,48 @@
             document.getElementById('step1-controls').classList.remove('hidden');
             document.getElementById('step2-controls').classList.add('hidden');
             document.getElementById('feedback-controls').classList.add('hidden');
+            document.getElementById('hint-box').classList.add('hidden');
             document.getElementById('error-message').classList.add('hidden');
-            document.getElementById('input-hcf').value = '';
-            document.getElementById('input-lcm').value = '';
+            
+            renderInputFields();
+        }
+
+        function renderInputFields() {
+            const container = document.getElementById('input-fields-container');
+            container.innerHTML = '';
+            
+            if (gameMode === 'hcf' || gameMode === 'both') {
+                const hcfDiv = document.createElement('div');
+                hcfDiv.className = 'space-y-2';
+                hcfDiv.innerHTML = `
+                    <label class="block text-sm font-bold text-slate-700">最大公因數</label>
+                    <input id="input-hcf" type="text" placeholder="例如: 2x2" class="equation-input w-full p-4 rounded-xl border-2 border-blue-200 focus:border-blue-500 outline-none text-center font-mono text-xl shadow-inner bg-white">
+                `;
+                container.appendChild(hcfDiv);
+            }
+            
+            if (gameMode === 'lcm' || gameMode === 'both') {
+                const lcmDiv = document.createElement('div');
+                lcmDiv.className = 'space-y-2';
+                lcmDiv.innerHTML = `
+                    <label class="block text-sm font-bold text-slate-700">最小公倍數</label>
+                    <input id="input-lcm" type="text" placeholder="例如: 2x2x3x7" class="equation-input w-full p-4 rounded-xl border-2 border-purple-200 focus:border-purple-500 outline-none text-center font-mono text-xl shadow-inner bg-white">
+                `;
+                container.appendChild(lcmDiv);
+            }
+            
+            // 加入鍵盤 * 轉換成 × 的事件
+            document.querySelectorAll('.equation-input').forEach(input => {
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === '*') {
+                        e.preventDefault();
+                        const start = this.selectionStart;
+                        const end = this.selectionEnd;
+                        this.value = this.value.substring(0, start) + '×' + this.value.substring(end);
+                        this.selectionStart = this.selectionEnd = start + 1;
+                    }
+                });
+            });
         }
 
         function renderFactors() {
@@ -306,31 +376,69 @@
                     b.style.cursor = 'default';
                 });
             } else {
-                showError('再檢查看看，圈出的數字要剛好是共同擁有的喔！');
+                // 判斷是多選還是少選
+                const selectedACount = selectedA.length;
+                const selectedBCount = selectedB.length;
+                const targetCount = currentProblem.commonFactors.length;
+                
+                let hint = '';
+                if (selectedACount !== targetCount || selectedBCount !== targetCount) {
+                    if (selectedACount > targetCount || selectedBCount > targetCount) {
+                        hint = '你多圈了一些數字喔！共同質因數是指「雙方都有」的數字，不是單方有的。';
+                    } else {
+                        hint = '好像漏圈了一些數字喔！請再仔細看看雙方的質因數分解式，找出「兩邊都有」的數字。';
+                    }
+                } else {
+                    hint = '圈的數量對了，但數字不太對喔！請確認你選的是「雙方共同擁有」的質因數。';
+                }
+                showError(hint);
             }
         }
 
         function checkFinal() {
-            const hcfVal = document.getElementById('input-hcf').value;
-            const lcmVal = document.getElementById('input-lcm').value;
-
-            if (!hcfVal || !lcmVal) {
-                showError('請輸入分解式！');
-                return;
+            let allCorrect = true;
+            let hints = [];
+            
+            if (gameMode === 'hcf' || gameMode === 'both') {
+                const hcfVal = document.getElementById('input-hcf').value;
+                if (!hcfVal) {
+                    showError('請輸入最大公因數！');
+                    return;
+                }
+                const userHcf = normalize(hcfVal);
+                const sortF = (s) => s.split('x').sort().join('x');
+                const isHcfOk = sortF(userHcf) === sortF(normalize(currentProblem.hcfAns));
+                
+                if (!isHcfOk) {
+                    allCorrect = false;
+                    hints.push('最大公因數是「雙方共同的質因數」相乘的結果。');
+                    hints.push('共同質因數：' + currentProblem.commonFactors.join('、'));
+                }
+            }
+            
+            if (gameMode === 'lcm' || gameMode === 'both') {
+                const lcmVal = document.getElementById('input-lcm').value;
+                if (!lcmVal) {
+                    showError('請輸入最小公倍數！');
+                    return;
+                }
+                const userLcm = normalize(lcmVal);
+                const sortF = (s) => s.split('x').sort().join('x');
+                const isLcmOk = sortF(userLcm) => sortF(normalize(currentProblem.lcmAns));
+                
+                if (!isLcmOk) {
+                    allCorrect = false;
+                    hints.push('最小公倍數是「雙方所有的質因數」相乘的結果（共同的只算一次）。');
+                    hints.push('所有質因數：' + currentProblem.lcmAns.split('x').join('、'));
+                }
             }
 
-            const userHcf = normalize(hcfVal);
-            const userLcm = normalize(lcmVal);
-            const sortF = (s) => s.split('x').sort().join('x');
-            const isHcfOk = sortF(userHcf) === sortF(normalize(currentProblem.hcfAns));
-            const isLcmOk = sortF(userLcm) === sortF(normalize(currentProblem.lcmAns));
-
-            if (isHcfOk && isLcmOk) {
+            if (allCorrect) {
                 score += 10;
                 document.getElementById('score-display').innerText = `目前積分: ${score}`;
                 showFeedback(true, '完全正確！');
             } else {
-                showFeedback(false, '分解式寫錯了，再接再厲！');
+                showFeedback(false, '分解式寫錯了，再接再厲！', hints.join('\n'));
             }
         }
 
@@ -342,16 +450,40 @@
             const err = document.getElementById('error-message');
             err.innerText = msg;
             err.classList.remove('hidden');
-            setTimeout(() => err.classList.add('hidden'), 2000);
+            setTimeout(() => err.classList.add('hidden'), 4000);
         }
 
-        function showFeedback(isCorrect, msg) {
+        function showFeedback(isCorrect, msg, hint) {
             document.getElementById('step2-controls').classList.add('hidden');
             document.getElementById('feedback-controls').classList.remove('hidden');
             
             const fMsg = document.getElementById('feedback-msg');
             fMsg.innerText = msg;
             fMsg.className = isCorrect ? 'p-4 rounded-xl font-bold text-lg bg-green-100 text-green-700' : 'p-4 rounded-xl font-bold text-lg bg-rose-100 text-rose-700';
+            
+            // 顯示引導提示
+            const hintBox = document.getElementById('hint-box');
+            if (!isCorrect && hint) {
+                hintBox.classList.remove('hidden');
+                document.getElementById('hint-text').innerText = hint;
+            } else {
+                hintBox.classList.add('hidden');
+            }
+            
+            // 根據模式顯示答案
+            const hcfLine = document.getElementById('correct-hcf-line');
+            const lcmLine = document.getElementById('correct-lcm-line');
+            
+            if (gameMode === 'hcf') {
+                hcfLine.classList.remove('hidden');
+                lcmLine.classList.add('hidden');
+            } else if (gameMode === 'lcm') {
+                hcfLine.classList.add('hidden');
+                lcmLine.classList.remove('hidden');
+            } else {
+                hcfLine.classList.remove('hidden');
+                lcmLine.classList.remove('hidden');
+            }
             
             document.getElementById('correct-hcf').innerText = currentProblem.hcfAns;
             document.getElementById('correct-lcm').innerText = currentProblem.lcmAns;
