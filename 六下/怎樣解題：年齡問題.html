@@ -1905,9 +1905,9 @@
                 if (!hasEqualShare) {
                     return { valid: false, reason: "引導：請在解釋中加入等分除「平分成幾段」的句型說明喔！" };
                 }
-                const hasOneSegMeaning = /(一|1)段/.test(text) && /當時|那時/.test(text) && (new RegExp(chars.younger).test(text) || /年齡|歲/.test(text));
+                const hasOneSegMeaning = /(一|1)(段|等分|份)/.test(text) && /當時|那時/.test(text) && (new RegExp(chars.younger).test(text) || /年齡|歲/.test(text));
                 if (!hasOneSegMeaning) {
-                    return { valid: false, reason: `引導：請在解釋中說明「一段（或1段）就是${chars.younger}當時的年齡」喔！` };
+                    return { valid: false, reason: `引導：請在解釋中說明「一段（或1段/1等分/1份）就是${chars.younger}當時的年齡」喔！` };
                 }
                 return { valid: true, normalizedEq: `${p.ageDiff} ÷ ${divider} = ${p.targetYoungerAge}`, meaningDesc: `當時${chars.younger}是 ${p.targetYoungerAge} 歲` };
             }
@@ -2308,7 +2308,7 @@
                     lbl.classList.add('default-preserved-label');
                 }
             });
-            // 若步驟二學生沒畫，在第三步驟自動繪製系統預設的線段圖與標籤
+            // 若步驟二學生沒畫，在第三步驟自動繪製系統預設的線段圖
             const youngerTrack = document.getElementById('track-younger');
             const elderTrack = document.getElementById('track-elder');
             if (youngerTrack && elderTrack && (youngerTrack.children.length === 0 || elderTrack.children.length === 0)) {
@@ -2318,29 +2318,30 @@
                     elderHtml += '<div class="segment-unit"><div class="segment-unit-line"></div></div>';
                 }
                 elderTrack.innerHTML = elderHtml;
-                // 延遲以取得實際渲染座標，放置 1倍與 n倍 標籤於下方
-                setTimeout(() => {
-                    const rect = document.getElementById('whiteboard-container').getBoundingClientRect();
-                    clearAbsoluteLabels(true); // 進入時強制清空所有
-                    // 置中 1倍 標籤
-                    const segY = youngerTrack.querySelector('.segment-unit');
-                    if (segY) {
-                        const sRect = segY.getBoundingClientRect();
-                        const x1 = sRect.left - rect.left + (sRect.width / 2);
-                        const y1 = sRect.bottom - rect.top + 8;
-                        createAbsoluteLabel("1倍", x1, y1, true); // true 為 preserved 預設標籤
-                    }
-                    // 置中 n倍 標籤
-                    const segsE = elderTrack.querySelectorAll('.segment-unit');
-                    if (segsE.length > 0) {
-                        const firstRect = segsE[0].getBoundingClientRect();
-                        const lastRect = segsE[segsE.length - 1].getBoundingClientRect();
-                        const midX = (firstRect.left + lastRect.right) / 2;
-                        const y2 = lastRect.bottom - rect.top + 8;
-                        createAbsoluteLabel(`${p.ratio}倍`, midX, y2, true); // true 為 preserved 預設標籤
-                    }
-                }, 80);
             }
+            // 預設在第三步驟放置 1倍與n倍 標籤
+            setTimeout(() => {
+                const rect = document.getElementById('whiteboard-container').getBoundingClientRect();
+                // 先清除非 preserved 的標籤，避免重複
+                clearAbsoluteLabels(true);
+                // 置中 1倍 標籤
+                const segY = youngerTrack.querySelector('.segment-unit');
+                if (segY) {
+                    const sRect = segY.getBoundingClientRect();
+                    const x1 = sRect.left - rect.left + (sRect.width / 2);
+                    const y1 = sRect.bottom - rect.top + 8;
+                    createAbsoluteLabel("1倍", x1, y1, true);
+                }
+                // 置中 n倍 標籤
+                const segsE = elderTrack.querySelectorAll('.segment-unit');
+                if (segsE.length > 0) {
+                    const firstRect = segsE[0].getBoundingClientRect();
+                    const lastRect = segsE[segsE.length - 1].getBoundingClientRect();
+                    const midX = (firstRect.left + lastRect.right) / 2;
+                    const y2 = lastRect.bottom - rect.top + 8;
+                    createAbsoluteLabel(`${p.ratio}倍`, midX, y2, true);
+                }
+            }, 80);
         }
         // 稍微延遲讓 DOM 渲染後定位 markup
         setTimeout(() => {
