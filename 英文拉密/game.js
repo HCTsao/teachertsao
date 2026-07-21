@@ -273,15 +273,13 @@ class RummikubGame {
             }
         });
 
-        // 綁定視窗縮放與全螢幕切換事件，確保縮放比例與位置即時更新（且支援 ESC 鍵退出）
-        window.addEventListener('resize', () => {
-            if (this._isScaledFullscreen) {
-                this.updateFullscreenScale();
-            }
-        });
+        // 監聽全螢幕狀態切換事件（無論透過 F11、Esc 鍵或點擊按鈕），即時同步按鈕文字
         document.addEventListener('fullscreenchange', () => {
-            if (!document.fullscreenElement && this._isScaledFullscreen) {
-                this.exitFullscreenScale();
+            const btnEl = document.getElementById('btn-fullscreen');
+            if (document.fullscreenElement) {
+                if (btnEl) btnEl.textContent = '✕ 退出全螢幕';
+            } else {
+                if (btnEl) btnEl.textContent = '⛶ 全螢幕 (Fullscreen)';
             }
         });
 
