@@ -232,17 +232,7 @@ class RummikubGame {
         this.isBgmPlaying = false;
         if (this.bgmPlayerEl) {
             this.bgmPlayerEl.volume = 0.35;
-            // 預設開啟：等第一次用戶互動後自動播放
-            this.bgmPlayerEl.play().then(() => {
-                this.isBgmPlaying = true;
-                if (this.btnToggleBgm) {
-                    this.btnToggleBgm.textContent = '🎵 背景音樂: 開';
-                    this.btnToggleBgm.classList.add('primary-btn');
-                }
-            }).catch(() => {
-                // 瀏覽器自動播放政策阻擋：等待第一次互動再播
-                this.isBgmPlaying = false;
-            });
+            this.toggleBgm(true);
         }
 
         this.bindEvents();
@@ -257,7 +247,21 @@ class RummikubGame {
         if (this.btnToggleBgm) {
             this.btnToggleBgm.addEventListener('click', () => this.toggleBgm());
         }
-        document.addEventListener('click', () => this.tryAutoPlayBgm(), { once: true });
+        
+        // 綁定全螢幕/視窗任意互動（觸控、按鍵、滑動、點擊）立刻開啟背景音樂
+        const autoPlayHandler = () => {
+            this.tryAutoPlayBgm();
+            window.removeEventListener('pointerdown', autoPlayHandler);
+            window.removeEventListener('keydown', autoPlayHandler);
+            window.removeEventListener('touchstart', autoPlayHandler);
+            window.removeEventListener('mousemove', autoPlayHandler);
+            window.removeEventListener('click', autoPlayHandler);
+        };
+        window.addEventListener('pointerdown', autoPlayHandler);
+        window.addEventListener('keydown', autoPlayHandler);
+        window.addEventListener('touchstart', autoPlayHandler);
+        window.addEventListener('mousemove', autoPlayHandler);
+        window.addEventListener('click', autoPlayHandler);
 
         document.getElementById('btn-fullscreen').addEventListener('click', () => this.toggleFullscreen());
         
