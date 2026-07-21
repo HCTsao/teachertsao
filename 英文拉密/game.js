@@ -448,12 +448,15 @@ class RummikubGame {
 
         this.allTiles = [];
         let idCounter = 1;
+        let jokerCounter = 1;
         for (const [letter, count] of Object.entries(TILE_DISTRIBUTION)) {
             for (let i = 0; i < count; i++) {
+                const isJ = (letter === 'JOKER');
                 this.allTiles.push({
                     id: `tile-${idCounter++}`,
-                    letter: letter === 'JOKER' ? 'JOKER' : letter,
-                    isJoker: letter === 'JOKER',
+                    letter: isJ ? 'JOKER' : letter,
+                    isJoker: isJ,
+                    jokerNum: isJ ? jokerCounter++ : null,
                     assignedLetter: null
                 });
             }
@@ -1426,7 +1429,8 @@ class RummikubGame {
         el.draggable = true;
 
         if (tile.isJoker) {
-            el.innerHTML = `<img src="images.png" class="joker-img" alt="Joker">`;
+            const numLabel = tile.jokerNum === 1 ? '①' : (tile.jokerNum === 2 ? '②' : '');
+            el.innerHTML = `<span class="joker-num">${numLabel}</span><img src="images.png" class="joker-img" alt="Joker">`;
             if (tile.assignedLetter) {
                 el.innerHTML += `<span class="assigned-letter">${tile.assignedLetter}</span>`;
             }
@@ -1473,15 +1477,14 @@ class RummikubGame {
                 return;
             }
 
-            // 若點擊玩家的百搭牌（手牌中或桌面上），開啟 Modal 讓玩家選擇 / 修改代表字母
-            if (tile.isJoker && this.currentPlayerIndex === 0) {
-                this.openJokerModal(tile, () => {
-                    this.renderAll();
-                });
-                return;
-            }
-
             if (this.selectedTileId === tile.id) {
+                // 若再次點擊已選中的百搭牌，開啟 Modal 供修改字母
+                if (tile.isJoker && this.currentPlayerIndex === 0) {
+                    this.openJokerModal(tile, () => {
+                        this.renderAll();
+                    });
+                    return;
+                }
                 this.clearTileSelection();
             } else {
                 this.clearTileSelection();
