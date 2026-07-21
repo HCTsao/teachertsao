@@ -187,7 +187,6 @@ class RummikubGame {
         this.slideAutoPlayInterval = null;
 
         this.initDOM();
-        this.startNewGame();
     }
 
     createEmptyGrid() {
@@ -195,6 +194,9 @@ class RummikubGame {
     }
 
     initDOM() {
+        this.startGameOverlayEl = document.getElementById('start-game-overlay');
+        this.btnStartGame = document.getElementById('btn-start-game');
+
         this.boardGridEl = document.getElementById('board-grid');
         this.rackGridEl = document.getElementById('rack-grid');
         this.drawPileCountEl = document.getElementById('draw-count');
@@ -223,6 +225,7 @@ class RummikubGame {
         this.jokerModalEl = document.getElementById('joker-modal');
         this.jokerLettersGridEl = document.getElementById('joker-letters-grid');
         this.confirmModalEl = document.getElementById('confirm-modal');
+        this.rulesModalEl = document.getElementById('rules-modal');
         this.confirmModalMsgEl = document.getElementById('confirm-modal-msg');
         this.confirmModalOkBtn = document.getElementById('confirm-modal-ok');
         this.confirmModalCancelBtn = document.getElementById('confirm-modal-cancel');
@@ -230,15 +233,28 @@ class RummikubGame {
         this.bgmPlayerEl = document.getElementById('bgm-player');
         this.btnToggleBgm = document.getElementById('btn-toggle-bgm');
         this.isBgmPlaying = false;
+        if (this.btnToggleBgm) {
+            this.btnToggleBgm.textContent = '🎵 背景音樂: 開';
+            this.btnToggleBgm.classList.add('primary-btn');
+        }
         if (this.bgmPlayerEl) {
             this.bgmPlayerEl.volume = 0.35;
-            this.toggleBgm(true);
         }
 
         this.bindEvents();
     }
 
     bindEvents() {
+        if (this.btnStartGame) {
+            this.btnStartGame.addEventListener('click', () => {
+                this.toggleBgm(true);
+                if (this.startGameOverlayEl) {
+                    this.startGameOverlayEl.classList.add('hidden');
+                }
+                this.startNewGame();
+            });
+        }
+
         this.btnEndTurn.addEventListener('click', () => this.handleEndTurn());
         this.btnDrawTile.addEventListener('click', () => this.handleDrawTile());
         this.btnHint.addEventListener('click', () => this.handleProvideHint());
