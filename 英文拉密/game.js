@@ -754,13 +754,14 @@ class RummikubGame {
 
     recordPlayedWords(player, formedWords) {
         formedWords.forEach(word => {
-            const upper = word.toUpperCase();
+            const baseWord = getWordBaseLemma(word);
+            const upper = baseWord.toUpperCase();
             if (!this.playedWordsHistory.some(item => item.word === upper)) {
                 this.playedWordsHistory.push({
                     word: upper,
-                    chinese: getWordChineseMeaning(word),
+                    chinese: getWordChineseMeaning(baseWord),
                     player: player.name,
-                    length: word.length
+                    length: baseWord.length
                 });
             }
         });
