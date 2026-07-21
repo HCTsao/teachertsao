@@ -345,10 +345,11 @@ class RummikubGame {
                     this.btnToggleBgm.classList.add('primary-btn');
                 }
             }).catch(() => {
+                // 自動播放因瀏覽器限制掛起時，保持「開」意圖，等待任何用戶手勢解鎖播放
                 this.isBgmPlaying = false;
                 if (this.btnToggleBgm) {
-                    this.btnToggleBgm.textContent = '🎵 背景音樂: 關';
-                    this.btnToggleBgm.classList.remove('primary-btn');
+                    this.btnToggleBgm.textContent = '🎵 背景音樂: 開';
+                    this.btnToggleBgm.classList.add('primary-btn');
                 }
             });
         } else {
