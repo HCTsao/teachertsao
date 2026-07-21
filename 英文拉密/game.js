@@ -539,11 +539,15 @@ class RummikubGame {
             this.orderCardsGridEl.innerHTML = '';
             
             const drawnResults = [];
-            const tempPile = [...this.drawPile];
+            const availableNonJokers = this.shuffle([...this.drawPile.filter(t => !t.isJoker)]);
+            const usedLetters = new Set();
 
             this.players.forEach(p => {
-                const tileIdx = tempPile.findIndex(t => !t.isJoker);
-                const sampleTile = tileIdx !== -1 ? tempPile.splice(tileIdx, 1)[0] : tempPile.pop();
+                const idx = availableNonJokers.findIndex(t => !usedLetters.has(t.letter));
+                const sampleTile = idx !== -1 ? availableNonJokers.splice(idx, 1)[0] : availableNonJokers.pop();
+                if (sampleTile) {
+                    usedLetters.add(sampleTile.letter);
+                }
                 drawnResults.push({ player: p, tile: sampleTile });
             });
 
