@@ -539,7 +539,8 @@ class RummikubGame {
             this.orderCardsGridEl.innerHTML = '';
             
             const drawnResults = [];
-            const availableNonJokers = this.shuffle([...this.drawPile.filter(t => !t.isJoker)]);
+            const availableNonJokers = [...this.drawPile.filter(t => !t.isJoker)];
+            this.shuffle(availableNonJokers);
             const usedLetters = new Set();
 
             this.players.forEach(p => {
