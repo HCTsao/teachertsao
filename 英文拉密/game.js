@@ -865,24 +865,32 @@ class RummikubGame {
                     }
                 }
             });
+
             if (allPossibleHints.length === 0) {
-                this.showToast('💡 破冰提示：尚未破冰。首次出牌需打出至少 4 個字母的全新單字，目前手牌無法拼出，建議選擇「抽牌」！');
+                this.showToast('💡 破冰提示：尚未破冰。首次出牌需打出至少 4 個字母（含）以上的全新單字，目前手牌無法拼出 4 字母以上的單字，建議選擇「抽牌」！');
                 return;
             }
-        } else {
-            ELEMENTARY_WORDS_LIST.forEach(word => {
-                if (word.length >= 2 && !boardWords.has(word.toLowerCase())) {
-                    const tilesMatched = this.matchWordWithHand(word, p.hand);
-                    if (tilesMatched) {
-                        const meaning = getWordChineseMeaning(word);
-                        allPossibleHints.push(`💡 出牌提示：手牌可直接組出 ${word.length} 個字母的單字（中文意思是：『${meaning}』）！`);
-                    }
+
+            const selectedHint = allPossibleHints[this.hintIndex % allPossibleHints.length];
+            this.hintIndex++;
+            this.showToast(selectedHint);
+            return;
+        }
+
+        // 已破冰後的一般出牌提示
+        ELEMENTARY_WORDS_LIST.forEach(word => {
+            if (word.length >= 2 && !boardWords.has(word.toLowerCase())) {
+                const tilesMatched = this.matchWordWithHand(word, p.hand);
+                if (tilesMatched) {
+                    const meaning = getWordChineseMeaning(word);
+                    allPossibleHints.push(`💡 出牌提示：手牌可直接組出 ${word.length} 個字母的單字（中文意思是：『${meaning}』）！`);
                 }
-            });
-            if (allPossibleHints.length === 0) {
-                this.showToast('💡 出牌提示：目前手牌無法組成有效單字，建議選擇「抽牌」！');
-                return;
             }
+        });
+
+        if (allPossibleHints.length === 0) {
+            this.showToast('💡 出牌提示：目前手牌無法組成有效單字，建議選擇「抽牌」！');
+            return;
         }
 
         const selectedHint = allPossibleHints[this.hintIndex % allPossibleHints.length];
