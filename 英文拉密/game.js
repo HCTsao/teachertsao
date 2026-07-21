@@ -752,15 +752,6 @@ class RummikubGame {
             return;
         }
 
-        if (!p.isIceBroken) {
-            let playedTilesCount = this.playedFromHandThisTurn.size;
-            if (playedTilesCount < 4) {
-                sfx.playError();
-                this.showToast(`⚠️ 破冰行動要求！首次出牌必須至少含有 4 個字母 (你只打了 ${playedTilesCount} 張)`);
-                return;
-            }
-        }
-
         const validation = this.validateCurrentBoard();
         if (!validation.valid) {
             sfx.playError();
@@ -768,11 +759,20 @@ class RummikubGame {
             return;
         }
 
-        this.recordPlayedWords(p, validation.formedWords);
-
         const newWordsThisTurn = validation.formedWords
             .map(w => w.toUpperCase())
             .filter(w => !this.turnStartWords || !this.turnStartWords.has(w));
+
+        if (!p.isIceBroken) {
+            const has4LetterWord = newWordsThisTurn.some(w => w.length >= 4);
+            if (!has4LetterWord) {
+                sfx.playError();
+                this.showToast('⚠️ 破冰行動要求！首次出牌必須包含至少一個 4 個字母（含）以上的完整單字！');
+                return;
+            }
+        }
+
+        this.recordPlayedWords(p, validation.formedWords);
 
         const wordsMsg = newWordsThisTurn.length > 0 ? newWordsThisTurn.join(', ') : validation.formedWords.map(w => w.toUpperCase()).join(', ');
 
