@@ -109,8 +109,8 @@ window.speakBilingual = function(word, chineseMeaning) {
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     
-    // 1. 英文發音：放慢語速 (rate = 0.65)
-    const utteranceEn = new SpeechSynthesisUtterance(word);
+    // 1. 英文發音：放慢語速 (rate = 0.65)，強制轉為小寫避免瀏覽器唸成縮寫 (例如 US 唸成 U-S)
+    const utteranceEn = new SpeechSynthesisUtterance(word.toLowerCase());
     utteranceEn.lang = 'en-US';
     utteranceEn.rate = 0.65;
 
@@ -139,11 +139,11 @@ window.speakBilingual = function(word, chineseMeaning) {
     window.speechSynthesis.speak(utteranceEn);
 };
 
-// 單獨英文單字朗讀 (語速放慢至 0.65)
+// 單獨英文單字朗讀 (語速放慢至 0.65，轉小寫防止個別縮寫拼音)
 window.speakWord = function(word) {
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(word);
+    const utterance = new SpeechSynthesisUtterance(word.toLowerCase());
     utterance.lang = 'en-US';
     utterance.rate = 0.65;
     window.speechSynthesis.speak(utterance);
