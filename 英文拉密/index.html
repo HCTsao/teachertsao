@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>英文拉密 Rummikub Word | 英文單字拼字對戰與教學</title>
+    <meta name="description" content="英文拉密 (Rummikub Word) 4人共用牌桌對戰互動網頁遊戲。3D木紋牌架、全螢幕切換、純中文提示與雙語單字學習簡報秀。">
+    <meta name="keywords" content="英文拉密, Rummikub Word, 英文單字遊戲, AI對戰遊戲, 紅旗老師教具">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Style CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app-root">
+    <!-- 頂部精簡 Header -->
+    <header class="app-header">
+        <div class="logo-area">
+            <h1 class="logo-title">🂠 Rummikub Word 英文拉密</h1>
+            <span class="badge-mode">4人共用牌桌單字對戰</span>
+        </div>
+        <div class="header-actions">
+            <button class="btn-icon primary-btn" id="btn-toggle-bgm">🎵 背景音樂: 開</button>
+            <button class="btn-icon primary-btn" id="btn-fullscreen">⛶ 全螢幕 (Fullscreen)</button>
+            <button class="btn-icon" id="btn-rules">📖 規則</button>
+            <button class="btn-icon" id="btn-new-game">🔄 重新開局</button>
+        </div>
+    </header>
+
+    <!-- 開局洗牌、比大小與發牌的全螢幕動畫遮罩 (Intro Animation Overlay) -->
+    <div class="intro-overlay" id="intro-overlay">
+        <h2 class="intro-title" id="intro-status-text">🔀 正在將 112 張牌洗勻...</h2>
+        <div class="shuffle-stage" id="shuffle-stage">
+            <!-- 由 JS 動態生成洗牌動畫牌塊 -->
+        </div>
+        <div class="order-cards-grid" id="order-cards-grid" style="display: none;">
+            <!-- 由 JS 動態生成 4 人抽牌比字母大小結果 -->
+        </div>
+    </div>
+
+    <!-- Toast 提示訊息容器 (右下角) -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- 官方風格主要遊戲桌 (Game Dashboard Layout) -->
+    <div class="rummi-dashboard">
+        
+        <!-- 左側垂直玩家列表 (Left Player Avatars Column) -->
+        <aside class="left-players-col" id="players-bar">
+            <!-- 由 JS 動態渲染 4 位玩家頭像卡 -->
+        </aside>
+
+        <!-- 中央皇家海軍藍絨布共用桌面 (Center Shared Board Area) -->
+        <main class="center-board-section">
+            
+            <!-- 桌面頂部：中央浮動狀態提示條 & 抽牌堆堆疊 -->
+            <div class="board-top-bar">
+                <!-- 黑底金框浮動狀態條 -->
+                <div class="floating-status-box" id="turn-message">
+                    👉 輪到 <strong>你的回合</strong>！至少打出 1 張手牌並可自由重組桌面
+                </div>
+
+                <!-- 倒數計時器 -->
+                <div class="timer-badge">
+                    ⏱️ <span id="timer-count">180s</span>
+                </div>
+
+                <!-- 抽牌堆 - 立體 7 張一疊區 -->
+                <div class="draw-stacks-container">
+                    <span style="font-size: 16px; font-weight: 700; color: #cbd5e1;" id="draw-count">抽牌堆: 56 張</span>
+                    <div class="stacks-grid" id="stacks-grid">
+                        <!-- 由 JS 動態生成 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 共用桌面主網格 (帶有 The Original Rummikub® 水印) -->
+            <div class="board-table-felt">
+                <div class="rummikub-watermark">The Original Rummikub®</div>
+                <div class="board-grid" id="board-grid">
+                    <!-- 2D 鋪滿畫面網格 -->
+                </div>
+            </div>
+
+        </main>
+
+        <!-- 右側直立式控制按鈕面板 (Right Action Pills Column) -->
+        <aside class="right-action-col">
+            <!-- 大號抽牌按鈕 -->
+            <button class="pill-btn draw-pill" id="btn-draw-tile" title="拿一張牌">
+                <span class="pill-icon">+</span>
+                <span class="pill-label">抽牌</span>
+            </button>
+
+            <!-- 排序按鈕 (ABC / 按順序) -->
+            <button class="pill-btn sort-pill" id="btn-sort-az" title="按字母順序 A-Z 排序">
+                <span class="pill-code">ABC</span>
+                <span class="pill-label">按順序</span>
+            </button>
+
+            <!-- 排序按鈕 (AEIOU / 按母音) -->
+            <button class="pill-btn sort-pill" id="btn-sort-vowel" title="按母音優先排序">
+                <span class="pill-code">AEIOU</span>
+                <span class="pill-label">按母音</span>
+            </button>
+
+            <!-- 純中文提示按鈕 -->
+            <button class="pill-btn hint-pill" id="btn-hint" title="出牌提示 (純中文，多次點擊更換提示)">
+                <span class="pill-icon">💡</span>
+                <span class="pill-label">提示</span>
+            </button>
+
+            <!-- 重置本回合按鈕 -->
+            <button class="pill-btn reset-pill" id="btn-reset-turn" title="重置本回合">
+                <span class="pill-icon">🔄</span>
+                <span class="pill-label">重置</span>
+            </button>
+
+            <!-- 完成回合按鈕 -->
+            <button class="pill-btn end-pill" id="btn-end-turn" title="完成回合">
+                <span class="pill-icon">✅</span>
+                <span class="pill-label">出牌</span>
+            </button>
+        </aside>
+
+    </div>
+
+    <!-- 底部 3D 木紋雙層牌架 (Bottom 3D Wooden Rack Tray) -->
+    <footer class="wooden-rack-section">
+        <div class="wooden-rack-tray">
+            <div class="rack-brand">Rummikub</div>
+            <div class="rack-grid" id="rack-grid">
+                <!-- 由 JS 動態渲染玩家手牌 -->
+            </div>
+        </div>
+    </footer>
+
+    <!-- 遊戲內部百搭萬用牌 (Joker) 選擇 Modal (#joker-modal) -->
+    <div class="modal-overlay" id="joker-modal">
+        <div class="modal-card" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 class="modal-title">😊 設定百搭萬用牌代表字母</h3>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <p style="margin-bottom: 14px; color: #cbd5e1; font-weight: 700;">請輸入想代替的英文字母 (A-Z)：</p>
+                <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 16px;">
+                    <input id="joker-letter-input"
+                           type="text"
+                           maxlength="1"
+                           placeholder="A~Z"
+                           style="width: 70px; font-size: 2rem; text-align: center; text-transform: uppercase;
+                                  background: rgba(30,41,59,0.9); color: #f8fafc; border: 2px solid rgba(99,102,241,0.6);
+                                  border-radius: 10px; padding: 8px; outline: none;"/>
+                    <button id="joker-letter-confirm" class="btn-icon primary-btn"
+                            style="font-size: 1rem; padding: 10px 22px;">✅ 確認</button>
+                </div>
+                <p style="margin-bottom: 10px; color: #94a3b8; font-size: 0.8rem;">或點擊下方快速選擇：</p>
+                <div class="joker-letters-grid" id="joker-letters-grid">
+                    <!-- JS 動態生成 26 個字母按鈕 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 自訂遊戲內部確認 Modal (#confirm-modal) -->
+    <div class="modal-overlay" id="confirm-modal">
+        <div class="modal-card" style="max-width: 460px;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="confirm-modal-title">⚠️ 系統確認提示</h3>
+                <button class="modal-close" id="close-confirm-modal">&times;</button>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <p id="confirm-modal-msg" style="margin-bottom: 20px; font-size: 1.1rem; color: #f8fafc; font-weight: 700;"></p>
+                <div style="display: flex; gap: 12px; justify-content: center;">
+                    <button class="btn-icon primary-btn" id="confirm-modal-ok" style="padding: 10px 24px;">確定</button>
+                    <button class="btn-icon" id="confirm-modal-cancel" style="padding: 10px 20px;">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 遊戲規則 Modal -->
+    <div class="modal-overlay" id="rules-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">📖 英文拉密 (Rummikub Word) 遊戲規則說明</h3>
+                <button class="modal-close" id="close-rules">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h4>🂠 遊戲簡介與配件</h4>
+                <p>英文拉密共有 <strong>112 張牌</strong>（110 張英文字母牌 + 2 張紅臉百搭牌 Joker）。一開始進行洗牌、4人抽牌比字母大小決定順序，並將剩餘牌以 <strong>每 7 張疊成一堆</strong> 放在桌邊。每位玩家初始分得 <strong>14 張牌</strong>，目標最先將牌架上的牌全部清空。</p>
+
+                <h4>❄️ 破冰行動 (Ice Breaking)</h4>
+                <ul>
+                    <li>玩家的第一次有效出牌稱為「破冰行動」。</li>
+                    <li>破冰出的單字/組合<strong>總字母數必須至少達到 4 個字母</strong>（例：`BOOK`, `PLAY`, 或 `GAME`）。</li>
+                    <li>破冰行動前，<strong>不能</strong>操作或拆解桌面上的現有牌塊。破冰行動可以使用百搭牌。</li>
+                </ul>
+
+                <h4>🔤 常規回合與單字規範</h4>
+                <ul>
+                    <li><strong>共用桌面與重組</strong>：所有玩家（包含 AI）共用中央主桌面。完成破冰後，可自由重組、拆解桌面上的單字。</li>
+                    <li><strong>單字長度要求</strong>：桌面上每一個單字<strong>長度必須至少 2 個字母</strong> (>= 2)。</li>
+                    <li><strong>單字合法性與空格分隔</strong>：出牌必須為合法的英文單字。桌面上不同單字之間必須保留至少 1 個空白格子隔開！</li>
+                    <li><strong>出牌提示與中文釋義</strong>：點擊「💡 提示」可獲取純中文釋義引導（多次點擊切換不同提示）！共用桌面上每個單字皆附註繁體中文釋義。</li>
+                    <li><strong>桌面不可重複</strong>：桌面上不能出現兩組完全相同的英文單字。</li>
+                    <li><strong>每回合強制要求</strong>：破冰後，每回合必須<strong>至少打出 1 張手牌</strong>到桌面上，才可以進行桌面重組。若無法/不出牌，則點擊「抽牌」結束回合。</li>
+                </ul>
+
+                <h4>😊 百搭牌 (Joker) 規則</h4>
+                <ul>
+                    <li>百搭牌可代表任何英文字母。在玩家回合中，點擊百搭牌即可隨時更改代表字母。</li>
+                    <li>桌上的百搭牌可以用玩家手上或桌上對應的實體字母牌換回。換回的百搭牌必須在<strong>當回合庫存用掉</strong>。</li>
+                    <li>遊戲結束時若手牌保留百搭牌，結算時扣 30 分。</li>
+                </ul>
+
+                <h4>⏰ 時間限制與超時懲罰</h4>
+                <p>每回合限時 <strong>3 分鐘 (180 秒)</strong>。若時間倒數結束或點擊「完成回合」時桌面不符合規則，桌面將自動<strong>還原至本回合開始前的狀態</strong>，且該玩家必須<strong>強制抽 1 張牌</strong>作為懲罰。</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 勝利結算 Modal -->
+    <div class="modal-overlay" id="victory-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">🎉 遊戲結束結算</h3>
+            </div>
+            <div class="modal-body" id="victory-body">
+                <!-- 由 JS 動態生成結算分數與單字複習 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 單字學習簡報秀 Modal (Presentation Slide Show Modal) -->
+    <div class="modal-overlay" id="slide-modal">
+        <div class="modal-card" style="max-width: 750px;">
+            <div class="modal-header">
+                <h3 class="modal-title">📖 本局單字學習簡報秀 (雙語語音發音)</h3>
+                <button class="modal-close" id="close-slide-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="slide-card-box" id="slide-card-box">
+                    <div class="slide-word-main" id="slide-word-text">S C H O O L</div>
+                    <div class="slide-chi-main" id="slide-chi-text">學校</div>
+                    <div class="slide-meta-info" id="slide-meta-text">6 個字母 • AI 小明 出牌 (第 1 / 5 頁)</div>
+                </div>
+
+                <div class="slide-controls-bar">
+                    <button class="slide-btn" id="btn-slide-prev">◀ 上一張</button>
+                    <button class="slide-btn primary" id="btn-slide-speak">🔊 重新發音</button>
+                    <button class="slide-btn primary" id="btn-slide-play">▶ 自動輪播</button>
+                    <button class="slide-btn" id="btn-slide-next">下一張 ▶</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 背景音樂音訊播放器 -->
+    <audio id="bgm-player" src="拼字小舞台.mp3" loop preload="auto"></audio>
+
+    <!-- 腳本引入 -->
+    <script src="words_data.js"></script>
+    <script src="game.js"></script>
+
+</div><!-- #app-root -->
+</body>
+</html>
