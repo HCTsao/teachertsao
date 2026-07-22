@@ -237,11 +237,43 @@ class RummikubGame {
             this.btnToggleBgm.textContent = '🎵 背景音樂: 開';
             this.btnToggleBgm.classList.add('primary-btn');
         }
-        if (this.bgmPlayerEl) {
-            this.bgmPlayerEl.volume = 0.35;
-        }
+        // 初始化與監聽等比例縮放適配
+        this.updateViewportScale();
+        window.addEventListener('resize', () => this.updateViewportScale());
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => this.updateViewportScale(), 150);
+        });
 
         this.bindEvents();
+    }
+
+    updateViewportScale() {
+        const appRoot = document.getElementById('app-root');
+        if (!appRoot) return;
+
+        const baseWidth = 1160;
+        const baseHeight = 740;
+
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+
+        const scaleX = windowWidth / baseWidth;
+        const scaleY = windowHeight / baseHeight;
+
+        // 取寬高縮放比之較小值，確保全畫面 100% 等比例適配且無視窗溢出
+        const scale = Math.min(scaleX, scaleY);
+
+        appRoot.style.transform = `scale(${scale})`;
+
+        // 行動裝置直向螢幕提示
+        const rotateTipEl = document.getElementById('rotate-screen-tip');
+        if (rotateTipEl) {
+            if (windowWidth < 768 && windowWidth < windowHeight) {
+                rotateTipEl.classList.add('show');
+            } else {
+                rotateTipEl.classList.remove('show');
+            }
+        }
     }
 
     bindEvents() {
