@@ -251,8 +251,8 @@ class RummikubGame {
         const appRoot = document.getElementById('app-root');
         if (!appRoot) return;
 
-        const baseWidth = 1160;
-        const baseHeight = 740;
+        const baseWidth = 1080;
+        const baseHeight = 660;
 
         const windowWidth = window.innerWidth;
         const windowHeight = window.innerHeight;
