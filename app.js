@@ -6,6 +6,13 @@
 const toolsData = [
 
     {
+        name: "使用錢幣大富翁",
+        category: "一下",
+        path: "一下/錢幣大富翁.html",
+        desc: "結合實體錢幣教具的橡盤遊戲！撲骰子移動棋子，遇到商店就以實際錢幣交易，經過機會與命運格考驗錢幣比大小與報讀，在遊戲中營業、升級、購物，深化錢幣操作能力。",
+        type: "遊戲"
+    },
+    {
         name: "數字貪食蛇",
         category: "一上",
         categories: ["一上", "一下", "二上"],
@@ -446,7 +453,7 @@ function renderTools() {
             t.category === currentCategory || 
             (t.categories && t.categories.includes(currentCategory))
         );
-        const isBlankCategory = ['一下', '二下', '三下'].includes(currentCategory) || (currentCategory !== 'all' && !hasToolsForCategory);
+        const isBlankCategory = ['二下', '三下'].includes(currentCategory) || (currentCategory !== 'all' && !hasToolsForCategory);
         
         if (isBlankCategory && searchQuery === '') {
             toolsGrid.appendChild(createComingSoonCard(currentCategory));

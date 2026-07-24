@@ -1,0 +1,2485 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>使用錢幣大富翁</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #ff6b6b;
+      --primary-dark: #ee5253;
+      --secondary: #48dbfb;
+      --accent: #feca57;
+      --success: #1dd1a1;
+      --purple: #9c88ff;
+      --bg: #f7f9fc;
+      --font-family: 'Fredoka', 'Noto Sans TC', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      font-family: var(--font-family);
+      background: linear-gradient(135deg, #a8ff78 0%, #78ffd6 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      color: #2d3436;
+      overflow-x: hidden;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 1280px;
+      height: 96vh;
+      max-height: 920px;
+      display: flex;
+      flex-direction: column;
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(12px);
+      border-radius: 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+      border: 4px solid #ffffff;
+      padding: 15px;
+      position: relative;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 15px 10px 15px;
+      border-bottom: 2px dashed #c8d6e5;
+    }
+
+    .title-group h1 {
+      font-size: 2.2rem;
+      color: #2c3e50;
+      text-shadow: 2px 2px 0px #fff;
+    }
+
+    .header-btns {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 10px 18px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      border-radius: 14px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 0 rgba(0,0,0,0.15);
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: inherit;
+    }
+
+    .btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 rgba(0,0,0,0.15);
+    }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-purple { background: var(--purple); color: white; }
+    .btn-accent { background: var(--accent); color: #d35400; }
+    .btn-success { background: var(--success); color: white; }
+    .btn-danger { background: #ee5253; color: white; }
+    .btn-info { background: #00cec9; color: white; }
+
+    /* Board Grid (5x5 Outer Ring = 16 Tiles) */
+    .board-wrapper {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      grid-template-rows: repeat(5, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+      position: relative;
+    }
+
+    .tile {
+      background: white;
+      border-radius: 18px;
+      border: 3px solid #dfe6e9;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.06);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px;
+      position: relative;
+      transition: transform 0.2s, box-shadow 0.2s;
+      overflow: hidden;
+    }
+
+    .tile.active-tile {
+      border-color: var(--accent);
+      box-shadow: 0 0 22px var(--accent);
+      transform: scale(1.04);
+      z-index: 5;
+    }
+
+    .tile-header {
+      width: 100%;
+      text-align: center;
+      padding: 3px 0;
+      border-radius: 8px;
+      font-weight: 900;
+      font-size: 0.92rem;
+      color: white;
+    }
+
+    .bg-start { background: #10ac84; }
+    .bg-shop { background: #ff9ff3; }
+    .bg-chance { background: #feca57; color: #d35400; }
+    .bg-fate { background: #ff6b6b; }
+
+    .tile-icon { font-size: 2.1rem; margin: 2px 0; }
+    .tile-name { font-size: 0.95rem; font-weight: 700; color: #2d3436; text-align: center; line-height: 1.1; }
+
+    /* OWNER BADGE ON TILE */
+    .owner-badge {
+      width: 100%;
+      background: linear-gradient(135deg, #feca57, #ff9ff3);
+      color: #2c3e50;
+      font-weight: 900;
+      font-size: 0.82rem;
+      border-radius: 8px;
+      padding: 2px 0;
+      text-align: center;
+      margin-top: 2px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      border: 1px solid #f39c12;
+    }
+
+    .tokens-container {
+      display: flex;
+      gap: 3px;
+      position: absolute;
+      bottom: 3px;
+      flex-wrap: wrap;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .player-token {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      border: 2px solid white;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .token-p1 { background: #ff6b6b; }
+    .token-p2 { background: #48dbfb; }
+    .token-p3 { background: #1dd1a1; }
+    .token-p4 { background: #feca57; }
+    .token-p5 { background: #9c88ff; }
+    .token-p6 { background: #eccc68; }
+
+    /* Dashboard */
+    .center-dashboard {
+      grid-column: 2 / 5;
+      grid-row: 2 / 5;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 24px;
+      border: 4px dashed #b2bec3;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.03);
+    }
+
+    .players-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      margin-bottom: 5px;
+    }
+
+    .player-card {
+      flex: 1;
+      min-width: 85px;
+      max-width: 150px;
+      background: #f1f2f6;
+      border-radius: 12px;
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      border: 3px solid transparent;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .player-card.active {
+      border-color: var(--primary);
+      background: #fff0f0;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+    }
+
+    .player-card-header {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .player-avatar-lg { font-size: 1.6rem; line-height: 1; }
+    .player-name-lg { font-weight: 900; font-size: 0.9rem; color: #2c3e50; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65px; }
+
+    .player-shops-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      background: #eccc68;
+      color: #2f3542;
+      padding: 1px 6px;
+      border-radius: 8px;
+      margin-top: 1px;
+    }
+
+    .action-zone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .event-banner {
+      background: #f8efba;
+      border: 3px solid #f9ca24;
+      padding: 10px 20px;
+      border-radius: 18px;
+      font-size: 1.25rem;
+      font-weight: 900;
+      color: #2c3e50;
+      max-width: 95%;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    }
+
+    .roll-btn {
+      padding: 14px 28px;
+      font-size: 1.3rem;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #ff9ff3, #feca57);
+      color: #2d3436;
+      border: none;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 6px 0 #e1b12c;
+      transition: all 0.15s ease;
+    }
+
+    .roll-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #e1b12c; }
+
+    /* Modals Overlay */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .modal-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-box {
+      background: white;
+      border-radius: 28px;
+      width: 92%;
+      max-width: 600px;
+      padding: 24px;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.3);
+      border: 6px solid var(--accent);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      transform: scale(0.85);
+      transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      max-height: 92vh;
+      overflow-y: auto;
+    }
+
+    .modal-overlay.show .modal-box {
+      transform: scale(1);
+    }
+
+    .modal-title {
+      font-size: 1.75rem;
+      color: #2c3e50;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 900;
+    }
+
+    .owner-status-banner {
+      background: #e3f2fd;
+      border: 2px solid #64b5f6;
+      color: #0d47a1;
+      padding: 8px 16px;
+      border-radius: 14px;
+      font-weight: 900;
+      font-size: 1.15rem;
+      margin-bottom: 12px;
+      width: 100%;
+    }
+
+    /* Product Display Card */
+    .product-display-card {
+      width: 100%;
+      background: linear-gradient(135deg, #fff9e6, #fff0f5);
+      border: 4px solid #feca57;
+      border-radius: 22px;
+      padding: 16px;
+      margin-bottom: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.06);
+    }
+
+    .product-big-icon {
+      font-size: 4.8rem;
+      line-height: 1;
+      margin-bottom: 6px;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.15));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .product-big-name {
+      font-size: 1.7rem;
+      font-weight: 900;
+      color: #2c3e50;
+      margin-bottom: 6px;
+    }
+
+    .product-big-price {
+      font-size: 2.1rem;
+      font-weight: 900;
+      color: #ee5253;
+      background: #ffeaa7;
+      padding: 4px 22px;
+      border-radius: 20px;
+      border: 2px solid #f1c40f;
+    }
+
+    /* Dialogue Card */
+    .dialogue-card {
+      width: 100%;
+      background: #fff8e7;
+      border: 3px solid #ffeaa7;
+      border-radius: 20px;
+      padding: 14px 18px;
+      margin-bottom: 12px;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.02);
+    }
+
+    .dialogue-line { font-size: 1.15rem; line-height: 1.5; color: #2c3e50; }
+
+    .role-badge {
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-weight: 900;
+      font-size: 1.05rem;
+      color: white;
+      display: inline-block;
+    }
+
+    .role-student { background: #ff6b6b; }
+    .role-teacher { background: #10ac84; }
+    .role-owner { background: #f39c12; }
+
+    .dialogue-text-prompt {
+      background: #ffffff;
+      padding: 12px 16px;
+      border-radius: 14px;
+      border: 3px dashed #ab47bc;
+      display: block;
+      margin-top: 6px;
+      color: #2d3436;
+      font-size: 1.3rem;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .settings-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      text-align: left;
+      width: 100%;
+      margin: 15px 0;
+    }
+
+    .player-edit-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #f1f2f6;
+      padding: 10px 15px;
+      border-radius: 14px;
+      width: 100%;
+    }
+
+    .player-edit-row input[type="text"] {
+      flex: 1;
+      font-size: 1.1rem;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 2px solid #b2bec3;
+      font-family: inherit;
+    }
+
+    .avatar-select {
+      font-size: 1.3rem;
+      padding: 6px;
+      border-radius: 10px;
+      border: 2px solid #b2bec3;
+    }
+
+    .compare-box-container {
+      display: flex;
+      justify-content: space-around;
+      width: 100%;
+      gap: 12px;
+      margin: 8px 0;
+    }
+
+    .compare-side {
+      flex: 1;
+      background: white;
+      border: 3px solid #74b9ff;
+      border-radius: 18px;
+      padding: 10px 6px;
+      text-align: center;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.05);
+      min-height: 100px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    .compare-side-title { font-size: 1.15rem; font-weight: 900; color: #0984e3; margin-bottom: 6px; }
+
+    /* REAL COIN IMAGE STYLES - STRICT PHYSICAL SIZE PROPORTION: 1元 < 5元 < 10元 < 50元 < 100元 */
+    #chance-side-a-coins, #chance-side-b-coins, #fate-coins-display {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 6px 4px;
+      width: 100%;
+      padding: 6px 0;
+    }
+
+    .real-coin-img {
+      object-fit: contain;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+      vertical-align: middle;
+      flex-shrink: 0;
+      transition: transform 0.15s;
+    }
+
+    /* Base Size 1元 */
+    .real-coin-img.coin-1 {
+      width: 30px !important;
+      height: 30px !important;
+      border-radius: 50%;
+    }
+
+    /* 5元 slightly bigger */
+    .real-coin-img.coin-5 {
+      width: 34px !important;
+      height: 34px !important;
+      border-radius: 50%;
+    }
+
+    /* 10元 bigger than 5元 */
+    .real-coin-img.coin-10 {
+      width: 38px !important;
+      height: 38px !important;
+      border-radius: 50%;
+    }
+
+    /* 50元 bigger than 10元 */
+    .real-coin-img.coin-50 {
+      width: 44px !important;
+      height: 44px !important;
+      border-radius: 50%;
+    }
+
+    /* 100元 banknote (rectangular note ratio) */
+    .real-coin-img.coin-100 {
+      width: 62px !important;
+      height: 34px !important;
+      border-radius: 4px;
+    }
+
+    .mortgage-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+      max-height: 250px;
+      overflow-y: auto;
+      margin: 10px 0;
+    }
+
+    .mortgage-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #fff;
+      border: 2px solid #e2e8f0;
+      padding: 10px 16px;
+      border-radius: 14px;
+      width: 100%;
+    }
+
+    /* 3D Dice Styles inside modal */
+    .scene-lg {
+      width: 100px;
+      height: 100px;
+      perspective: 400px;
+      margin: 30px 0;
+      cursor: pointer;
+      display: inline-block;
+    }
+
+    .cube-lg {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 1.5s cubic-bezier(0.2, 0.8, 0.25, 1);
+      transform: rotateX(-15deg) rotateY(45deg);
+    }
+
+    .cube-lg__face {
+      position: absolute;
+      width: 100px;
+      height: 100px;
+      border: 4px solid #57606f;
+      background: white;
+      border-radius: 16px;
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.15), 0 6px 12px rgba(0,0,0,0.25);
+      padding: 12px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 4px;
+      align-items: center;
+      justify-items: center;
+    }
+
+    /* Dice dot styles */
+    .dot {
+      display: block;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #2c3e50; /* 預設深色點 */
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
+    }
+
+    .dot.red-dot {
+      background: #ee5253; /* 1 點大紅點 */
+      width: 26px;
+      height: 26px;
+    }
+
+    .cube-lg__face--1 { transform: rotateY(  0deg) translateZ(50px); }
+    .cube-lg__face--2 { transform: rotateY(180deg) translateZ(50px); }
+    .cube-lg__face--3 { transform: rotateY( 90deg) translateZ(50px); }
+    .cube-lg__face--4 { transform: rotateY(-90deg) translateZ(50px); }
+    .cube-lg__face--5 { transform: rotateX( 90deg) translateZ(50px); }
+    .cube-lg__face--6 { transform: rotateX(-90deg) translateZ(50px); }
+
+    #celebration-canvas {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      pointer-events: none;
+      z-index: 2000;
+    }
+
+    /* Tutorial Slide Show styles */
+    .tutorial-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 98vh;
+      width: 100%;
+      max-width: 850px;
+      margin: 0 auto;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    .tutorial-box {
+      background: rgba(255, 255, 255, 0.98);
+      border-radius: 28px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+      border: 6px solid #fff;
+      padding: 35px;
+      width: 100%;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .tutorial-header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 3px dashed #a29bfe;
+      padding-bottom: 15px;
+      margin-bottom: 25px;
+    }
+
+    .tutorial-header-title {
+      font-size: 1.8rem;
+      font-weight: 900;
+      color: #2c3e50;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .tutorial-skip-btn {
+      background: #f1f2f6;
+      color: #57606f;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 10px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+
+    .tutorial-skip-btn:hover {
+      background: #dfe4ea;
+    }
+
+    .slide-deck {
+      width: 100%;
+      min-height: 420px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .slide-card {
+      display: none;
+      animation: slideIn 0.3s ease;
+      width: 100%;
+    }
+
+    .slide-card.active {
+      display: block;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .slide-theme-box {
+      background: #f8faff;
+      border-radius: 20px;
+      padding: 22px;
+      border: 2px solid #e1e8ff;
+      margin-bottom: 20px;
+    }
+
+    .slide-subtitle {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #485460;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .slide-list {
+      list-style-type: none;
+      padding-left: 0;
+    }
+
+    .slide-list li {
+      position: relative;
+      padding-left: 30px;
+      margin-bottom: 12px;
+      font-size: 1.15rem;
+      color: #2c3e50;
+      line-height: 1.6;
+    }
+
+    .slide-list li::before {
+      content: "⭐";
+      position: absolute;
+      left: 0;
+      top: 2px;
+      font-size: 1.1rem;
+    }
+
+    .slide-list li.check::before {
+      content: "✅";
+    }
+    
+    .slide-list li.coin::before {
+      content: "💰";
+    }
+
+    .slide-list li.dialogue::before {
+      content: "💬";
+    }
+
+    .slide-list li.warning::before {
+      content: "⚠️";
+    }
+
+    .slide-dialogue-demo {
+      background: #fff8e7;
+      border: 2px solid #ffeaa7;
+      border-radius: 16px;
+      padding: 15px;
+      margin-top: 10px;
+      font-family: inherit;
+    }
+
+    .slide-footer-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    .slide-indicators {
+      display: flex;
+      gap: 8px;
+    }
+
+    .indicator-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #dcdde1;
+      transition: all 0.2s ease;
+    }
+
+    .indicator-dot.active {
+      background: #74b9ff;
+      transform: scale(1.3);
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="celebration-canvas"></canvas>
+
+  <!-- Tutorial Slide Show Container -->
+  <div class="tutorial-container" id="tutorial-container">
+    <div class="tutorial-box">
+      <div class="tutorial-header">
+        <div class="tutorial-header-title">📖 使用錢幣大富翁：行前教學簡報</div>
+        <button class="tutorial-skip-btn" onclick="skipTutorial()">跳過教學 ⏩</button>
+      </div>
+
+      <div class="slide-deck">
+        <!-- Slide 1: Welcome & Props Prep -->
+        <div class="slide-card active" id="slide-0">
+          <div class="slide-theme-box" style="background:#e8f5e9; border-color:#81c784;">
+            <div class="slide-subtitle">🎒 步驟 1：老師需要準備的教具</div>
+            <ul class="slide-list">
+              <li class="check">請老師協助準備<b>錢幣教具</b>，供學生在遊戲中實體付款。</li>
+              <li class="check"><b>幣值種類</b>：包括 <b>100元、50元、10元、5元、1元</b> 共五種。</li>
+              <li class="check">學生每次抵達商店付錢時，都必須使用<b>錢幣教具實際操作一次</b>哦！</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Slide 2: Initial Money -->
+        <div class="slide-card" id="slide-1">
+          <div class="slide-theme-box" style="background:#e3f2fd; border-color:#64b5f6;">
+            <div class="slide-subtitle">💵 步驟 2：發放初始錢幣給學生</div>
+            <ul class="slide-list">
+              <li class="coin"><b>老師實體發放分配建議（每人 $250）</b>：
+                <br>• <b>100元</b>：1 張
+                <br>• <b>50元</b>：1 個
+                <br>• <b>10元</b>：7 個
+                <br>• <b>5元</b>：4 個
+                <br>• <b>1元</b>：10 個
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Slide 3: Shop & Purchase Rules -->
+        <div class="slide-card" id="slide-2">
+          <div class="slide-theme-box" style="background:#fff3e0; border-color:#ffb74d;">
+            <div class="slide-subtitle">🛒 步驟 3：踩到商店格的規則</div>
+            <ul class="slide-list">
+              <li class="warning" style="color: #d35400;"><b>走完第一圈之前，商店不會開始營業哦！第二圈才開始需要付錢給老闆。</b></li>
+              <li class="check"><b>踩到「老師的店家」</b>：玩家需要付給老師(銀行)商品的金額，回答正確後，就可以成為這家店的<b>新老闆</b> 👑！</li>
+              <li class="check"><b>踩到「別人的店家」</b>：玩家必須支付<b>商品的金額</b>給那家店的老闆！</li>
+              <li class="check"><b>踩到「自己的店家」</b>：可以決定要不要花 100 元升級商店，<b>最多可以升級 2 次（最高 Lv.3）</b>！</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Slide 4: Pay Exact Amount -->
+        <div class="slide-card" id="slide-3">
+          <div class="slide-theme-box" style="background:#fff8e7; border-color:#ffeaa7;">
+            <div class="slide-subtitle">💬 步驟 4：付錢一定要剛剛好！</div>
+            <ul class="slide-list font-weight-bold">
+              <li class="dialogue"><b>付錢的對話句型</b>：
+                <div class="slide-dialogue-demo" style="font-size: 1.05rem; line-height: 1.5;">
+                  👩‍🎓 <b>生（顧客）</b>：「老闆，請問這個多少錢？」
+                  <br>👨‍🏫 <b>生/師（老闆）</b>：「<b>xxx____元</b>，請給剛好的錢。說說看，你是怎麼給錢的？」
+                  <br>👩‍🎓 <b>生（顧客）</b>：「我給了<b>____個____元，____個____元，總共是____元</b>。」
+                </div>
+              </li>
+              <li class="warning"><b>錢不夠嗎？找銀行換錢吧！</b>：如果手中剛好沒有適合的硬幣，可以找<b>銀行(老師)換錢</b>唷！</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Slide 5: Upgrade Shop -->
+        <div class="slide-card" id="slide-4">
+          <div class="slide-theme-box" style="background:#e8f5e9; border-color:#a29bfe;">
+            <div class="slide-subtitle">🏰 步驟 5：店面升級機制 (Lv.1 ~ Lv.3)</div>
+            <ul class="slide-list">
+              <li class="check"><b>商品價格提升</b>：每次升級後，該商店的商品價格就會<b>提高 3~5 元</b>！</li>
+              <li class="check"><b>破產抵押</b>：如果玩家破產了，可以隨時向銀行抵押自己的商店，退回買下這間店的錢。但是，此時商店會變回<b>「老師的商店」</b>，別人就可以重新成為老闆！</li>
+              <li class="check"><b>抵押重置</b>：如果因為破產抵押了商店，該商店的等級會重新回到 <b>Lv.1</b>。</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Slide 6: Start Line & Game End -->
+        <div class="slide-card" id="slide-5">
+          <div class="slide-theme-box" style="background:#ffebee; border-color:#ff8a80;">
+            <div class="slide-subtitle">🏁 步驟 6：起點與遊戲結束條件</div>
+            <ul class="slide-list">
+              <li class="check"><b>通過起點</b>：每次走完一圈時，就可以向銀行領取 <b>20 元</b> 的獎勵！</li>
+              <li class="check"><b>🏆 遊戲結束條件</b>：
+                <br>1. 有玩家錢幣歸零，且手中已無商店可以抵押時，該玩家破產，遊戲結束！
+                <br>2. 下課鐘聲響，擁有最多錢的玩家獲勝！
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Slide 7: Let's Go -->
+        <div class="slide-card" id="slide-6">
+          <div class="slide-theme-box" style="background:#e8f5e9; border-color:#81c784; text-align:center; padding: 40px 20px;">
+            <div style="font-size: 3.5rem; margin-bottom: 20px;">🚀</div>
+            <div style="font-size: 1.6rem; font-weight:900; color:#2e7d32; margin-bottom:15px;">一切準備就緒！</div>
+            <p style="font-size:1.25rem; color:#57606f; line-height:1.6;">
+              請老師先協助引導學生準備好實體硬幣，<br>我們馬上就要出發囉！
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide Navigators & Indicators -->
+      <div class="slide-footer-nav">
+        <button class="btn btn-purple" id="slide-prev-btn" onclick="prevSlide()" disabled>⬅️ 上一頁</button>
+        
+        <div class="slide-indicators" id="slide-indicators-container">
+          <div class="indicator-dot active"></div>
+          <div class="indicator-dot"></div>
+          <div class="indicator-dot"></div>
+          <div class="indicator-dot"></div>
+          <div class="indicator-dot"></div>
+          <div class="indicator-dot"></div>
+          <div class="indicator-dot"></div>
+        </div>
+
+        <button class="btn btn-primary" id="slide-next-btn" onclick="nextSlide()">下一頁 ➡️</button>
+        
+        <!-- 開始遊戲的大按鈕，預設隱藏，最後一頁顯示 -->
+        <button class="btn btn-success" id="slide-start-game-btn" onclick="startPreGameSettings()" style="display:none; padding:12px 30px; font-size:1.25rem; animation: pulse 1.5s infinite;">
+          🚀 設定玩家資料並開始！
+        </button>
+      </div>
+
+      <!-- 最後一頁的再看一次按鈕，預設隱藏 -->
+      <button class="btn btn-info" id="slide-replay-btn" onclick="replayTutorial()" style="display:none; margin-top:20px; width:100%; justify-content:center;">
+        🔄 再看一次教學引導
+      </button>
+    </div>
+  </div>
+
+  <div class="app-container" style="display: none;">
+    <!-- Header -->
+    <header>
+      <div class="title-group">
+        <h1>使用錢幣大富翁</h1>
+      </div>
+      <div class="header-btns">
+        <button class="btn btn-info" onclick="showTutorial()">
+          <span>📖</span> 教學引導
+        </button>
+        <button class="btn btn-purple" onclick="toggleSpeech()">
+          <span id="speech-icon">🔊</span> 語音朗讀
+        </button>
+        <button class="btn btn-danger" onclick="openMortgageModal()">
+          <span>🏦</span> 抵押/賣出商店
+        </button>
+        <button class="btn btn-accent" onclick="openSettingsModal()">
+          <span>⚙️</span> 玩家設定
+        </button>
+      </div>
+    </header>
+
+    <!-- Monopoly Board -->
+    <div class="board-wrapper" id="board">
+      <div class="center-dashboard">
+        <!-- 頂部玩家狀態列 -->
+        <div class="players-bar" id="players-bar"></div>
+
+        <!-- 擲骰子觸發按鈕區 -->
+        <div class="action-zone">
+          <div class="event-banner" id="event-banner" style="font-size:1.15rem; min-height:56px; display:flex; align-items:center; justify-content:center; line-height:1.4;">
+            歡迎來到錢幣大富翁！請點擊擲骰子開始遊戲 🎲
+          </div>
+
+          <div style="margin-top: 15px;">
+            <button class="roll-btn" id="roll-trigger-btn" onclick="openDiceModal()" style="padding: 16px 36px; font-size: 1.4rem;">擲骰子 🎲</button>
+          </div>
+        </div>
+
+        <div></div> <!-- 佔位符 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: 3D Dice Modal -->
+  <div class="modal-overlay" id="dice-modal">
+    <div class="modal-box" style="max-width: 480px; border-color: var(--purple);">
+      <div class="modal-title" id="dice-modal-title" style="font-size: 1.4rem; justify-content: center; width: 100%;">🎲 準備擲兩個骰子...</div>
+      
+      <div style="display: flex; gap: 40px; justify-content: center; align-items: center; width: 100%; margin: 15px 0;">
+        <!-- 骰子 1 -->
+        <div class="scene-lg">
+          <div class="cube-lg" id="cube-lg-1">
+            <div class="cube-lg__face cube-lg__face--1"><span class="dot red-dot" style="grid-area: 2 / 2;"></span></div>
+            <div class="cube-lg__face cube-lg__face--2"><span class="dot" style="grid-area: 1 / 1;"></span><span class="dot" style="grid-area: 3 / 3;"></span></div>
+            <div class="cube-lg__face cube-lg__face--3"><span class="dot" style="grid-area: 1 / 1;"></span><span class="dot" style="grid-area: 2 / 2;"></span><span class="dot" style="grid-area: 3 / 3;"></span></div>
+            <div class="cube-lg__face cube-lg__face--4"><span class="dot" style="grid-area: 1 / 1;"></span><span class="dot" style="grid-area: 1 / 3;"></span><span class="dot" style="grid-area: 3 / 1;"></span><span class="dot" style="grid-area: 3 / 3;"></span></div>
+            <div class="cube-lg__face cube-lg__face--5"><span class="dot" style="grid-area: 1 / 1;"></span><span class="dot" style="grid-area: 1 / 3;"></span><span class="dot" style="grid-area: 2 / 2;"></span><span class="dot" style="grid-area: 3 / 1;"></span><span class="dot" style="grid-area: 3 / 3;"></span></div>
+            <div class="cube-lg__face cube-lg__face--6"><span class="dot" style="grid-area: 1 / 1;"></span><span class="dot" style="grid-area: 2 / 1;"></span><span class="dot" style="grid-area: 3 / 1;"></span><span class="dot" style="grid-area: 1 / 3;"></span><span class="dot" style="grid-area: 2 / 3;"></span><span class="dot" style="grid-area: 3 / 3;"></span></div>
+          </div>
+        </div>
+
+        <!-- 骰子 2 -->
+        <div class="scene-lg">
+          <div class="cube-lg" id="cube-lg-2">
+            <div class="cube-lg__face cube-lg__face--1"><span class="dot red-dot" style="grid-area: 2 / 2;"></span></div>
+            <div class="cube-lg__face cube-lg__face--2"><span class="dot" style="grid-area: 1 / 1;"></span><span class="dot" style="grid-area: 3 / 3;"></span></div>
+            <div class="cube-lg__face cube-lg__face--3"><span class="dot" style="grid-area: 1 / 1;"></span><span class="dot" style="grid-area: 2 / 2;"></span><span class="dot" style="grid-area: 3 / 3;"></span></div>
+            <div class="cube-lg__face cube-lg__face--4"><span class="dot" style="grid-area: 1 / 1;"></span><span class="dot" style="grid-area: 1 / 3;"></span><span class="dot" style="grid-area: 3 / 1;"></span><span class="dot" style="grid-area: 3 / 3;"></span></div>
+            <div class="cube-lg__face cube-lg__face--5"><span class="dot" style="grid-area: 1 / 1;"></span><span class="dot" style="grid-area: 1 / 3;"></span><span class="dot" style="grid-area: 2 / 2;"></span><span class="dot" style="grid-area: 3 / 1;"></span><span class="dot" style="grid-area: 3 / 3;"></span></div>
+            <div class="cube-lg__face cube-lg__face--6"><span class="dot" style="grid-area: 1 / 1;"></span><span class="dot" style="grid-area: 2 / 1;"></span><span class="dot" style="grid-area: 3 / 1;"></span><span class="dot" style="grid-area: 1 / 3;"></span><span class="dot" style="grid-area: 2 / 3;"></span><span class="dot" style="grid-area: 3 / 3;"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-purple" id="dice-modal-roll-btn" onclick="triggerDiceRoll()" style="display: none;">投擲骰子 🎲</button>
+    </div>
+  </div>
+
+  <!-- Modal: Shop Product Modal -->
+  <div class="modal-overlay" id="payment-modal">
+    <div class="modal-box">
+      <div class="modal-title">
+        <span id="pay-modal-icon">🛒</span>
+        <span id="pay-modal-title">商店購物</span>
+      </div>
+
+      <!-- 1. 購物付錢資訊區 -->
+      <div id="payment-info-view" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+        <!-- Owner Status Banner -->
+        <div class="owner-status-banner" id="owner-status-banner">
+          🏫 這是【老師的店家】！回答正確你就能成為這家店的老闆！👑
+        </div>
+
+        <!-- Default Product Image & Price Display -->
+        <div class="product-display-card">
+          <div class="product-big-icon" id="product-big-icon">🍞</div>
+          <div class="product-big-name" id="dialogue-item-name">香甜菠蘿麵包</div>
+          <div class="product-big-price">$<span id="dialogue-price-text">35</span> 元</div>
+        </div>
+
+        <button class="btn btn-info" id="toggle-dialogue-btn" style="margin-bottom: 12px; width: 100%; justify-content: center; font-size: 1.15rem; padding: 10px;" onclick="toggleRoleplayDialogue()">
+          💬 顯示對話句型
+        </button>
+
+        <!-- Dialogue Card -->
+        <div class="dialogue-card" id="dialogue-card-section" style="display: none;">
+          <div class="dialogue-line" id="dialogue-line-1">
+            <span class="role-badge role-student">生（顧客）</span>：
+            <b>「老闆，請問這個多少錢？」</b>
+          </div>
+          <div class="dialogue-line" id="dialogue-line-2">
+            <span class="role-badge role-teacher">師（老闆）</span>：
+            <b>「<span id="dialogue-item-name-2" style="color:#27ae60;">香甜菠蘿麵包</span> <span id="dialogue-price-text-2" style="color:#ee5253; font-size:1.3rem;">35</span> 元，請給剛好的錢。說說看，你是怎麼給錢的？」</b>
+          </div>
+        </div>
+
+        <button class="btn btn-purple" style="margin-bottom: 12px; width: 100%; justify-content: center; font-size: 1.1rem; padding: 10px;" onclick="openBankNeedExchangeModal()">
+          🏦 錢不夠嗎？找銀行換錢吧！
+        </button>
+
+        <button class="btn btn-accent" id="upgrade-shop-btn" style="margin-bottom: 12px; width: 100%; justify-content: center; font-size: 1.15rem; color: #fff; display: none;" onclick="upgradeCurrentShop()">
+          🏰 升級店面（花費 $100 元）
+        </button>
+
+        <button class="btn btn-success" id="pay-approve-btn" style="padding: 14px 35px; font-size: 1.35rem; width: 100%; justify-content: center;" onclick="teacherApprovePayment()">
+          ✅ 老師驗證
+        </button>
+      </div>
+
+      <!-- 2. 結果提示區 (與付款彈窗共用) -->
+      <div id="payment-result-view" style="width: 100%; display: none; flex-direction: column; align-items: center; gap: 15px;">
+        <div class="dialogue-card" style="background: #e8f5e9; border: 3px solid #81c784; text-align: center; width: 100%; padding: 20px; border-radius: 20px; margin-bottom: 5px;">
+          <div id="payment-result-text" style="font-size: 1.3rem; font-weight: 900; color: #2e7d32; line-height: 1.5;">
+            🎉 恭喜！【小明】回答正確！<br>成功成為【美味麵包店】的老闆！👑
+          </div>
+        </div>
+        <button class="btn btn-primary" style="width: 100%; justify-content: center; font-size: 1.2rem; padding: 12px;" onclick="confirmPaymentResult()">
+          確認（換下一位玩家） 🚀
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Chance Tile -->
+  <div class="modal-overlay" id="chance-modal">
+    <div class="modal-box" style="border-color: #feca57; max-width: 650px;">
+      <div class="modal-title">🎁 機會：比比看誰比較多！</div>
+      
+      <!-- 1. 機會出題資訊區 -->
+      <div id="chance-info-view" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+        <div class="dialogue-card" style="background: #fff8e7; border-color: #feca57; margin-bottom: 10px;">
+          <div style="font-size: 1.25rem; font-weight: 900; color: #d35400; margin-bottom: 6px; text-align: center;">
+            💬 請比較下方甲與乙兩人的錢幣，<b>回答正確就可以向銀行領取錢幣獎勵喔！</b>
+          </div>
+
+          <div class="compare-box-container">
+            <div class="compare-side">
+              <div class="compare-side-title">🅰️ 甲的錢幣</div>
+              <div id="chance-side-a-coins"></div>
+            </div>
+            <div class="compare-side">
+              <div class="compare-side-title">🅱️ 乙的錢幣</div>
+              <div id="chance-side-b-coins"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="font-size: 1.15rem; font-weight: 900; color: #2c3e50; margin-bottom: 10px;">
+          👇 請點擊按鈕進行回答：
+        </div>
+
+        <div style="display: flex; gap: 12px; width: 100%;">
+          <button id="chance-btn-a" class="btn btn-primary" style="flex: 1; justify-content: center; font-size: 1.2rem; padding: 12px;" onclick="submitChanceAnswer('A')">
+            🅰️ 甲比較多
+          </button>
+          <button id="chance-btn-b" class="btn btn-purple" style="flex: 1; justify-content: center; font-size: 1.2rem; padding: 12px;" onclick="submitChanceAnswer('B')">
+            🅱️ 乙比較多
+          </button>
+          <button id="chance-btn-equal" class="btn btn-accent" style="flex: 1; justify-content: center; font-size: 1.2rem; padding: 12px; color:#d35400;" onclick="submitChanceAnswer('EQUAL')">
+            ⚖️ 一樣多
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. 機會結果區 -->
+      <div id="chance-result-view" style="width: 100%; display: none; flex-direction: column; align-items: center; gap: 15px;">
+        <div class="dialogue-card" style="background: #e8f5e9; border: 3px solid #81c784; text-align: center; width: 100%; padding: 20px; border-radius: 20px;">
+          <div id="chance-result-text" style="font-size: 1.35rem; font-weight: 900; color: #2e7d32; line-height: 1.5;"></div>
+        </div>
+        <button class="btn btn-primary" style="width: 100%; justify-content: center; font-size: 1.25rem; padding: 12px;" onclick="confirmChanceResult()">
+          確認（換下一位玩家） 🚀
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Modal: Fate Tile -->
+  <div class="modal-overlay" id="fate-modal">
+    <div class="modal-box" style="border-color: #ff6b6b;">
+      <div class="modal-title">❓ 命運：報讀錢幣總數量！</div>
+
+      <!-- 1. 命運出題資訊區 -->
+      <div id="fate-info-view" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+        <div class="dialogue-card" style="background: #fff0f0; border-color: #ff7675; margin-bottom: 10px;">
+          <div style="font-size: 1.15rem; font-weight: 700; color: #c0392b; margin-bottom: 6px; text-align: center;">
+            💬 請看著撲滿裡的錢幣，<b>親口向老師報讀出錢幣總共有多少錢</b>！
+          </div>
+
+          <div style="background: white; border: 3px dashed #ff7675; border-radius: 18px; padding: 14px; text-align: center; margin: 8px 0; width: 100%;">
+            <div style="font-size: 1.15rem; font-weight: 900; color: #d63031; margin-bottom: 8px;">🐷 撲滿裡的真實錢幣：</div>
+            <div id="fate-coins-display"></div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 15px; width: 100%;">
+          <button id="fate-btn-correct" class="btn btn-success" style="flex: 1; justify-content: center; font-size: 1.15rem; padding: 12px;" onclick="teacherApproveFate(true)">
+            ✅ 老師確認：報讀正確 (領獎)
+          </button>
+          <button id="fate-btn-wrong" class="btn btn-danger" style="flex: 1; justify-content: center; font-size: 1.15rem; padding: 12px;" onclick="teacherApproveFate(false)">
+            ❌ 老師確認：報讀錯誤 (扣$10)
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. 命運結果區 -->
+      <div id="fate-result-view" style="width: 100%; display: none; flex-direction: column; align-items: center; gap: 15px;">
+        <div class="dialogue-card" style="background: #fff0f0; border: 3px solid #ff7675; text-align: center; width: 100%; padding: 20px; border-radius: 20px;">
+          <div id="fate-result-text" style="font-size: 1.35rem; font-weight: 900; color: #c0392b; line-height: 1.5;"></div>
+        </div>
+        <button class="btn btn-primary" style="width: 100%; justify-content: center; font-size: 1.25rem; padding: 12px;" onclick="confirmFateResult()">
+          確認（換下一位玩家） 🚀
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Modal: Bank Need Exchange -->
+  <div class="modal-overlay" id="bank-need-modal">
+    <div class="modal-box" style="border-color: #9c88ff; max-width: 500px;">
+      <div class="modal-title">🏦 找銀行（老師）換錢句型</div>
+      <div class="dialogue-card" style="background: #f3e5f5; border-color: #ab47bc; padding: 20px;">
+        <div class="dialogue-text-prompt" style="font-size: 1.25rem; padding: 12px;">
+          💬 「我想用 <span style="color:#ee5253;">____</span> 個 <span style="color:#ee5253;">____</span> 元，<br>換成 <span style="color:#ee5253;">____</span> 個 <span style="color:#ee5253;">____</span> 元。」
+        </div>
+      </div>
+      <button class="btn btn-success" style="font-size: 1.2rem; padding: 12px 25px; width: 100%; justify-content: center;" onclick="closeBankNeedExchangeModal()">✅ 完成換錢，回商店付錢！</button>
+    </div>
+  </div>
+
+  <!-- Modal: Mortgage / Sell Shop Modal -->
+  <div class="modal-overlay" id="mortgage-modal">
+    <div class="modal-box" style="border-color: #ee5253;">
+      <div class="modal-title">🏦 抵押/賣出商店（破產退錢機制）</div>
+      
+      <!-- 內嵌訊息提示橫幅，用以取代 alert() -->
+      <div id="mortgage-alert-banner" style="display:none; background:#e8f5e9; border:2px solid #81c784; padding:8px 12px; border-radius:12px; font-weight:bold; color:#2e7d32; margin-bottom:12px; width:100%; font-size: 0.95rem; line-height: 1.4;"></div>
+
+      <div style="font-size: 1.1rem; color: #576574; margin-bottom: 12px;">
+        💡 缺錢或破產時，可以將手中的商店抵押給銀行（老師），銀行會退還當初購買該商店的實體錢幣！
+      </div>
+
+      <div class="mortgage-list" id="mortgage-list-container"></div>
+
+      <button class="btn btn-primary" style="font-size: 1.15rem; padding: 10px 25px; margin-top: 10px; width: 100%; justify-content: center;" onclick="closeMortgageModal()">關閉視窗</button>
+    </div>
+  </div>
+
+  <!-- Modal: Settings Modal -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal-box" style="border-color: #feca57;">
+      <div class="modal-title">⚙️ 玩家暱稱、頭像與遊戲設定</div>
+      <div class="settings-grid">
+        <div class="setting-item" style="display: flex; align-items: center; justify-content: space-between; background: #f1f2f6; padding: 10px 15px; border-radius: 14px;">
+          <span class="setting-label" style="font-weight: 900;">🎮 遊戲人數：</span>
+          <select id="setting-players" onchange="renderPlayerSettingsRows()" style="font-size: 1.1rem; padding: 6px; border-radius: 10px; border: 2px solid #b2bec3;">
+            <option value="2">2 人對戰</option>
+            <option value="3">3 人對戰</option>
+            <option value="4" selected>4 人對戰</option>
+            <option value="5">5 人對戰</option>
+            <option value="6">6 人對戰</option>
+            <option value="1">1 人對戰 (VS 小熊電腦)</option>
+          </select>
+        </div>
+
+        <div style="font-weight: 900; font-size: 1.1rem; color: #2c3e50; margin-top: 10px; margin-bottom: 5px;">
+          👤 設定玩家暱稱與頭像（點擊頭像下拉選單更換）：
+        </div>
+        <div id="players-custom-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; width: 100%;"></div>
+      </div>
+      <button class="btn btn-primary" style="font-size: 1.3rem; width:100%; justify-content:center; padding: 14px; margin-top: 15px;" onclick="applySettings()">儲存設定並開始遊戲 🚀</button>
+    </div>
+  </div>
+
+  <!-- Game Logic -->
+  <script>
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) audioCtx = new AudioCtx();
+    }
+
+    function playSound(type) {
+      try {
+        initAudio();
+        if (!audioCtx) return;
+        const now = audioCtx.currentTime;
+
+        if (type === 'dice') {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(200, now);
+          osc.frequency.linearRampToValueAtTime(400, now + 0.1);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+          osc.connect(gain); gain.connect(audioCtx.destination);
+          osc.start(now); osc.stop(now + 0.15);
+        } else if (type === 'step') {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(600, now);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+          osc.connect(gain); gain.connect(audioCtx.destination);
+          osc.start(now); osc.stop(now + 0.1);
+        } else if (type === 'success') {
+          const notes = [523.25, 659.25, 783.99, 1046.50];
+          notes.forEach((freq, idx) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+            gain.gain.setValueAtTime(0.25, now + idx * 0.08);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.08 + 0.3);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(now + idx * 0.08); osc.stop(now + idx * 0.08 + 0.3);
+          });
+        } else if (type === 'error') {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(150, now);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+          osc.connect(gain); gain.connect(audioCtx.destination);
+          osc.start(now); osc.stop(now + 0.3);
+        }
+      } catch (e) {}
+    }
+
+    const RUBIKS_CUBE_SVG = `<svg width="50" height="50" viewBox="0 0 90 90" style="vertical-align: middle; display: inline-block; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.15));"><rect x="2" y="2" width="86" height="86" rx="12" fill="#2c3e50" /><rect x="8" y="8" width="22" height="22" rx="4" fill="#ee5253" /><rect x="34" y="8" width="22" height="22" rx="4" fill="#1dd1a1" /><rect x="60" y="8" width="22" height="22" rx="4" fill="#48dbfb" /><rect x="8" y="34" width="22" height="22" rx="4" fill="#feca57" /><rect x="34" y="34" width="22" height="22" rx="4" fill="#ff9ff3" /><rect x="60" y="34" width="22" height="22" rx="4" fill="#54a0ff" /><rect x="8" y="60" width="22" height="22" rx="4" fill="#10ac84" /><rect x="34" y="60" width="22" height="22" rx="4" fill="#ff6b6b" /><rect x="60" y="60" width="22" height="22" rx="4" fill="#feca57" /></svg>`;
+
+    const AVATAR_OPTIONS = ['🐱', '🐶', '🐰', '🐻', '🦁', '🐯', '🐼', '🐨', '🦊', '🐸', '🦄', '🤖', '👑', '🎒'];
+
+    /* REALISTIC TAIWAN CURRENT MARKET PRICES (ALL <= 100 NTD) */
+    const SHOPS_DATA = [
+      { id: 0, name: '起點 🚩', icon: '🚩', type: 'start', owner: null, boughtPrice: 0 },
+      { id: 1, name: '美味麵包店', icon: '🥐', type: 'shop', owner: null, boughtPrice: 0, products: [
+        { name: '牛角麵包', price: 32, icon: '🥐' },
+        { name: '草莓蛋糕', price: 64, icon: '🍰' },
+        { name: '肉鬆麵包', price: 38, icon: '🥖' },
+        { name: '甜甜圈', price: 33, icon: '🍩' }
+      ]},
+      { id: 2, name: '快樂文具店', icon: '✏️', type: 'shop', owner: null, boughtPrice: 0, products: [
+        { name: '彩色筆', price: 61, icon: '🖍️' },
+        { name: '鉛筆盒', price: 87, icon: '👝' },
+        { name: '螢光筆', price: 22, icon: '🖊️' },
+        { name: '橡皮擦', price: 16, icon: '🧽' }
+      ]},
+      { id: 3, name: '機會 🎁', icon: '🎁', type: 'chance', desc: '比比看誰比較多！', owner: null, boughtPrice: 0 },
+      { id: 4, name: '神奇玩具店', icon: '🧸', type: 'shop', owner: null, boughtPrice: 0, products: [
+        { name: '遙控賽車', price: 89, icon: '🏎️' },
+        { name: '機器人', price: 83, icon: '🤖' },
+        { name: '水槍', price: 46, icon: '🔫' },
+        { name: '魔術方塊', price: 54, isRubikCube: true }
+      ]},
+      { id: 5, name: '冰淇淋車', icon: '🍦', type: 'shop', owner: null, boughtPrice: 0, products: [
+        { name: '冰淇淋聖代', price: 62, icon: '🍨' },
+        { name: '巧克力冰淇淋', price: 37, icon: '🍦' },
+        { name: '霜淇淋', price: 28, icon: '🍦' },
+        { name: '水果冰棒', price: 19, icon: '🍧' }
+      ]},
+      { id: 6, name: '可愛書局', icon: '📚', type: 'shop', owner: null, boughtPrice: 0, products: [
+        { name: '繪本', price: 82, icon: '📕' },
+        { name: '故事書', price: 83, icon: '📘' },
+        { name: '著色本', price: 31, icon: '📙' }
+      ]},
+      { id: 7, name: '命運 ❓', icon: '❓', type: 'fate', desc: '報讀錢幣總數量！', owner: null, boughtPrice: 0 },
+      { id: 8, name: '歡樂飲料店', icon: '🥤', type: 'shop', owner: null, boughtPrice: 0, products: [
+        { name: '珍珠奶茶', price: 66, icon: '🧋' },
+        { name: '水果茶', price: 58, icon: '🍹' },
+        { name: '紅茶', price: 27, icon: '🥤' }
+      ]},
+      { id: 9, name: '夢幻甜點屋', icon: '🍰', type: 'shop', owner: null, boughtPrice: 0, products: [
+        { name: '水果塔', price: 84, icon: '🥧' },
+        { name: '馬卡龍', price: 81, icon: '🧁' },
+        { name: '杯子蛋糕', price: 42, icon: '🧁' }
+      ]},
+      { id: 10, name: '幸福便當店', icon: '🍱', type: 'shop', owner: null, boughtPrice: 0, products: [
+        { name: '雞腿便當', price: 87, icon: '🍱' },
+        { name: '排骨便當', price: 89, icon: '🍱' },
+        { name: '飯糰', price: 34, icon: '🍙' }
+      ]},
+      { id: 11, name: '機會 🎁', icon: '🎁', type: 'chance', desc: '比比看誰比較多！', owner: null, boughtPrice: 0 },
+      { id: 12, name: '童趣飾品店', icon: '🎀', type: 'shop', owner: null, boughtPrice: 0, products: [
+        { name: '圍巾', price: 36, icon: '🧣' },
+        { name: '髮圈', price: 48, icon: '🎀' },
+        { name: '襪子', price: 33, icon: '🧦' }
+      ]},
+      { id: 13, name: '迴轉壽司店', icon: '🍣', type: 'shop', owner: null, boughtPrice: 0, products: [
+        { name: '鮭魚壽司', price: 41, icon: '🍣' },
+        { name: '炸蝦壽司', price: 43, icon: '🍤' },
+        { name: '玉子燒壽司', price: 29, icon: '🍣' }
+      ]},
+      { id: 14, name: '命運 ❓', icon: '❓', type: 'fate', desc: '報讀錢幣總數量！', owner: null, boughtPrice: 0 },
+      { id: 15, name: '夢幻遊樂園', icon: '🎡', type: 'shop', owner: null, boughtPrice: 0, products: [
+        { name: '旋轉木馬', price: 52, icon: '🎠' },
+        { name: '摩天輪', price: 84, icon: '🎡' },
+        { name: '雲霄飛車', price: 88, icon: '🎢' }
+      ]}
+    ];
+
+    /* 起點設在右下角 (5, 5)，並順時針移動：
+       右下角(5,5) -> 底排向左 -> 左下角(5,1) -> 左排向上 -> 左上角(1,1) -> 頂排向右 -> 右上角(1,5) -> 右排向下 */
+    const GRID_POSITIONS = [
+      { r: 5, c: 5 }, // 0: 起點 🚩 (右下角)
+      { r: 5, c: 4 }, // 1
+      { r: 5, c: 3 }, // 2
+      { r: 5, c: 2 }, // 3
+      { r: 5, c: 1 }, // 4: 左下角
+      { r: 4, c: 1 }, // 5
+      { r: 3, c: 1 }, // 6
+      { r: 2, c: 1 }, // 7
+      { r: 1, c: 1 }, // 8: 左上角
+      { r: 1, c: 2 }, // 9
+      { r: 1, c: 3 }, // 10
+      { r: 1, c: 4 }, // 11
+      { r: 1, c: 5 }, // 12: 右上角
+      { r: 2, c: 5 }, // 13
+      { r: 3, c: 5 }, // 14
+      { r: 4, c: 5 }  // 15
+    ];
+
+    let config = { playerCount: 4, speech: true };
+
+    let players = [
+      { id: 1, name: '小明', avatar: '🐱', cls: 'token-p1', pos: 0, money: 250 },
+      { id: 2, name: '小華', avatar: '🐶', cls: 'token-p2', pos: 0, money: 250 },
+      { id: 3, name: '小美', avatar: '🐰', cls: 'token-p3', pos: 0, money: 250 },
+      { id: 4, name: '小強', avatar: '🐻', cls: 'token-p4', pos: 0, money: 250 },
+      { id: 5, name: '小亮', avatar: '🦁', cls: 'token-p5', pos: 0, money: 250 },
+      { id: 6, name: '小雪', avatar: '🦊', cls: 'token-p6', pos: 0, money: 250 }
+    ];
+
+    let currentPlayerIdx = 0;
+    let isRolling = false;
+    let currentFateTargetVal = 0;
+    let currentPendingProduct = null;
+    let currentPendingShop = null;
+
+    let currentChanceSetA = null;
+    let currentChanceSetB = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      renderPlayerSettingsRows();
+      initGame();
+    });
+
+    function initGame() {
+      currentPlayerIdx = 0;
+      players.forEach(p => {
+        p.pos = 0;
+        p.money = 250;
+        p.lap = 1;
+      });
+      SHOPS_DATA.forEach(s => { s.owner = null; s.boughtPrice = 0; s.level = 1; });
+      isRolling = false;
+      renderBoard();
+      updateDashboard();
+    }
+
+    function openModal(modalId) {
+      const modal = document.getElementById(modalId);
+      if (modal) modal.classList.add('show');
+    }
+
+    function closeModal(modalId) {
+      const modal = document.getElementById(modalId);
+      if (modal) modal.classList.remove('show');
+    }
+
+    function renderBoard() {
+      const board = document.getElementById('board');
+      const centerDash = board.querySelector('.center-dashboard');
+      board.innerHTML = '';
+      board.appendChild(centerDash);
+
+      SHOPS_DATA.forEach((tile, idx) => {
+        const tileEl = document.createElement('div');
+        tileEl.className = 'tile';
+        tileEl.id = `tile-${idx}`;
+        const pos = GRID_POSITIONS[idx];
+        tileEl.style.gridRow = pos.r;
+        tileEl.style.gridColumn = pos.c;
+
+        let bgCls = 'bg-shop';
+        if (tile.type === 'start') bgCls = 'bg-start';
+        if (tile.type === 'chance') bgCls = 'bg-chance';
+        if (tile.type === 'fate') bgCls = 'bg-fate';
+
+        let ownerBadgeHtml = '';
+        if (tile.type === 'shop') {
+          if (tile.owner !== null) {
+            const ownerP = players[tile.owner];
+            ownerBadgeHtml = `<div class="owner-badge">👑 ${ownerP.avatar} ${ownerP.name} (Lv.${tile.level || 1})</div>`;
+          } else {
+            ownerBadgeHtml = `<div style="font-size:0.75rem; color:#888;">(老師的店家)</div>`;
+          }
+        }
+
+        tileEl.innerHTML = `
+          <div class="tile-header ${bgCls}">${tile.name}</div>
+          <div class="tile-icon">${tile.icon}</div>
+          <div class="tile-name">${tile.name}</div>
+          ${ownerBadgeHtml}
+          <div class="tokens-container" id="tokens-tile-${idx}"></div>
+        `;
+        board.appendChild(tileEl);
+      });
+
+      renderTokens();
+    }
+
+    function renderTokens() {
+      SHOPS_DATA.forEach((_, idx) => {
+        const container = document.getElementById(`tokens-tile-${idx}`);
+        if (container) container.innerHTML = '';
+      });
+
+      players.slice(0, config.playerCount).forEach((p) => {
+        const container = document.getElementById(`tokens-tile-${p.pos}`);
+        if (container) {
+          const token = document.createElement('div');
+          token.className = `player-token ${p.cls}`;
+          token.innerHTML = p.avatar;
+          token.title = p.name;
+          container.appendChild(token);
+        }
+      });
+    }
+
+    function renderPlayersBar() {
+      const bar = document.getElementById('players-bar');
+      bar.innerHTML = '';
+
+      players.slice(0, config.playerCount).forEach((p, idx) => {
+        const ownedShops = SHOPS_DATA.filter(s => s.owner === idx);
+        const card = document.createElement('div');
+        card.className = `player-card ${idx === currentPlayerIdx ? 'active' : ''}`;
+        card.id = `pcard-${idx}`;
+        card.innerHTML = `
+          <div class="player-card-header">
+            <div class="player-avatar-lg">${p.avatar}</div>
+            <div class="player-name-lg">${p.name}</div>
+          </div>
+          <div class="player-money" style="font-weight: 900; color: #ee5253; font-size: 1.1rem; margin-top: 2px;">💰 $${p.money}</div>
+          <div class="player-shops-badge">🏪 擁有 ${ownedShops.length} 家店</div>
+        `;
+        bar.appendChild(card);
+      });
+    }
+
+    function updateDashboard() {
+      renderPlayersBar();
+      document.querySelectorAll('.tile').forEach(t => t.classList.remove('active-tile'));
+      const activeTile = document.getElementById(`tile-${players[currentPlayerIdx].pos}`);
+      if (activeTile) activeTile.classList.add('active-tile');
+    }
+
+    function openDiceModal() {
+      if (isRolling) return;
+      
+      // 重置兩個骰子旋轉角度到基準狀態
+      const cube1 = document.getElementById('cube-lg-1');
+      const cube2 = document.getElementById('cube-lg-2');
+      if (cube1) {
+        cube1.style.transition = 'none';
+        cube1.style.transform = 'rotateX(-15deg) rotateY(45deg) rotateZ(0deg)';
+      }
+      if (cube2) {
+        cube2.style.transition = 'none';
+        cube2.style.transform = 'rotateX(-15deg) rotateY(45deg) rotateZ(0deg)';
+      }
+      
+      const activeP = players[currentPlayerIdx];
+      document.getElementById('dice-modal-title').innerText = `🎲 輪到 【${activeP.name}】 擲兩個骰子`;
+      
+      openModal('dice-modal');
+
+      // 彈窗開啟後，延遲 150 毫秒直接自動擲兩個骰子
+      setTimeout(() => {
+        triggerDiceRoll();
+      }, 150);
+    }
+
+    function triggerDiceRoll() {
+      if (isRolling) return;
+      isRolling = true;
+      playSound('dice');
+
+      const cube1 = document.getElementById('cube-lg-1');
+      const cube2 = document.getElementById('cube-lg-2');
+
+      const d1 = Math.floor(Math.random() * 6) + 1;
+      const d2 = Math.floor(Math.random() * 6) + 1;
+      const totalDice = d1 + d2;
+
+      function calcRotation(diceVal) {
+        const extraX = (Math.floor(Math.random() * 3) + 4) * 360; 
+        const extraY = (Math.floor(Math.random() * 3) + 4) * 360;
+        let targetX = 0, targetY = 0;
+        switch(diceVal) {
+          case 1: targetX = 0; targetY = 0; break;
+          case 2: targetX = 0; targetY = 180; break;
+          case 3: targetX = 0; targetY = -90; break;
+          case 4: targetX = 0; targetY = 90; break;
+          case 5: targetX = -90; targetY = 0; break;
+          case 6: targetX = 90; targetY = 0; break;
+        }
+        return `rotateX(${targetX + extraX}deg) rotateY(${targetY + extraY}deg) rotateZ(${Math.random() > 0.5 ? 360 : 0}deg)`;
+      }
+
+      if (cube1) {
+        cube1.style.transition = 'transform 1.5s cubic-bezier(0.2, 0.8, 0.25, 1)';
+        cube1.style.transform = calcRotation(d1);
+      }
+      if (cube2) {
+        cube2.style.transition = 'transform 1.5s cubic-bezier(0.2, 0.8, 0.25, 1)';
+        cube2.style.transform = calcRotation(d2);
+      }
+      
+      document.getElementById('dice-modal-title').innerText = `🎲 擲骰中...`;
+
+      setTimeout(() => {
+        const curP = players[currentPlayerIdx];
+        document.getElementById('dice-modal-title').innerText = `🎲 擲出了 ${totalDice} 點！`;
+        speakText(`${curP.name} 擲出了 ${totalDice} 點！`).then(() => {
+          setTimeout(() => {
+            closeModal('dice-modal');
+            movePlayer(totalDice);
+          }, 400);
+        });
+      }, 1600);
+    }
+
+    function movePlayer(steps) {
+      const player = players[currentPlayerIdx];
+      let stepCount = 0;
+      let passedStart = false;
+
+      const moveInterval = setInterval(() => {
+        player.pos = (player.pos + 1) % SHOPS_DATA.length;
+        renderTokens();
+        playSound('step');
+
+        if (player.pos === 0) {
+          player.money += 20; // 經過起點加 20 元
+          player.lap = (player.lap || 1) + 1; // 增加圈數
+          passedStart = true;
+          updateDashboard();
+        }
+
+        stepCount++;
+        if (stepCount >= steps) {
+          clearInterval(moveInterval);
+
+          if (passedStart) {
+            // 顯示通過起點提示，等語音播完後再等至滿 5 秒，才觸發踩格事件
+            const banner = document.getElementById('event-banner');
+            if (banner) banner.innerHTML = `🚩 【${player.name}】通過起點，向銀行領取 $20 元獎勵！`;
+            playSound('success');
+            triggerCelebration();
+            const startTime = Date.now();
+            speakText(`${player.name} 通過起點！向銀行領取 20 元獎勵！`).then(() => {
+              const elapsed = Date.now() - startTime;
+              const remaining = Math.max(0, 5000 - elapsed);
+              setTimeout(() => {
+                if (banner) banner.innerHTML = `歡迎來到錢幣大富翁！請點擊擲骰子開始遊戲 🎲`;
+                handleTileEvent();
+              }, remaining);
+            });
+          } else {
+            setTimeout(() => {
+              handleTileEvent();
+            }, 400);
+          }
+        }
+      }, 350);
+    }
+
+    function handleTileEvent() {
+      const player = players[currentPlayerIdx];
+      const tile = SHOPS_DATA[player.pos];
+
+      if (tile.type === 'start') {
+        // 落在起點格：顯示提示，等語音播完再滿 5 秒後換人
+        const banner = document.getElementById('event-banner');
+        banner.innerHTML = `🚩 【${player.name}】停在起點，向銀行領取 $20 元獎勵！`;
+        player.money += 20;
+        updateDashboard();
+        playSound('success');
+        triggerCelebration();
+        const startTime = Date.now();
+        speakText(`${player.name} 停在起點！向銀行領取 20 元獎勵！`).then(() => {
+          const elapsed = Date.now() - startTime;
+          const remaining = Math.max(0, 5000 - elapsed);
+          setTimeout(nextTurn, remaining);
+        });
+        return;
+      }
+
+      if (tile.type === 'shop') {
+        // 第一圈商店尚未營業，不觸發付款流程
+        if ((player.lap || 1) < 2) {
+          const banner = document.getElementById('event-banner');
+          if (banner) banner.innerHTML = `🏪 走完第一圈之前，商店還沒營業喔！`;
+          speakText(`${player.name} 到達 ${tile.name}！走完第一圈之前，商店還沒營業喔！`).then(() => {
+            if (banner) banner.innerHTML = `歡迎來到錢幣大富翁！請點擊擲骰子開始遊戲 🎲`;
+            nextTurn();
+          });
+          return;
+        }
+
+        const randomProduct = tile.products[Math.floor(Math.random() * tile.products.length)];
+        currentPendingShop = tile;
+        currentPendingProduct = randomProduct;
+
+        const arrivalText = tile.owner === null
+          ? `${player.name} 到達 ${tile.name}！回答正確就能成為老闆！`
+          : tile.owner === currentPlayerIdx
+            ? `${player.name} 巡視自己的 ${tile.name}！`
+            : `${player.name} 到達 ${tile.name}！請支付 ${randomProduct.price} 元給老闆！`;
+        speakText(arrivalText).then(() => {
+          openPaymentModal(tile, randomProduct);
+        });
+
+      } else if (tile.type === 'chance') {
+        speakText(`${player.name} 遇到了機會！請比較兩邊的錢幣哪邊比較多！`).then(() => {
+          openChanceModal();
+        });
+
+      } else if (tile.type === 'fate') {
+        speakText(`${player.name} 遇到了命運！請向老師報讀撲滿裡的錢幣總金額！`).then(() => {
+          openFateModal();
+        });
+      }
+    }
+
+    function openPaymentModal(shop, product) {
+      // 每次開啟時重置分頁顯示，預設顯示購物，隱藏結果
+      document.getElementById('payment-info-view').style.display = 'flex';
+      document.getElementById('payment-result-view').style.display = 'none';
+
+      const curP = players[currentPlayerIdx];
+      const ownerBanner = document.getElementById('owner-status-banner');
+      const line1 = document.getElementById('dialogue-line-1');
+      const line2 = document.getElementById('dialogue-line-2');
+      const approveBtn = document.getElementById('pay-approve-btn');
+      const upgradeBtn = document.getElementById('upgrade-shop-btn');
+
+      // 1. 計算可能帶有等級加成的最終過路費/商品售價
+      let finalPrice = product.price;
+      if (shop.type === 'shop' && shop.owner !== null && shop.owner !== currentPlayerIdx) {
+        const lv = shop.level || 1;
+        if (lv > 1) {
+          let bonus = 0;
+          for (let i = 1; i < lv; i++) {
+            bonus += Math.floor(Math.random() * 3) + 3; // 每升一級，隨機增加 3~5 元
+          }
+          finalPrice = Math.min(100, product.price + bonus); // 上限 100 元
+        }
+      }
+      // 將最終計算價格掛在臨時 product 物件上，便於後面付錢邏輯共用
+      product.finalPrice = finalPrice;
+
+      document.getElementById('pay-modal-icon').innerText = shop.icon;
+      document.getElementById('pay-modal-title').innerText = `${shop.name} 購物`;
+
+      const bigIconContainer = document.getElementById('product-big-icon');
+      if (product.isRubikCube) {
+        bigIconContainer.innerHTML = RUBIKS_CUBE_SVG;
+      } else {
+        bigIconContainer.innerText = product.icon || shop.icon;
+      }
+
+      document.getElementById('dialogue-item-name').innerText = product.name;
+      document.getElementById('dialogue-price-text').innerText = finalPrice;
+
+      const bossSentence = `<b>「<span style="color:#27ae60;">${product.name}</span> <span style="color:#ee5253; font-size:1.2rem;">${finalPrice}</span> 元，請給剛好的錢。說說看，你是怎麼給錢的？」</b>`;
+
+      // 2. 判斷商店屋主狀態與配置按鈕
+      if (shop.owner === null) {
+        // 老師的店家
+        upgradeBtn.style.display = 'none';
+        ownerBanner.innerHTML = `🏫 <b>這是【老師的店家】！</b><br>【${curP.avatar} ${curP.name}】回答正確就能成為【${shop.name}】的老闆！👑`;
+        ownerBanner.style.background = '#e3f2fd';
+        ownerBanner.style.borderColor = '#64b5f6';
+        ownerBanner.style.color = '#0d47a1';
+
+        line1.innerHTML = `<span class="role-badge role-student">生（顧客: ${curP.name}）</span>：<b>「老闆，請問這個多少錢？」</b>`;
+        line2.innerHTML = `<span class="role-badge role-teacher">師（老闆: 老師）</span>：${bossSentence}`;
+
+        approveBtn.innerHTML = `✅ 老師驗證`;
+      } else if (shop.owner === currentPlayerIdx) {
+        // 玩家自己的店家：可以進行店面升級 (花費 $100)
+        upgradeBtn.style.display = 'flex';
+        const currentLv = shop.level || 1;
+        if (currentLv >= 3) {
+          upgradeBtn.disabled = true;
+          upgradeBtn.innerText = `🏰 已達最高等級 Lv.3`;
+        } else if (curP.money < 100) {
+          upgradeBtn.disabled = true;
+          upgradeBtn.innerText = `🏰 餘額不足 $100 無法升級`;
+        } else {
+          upgradeBtn.disabled = false;
+          upgradeBtn.innerText = `🏰 升級店面至 Lv.${currentLv + 1} (花費 $100 元)`;
+        }
+
+        ownerBanner.innerHTML = `🏠 <b>這是【${curP.avatar} ${curP.name}】你自己開的【${shop.name}】 (Lv.${currentLv})！</b><br>歡迎回店巡視！巡店完全免費，也可以花費 $100 元升級店面喔！`;
+        ownerBanner.style.background = '#e8f5e9';
+        ownerBanner.style.borderColor = '#81c784';
+        ownerBanner.style.color = '#2e7d32';
+
+        line1.innerHTML = `<span class="role-badge role-owner">老闆（${curP.name}）</span>：<b>「這是我開的店，目前等級是 Lv.${currentLv}！」</b>`;
+        line2.innerHTML = `<span class="role-badge role-teacher">師（老師）</span>：<b>「太棒了！巡視自己的店家完成！」</b>`;
+
+        approveBtn.innerHTML = `✅ 完成巡店，換下一位！`;
+      } else {
+        // 對手的店家
+        upgradeBtn.style.display = 'none';
+        const ownerP = players[shop.owner];
+        const currentLv = shop.level || 1;
+        ownerBanner.innerHTML = `👑 <b>這家店的老闆是【${ownerP.avatar} ${ownerP.name}】 (Lv.${currentLv})！</b><br>【${curP.name}】請支付 $${finalPrice} 元實體錢幣給老闆【${ownerP.name}】！`;
+        ownerBanner.style.background = '#fff3e0';
+        ownerBanner.style.borderColor = '#ffb74d';
+        ownerBanner.style.color = '#e65100';
+
+        line1.innerHTML = `<span class="role-badge role-student">生（顧客: ${curP.name}）</span>：<b>「老闆，請問這個多少錢？」</b>`;
+        line2.innerHTML = `<span class="role-badge role-owner">生（老闆: ${ownerP.name}）</span>：${bossSentence}`;
+
+        approveBtn.innerHTML = `✅ 老師驗證`;
+      }
+
+      const diagCard = document.getElementById('dialogue-card-section');
+      diagCard.style.display = 'none';
+      document.getElementById('toggle-dialogue-btn').innerHTML = '💬 顯示對話句型';
+
+      openModal('payment-modal');
+
+      // 付款視窗不播語音，直接解鎖驗證按鈕
+      unlockBtns(['pay-approve-btn']);
+    }
+
+    function toggleRoleplayDialogue() {
+      playSound('step');
+      const diagCard = document.getElementById('dialogue-card-section');
+      const btn = document.getElementById('toggle-dialogue-btn');
+
+      if (diagCard.style.display === 'none') {
+        diagCard.style.display = 'flex';
+        btn.innerHTML = '🙈 隱藏對話句型';
+      } else {
+        diagCard.style.display = 'none';
+        btn.innerHTML = '💬 顯示對話句型';
+      }
+    }
+
+    function generateRandomCoinDecomposition(amount) {
+      let remaining = amount;
+      let c100 = 0, c50 = 0, c10 = 0, c5 = 0, c1 = 0;
+
+      // 100元
+      if (remaining >= 100) {
+        if (Math.random() > 0.5) {
+          c100 = 1;
+          remaining -= 100;
+        } else {
+          c50 = 2;
+          remaining -= 100;
+        }
+      }
+
+      // 50元
+      if (remaining >= 50) {
+        if (Math.random() > 0.4) {
+          c50 += 1;
+          remaining -= 50;
+        }
+      }
+
+      // 10元
+      if (remaining >= 10) {
+        const max10 = Math.floor(remaining / 10);
+        const use10 = Math.floor(Math.random() * (max10 + 1));
+        c10 = use10;
+        remaining -= use10 * 10;
+      }
+
+      // 5元
+      if (remaining >= 5) {
+        const max5 = Math.floor(remaining / 5);
+        const use5 = Math.floor(Math.random() * (max5 + 1));
+        c5 = use5;
+        remaining -= use5 * 5;
+      }
+
+      // 1元
+      c1 = remaining;
+
+      // 嚴格保證 1元硬幣個數不超過 20 個（配合實體教具與視覺清晰度）
+      while (c1 > 20) {
+        if (c1 >= 10) {
+          c10 += 1;
+          c1 -= 10;
+        } else if (c1 >= 5) {
+          c5 += 1;
+          c1 -= 5;
+        } else {
+          break;
+        }
+      }
+
+      return { c100, c50, c10, c5, c1, total: amount };
+    }
+
+    // 依照指定「策略」拆解金額，讓甲乙兩邊使用截然不同的面額組合
+    // strategy: 0=多大面額, 1=多小面額(避免50/100), 2=偏好50元, 3=多用5元與1元
+    function generateDiverseCoinDecomposition(amount, strategy) {
+      let remaining = amount;
+      let c100 = 0, c50 = 0, c10 = 0, c5 = 0, c1 = 0;
+
+      if (strategy === 0) {
+        // 策略0：盡量用大面額（100 > 50 > 10 > 5 > 1）
+        if (remaining >= 100) { c100 = Math.floor(remaining / 100); remaining -= c100 * 100; }
+        if (remaining >= 50)  { c50  = Math.floor(remaining / 50);  remaining -= c50  * 50;  }
+        if (remaining >= 10)  { c10  = Math.floor(remaining / 10);  remaining -= c10  * 10;  }
+        if (remaining >= 5)   { c5   = Math.floor(remaining / 5);   remaining -= c5   * 5;   }
+        c1 = remaining;
+
+      } else if (strategy === 1) {
+        // 策略1：完全不用50元，改用10元堆疊
+        if (remaining >= 100) { c100 = Math.floor(remaining / 100); remaining -= c100 * 100; }
+        // 不用50元，直接10元
+        if (remaining >= 10) { c10 = Math.floor(remaining / 10); remaining -= c10 * 10; }
+        if (remaining >= 5)  { c5  = Math.floor(remaining / 5);  remaining -= c5  * 5;  }
+        c1 = remaining;
+
+      } else if (strategy === 2) {
+        // 策略2：偏好50元（盡量拆成50元為主，少用10元）
+        if (remaining >= 50) { c50 = Math.floor(remaining / 50); remaining -= c50 * 50; }
+        // 剩餘部分隨機選: 5元或1元為主，避免10元
+        if (remaining >= 5) { c5 = Math.floor(remaining / 5); remaining -= c5 * 5; }
+        c1 = remaining;
+
+      } else {
+        // 策略3：完全不用50/100，只用10/5/1元堆疊
+        if (remaining >= 10) { c10 = Math.floor(remaining / 10); remaining -= c10 * 10; }
+        if (remaining >= 5)  { c5  = Math.floor(remaining / 5);  remaining -= c5  * 5;  }
+        c1 = remaining;
+      }
+
+      // 保證 1元不超過 20 個
+      while (c1 > 20) {
+        if (c1 >= 10) { c10 += 1; c1 -= 10; }
+        else if (c1 >= 5) { c5 += 1; c1 -= 5; }
+        else break;
+      }
+
+      return { c100, c50, c10, c5, c1, total: amount };
+    }
+
+    function openChanceModal() {
+      // 每次開啟時重置為出題資訊頁，隱藏結果頁
+      document.getElementById('chance-info-view').style.display = 'flex';
+      document.getElementById('chance-result-view').style.display = 'none';
+
+      // 1. 產生甲的隨機總金額 (10 ~ 100)
+      const valA = Math.floor(Math.random() * 91) + 10;
+
+      // 2. 產生乙的隨機總金額，使金額差異 < 5，且總額在 10 ~ 100 之間
+      let valB;
+      while (true) {
+        const diff = Math.floor(Math.random() * 9) - 4; // -4 到 4 元的差異
+        valB = valA + diff;
+        if (valB >= 10 && valB <= 100) {
+          break;
+        }
+      }
+
+      // 3. 甲乙各選不同策略，確保面額組成截然不同
+      const strategies = [0, 1, 2, 3];
+      const idxA = Math.floor(Math.random() * strategies.length);
+      let idxB;
+      do { idxB = Math.floor(Math.random() * strategies.length); } while (idxB === idxA);
+
+      const setA = generateDiverseCoinDecomposition(valA, strategies[idxA]);
+      const setB = generateDiverseCoinDecomposition(valB, strategies[idxB]);
+
+      currentChanceSetA = setA;
+      currentChanceSetB = setB;
+
+      renderCoinImages(currentChanceSetA, 'chance-side-a-coins');
+      renderCoinImages(currentChanceSetB, 'chance-side-b-coins');
+
+      openModal('chance-modal');
+
+      const chanceBtns = ['chance-btn-a', 'chance-btn-b', 'chance-btn-equal'];
+      unlockBtns(chanceBtns);
+    }
+
+    function openFateModal() {
+      // 每次開啟時重置為出題資訊頁，隱藏結果頁
+      document.getElementById('fate-info-view').style.display = 'flex';
+      document.getElementById('fate-result-view').style.display = 'none';
+
+      // 隨機產生一個命運格的硬幣總額 (10 ~ 100)
+      const targetVal = Math.floor(Math.random() * 91) + 10;
+      const set = generateRandomCoinDecomposition(targetVal);
+      currentFateTargetVal = set.total;
+      renderCoinImages(set, 'fate-coins-display');
+
+      openModal('fate-modal');
+
+      const fateBtns = ['fate-btn-correct', 'fate-btn-wrong'];
+      unlockBtns(fateBtns);
+    }
+
+    function teacherApprovePayment() {
+      const curP = players[currentPlayerIdx];
+      const shop = currentPendingShop;
+      const product = currentPendingProduct;
+      const priceToPay = product.finalPrice || product.price;
+
+      playSound('success');
+      triggerCelebration();
+
+      let resultHtml = '';
+
+      if (shop && shop.owner === null) {
+        shop.owner = currentPlayerIdx;
+        shop.boughtPrice = priceToPay;
+        shop.level = 1; // 初始等級為 1
+        curP.money -= priceToPay;
+        renderBoard();
+        updateDashboard();
+        speakText(`太棒了！驗證通過！${curP.name} 成為 ${shop.name} 的新老闆！`);
+        resultHtml = `🎉 恭喜！【${curP.avatar} ${curP.name}】回答正確！<br>成功成為【${shop.name}】的老闆！👑<br><span style="font-size: 0.95rem; font-weight:700; color:#57606f;">下一次有其他玩家經過時，就要付錢給你喔！</span>`;
+      } else if (shop && shop.owner !== currentPlayerIdx) {
+        const ownerP = players[shop.owner];
+        curP.money -= priceToPay;
+        ownerP.money += priceToPay;
+        updateDashboard();
+        speakText(`太棒了！成功付給 ${ownerP.name} 老闆 ${priceToPay} 元！`);
+        resultHtml = `💰 老師驗證通過！<br>【${curP.avatar} ${curP.name}】成功支付 <b>$${priceToPay}</b> 元實體錢幣給老闆【${ownerP.avatar} ${ownerP.name}】！`;
+      } else {
+        speakText(`巡店完成！`);
+        resultHtml = `🏠 巡視自己的【${shop ? shop.name : ''}】完成！`;
+      }
+
+      // 替換原生 alert()，切換為彈窗內的結果提示頁面
+      document.getElementById('payment-result-text').innerHTML = resultHtml;
+      document.getElementById('payment-info-view').style.display = 'none';
+      document.getElementById('payment-result-view').style.display = 'flex';
+    }
+
+    function upgradeCurrentShop() {
+      const curP = players[currentPlayerIdx];
+      const shop = currentPendingShop;
+      if (!shop || shop.owner !== currentPlayerIdx) return;
+
+      const currentLv = shop.level || 1;
+      if (currentLv >= 3 || curP.money < 100) return;
+
+      // 扣除 100 元，等級加 1
+      curP.money -= 100;
+      shop.level = currentLv + 1;
+
+      playSound('success');
+      triggerCelebration();
+      renderBoard();
+      updateDashboard();
+
+      speakText(`升級成功！${shop.name} 升級至 ${shop.level} 級！`);
+      
+      const resultHtml = `🏰 升級成功！<br>【${curP.avatar} ${curP.name}】花費 <b>$100</b> 元，將【${shop.name}】升級至 <b>Lv.${shop.level}</b>！👑<br><span style="font-size: 0.95rem; font-weight:700; color:#57606f;">下次其他玩家走過這格時，過路費將會提高 3~5 元喔！</span>`;
+
+      document.getElementById('payment-result-text').innerHTML = resultHtml;
+      document.getElementById('payment-info-view').style.display = 'none';
+      document.getElementById('payment-result-view').style.display = 'flex';
+    }
+
+    function confirmPaymentResult() {
+      closeModal('payment-modal');
+      setTimeout(nextTurn, 300);
+    }
+
+    /* REAL COIN IMAGE GENERATOR WITH STRICT PHYSICAL SIZE SCALING (1元 < 5元 < 10元 < 50元 < 100元) */
+    function renderCoinImages(set, elementId) {
+      const el = document.getElementById(elementId);
+      let html = '';
+
+      if (set.c100) {
+        for (let i = 0; i < set.c100; i++) {
+          html += `<img src="../二上/1.jpg" class="real-coin-img coin-100" alt="100元" title="100元">`;
+        }
+      }
+      if (set.c50) {
+        for (let i = 0; i < set.c50; i++) {
+          html += `<img src="../二上/50元.jpg" class="real-coin-img coin-50" alt="50元" title="50元">`;
+        }
+      }
+      if (set.c10) {
+        for (let i = 0; i < set.c10; i++) {
+          html += `<img src="../二上/10元.jpg" class="real-coin-img coin-10" alt="10元" title="10元">`;
+        }
+      }
+      if (set.c5) {
+        for (let i = 0; i < set.c5; i++) {
+          html += `<img src="../二上/5元.jpg" class="real-coin-img coin-5" alt="5元" title="5元">`;
+        }
+      }
+      if (set.c1) {
+        for (let i = 0; i < set.c1; i++) {
+          html += `<img src="../二上/1元.jpg" class="real-coin-img coin-1" alt="1元" title="1元">`;
+        }
+      }
+
+      el.innerHTML = html;
+    }
+
+    function submitChanceAnswer(userChoice) {
+      const curP = players[currentPlayerIdx];
+      
+      const valA = currentChanceSetA.total;
+      const valB = currentChanceSetB.total;
+      const maxVal = Math.max(valA, valB);
+
+      let correctChoice = 'EQUAL';
+      if (valA > valB) correctChoice = 'A';
+      if (valB > valA) correctChoice = 'B';
+
+      const isCorrect = (userChoice === correctChoice);
+      let resultHtml = '';
+
+      if (isCorrect) {
+        curP.money += maxVal;
+        playSound('success');
+        triggerCelebration();
+        speakText(`答對了！請向銀行領取 ${maxVal} 元錢幣獎勵！`);
+        resultHtml = `🎉 恭喜回答正確！<br>👉 請向銀行領取 <b>${maxVal}</b> 元錢幣獎勵！`;
+      } else {
+        playSound('error');
+        let answerStr = '兩邊一樣多';
+        if (valA > valB) answerStr = `甲比較多 ($${valA}元 > $${valB}元)`;
+        if (valB > valA) answerStr = `乙比較多 ($${valB}元 > $${valA}元)`;
+
+        speakText(`回答錯誤！正確答案是 ${answerStr}。繼續加油！`);
+        resultHtml = `💡 回答錯誤！正確答案是【${answerStr}】<br><span style="font-size:0.95rem; color:#ee5253; font-weight:700;">沒有懲罰 (不用給錢)，繼續加油喔！</span>`;
+      }
+
+      // 切換為機會格結果頁面
+      document.getElementById('chance-result-text').innerHTML = resultHtml;
+      document.getElementById('chance-info-view').style.display = 'none';
+      document.getElementById('chance-result-view').style.display = 'flex';
+    }
+
+    function confirmChanceResult() {
+      closeModal('chance-modal');
+      setTimeout(nextTurn, 300);
+    }
+
+    function teacherApproveFate(isCorrect) {
+      const curP = players[currentPlayerIdx];
+      let resultHtml = '';
+      
+      if (isCorrect) {
+        curP.money += currentFateTargetVal;
+        playSound('success');
+        triggerCelebration();
+        speakText(`報讀正確！向老師領取 ${currentFateTargetVal} 元實體錢幣！`);
+        resultHtml = `🎉 老師驗證：報讀正確 (<b>$${currentFateTargetVal}</b> 元)！<br>👉 請向老師領取 <b>$${currentFateTargetVal}</b> 元實體錢幣獎勵！`;
+      } else {
+        curP.money -= 10;
+        playSound('error');
+        speakText(`報讀錯誤！請繳回 10 元實體錢幣！`);
+        resultHtml = `❌ 老師驗證：報讀錯誤！<br>👉 請繳回 <b>$10</b> 元實體錢幣給老師（銀行）。`;
+      }
+
+      // 切換為命運格結果頁面
+      document.getElementById('fate-result-text').innerHTML = resultHtml;
+      document.getElementById('fate-info-view').style.display = 'none';
+      document.getElementById('fate-result-view').style.display = 'flex';
+    }
+
+    function confirmFateResult() {
+      closeModal('fate-modal');
+      setTimeout(nextTurn, 300);
+    }
+
+    function openBankNeedExchangeModal() {
+      playSound('step');
+      openModal('bank-need-modal');
+    }
+
+    function closeBankNeedExchangeModal() {
+      playSound('success');
+      closeModal('bank-need-modal');
+    }
+
+    /* MORTGAGE / BANKRUPTCY SYSTEM */
+    function openMortgageModal() {
+      playSound('step');
+      
+      // 每次開啟時先隱藏訊息橫幅
+      document.getElementById('mortgage-alert-banner').style.display = 'none';
+
+      const container = document.getElementById('mortgage-list-container');
+      container.innerHTML = '';
+
+      let hasAnyShops = false;
+
+      players.slice(0, config.playerCount).forEach((p, pIdx) => {
+        const pShops = SHOPS_DATA.filter(s => s.owner === pIdx);
+        if (pShops.length > 0) {
+          hasAnyShops = true;
+          pShops.forEach(s => {
+            const row = document.createElement('div');
+            row.className = 'mortgage-item';
+            row.innerHTML = `
+              <div>
+                <b style="font-size:1.1rem; color:#2c3e50;">${s.icon} ${s.name}</b>
+                <span style="font-size:0.9rem; color:#7f8c8d; margin-left:8px;">(老闆: ${p.avatar} ${p.name}) (Lv.${s.level || 1})</span>
+              </div>
+              <button class="btn btn-danger" style="font-size:0.95rem; padding:6px 14px;" onclick="mortgageShop(${s.id})">
+                🏦 抵押並領回 $${s.boughtPrice} 元
+              </button>
+            `;
+            container.appendChild(row);
+          });
+        }
+      });
+
+      if (!hasAnyShops) {
+        container.innerHTML = `<div style="text-align:center; padding:20px; font-size:1.2rem; color:#95a5a6;">目前還沒有任何玩家擁有商店喔！</div>`;
+      }
+
+      openModal('mortgage-modal');
+    }
+
+    function mortgageShop(shopId) {
+      const shop = SHOPS_DATA.find(s => s.id === shopId);
+      if (!shop || shop.owner === null) return;
+
+      const oldOwnerP = players[shop.owner];
+      const refundPrice = shop.boughtPrice;
+
+      shop.owner = null;
+      shop.boughtPrice = 0;
+      shop.level = 1; // 抵押時等級重置為 Lv. 1
+      oldOwnerP.money += refundPrice;
+
+      playSound('success');
+      renderBoard();
+      updateDashboard();
+      
+      // 不再調用原生的 alert()，改為渲染並顯示抵押彈窗內部的橫幅
+      openMortgageModal(); // 重新渲染列表以更新狀態，這時會隱藏橫幅，故需重新顯露
+      
+      const banner = document.getElementById('mortgage-alert-banner');
+      banner.innerHTML = `🏦 抵押成功！【${oldOwnerP.avatar} ${oldOwnerP.name}】成功抵押了【${shop.name}】！<br>👉 請向銀行領回 $${refundPrice} 元實體錢幣獎勵。<br><span style="font-size:0.85rem; color:#57606f;">(該店面等級已重置為 Lv.1，已恢復為「老師的店家」)</span>`;
+      banner.style.display = 'block';
+
+      speakText(`${oldOwnerP.name} 抵押了 ${shop.name}，向銀行領回 ${refundPrice} 元！`);
+    }
+
+    function closeModalAndReturn(modalId) {
+      closeModal(modalId);
+    }
+
+    function closeMortgageModal() {
+      closeModal('mortgage-modal');
+    }
+
+    function nextTurn() {
+      currentPlayerIdx = (currentPlayerIdx + 1) % config.playerCount;
+      isRolling = false;
+      document.getElementById('roll-trigger-btn').disabled = false;
+      updateDashboard();
+
+      const activeP = players[currentPlayerIdx];
+      const banner = document.getElementById('event-banner');
+      banner.innerHTML = `輪到 【${activeP.avatar} ${activeP.name}】 囉！請點擊擲骰子！`;
+      speakText(`輪到 ${activeP.name} 囉！`);
+    }
+
+    function openSettingsModal() {
+      openModal('settings-modal');
+    }
+
+    function renderPlayerSettingsRows() {
+      const count = parseInt(document.getElementById('setting-players').value);
+      config.playerCount = count;
+
+      const container = document.getElementById('players-custom-list');
+      container.innerHTML = '';
+
+      for (let i = 0; i < count; i++) {
+        const p = players[i];
+        const row = document.createElement('div');
+        row.className = 'player-edit-row';
+
+        let avatarOptionsHtml = AVATAR_OPTIONS.map(a => `<option value="${a}" ${a === p.avatar ? 'selected' : ''}>${a}</option>`).join('');
+
+        row.innerHTML = `
+          <span style="font-weight:900;">玩家 ${i + 1}：</span>
+          <select class="avatar-select" id="p-avatar-${i}">${avatarOptionsHtml}</select>
+          <input type="text" id="p-name-${i}" value="${p.name}" placeholder="輸入暱稱">
+        `;
+        container.appendChild(row);
+      }
+    }
+
+    function applySettings() {
+      const count = config.playerCount;
+      for (let i = 0; i < count; i++) {
+        const nameVal = document.getElementById(`p-name-${i}`).value.trim() || `玩家${i + 1}`;
+        const avatarVal = document.getElementById(`p-avatar-${i}`).value;
+        players[i].name = nameVal;
+        players[i].avatar = avatarVal;
+      }
+
+      initGame();
+      closeModal('settings-modal');
+      document.getElementById('event-banner').innerHTML = '⚙️ 遊戲人數與玩家設定已更新！';
+    }
+
+    function toggleSpeech() {
+      config.speech = !config.speech;
+      document.getElementById('speech-icon').innerText = config.speech ? '🔊' : '🔇';
+      document.getElementById('event-banner').innerHTML = config.speech ? '🔊 已開啟語音朗讀功能' : '🔇 已關閉語音朗讀功能';
+    }
+
+    function speakText(text) {
+      return new Promise((resolve) => {
+        if (!config.speech || !('speechSynthesis' in window)) { resolve(); return; }
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-TW';
+        utterance.rate = 0.9;
+        utterance.onend = () => resolve();
+        utterance.onerror = () => resolve();
+        window.speechSynthesis.speak(utterance);
+      });
+    }
+
+    // 鎖定按鈕：語音播放時禁止點擊
+    function lockBtns(selectors) {
+      selectors.forEach(sel => {
+        const el = document.getElementById(sel);
+        if (el) { el.disabled = true; el.style.opacity = '0.45'; el.style.cursor = 'not-allowed'; }
+      });
+    }
+
+    // 解鎖按鈕：語音播完後恢復
+    function unlockBtns(selectors) {
+      selectors.forEach(sel => {
+        const el = document.getElementById(sel);
+        if (el) { el.disabled = false; el.style.opacity = ''; el.style.cursor = ''; }
+      });
+    }
+
+    function triggerCelebration() {
+      const canvas = document.getElementById('celebration-canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const particles = [];
+      const colors = ['#ff6b6b', '#48dbfb', '#1dd1a1', '#feca57', '#9c88ff'];
+
+      for (let i = 0; i < 60; i++) {
+        particles.push({
+          x: canvas.width / 2,
+          y: canvas.height / 2,
+          vx: (Math.random() - 0.5) * 16,
+          vy: (Math.random() - 0.7) * 16,
+          size: Math.random() * 10 + 5,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          alpha: 1
+        });
+      }
+
+      let frame = 0;
+      function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => {
+          p.x += p.vx; p.y += p.vy; p.vy += 0.4; p.alpha -= 0.02;
+          ctx.globalAlpha = Math.max(0, p.alpha);
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        frame++;
+        if (frame < 50) requestAnimationFrame(animate);
+        else ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      animate();
+    }
+
+    // === 簡報引導播放邏輯 ===
+    let currentSlideIdx = 0;
+    const totalSlides = 7;
+
+    function showSlide(idx) {
+      currentSlideIdx = idx;
+      
+      // 1. 切換 active class
+      for (let i = 0; i < totalSlides; i++) {
+        const slide = document.getElementById(`slide-${i}`);
+        if (slide) {
+          if (i === idx) {
+            slide.classList.add('active');
+          } else {
+            slide.classList.remove('active');
+          }
+        }
+      }
+
+      // 2. 更新 indicator dots
+      const dots = document.querySelectorAll('.indicator-dot');
+      dots.forEach((dot, dIdx) => {
+        if (dIdx === idx) {
+          dot.classList.add('active');
+        } else {
+          dot.classList.remove('active');
+        }
+      });
+
+      // 3. 控制按鈕可用性與顯隱
+      const prevBtn = document.getElementById('slide-prev-btn');
+      const nextBtn = document.getElementById('slide-next-btn');
+      const startBtn = document.getElementById('slide-start-game-btn');
+      const replayBtn = document.getElementById('slide-replay-btn');
+
+      if (prevBtn) prevBtn.disabled = (idx === 0);
+
+      if (idx === totalSlides - 1) {
+        if (nextBtn) nextBtn.style.display = 'none';
+        if (startBtn) startBtn.style.display = 'flex';
+        if (replayBtn) replayBtn.style.display = 'flex';
+      } else {
+        if (nextBtn) nextBtn.style.display = 'flex';
+        if (startBtn) startBtn.style.display = 'none';
+        if (replayBtn) replayBtn.style.display = 'none';
+      }
+    }
+
+    function nextSlide() {
+      if (currentSlideIdx < totalSlides - 1) {
+        playSound('step');
+        showSlide(currentSlideIdx + 1);
+      }
+    }
+
+    function prevSlide() {
+      if (currentSlideIdx > 0) {
+        playSound('step');
+        showSlide(currentSlideIdx - 1);
+      }
+    }
+
+    function skipTutorial() {
+      playSound('success');
+      startPreGameSettings();
+    }
+
+    function replayTutorial() {
+      playSound('step');
+      showSlide(0);
+    }
+
+    // 引導結束，切換到設定頁面
+    function startPreGameSettings() {
+      // 隱藏簡報，顯示遊戲
+      document.getElementById('tutorial-container').style.display = 'none';
+      document.querySelector('.app-container').style.display = 'flex';
+      
+      // 動態載入設定面板，引導老師/玩家進行人數與暱稱的初始設定
+      openSettingsModal();
+    }
+
+    // 從選單點擊「教學引導」重新回到簡報
+    function showTutorial() {
+      document.querySelector('.app-container').style.display = 'none';
+      document.getElementById('tutorial-container').style.display = 'flex';
+      showSlide(0);
+    }
+  </script>
+</body>
+</html>
