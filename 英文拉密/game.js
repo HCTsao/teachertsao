@@ -1383,7 +1383,7 @@ class RummikubGame {
             card.innerHTML = `
                 <div class="player-avatar-box">
                     <div class="player-avatar">${p.avatar}</div>
-                    ${isActive ? `<div class="turn-indicator-arrow">⬅ ${p.isAI ? '思考中...' : '你的回合'}</div>` : ''}
+                    ${isActive ? `<div class="turn-indicator-arrow">⬅</div>` : ''}
                 </div>
                 <div class="player-name">${p.name}</div>
                 <span class="badge-ice ${p.isIceBroken ? 'broken' : 'unbroken'}">
