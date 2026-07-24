@@ -1475,13 +1475,8 @@ class RummikubGame {
     }
 
     renderDrawStacks() {
+        if (!this.stacksGridEl) return;
         this.stacksGridEl.innerHTML = '';
-        const numPiles = Math.ceil(this.drawPile.length / 7);
-        for (let i = 0; i < numPiles; i++) {
-            const stackUnit = document.createElement('div');
-            stackUnit.className = 'tile-stack-unit';
-            this.stacksGridEl.appendChild(stackUnit);
-        }
     }
 
     renderRack() {
