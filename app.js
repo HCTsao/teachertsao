@@ -4,14 +4,7 @@
 
 // 教具資料庫
 const toolsData = [
-    {
-        name: "英文拉密 (Rummikub Word)",
-        category: "三上",
-        categories: ["三上", "四上", "五上", "六上"],
-        path: "英文拉密/index.html",
-        desc: "經典英文拉密 4 人對戰互動遊戲！包含國小 1000 常見單字表，支援破冰行動、桌面拆字重組、百搭牌替換與 AI 競賽對抗。",
-        type: "遊戲"
-    },
+
     {
         name: "數字貪食蛇",
         category: "一上",
