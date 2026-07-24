@@ -278,13 +278,19 @@ class RummikubGame {
 
     bindEvents() {
         if (this.btnStartGame) {
-            this.btnStartGame.addEventListener('click', () => {
+            let started = false;
+            const handleStart = (e) => {
+                if (started) return;
+                started = true;
+                if (e) e.preventDefault();
                 this.toggleBgm(true);
                 if (this.startGameOverlayEl) {
                     this.startGameOverlayEl.classList.add('hidden');
                 }
                 this.startNewGame();
-            });
+            };
+            this.btnStartGame.addEventListener('pointerdown', handleStart);
+            this.btnStartGame.addEventListener('click', handleStart);
         }
 
         this.btnEndTurn.addEventListener('click', () => this.handleEndTurn());
