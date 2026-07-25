@@ -1363,12 +1363,9 @@
       <!-- 第四名 / 其他排名卡片 -->
       <div id="remaining-rankings-container" style="width: 100%; margin-top: 10px;"></div>
 
-      <div style="display: flex; gap: 15px; width: 100%; margin-top: 20px;">
-        <button class="btn btn-success" style="flex: 1; justify-content: center; font-size: 1.2rem; padding: 12px;" onclick="restartGameFromGameOver()">
-          🔄 重新開始新局
-        </button>
-        <button class="btn btn-purple" style="flex: 1; justify-content: center; font-size: 1.2rem; padding: 12px;" onclick="closeModal('game-over-modal')">
-          ❌ 關閉視窗 (查看棋盤)
+      <div style="display: flex; justify-content: center; width: 100%; margin-top: 20px;">
+        <button class="btn btn-success" style="width: 100%; justify-content: center; font-size: 1.3rem; padding: 14px;" onclick="restartGameFromGameOver()">
+          🔄 重新開始新局 🚀
         </button>
       </div>
     </div>
@@ -1580,6 +1577,7 @@
     }
 
     function closeModal(modalId) {
+      if (modalId === 'game-over-modal') return; // 遊戲結束結算視窗不可關閉，只能重新開始
       const modal = document.getElementById(modalId);
       if (modal) {
         modal.classList.remove('show');
@@ -1851,6 +1849,22 @@
           else if (lv >= 3) finalPrice = randomProduct.priceLv3;
         }
         randomProduct.finalPrice = finalPrice;
+
+        // 如果這是別人的店，檢查踩中的玩家扣除房租後是否會破產（無法支付且無足夠店面可抵押）
+        if (tile.owner !== null && tile.owner !== currentPlayerIdx) {
+          const ownedShops = SHOPS_DATA.filter(s => s.owner === currentPlayerIdx);
+          const maxMortgageValue = ownedShops.reduce((sum, s) => sum + s.boughtPrice, 0);
+
+          if (player.money + maxMortgageValue < finalPrice) {
+            // 直接破產，不開啟付款視窗，扣除金額後直接進入頒獎結算畫面
+            player.money -= finalPrice;
+            updateDashboard();
+            speakText(`${player.name} 無法支付過路費，破產了！`).then(() => {
+              triggerGameOver('bankrupt', player);
+            });
+            return;
+          }
+        }
 
         const arrivalText = tile.owner === null
           ? `${player.name} 到達 ${tile.name}！回答正確就能成為老闆！`
@@ -2381,7 +2395,18 @@
       } else {
         const truncatedVal = Math.floor(currentFateTargetVal / 10) * 10;
         const penaltyAmount = Math.floor(truncatedVal / 2);
-        curP.money = Math.max(0, curP.money - penaltyAmount);
+        curP.money -= penaltyAmount;
+        updateDashboard();
+
+        const ownedShops = SHOPS_DATA.filter(s => s.owner === currentPlayerIdx);
+        const maxMortgageValue = ownedShops.reduce((sum, s) => sum + s.boughtPrice, 0);
+
+        if (curP.money + maxMortgageValue < 0 || (curP.money <= 0 && ownedShops.length === 0)) {
+          closeModal('fate-modal');
+          triggerGameOver('bankrupt', curP);
+          return;
+        }
+
         playSound('error');
         speakText(`報讀錯誤！請繳回 ${penaltyAmount} 元錢幣！`);
         resultHtml = `❌ 老師驗證：報讀錯誤！<br>👉 請繳回 <b>$${penaltyAmount}</b> 元實體錢幣給老師（銀行）。`;
@@ -2611,7 +2636,11 @@
     }
 
     function restartGameFromGameOver() {
-      closeModal('game-over-modal');
+      const modal = document.getElementById('game-over-modal');
+      if (modal) {
+        modal.classList.remove('show');
+        modal.style.display = 'none';
+      }
       applySettings();
     }
 
