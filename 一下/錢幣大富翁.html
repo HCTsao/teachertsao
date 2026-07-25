@@ -1462,12 +1462,18 @@
 
     function openModal(modalId) {
       const modal = document.getElementById(modalId);
-      if (modal) modal.classList.add('show');
+      if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.add('show');
+      }
     }
 
     function closeModal(modalId) {
       const modal = document.getElementById(modalId);
-      if (modal) modal.classList.remove('show');
+      if (modal) {
+        modal.classList.remove('show');
+        modal.style.display = 'none';
+      }
     }
 
     function renderBoard() {
@@ -2332,6 +2338,7 @@
     }
 
     function openSettingsModal() {
+      renderPlayerSettingsRows();
       openModal('settings-modal');
     }
 
@@ -2363,33 +2370,46 @@
     }
 
     function applySettings() {
-      const selectEl = document.getElementById('setting-players');
-      if (selectEl) {
-        config.playerCount = parseInt(selectEl.value) || 4;
-      }
-      const count = config.playerCount;
-      for (let i = 0; i < count; i++) {
-        const nameEl = document.getElementById(`p-name-${i}`);
-        const avatarEl = document.getElementById(`p-avatar-${i}`);
-        if (nameEl && players[i]) {
-          players[i].name = nameEl.value.trim() || `玩家${i + 1}`;
+      // 無條件優先關閉設定彈窗
+      closeModal('settings-modal');
+
+      try {
+        const selectEl = document.getElementById('setting-players');
+        if (selectEl) {
+          config.playerCount = parseInt(selectEl.value) || 4;
         }
-        if (avatarEl && players[i]) {
-          players[i].avatar = avatarEl.value;
+        const count = config.playerCount;
+        for (let i = 0; i < count; i++) {
+          const nameEl = document.getElementById(`p-name-${i}`);
+          const avatarEl = document.getElementById(`p-avatar-${i}`);
+          if (nameEl && players[i]) {
+            players[i].name = nameEl.value.trim() || `玩家${i + 1}`;
+          }
+          if (avatarEl && players[i]) {
+            players[i].avatar = avatarEl.value;
+          }
         }
+      } catch (err) {
+        console.error('applySettings error:', err);
       }
 
-      initGame();
-      closeModal('settings-modal');
+      try {
+        initGame();
+      } catch (err) {
+        console.error('initGame error:', err);
+      }
+
       isRolling = false;
       const rollBtn = document.getElementById('roll-trigger-btn');
       if (rollBtn) rollBtn.disabled = false;
 
-      const activeP = players[0];
+      const activeP = players[0] || { avatar: '🐱', name: '玩家1' };
       const banner = document.getElementById('event-banner');
       if (banner) banner.innerHTML = `輪到 【${activeP.avatar} ${activeP.name}】 囉！請點擊擲骰子！`;
 
-      speakText(`遊戲開始囉！由${activeP.name}先開始擲骰子。`);
+      try {
+        speakText(`遊戲開始囉！由${activeP.name}先開始擲骰子。`);
+      } catch (e) {}
     }
 
     function toggleSpeech() {
