@@ -1999,6 +1999,28 @@
       return { c100, c50, c10, c5, c1, total: amount };
     }
 
+    function isSameCoinSet(a, b) {
+      return a.c100 === b.c100 && a.c50 === b.c50 && a.c10 === b.c10 && a.c5 === b.c5 && a.c1 === b.c1;
+    }
+
+    function forceDifferentCoinStructure(set) {
+      const s = { ...set };
+      if (s.c50 > 0) {
+        s.c50 -= 1;
+        s.c10 += 5;
+      } else if (s.c10 > 0) {
+        s.c10 -= 1;
+        s.c5 += 2;
+      } else if (s.c5 > 0) {
+        s.c5 -= 1;
+        s.c1 += 5;
+      } else if (s.c100 > 0) {
+        s.c100 -= 1;
+        s.c50 += 2;
+      }
+      return s;
+    }
+
     function confirmShopUpgradeFromModal() {
       const shop = currentPendingShop;
       const curP = players[currentPlayerIdx];
@@ -2050,8 +2072,13 @@
       let idxB;
       do { idxB = Math.floor(Math.random() * strategies.length); } while (idxB === idxA);
 
-      const setA = generateDiverseCoinDecomposition(valA, strategies[idxA]);
-      const setB = generateDiverseCoinDecomposition(valB, strategies[idxB]);
+      let setA = generateDiverseCoinDecomposition(valA, strategies[idxA]);
+      let setB = generateDiverseCoinDecomposition(valB, strategies[idxB]);
+
+      // 若兩邊硬幣組合完全相同（如在一樣多時發生），強制改造乙邊的硬幣等價呈現方式
+      if (isSameCoinSet(setA, setB)) {
+        setB = forceDifferentCoinStructure(setB);
+      }
 
       currentChanceSetA = setA;
       currentChanceSetB = setB;
