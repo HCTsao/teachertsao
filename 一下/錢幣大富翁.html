@@ -1363,11 +1363,8 @@
       <!-- 第四名 / 其他排名卡片 -->
       <div id="remaining-rankings-container" style="width: 100%; margin-top: 10px;"></div>
 
-      <div style="display: flex; justify-content: center; width: 100%; margin-top: 20px;">
-        <button class="btn btn-success" style="width: 100%; justify-content: center; font-size: 1.3rem; padding: 14px;" onclick="restartGameFromGameOver()">
-          🔄 重新開始新局 🚀
-        </button>
-      </div>
+      <!-- 按鈕控制區段 (依破產或下課鐘響動態渲染) -->
+      <div id="game-over-actions-container" style="display: flex; gap: 15px; width: 100%; margin-top: 20px;"></div>
     </div>
   </div>
 
@@ -1576,9 +1573,19 @@
       }
     }
 
+    let currentGameOverReason = 'bell';
+
     function closeModal(modalId) {
-      if (modalId === 'game-over-modal') return; // 遊戲結束結算視窗不可關閉，只能重新開始
+      if (modalId === 'game-over-modal' && currentGameOverReason === 'bankrupt') return; // 破產時不可手動關閉視窗
       const modal = document.getElementById(modalId);
+      if (modal) {
+        modal.classList.remove('show');
+        modal.style.display = 'none';
+      }
+    }
+
+    function closeGameOverModalManually() {
+      const modal = document.getElementById('game-over-modal');
       if (modal) {
         modal.classList.remove('show');
         modal.style.display = 'none';
@@ -2624,6 +2631,28 @@
       // 第四名不用顯示
       const extraRankContainer = document.getElementById('remaining-rankings-container');
       if (extraRankContainer) extraRankContainer.innerHTML = '';
+
+      currentGameOverReason = reason;
+
+      const actionsContainer = document.getElementById('game-over-actions-container');
+      if (actionsContainer) {
+        if (reason === 'bankrupt') {
+          actionsContainer.innerHTML = `
+            <button class="btn btn-success" style="width: 100%; justify-content: center; font-size: 1.3rem; padding: 14px;" onclick="restartGameFromGameOver()">
+              🔄 重新開始新局 🚀
+            </button>
+          `;
+        } else {
+          actionsContainer.innerHTML = `
+            <button class="btn btn-success" style="flex: 1; justify-content: center; font-size: 1.2rem; padding: 12px;" onclick="restartGameFromGameOver()">
+              🔄 重新開始新局
+            </button>
+            <button class="btn btn-purple" style="flex: 1; justify-content: center; font-size: 1.2rem; padding: 12px;" onclick="closeGameOverModalManually()">
+              ❌ 關閉視窗 (繼續遊戲)
+            </button>
+          `;
+        }
+      }
 
       openModal('game-over-modal');
 
