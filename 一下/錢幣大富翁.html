@@ -1630,7 +1630,7 @@
           setTimeout(() => {
             closeModal('dice-modal');
             movePlayer(totalDice);
-          }, 400);
+          }, 300);
         });
       }, 1600);
     }
@@ -2336,14 +2336,18 @@
     }
 
     function renderPlayerSettingsRows() {
-      const count = parseInt(document.getElementById('setting-players').value);
+      const selectEl = document.getElementById('setting-players');
+      if (!selectEl) return;
+      const count = parseInt(selectEl.value) || 4;
       config.playerCount = count;
 
       const container = document.getElementById('players-custom-list');
+      if (!container) return;
       container.innerHTML = '';
 
       for (let i = 0; i < count; i++) {
         const p = players[i];
+        if (!p) continue;
         const row = document.createElement('div');
         row.className = 'player-edit-row';
 
@@ -2359,17 +2363,33 @@
     }
 
     function applySettings() {
+      const selectEl = document.getElementById('setting-players');
+      if (selectEl) {
+        config.playerCount = parseInt(selectEl.value) || 4;
+      }
       const count = config.playerCount;
       for (let i = 0; i < count; i++) {
-        const nameVal = document.getElementById(`p-name-${i}`).value.trim() || `玩家${i + 1}`;
-        const avatarVal = document.getElementById(`p-avatar-${i}`).value;
-        players[i].name = nameVal;
-        players[i].avatar = avatarVal;
+        const nameEl = document.getElementById(`p-name-${i}`);
+        const avatarEl = document.getElementById(`p-avatar-${i}`);
+        if (nameEl && players[i]) {
+          players[i].name = nameEl.value.trim() || `玩家${i + 1}`;
+        }
+        if (avatarEl && players[i]) {
+          players[i].avatar = avatarEl.value;
+        }
       }
 
       initGame();
       closeModal('settings-modal');
-      speakText(`遊戲開始囉！由${players[0].name}先開始擲骰子。`);
+      isRolling = false;
+      const rollBtn = document.getElementById('roll-trigger-btn');
+      if (rollBtn) rollBtn.disabled = false;
+
+      const activeP = players[0];
+      const banner = document.getElementById('event-banner');
+      if (banner) banner.innerHTML = `輪到 【${activeP.avatar} ${activeP.name}】 囉！請點擊擲骰子！`;
+
+      speakText(`遊戲開始囉！由${activeP.name}先開始擲骰子。`);
     }
 
     function toggleSpeech() {
@@ -2386,9 +2406,17 @@
         const utterance = new SpeechSynthesisUtterance(spokenText);
         utterance.lang = 'zh-TW';
         utterance.rate = 0.9;
-        utterance.onend = () => resolve();
-        utterance.onerror = () => resolve();
+        let isResolved = false;
+        const doResolve = () => {
+          if (!isResolved) {
+            isResolved = true;
+            resolve();
+          }
+        };
+        utterance.onend = doResolve;
+        utterance.onerror = doResolve;
         window.speechSynthesis.speak(utterance);
+        setTimeout(doResolve, 3000);
       });
     }
 
