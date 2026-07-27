@@ -104,49 +104,70 @@ class SoundFX {
 
 const sfx = new SoundFX();
 
-// 雙語發音 (英文放慢語速至 0.65，中文遇到分號 ； 停頓 1 秒)
-window.speakBilingual = function(word, chineseMeaning) {
+// 雙語發音 (英文放慢語速至 0.65，中文遇到分號 ； 停頓 0.5 秒；連續重複播放 2 次)
+window.speakBilingual = function(word, chineseMeaning, repeatTimes = 2) {
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     
-    // 1. 英文發音：放慢語速 (rate = 0.65)，強制轉為小寫避免瀏覽器唸成縮寫 (例如 US 唸成 U-S)
-    const utteranceEn = new SpeechSynthesisUtterance(word.toLowerCase());
-    utteranceEn.lang = 'en-US';
-    utteranceEn.rate = 0.65;
+    const playOnce = (countLeft) => {
+        if (countLeft <= 0) return;
 
-    utteranceEn.onend = async () => {
-        if (!chineseMeaning) return;
-        
-        // 2. 中文發音：遇到分號 ； 停頓 1 秒
-        const parts = chineseMeaning.split(/[；;]/).map(p => p.trim()).filter(Boolean);
-        
-        for (let i = 0; i < parts.length; i++) {
-            if (i > 0) {
-                // 分號停頓 500ms (0.5 秒)
-                await new Promise(r => setTimeout(r, 500));
+        const utteranceEn = new SpeechSynthesisUtterance(word.toLowerCase());
+        utteranceEn.lang = 'en-US';
+        utteranceEn.rate = 0.65;
+
+        utteranceEn.onend = async () => {
+            if (chineseMeaning) {
+                const parts = chineseMeaning.split(/[；;]/).map(p => p.trim()).filter(Boolean);
+                
+                for (let i = 0; i < parts.length; i++) {
+                    if (i > 0) {
+                        await new Promise(r => setTimeout(r, 500));
+                    }
+                    await new Promise(resolve => {
+                        const utteranceZh = new SpeechSynthesisUtterance(parts[i]);
+                        utteranceZh.lang = 'zh-TW';
+                        utteranceZh.rate = 0.72;
+                        utteranceZh.onend = resolve;
+                        utteranceZh.onerror = resolve;
+                        window.speechSynthesis.speak(utteranceZh);
+                    });
+                }
             }
-            await new Promise(resolve => {
-                const utteranceZh = new SpeechSynthesisUtterance(parts[i]);
-                utteranceZh.lang = 'zh-TW';
-                utteranceZh.rate = 0.72;
-                utteranceZh.onend = resolve;
-                utteranceZh.onerror = resolve;
-                window.speechSynthesis.speak(utteranceZh);
-            });
-        }
+
+            // 第一次播完後，若尚有重複次數，停頓 600ms 後重複播放下一遍
+            if (countLeft > 1) {
+                await new Promise(r => setTimeout(r, 600));
+                playOnce(countLeft - 1);
+            }
+        };
+
+        window.speechSynthesis.speak(utteranceEn);
     };
 
-    window.speechSynthesis.speak(utteranceEn);
+    playOnce(repeatTimes);
 };
 
-// 單獨英文單字朗讀 (語速放慢至 0.65，轉小寫防止個別縮寫拼音)
-window.speakWord = function(word) {
+// 單獨英文單字朗讀 (連續重複播放 2 次)
+window.speakWord = function(word, repeatTimes = 2) {
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(word.toLowerCase());
-    utterance.lang = 'en-US';
-    utterance.rate = 0.65;
-    window.speechSynthesis.speak(utterance);
+
+    const playOnce = (countLeft) => {
+        if (countLeft <= 0) return;
+        const utterance = new SpeechSynthesisUtterance(word.toLowerCase());
+        utterance.lang = 'en-US';
+        utterance.rate = 0.65;
+        utterance.onend = async () => {
+            if (countLeft > 1) {
+                await new Promise(r => setTimeout(r, 500));
+                playOnce(countLeft - 1);
+            }
+        };
+        window.speechSynthesis.speak(utterance);
+    };
+
+    playOnce(repeatTimes);
 };
 
 const TILE_DISTRIBUTION = {
@@ -368,6 +389,14 @@ class RummikubGame {
                 if (data.source === 'board') {
                     this.moveTileFromBoardToRack(data.id);
                 }
+            }
+        });
+
+        // 點擊牌架空白區：若有選中的桌面牌，則送回手牌
+        this.rackGridEl.addEventListener('click', (e) => {
+            if (this.selectedTileId && this.selectedTileSource === 'board') {
+                this.moveTileFromBoardToRack(this.selectedTileId);
+                this.clearTileSelection();
             }
         });
     }
@@ -827,6 +856,15 @@ class RummikubGame {
             .filter(w => !this.turnStartWords || !this.turnStartWords.has(w));
 
         if (!p.isIceBroken) {
+            // 破冰檢查 1：不可使用百搭牌 (Joker)
+            const usedJokerInIceBreak = Array.from(this.playedFromHandThisTurn).some(t => t.isJoker);
+            if (usedJokerInIceBreak) {
+                sfx.playError();
+                this.showToast('⚠️ 破冰出牌不能使用百搭牌（Joker）！必須全數使用實體字母牌破冰。');
+                return;
+            }
+
+            // 破冰檢查 2：必須包含至少一個 4 個字母（含）以上的全新單字
             const has4LetterWord = newWordsThisTurn.some(w => w.length >= 4);
             if (!has4LetterWord) {
                 sfx.playError();
@@ -891,23 +929,36 @@ class RummikubGame {
 
         sfx.playTileClick();
 
+        // 收集玩家當前所有真正可動用的手牌（包含牌架上的手牌 + 本回合暫時擺在桌面上的手牌）
+        const availableHand = [...p.hand];
+        this.playedFromHandThisTurn.forEach(tileId => {
+            for (let r = 0; r < this.GRID_ROWS; r++) {
+                for (let c = 0; c < this.GRID_COLS; c++) {
+                    if (this.boardGrid[r][c] && this.boardGrid[r][c].id === tileId) {
+                        availableHand.push(this.boardGrid[r][c]);
+                    }
+                }
+            }
+        });
+
         const allPossibleHints = [];
-        // 已在桌面上的單字，不能再作為提示
+        // 取出已經存在於桌面上的單字
         const boardWords = this.getExistingBoardWords();
 
         if (!p.isIceBroken) {
+            // 未破冰提示：長度 >= 3，且不可使用百搭牌 (allowJoker = false)
             ELEMENTARY_WORDS_LIST.forEach(word => {
-                if (word.length >= 4 && !boardWords.has(word.toLowerCase())) {
-                    const tilesMatched = this.matchWordWithHand(word, p.hand);
+                if (word.length >= 3 && !boardWords.has(word.toLowerCase())) {
+                    const tilesMatched = this.matchWordWithHand(word, availableHand, false);
                     if (tilesMatched) {
                         const meaning = getWordChineseMeaning(word);
-                        allPossibleHints.push(`💡 破冰提示：手牌可拼出 ${word.length} 個字母的破冰單字（中文意思是：『${meaning}』）！`);
+                        allPossibleHints.push(`💡 破冰提示：手牌可拼出 ${word.length} 個字母的破冰單字「${word.toUpperCase()}」(${meaning})！`);
                     }
                 }
             });
 
             if (allPossibleHints.length === 0) {
-                this.showToast('💡 破冰提示：尚未破冰。首次出牌需打出至少 4 個字母（含）以上的全新單字，目前手牌無法拼出 4 字母以上的單字，建議選擇「抽牌」！');
+                this.showToast('💡 破冰提示：尚未破冰（首次出牌需長度 >= 3 且不能用鬼牌），目前手牌無法完成破冰，建議選擇「抽牌」！');
                 return;
             }
 
@@ -917,19 +968,51 @@ class RummikubGame {
             return;
         }
 
-        // 已破冰後的一般出牌提示
+        // 已破冰提示 1：搜尋桌面接龍延伸 (例：桌面 CAT -> 延伸成 CATS)
+        const wordSets = this.getBoardWordSets();
+        for (const setItem of wordSets) {
+            const currentStr = this.getSetWordString(setItem.map(i => i.tile)).toLowerCase();
+
+            for (const targetWord of ELEMENTARY_WORDS_LIST) {
+                const targetLower = targetWord.toLowerCase();
+                if (targetLower.length <= currentStr.length) continue;
+                if (boardWords.has(targetLower)) continue;
+
+                // 後綴接龍
+                if (targetLower.startsWith(currentStr)) {
+                    const suffixNeeded = targetLower.substring(currentStr.length);
+                    const tilesMatched = this.matchWordWithHand(suffixNeeded, availableHand, true);
+                    if (tilesMatched) {
+                        const meaning = getWordChineseMeaning(targetWord);
+                        allPossibleHints.push(`💡 接龍提示：手牌「${suffixNeeded.toUpperCase()}」可接在桌面「${currentStr.toUpperCase()}」後面組成「${targetWord.toUpperCase()}」(${meaning})！`);
+                    }
+                }
+
+                // 前綴接龍
+                if (targetLower.endsWith(currentStr)) {
+                    const prefixNeeded = targetLower.substring(0, targetLower.length - currentStr.length);
+                    const tilesMatched = this.matchWordWithHand(prefixNeeded, availableHand, true);
+                    if (tilesMatched) {
+                        const meaning = getWordChineseMeaning(targetWord);
+                        allPossibleHints.push(`💡 接龍提示：手牌「${prefixNeeded.toUpperCase()}」可接在桌面「${currentStr.toUpperCase()}」前面組成「${targetWord.toUpperCase()}」(${meaning})！`);
+                    }
+                }
+            }
+        }
+
+        // 已破冰提示 2：手牌獨立組字
         ELEMENTARY_WORDS_LIST.forEach(word => {
             if (word.length >= 2 && !boardWords.has(word.toLowerCase())) {
-                const tilesMatched = this.matchWordWithHand(word, p.hand);
+                const tilesMatched = this.matchWordWithHand(word, availableHand, true);
                 if (tilesMatched) {
                     const meaning = getWordChineseMeaning(word);
-                    allPossibleHints.push(`💡 出牌提示：手牌可直接組出 ${word.length} 個字母的單字（中文意思是：『${meaning}』）！`);
+                    allPossibleHints.push(`💡 出牌提示：手牌可直接拼出 ${word.length} 個字母的單字「${word.toUpperCase()}」(${meaning})！`);
                 }
             }
         });
 
         if (allPossibleHints.length === 0) {
-            this.showToast('💡 出牌提示：目前手牌無法組成有效單字，建議選擇「抽牌」！');
+            this.showToast('💡 出牌提示：目前手牌無法組成或接龍任何單字，建議選擇「抽牌」！');
             return;
         }
 
@@ -949,64 +1032,88 @@ class RummikubGame {
     async executeAITurn(aiPlayer) {
         if (this.gameEnded) return;
 
-        const hand = aiPlayer.hand;
+        // 1. 延長 AI 思考時間，提升對弈沉浸感與真實感
+        this.showToast(`🤖 ${aiPlayer.name} 思考中...`);
+        await this.sleep(2500);
 
+        let hasPlayedTile = false;
+
+        // 2. 如果未破冰，嘗試尋找一組破冰單字 (破冰不能使用百搭牌)
         if (!aiPlayer.isIceBroken) {
-            const move = this.findAIIceBreakingMove(hand);
+            const move = this.findAIIceBreakingMove(aiPlayer.hand);
             if (move) {
                 const placed = this.placeTilesSequenceOnGrid(move.tiles);
                 if (placed) {
                     const playedIds = new Set(move.tiles.map(mt => mt.id));
-                    aiPlayer.hand = hand.filter(t => !playedIds.has(t.id));
+                    aiPlayer.hand = aiPlayer.hand.filter(t => !playedIds.has(t.id));
                     aiPlayer.isIceBroken = true;
+                    hasPlayedTile = true;
                     this.recordPlayedWords(aiPlayer, [move.word]);
                     sfx.playSuccess();
-                    this.showToast(`🤖 ${aiPlayer.name} 在共用桌面上破冰成功！拼出單字: ${move.word.toUpperCase()} (${getWordChineseMeaning(move.word)})`);
-                    
-                    await this.sleep(2000);
+                    this.showToast(`🤖 ${aiPlayer.name} 破冰成功！拼出單字: ${move.word.toUpperCase()} (${getWordChineseMeaning(move.word)})`);
+                    this.renderAll();
+                    await this.sleep(1800);
+
                     if (aiPlayer.hand.length === 0) {
                         this.handleVictory(aiPlayer);
                         return;
                     }
-                    this.renderAll();
-                    this.nextTurn();
-                    return;
                 }
             }
         } else {
-            const move = this.findAIRegularMove(hand);
+            // 3. 已破冰：嘗試出一組單字/接龍 (AI 一次只出一組牌)
+            const move = this.findAIRegularMove(aiPlayer.hand);
             if (move) {
-                const placed = this.placeTilesSequenceOnGrid(move.tiles);
+                let placed = false;
+                if (move.type === 'new') {
+                    placed = this.placeTilesSequenceOnGrid(move.tiles);
+                } else if (move.type === 'extend_suffix' || move.type === 'extend_prefix') {
+                    placed = this.executeBoardExtensionMove(move);
+                }
+
                 if (placed) {
                     const playedIds = new Set(move.tiles.map(mt => mt.id));
-                    aiPlayer.hand = hand.filter(t => !playedIds.has(t.id));
+                    aiPlayer.hand = aiPlayer.hand.filter(t => !playedIds.has(t.id));
+                    hasPlayedTile = true;
                     this.recordPlayedWords(aiPlayer, [move.word]);
                     sfx.playTileDrop();
-                    this.showToast(`🤖 ${aiPlayer.name} 在共用桌面出牌: ${move.word.toUpperCase()} (${getWordChineseMeaning(move.word)})`);
 
-                    await this.sleep(2000);
+                    const actionText = (move.type === 'new') ? '出牌' : '桌面接龍延伸';
+                    this.showToast(`🤖 ${aiPlayer.name} ${actionText}: ${move.word.toUpperCase()} (${getWordChineseMeaning(move.word)})`);
+                    this.renderAll();
+                    await this.sleep(1800);
+
                     if (aiPlayer.hand.length === 0) {
                         this.handleVictory(aiPlayer);
                         return;
                     }
-                    this.renderAll();
-                    this.nextTurn();
-                    return;
                 }
             }
         }
 
-        if (this.drawPile.length > 0) {
-            aiPlayer.hand.push(this.drawPile.pop());
-            sfx.playDraw();
-            this.showToast(`🤖 ${aiPlayer.name} 無法出牌，抽了一張牌`);
-        } else {
-            this.showToast(`🤖 ${aiPlayer.name} 跳過回合`);
+        // 4. 如果本回合無法出牌，則抽一張牌
+        if (!hasPlayedTile) {
+            if (this.drawPile.length > 0) {
+                aiPlayer.hand.push(this.drawPile.pop());
+                sfx.playDraw();
+                this.showToast(`🤖 ${aiPlayer.name} 無法出牌，抽了一張牌`);
+            } else {
+                this.showToast(`🤖 ${aiPlayer.name} 無法出牌且抽牌堆已空，跳過回合`);
+            }
+            await this.sleep(1200);
         }
 
-        await this.sleep(1500);
         this.renderAll();
         this.nextTurn();
+    }
+
+    executeBoardExtensionMove(move) {
+        const { row, startCol, tiles } = move;
+        for (let i = 0; i < tiles.length; i++) {
+            this.boardGrid[row][startCol + i] = tiles[i];
+        }
+        this.autoFixRowWordSpacings(row);
+        return true;
     }
 
     canPlaceWordAt(r, startC, len) {
@@ -1042,11 +1149,12 @@ class RummikubGame {
 
     findAIIceBreakingMove(hand) {
         const existingWords = this.getExistingBoardWords();
-        for (const word of ELEMENTARY_WORDS_LIST) {
-            if (word.length >= 4 && !existingWords.has(word.toLowerCase())) {
-                const tilesMatched = this.matchWordWithHand(word, hand);
+        for (const word of AI_1200_WORDS_LIST) {
+            // 破冰：需為全新單字 (長度 >= 3)，且不在桌面上，且【不允許使用百搭牌 (Joker)】
+            if (word.length >= 3 && !existingWords.has(word.toLowerCase())) {
+                const tilesMatched = this.matchWordWithHand(word, hand, false);
                 if (tilesMatched) {
-                    return { word, tiles: tilesMatched };
+                    return { type: 'new', word, tiles: tilesMatched };
                 }
             }
         }
@@ -1055,19 +1163,107 @@ class RummikubGame {
 
     findAIRegularMove(hand) {
         const existingWords = this.getExistingBoardWords();
-        for (const word of ELEMENTARY_WORDS_LIST) {
-                if (word.length >= 2 && !existingWords.has(word.toLowerCase())) {
-                    const tilesMatched = this.matchWordWithHand(word, hand);
+
+        // 優先搜尋 1：對桌面上既有的單字進行手牌延伸接龍（例：CAT -> CATS, IN -> WIN）
+        const extendMove = this.findAIExtendBoardWordMove(hand, existingWords);
+        if (extendMove) return extendMove;
+
+        // 搜尋 2：手牌獨立拼出桌面上未曾出現過的全新合法單字
+        for (const word of AI_1200_WORDS_LIST) {
+            if (word.length >= 2 && !existingWords.has(word.toLowerCase())) {
+                const tilesMatched = this.matchWordWithHand(word, hand, true);
                 if (tilesMatched) {
-                    return { word, tiles: tilesMatched };
+                    return { type: 'new', word, tiles: tilesMatched };
                 }
             }
         }
         return null;
     }
 
-    matchWordWithHand(word, hand) {
-        // 深拷貝手牌陣列物件，防止提示測試時污染真實手牌的 assignedLetter
+    findAIExtendBoardWordMove(hand, existingWords) {
+        const wordSets = this.getBoardWordSets();
+
+        for (const setItem of wordSets) {
+            const currentStr = this.getSetWordString(setItem.map(i => i.tile)).toLowerCase();
+            const r = setItem[0].row;
+            const startC = setItem[0].col;
+            const endC = setItem[setItem.length - 1].col;
+
+            for (const targetWord of AI_1200_WORDS_LIST) {
+                const targetLower = targetWord.toLowerCase();
+                if (targetLower.length <= currentStr.length) continue;
+                if (existingWords.has(targetLower)) continue;
+
+                // 情況 A：後綴延伸接龍 (例：CAT -> CATS, PLAY -> PLAYED)
+                if (targetLower.startsWith(currentStr)) {
+                    const suffixNeeded = targetLower.substring(currentStr.length);
+                    const suffixLen = suffixNeeded.length;
+
+                    if (endC + suffixLen < this.GRID_COLS) {
+                        let canPlace = true;
+                        for (let i = 1; i <= suffixLen; i++) {
+                            if (this.boardGrid[r][endC + i] !== null) {
+                                canPlace = false;
+                                break;
+                            }
+                        }
+                        if (endC + suffixLen + 1 < this.GRID_COLS && this.boardGrid[r][endC + suffixLen + 1] !== null) {
+                            canPlace = false;
+                        }
+
+                        if (canPlace) {
+                            const tilesMatched = this.matchWordWithHand(suffixNeeded, hand, true);
+                            if (tilesMatched) {
+                                return {
+                                    type: 'extend_suffix',
+                                    word: targetWord,
+                                    row: r,
+                                    startCol: endC + 1,
+                                    tiles: tilesMatched
+                                };
+                            }
+                        }
+                    }
+                }
+
+                // 情況 B：前綴延伸接龍 (例：IN -> WIN, AT -> BAT)
+                if (targetLower.endsWith(currentStr)) {
+                    const prefixNeeded = targetLower.substring(0, targetLower.length - currentStr.length);
+                    const prefixLen = prefixNeeded.length;
+
+                    if (startC - prefixLen >= 0) {
+                        let canPlace = true;
+                        for (let i = 1; i <= prefixLen; i++) {
+                            if (this.boardGrid[r][startC - i] !== null) {
+                                canPlace = false;
+                                break;
+                            }
+                        }
+                        if (startC - prefixLen - 1 >= 0 && this.boardGrid[r][startC - prefixLen - 1] !== null) {
+                            canPlace = false;
+                        }
+
+                        if (canPlace) {
+                            const tilesMatched = this.matchWordWithHand(prefixNeeded, hand, true);
+                            if (tilesMatched) {
+                                return {
+                                    type: 'extend_prefix',
+                                    word: targetWord,
+                                    row: r,
+                                    startCol: startC - prefixLen,
+                                    tiles: tilesMatched
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    matchWordWithHand(word, hand, allowJoker = true) {
+        // 深拷貝手牌陣列物件，防止測試時污染真實手牌的 assignedLetter
         const remainingHand = hand.map(t => ({ ...t }));
         const resultTiles = [];
 
@@ -1076,6 +1272,8 @@ class RummikubGame {
             if (exactIdx !== -1) {
                 resultTiles.push(remainingHand.splice(exactIdx, 1)[0]);
             } else {
+                if (!allowJoker) return null; // 破冰或指定不允許鬼牌時直接失敗
+
                 const jokerIdx = remainingHand.findIndex(t => t.isJoker);
                 if (jokerIdx !== -1) {
                     const jokerTile = remainingHand.splice(jokerIdx, 1)[0];
@@ -1135,6 +1333,12 @@ class RummikubGame {
         const p = this.players[this.currentPlayerIndex];
         if (p.isAI) return;
 
+        // 嚴格確保出牌座標在牌桌邊界範圍內
+        if (row < 0 || row >= this.GRID_ROWS || col < 0 || col >= this.GRID_COLS) {
+            this.showToast('⚠️ 出牌位置已超出牌桌範圍！');
+            return;
+        }
+
         let tile = null;
         if (source === 'rack') {
             const idx = p.hand.findIndex(t => t.id === tileId);
@@ -1157,6 +1361,7 @@ class RummikubGame {
         if (tile) {
             const doPlace = () => {
                 if (this.boardGrid[row][col] !== null) {
+                    // 若目標位置有牌，右移其他牌，但確保最右端不溢出
                     for (let c = this.GRID_COLS - 1; c > col; c--) {
                         this.boardGrid[row][c] = this.boardGrid[row][c - 1];
                     }
@@ -1461,8 +1666,15 @@ class RummikubGame {
                 cellEl.addEventListener('click', (e) => {
                     if (this.selectedTileId) {
                         e.stopPropagation();
-                        this.placeTileOnGrid(this.selectedTileId, r, c, this.selectedTileSource);
-                        this.clearTileSelection();
+                        if (this.selectedTileSource === 'rack') {
+                            // 手牌放到桌面格
+                            this.placeTileOnGrid(this.selectedTileId, r, c, 'rack');
+                            this.clearTileSelection();
+                        } else if (this.selectedTileSource === 'board') {
+                            // 桌面牌移到另一個格子（重組）
+                            this.placeTileOnGrid(this.selectedTileId, r, c, 'board');
+                            this.clearTileSelection();
+                        }
                     }
                 });
 
@@ -1536,6 +1748,13 @@ class RummikubGame {
         el.addEventListener('click', (e) => {
             e.stopPropagation();
             sfx.playTileClick();
+
+            // 若有選中的桌面牌，點擊牌架上任意牌 → 把桌面牌送回手牌
+            if (this.selectedTileId && this.selectedTileSource === 'board' && source === 'rack') {
+                this.moveTileFromBoardToRack(this.selectedTileId);
+                this.clearTileSelection();
+                return;
+            }
 
             if (this.selectedTileId && this.selectedTileSource === 'rack' && source === 'rack' && this.selectedTileId !== tile.id) {
                 this.reorderRackTile(this.selectedTileId, tile.id);
