@@ -1538,7 +1538,7 @@ class RummikubGame {
 
         // 遊戲結束後：出牌按鈕改為「複習」
         if (this.btnEndTurn) {
-            this.btnEndTurn.textContent = '📖 複習';
+            this.btnEndTurn.innerHTML = `<span class="pill-icon">📖</span><span class="pill-label">複習</span>`;
             this.btnEndTurn.disabled = false;
         }
     }
@@ -1843,9 +1843,9 @@ class RummikubGame {
         const isHumanTurn = (this.currentPlayerIndex === 0) && !this.gameEnded;
         this.btnEndTurn.disabled = !isHumanTurn && !this.gameEnded;
         if (this.gameEnded) {
-            this.btnEndTurn.textContent = '📖 複習';
+            this.btnEndTurn.innerHTML = `<span class="pill-icon">📖</span><span class="pill-label">複習</span>`;
         } else {
-            this.btnEndTurn.textContent = '出牌';
+            this.btnEndTurn.innerHTML = `<span class="pill-icon">✅</span><span class="pill-label">出牌</span>`;
         }
         this.btnDrawTile.disabled = !isHumanTurn;
         this.btnHint.disabled = !isHumanTurn;
