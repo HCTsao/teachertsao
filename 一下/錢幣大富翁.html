@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>使用錢幣大富翁</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,24 +27,35 @@
       -webkit-user-select: none;
     }
 
-    body {
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
       font-family: var(--font-family);
       background: linear-gradient(135deg, #a8ff78 0%, #78ffd6 100%);
-      min-height: 100vh;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 10px;
       color: #2d3436;
-      overflow-x: hidden;
+    }
+
+    /* 桌面版標準視窗 stage，透過 JS 自動在平板/手機上記算比例縮放 */
+    .viewport-stage {
+      width: 1280px;
+      height: 860px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform-origin: center center;
+      flex-shrink: 0;
     }
 
     .app-container {
-      width: 100%;
-      max-width: 1280px;
-      height: 96vh;
-      max-height: 920px;
+      width: 1280px;
+      height: 860px;
       display: flex;
       flex-direction: column;
       background: rgba(255, 255, 255, 0.88);
@@ -54,6 +65,7 @@
       border: 4px solid #ffffff;
       padding: 15px;
       position: relative;
+      overflow: hidden;
     }
 
     /* Header */
@@ -305,8 +317,8 @@
 
     /* Modals Overlay */
     .modal-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
+      position: absolute;
+      top: 0; left: 0; width: 1280px; height: 860px;
       background: rgba(0, 0, 0, 0.65);
       backdrop-filter: blur(8px);
       display: flex;
@@ -316,6 +328,7 @@
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.25s ease;
+      border-radius: 24px;
     }
 
     .modal-overlay.show {
@@ -327,8 +340,8 @@
       background: white;
       border-radius: 28px;
       width: 92%;
-      max-width: 600px;
-      padding: 24px;
+      max-width: 720px;
+      padding: 22px;
       box-shadow: 0 25px 60px rgba(0,0,0,0.3);
       border: 6px solid var(--accent);
       display: flex;
@@ -337,7 +350,7 @@
       text-align: center;
       transform: scale(0.85);
       transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      max-height: 92vh;
+      max-height: 800px;
       overflow-y: auto;
     }
 
@@ -647,10 +660,11 @@
     .cube-lg__face--6 { transform: rotateX(-90deg) translateZ(50px); }
 
     #celebration-canvas {
-      position: fixed;
-      top: 0; left: 0; width: 100vw; height: 100vh;
+      position: absolute;
+      top: 0; left: 0; width: 1280px; height: 860px;
       pointer-events: none;
       z-index: 2000;
+      border-radius: 24px;
     }
 
     /* Tutorial Slide Show styles */
@@ -659,8 +673,8 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: 98vh;
-      width: 100%;
+      height: 860px;
+      width: 1280px;
       max-width: 850px;
       margin: 0 auto;
       padding: 20px;
@@ -914,7 +928,10 @@
 </head>
 <body>
 
-  <canvas id="celebration-canvas"></canvas>
+  <!-- 行動裝置電腦版畫面等比例縮放容器 -->
+  <div id="viewport-stage" class="viewport-stage">
+
+    <canvas id="celebration-canvas"></canvas>
 
   <!-- Tutorial Slide Show Container -->
   <div class="tutorial-container" id="tutorial-container">
@@ -2924,6 +2941,9 @@
       document.getElementById('tutorial-container').style.display = 'none';
       document.querySelector('.app-container').style.display = 'flex';
       
+      // 重新計算縮放比例
+      fitToScreen();
+
       // 動態載入設定面板，引導老師/玩家進行人數與暱稱的初始設定
       openSettingsModal();
     }
@@ -2932,8 +2952,32 @@
     function showTutorial() {
       document.querySelector('.app-container').style.display = 'none';
       document.getElementById('tutorial-container').style.display = 'flex';
+      fitToScreen();
       showSlide(0);
     }
+
+    // 行動裝置 (手機、平板) 等比例自動縮放適應螢幕
+    function fitToScreen() {
+      const stage = document.getElementById('viewport-stage');
+      if (!stage) return;
+
+      const baseW = 1280;
+      const baseH = 860;
+      const winW = window.innerWidth;
+      const winH = window.innerHeight;
+
+      // 計算水平與垂直縮放比率，取較小者以完全包含在螢幕內不裁切
+      const scaleX = winW / baseW;
+      const scaleY = winH / baseH;
+      const scale = Math.min(scaleX, scaleY);
+
+      stage.style.transform = `scale(${scale})`;
+    }
+
+    window.addEventListener('resize', fitToScreen);
+    window.addEventListener('orientationchange', fitToScreen);
+    document.addEventListener('DOMContentLoaded', fitToScreen);
   </script>
+</div>
 </body>
 </html>
