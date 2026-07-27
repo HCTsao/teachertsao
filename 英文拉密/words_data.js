@@ -1,4 +1,4 @@
-﻿// 英文拉密 Rummikub Word - 完整審核 2000 字詞庫與 1200 字 AI 專用字典庫
+// 英文拉密 Rummikub Word - 完整審核 2000 字詞庫與 1200 字 AI 專用字典庫
 // 確保收錄 it, is, in, at, on, to, by, or, so 等所有基礎二字與多字短語
 
 const WORD_CHINESE_MAP = {
@@ -4503,7 +4503,7 @@ const WORD_CHINESE_MAP = {
     "workbook": "作業本",
     "zebra": "斑馬",
     "view": "風景；景觀",
-    "views": "風景；景觀",
+    "views": "觀點；看法",
     "mom": "媽媽",
     "moms": "媽媽",
     "dad": "爸爸",
