@@ -967,13 +967,14 @@ class RummikubGame {
         const boardWords = this.getExistingBoardWords();
 
         if (!p.isIceBroken) {
-            // 未破冰提示：長度 >= 3，且不可使用百搭牌 (allowJoker = false)
+            // 未破冰提示：長度 >= 3，且不可使用百搭牌 (allowJoker = false)，僅限原型單字
             ELEMENTARY_WORDS_LIST.forEach(word => {
-                if (word.length >= 3 && !boardWords.has(word.toLowerCase())) {
+                const wordLower = word.toLowerCase();
+                if (wordLower === getWordBaseLemma(wordLower) && word.length >= 3 && !boardWords.has(wordLower)) {
                     const tilesMatched = this.matchWordWithHand(word, availableHand, false);
                     if (tilesMatched) {
                         const meaning = getWordChineseMeaning(word);
-                        allPossibleHints.push(`💡 破冰提示：手牌可拼出 ${word.length} 個字母的破冰單字「${word.toUpperCase()}」(${meaning})！`);
+                        allPossibleHints.push(`💡 破冰提示：手牌可拼出 ${word.length} 個字母的破冰原型單字「${word.toUpperCase()}」(${meaning})！`);
                     }
                 }
             });
@@ -989,13 +990,15 @@ class RummikubGame {
             return;
         }
 
-        // 已破冰提示 1：搜尋桌面接龍延伸 (例：桌面 CAT -> 延伸成 CATS)
+        // 已破冰提示 1：搜尋桌面接龍延伸 (僅限原型單字)
         const wordSets = this.getBoardWordSets();
         for (const setItem of wordSets) {
             const currentStr = this.getSetWordString(setItem.map(i => i.tile)).toLowerCase();
 
             for (const targetWord of ELEMENTARY_WORDS_LIST) {
                 const targetLower = targetWord.toLowerCase();
+                // 僅限原型單字，排除態變化與複數型態
+                if (targetLower !== getWordBaseLemma(targetLower)) continue;
                 if (targetLower.length <= currentStr.length) continue;
                 if (boardWords.has(targetLower)) continue;
 
@@ -1005,7 +1008,7 @@ class RummikubGame {
                     const tilesMatched = this.matchWordWithHand(suffixNeeded, availableHand, true);
                     if (tilesMatched) {
                         const meaning = getWordChineseMeaning(targetWord);
-                        allPossibleHints.push(`💡 接龍提示：手牌「${suffixNeeded.toUpperCase()}」可接在桌面「${currentStr.toUpperCase()}」後面組成「${targetWord.toUpperCase()}」(${meaning})！`);
+                        allPossibleHints.push(`💡 接龍提示：手牌「${suffixNeeded.toUpperCase()}」可接在桌面「${currentStr.toUpperCase()}」後面組成原型「${targetWord.toUpperCase()}」(${meaning})！`);
                     }
                 }
 
@@ -1015,19 +1018,20 @@ class RummikubGame {
                     const tilesMatched = this.matchWordWithHand(prefixNeeded, availableHand, true);
                     if (tilesMatched) {
                         const meaning = getWordChineseMeaning(targetWord);
-                        allPossibleHints.push(`💡 接龍提示：手牌「${prefixNeeded.toUpperCase()}」可接在桌面「${currentStr.toUpperCase()}」前面組成「${targetWord.toUpperCase()}」(${meaning})！`);
+                        allPossibleHints.push(`💡 接龍提示：手牌「${prefixNeeded.toUpperCase()}」可接在桌面「${currentStr.toUpperCase()}」前面組成原型「${targetWord.toUpperCase()}」(${meaning})！`);
                     }
                 }
             }
         }
 
-        // 已破冰提示 2：手牌獨立組字
+        // 已破冰提示 2：手牌獨立組字 (僅限原型單字)
         ELEMENTARY_WORDS_LIST.forEach(word => {
-            if (word.length >= 2 && !boardWords.has(word.toLowerCase())) {
+            const wordLower = word.toLowerCase();
+            if (wordLower === getWordBaseLemma(wordLower) && word.length >= 2 && !boardWords.has(wordLower)) {
                 const tilesMatched = this.matchWordWithHand(word, availableHand, true);
                 if (tilesMatched) {
                     const meaning = getWordChineseMeaning(word);
-                    allPossibleHints.push(`💡 出牌提示：手牌可直接拼出 ${word.length} 個字母的單字「${word.toUpperCase()}」(${meaning})！`);
+                    allPossibleHints.push(`💡 出牌提示：手牌可直接拼出 ${word.length} 個字母的原型單字「${word.toUpperCase()}」(${meaning})！`);
                 }
             }
         });
