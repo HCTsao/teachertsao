@@ -253,7 +253,23 @@ class RummikubGame {
 
         this.bgmPlayerEl = document.getElementById('bgm-player');
         this.btnToggleBgm = document.getElementById('btn-toggle-bgm');
+        this.bgmVolumeSliderEl = document.getElementById('bgm-volume-slider');
         this.isBgmPlaying = false;
+        
+        if (this.bgmPlayerEl) {
+            this.bgmPlayerEl.volume = 0.8;
+        }
+
+        if (this.bgmVolumeSliderEl) {
+            this.bgmVolumeSliderEl.value = 0.8;
+            this.bgmVolumeSliderEl.addEventListener('input', (e) => {
+                const vol = parseFloat(e.target.value);
+                if (this.bgmPlayerEl) {
+                    this.bgmPlayerEl.volume = vol;
+                }
+            });
+        }
+
         if (this.btnToggleBgm) {
             this.btnToggleBgm.textContent = '🎵 背景音樂: 開';
             this.btnToggleBgm.classList.add('primary-btn');
@@ -835,6 +851,11 @@ class RummikubGame {
     }
 
     handleEndTurn() {
+        if (this.gameEnded) {
+            this.toggleModal('victory-modal', true);
+            return;
+        }
+
         const p = this.players[this.currentPlayerIndex];
         if (p.isAI) return;
 
@@ -1488,11 +1509,12 @@ class RummikubGame {
             detailsHtml += `<div style="grid-column: 1/-1; color:#94a3b8;">本局暫無組出的單字紀錄。</div>`;
         } else {
             this.playedWordsHistory.forEach(item => {
+                const lowerWord = item.word.toLowerCase();
                 detailsHtml += `
                     <div class="word-review-card">
                         <div class="review-eng">
-                            <span>${item.word}</span>
-                            <button class="btn-speak" title="聽雙語發音" onclick="speakBilingual('${item.word}', '${item.chinese}')">🔊</button>
+                            <span>${lowerWord}</span>
+                            <button class="btn-speak" title="聽雙語發音" onclick="speakBilingual('${lowerWord}', '${item.chinese}')">🔊</button>
                         </div>
                         <div class="review-chi">${item.chinese}</div>
                         <div class="review-meta">${item.length} 個字母 • ${item.player} 出牌</div>
@@ -1509,6 +1531,12 @@ class RummikubGame {
         const modalBody = document.getElementById('victory-body');
         modalBody.innerHTML = detailsHtml;
         this.toggleModal('victory-modal', true);
+
+        // 遊戲結束後：出牌按鈕改為「複習」
+        if (this.btnEndTurn) {
+            this.btnEndTurn.textContent = '📖 複習';
+            this.btnEndTurn.disabled = false;
+        }
     }
 
     startSlidePresentation() {
@@ -1809,7 +1837,12 @@ class RummikubGame {
 
     updateTurnUI() {
         const isHumanTurn = (this.currentPlayerIndex === 0) && !this.gameEnded;
-        this.btnEndTurn.disabled = !isHumanTurn;
+        this.btnEndTurn.disabled = !isHumanTurn && !this.gameEnded;
+        if (this.gameEnded) {
+            this.btnEndTurn.textContent = '📖 複習';
+        } else {
+            this.btnEndTurn.textContent = '出牌';
+        }
         this.btnDrawTile.disabled = !isHumanTurn;
         this.btnHint.disabled = !isHumanTurn;
         this.btnResetTurn.disabled = !isHumanTurn;
