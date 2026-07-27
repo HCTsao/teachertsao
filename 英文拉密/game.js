@@ -13,7 +13,7 @@ class SoundFX {
         }
     }
 
-    playTone(freq, type = 'sine', duration = 0.1, gainVal = 0.1) {
+    playTone(freq, type = 'sine', duration = 0.1, gainVal = 0.2) {
         try {
             this.init();
             if (this.ctx.state === 'suspended') this.ctx.resume();
@@ -39,7 +39,7 @@ class SoundFX {
                 const gain = this.ctx.createGain();
                 osc.type = 'triangle';
                 osc.frequency.setValueAtTime(200 + Math.random() * 300, now + i * 0.1);
-                gain.gain.setValueAtTime(0.1, now + i * 0.1);
+                gain.gain.setValueAtTime(0.2, now + i * 0.1);
                 gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.08);
                 osc.connect(gain);
                 gain.connect(this.ctx.destination);
@@ -50,11 +50,11 @@ class SoundFX {
     }
 
     playTileClick() {
-        this.playTone(600, 'triangle', 0.05, 0.15);
+        this.playTone(600, 'triangle', 0.05, 0.35);
     }
 
     playTileDrop() {
-        this.playTone(320, 'sine', 0.08, 0.2);
+        this.playTone(320, 'sine', 0.08, 0.45);
     }
 
     playSuccess() {
@@ -65,7 +65,7 @@ class SoundFX {
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
                 osc.frequency.setValueAtTime(freq, now + idx * 0.08);
-                gain.gain.setValueAtTime(0.12, now + idx * 0.08);
+                gain.gain.setValueAtTime(0.3, now + idx * 0.08);
                 gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.2);
                 osc.connect(gain);
                 gain.connect(this.ctx.destination);
@@ -76,11 +76,11 @@ class SoundFX {
     }
 
     playError() {
-        this.playTone(180, 'sawtooth', 0.3, 0.25);
+        this.playTone(180, 'sawtooth', 0.3, 0.5);
     }
 
     playDraw() {
-        this.playTone(440, 'sine', 0.1, 0.1);
+        this.playTone(440, 'sine', 0.1, 0.25);
     }
 
     playWin() {
@@ -91,7 +91,7 @@ class SoundFX {
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
                 osc.frequency.setValueAtTime(freq, now + idx * 0.12);
-                gain.gain.setValueAtTime(0.2, now + idx * 0.12);
+                gain.gain.setValueAtTime(0.45, now + idx * 0.12);
                 gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.4);
                 osc.connect(gain);
                 gain.connect(this.ctx.destination);
