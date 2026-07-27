@@ -1506,7 +1506,7 @@ class RummikubGame {
         this.currentSlideIndex = (idx + this.playedWordsHistory.length) % this.playedWordsHistory.length;
         const item = this.playedWordsHistory[this.currentSlideIndex];
 
-        this.slideWordTextEl.textContent = item.word.split('').join(' ');
+        this.slideWordTextEl.textContent = item.word.toLowerCase().split('').join(' ');
         this.slideChiTextEl.textContent = item.chinese;
         this.slideMetaTextEl.textContent = `${item.length} 個字母 • ${item.player} 出牌 (第 ${this.currentSlideIndex + 1} / ${this.playedWordsHistory.length} 頁)`;
 
