@@ -981,7 +981,7 @@ class RummikubGame {
                     const tilesMatched = this.matchWordWithHand(word, availableHand, false);
                     if (tilesMatched) {
                         const meaning = getWordChineseMeaning(word);
-                        allPossibleHints.push(`💡 破冰提示：手牌可拼出 ${word.length} 個字母的破冰原型單字「${word.toUpperCase()}」(${meaning})！`);
+                        allPossibleHints.push(`💡 破冰提示：手上的牌可以拼出一個 ${word.length} 個字母，意思是「${meaning}」的單字！`);
                     }
                 }
             });
@@ -1015,7 +1015,7 @@ class RummikubGame {
                     const tilesMatched = this.matchWordWithHand(suffixNeeded, availableHand, true);
                     if (tilesMatched) {
                         const meaning = getWordChineseMeaning(targetWord);
-                        allPossibleHints.push(`💡 接龍提示：手牌「${suffixNeeded.toUpperCase()}」可接在桌面「${currentStr.toUpperCase()}」後面組成原型「${targetWord.toUpperCase()}」(${meaning})！`);
+                        allPossibleHints.push(`💡 接龍提示：手上的牌可以接在桌面「${currentStr.toUpperCase()}」後面，變成「${meaning}」的意思！`);
                     }
                 }
 
@@ -1025,7 +1025,7 @@ class RummikubGame {
                     const tilesMatched = this.matchWordWithHand(prefixNeeded, availableHand, true);
                     if (tilesMatched) {
                         const meaning = getWordChineseMeaning(targetWord);
-                        allPossibleHints.push(`💡 接龍提示：手牌「${prefixNeeded.toUpperCase()}」可接在桌面「${currentStr.toUpperCase()}」前面組成原型「${targetWord.toUpperCase()}」(${meaning})！`);
+                        allPossibleHints.push(`💡 接龍提示：手上的牌可以接在桌面「${currentStr.toUpperCase()}」前面，變成「${meaning}」的意思！`);
                     }
                 }
             }
@@ -1038,7 +1038,7 @@ class RummikubGame {
                 const tilesMatched = this.matchWordWithHand(word, availableHand, true);
                 if (tilesMatched) {
                     const meaning = getWordChineseMeaning(word);
-                    allPossibleHints.push(`💡 出牌提示：手牌可直接拼出 ${word.length} 個字母的原型單字「${word.toUpperCase()}」(${meaning})！`);
+                    allPossibleHints.push(`💡 出牌提示：手上的牌可以拼出一個 ${word.length} 個字母，意思是「${meaning}」的單字！`);
                 }
             }
         });
