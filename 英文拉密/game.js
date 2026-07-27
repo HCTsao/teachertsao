@@ -125,7 +125,14 @@ window.speakBilingual = function(word, chineseMeaning, repeatTimes = 2) {
                         await new Promise(r => setTimeout(r, 500));
                     }
                     await new Promise(resolve => {
-                        const utteranceZh = new SpeechSynthesisUtterance(parts[i]);
+                        let zhText = parts[i];
+                        // 修正 TTS 發音：將「和」替換為同音同調字「翰」，以確保正確發音為 ㄏㄢˋ (hàn)
+                        if (zhText === '和') {
+                            zhText = '翰';
+                        } else {
+                            zhText = zhText.replace(/^和(?=[\s\S]*)/, '翰');
+                        }
+                        const utteranceZh = new SpeechSynthesisUtterance(zhText);
                         utteranceZh.lang = 'zh-TW';
                         utteranceZh.rate = 0.72;
                         utteranceZh.onend = resolve;
