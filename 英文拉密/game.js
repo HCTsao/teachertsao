@@ -1042,8 +1042,8 @@ class RummikubGame {
         if (!aiPlayer.isIceBroken) {
             const move = this.findAIIceBreakingMove(aiPlayer.hand);
             if (move) {
-                const placed = this.placeTilesSequenceOnGrid(move.tiles);
-                if (placed) {
+                const placedPositions = await this.placeTilesSequenceOnGrid(move.tiles);
+                if (placedPositions) {
                     const playedIds = new Set(move.tiles.map(mt => mt.id));
                     aiPlayer.hand = aiPlayer.hand.filter(t => !playedIds.has(t.id));
                     aiPlayer.isIceBroken = true;
@@ -1051,8 +1051,10 @@ class RummikubGame {
                     this.recordPlayedWords(aiPlayer, [move.word]);
                     sfx.playSuccess();
                     this.showToast(`🤖 ${aiPlayer.name} 破冰成功！拼出單字: ${move.word.toUpperCase()} (${getWordChineseMeaning(move.word)})`);
+                    
+                    await this.animateAITilePlacement(placedPositions);
                     this.renderAll();
-                    await this.sleep(1800);
+                    await this.sleep(1200);
 
                     if (aiPlayer.hand.length === 0) {
                         this.handleVictory(aiPlayer);
@@ -1064,14 +1066,14 @@ class RummikubGame {
             // 3. 已破冰：嘗試出一組單字/接龍 (AI 一次只出一組牌)
             const move = this.findAIRegularMove(aiPlayer.hand);
             if (move) {
-                let placed = false;
+                let placedPositions = null;
                 if (move.type === 'new') {
-                    placed = this.placeTilesSequenceOnGrid(move.tiles);
+                    placedPositions = await this.placeTilesSequenceOnGrid(move.tiles);
                 } else if (move.type === 'extend_suffix' || move.type === 'extend_prefix') {
-                    placed = this.executeBoardExtensionMove(move);
+                    placedPositions = await this.executeBoardExtensionMove(move);
                 }
 
-                if (placed) {
+                if (placedPositions && placedPositions.length > 0) {
                     const playedIds = new Set(move.tiles.map(mt => mt.id));
                     aiPlayer.hand = aiPlayer.hand.filter(t => !playedIds.has(t.id));
                     hasPlayedTile = true;
@@ -1080,8 +1082,10 @@ class RummikubGame {
 
                     const actionText = (move.type === 'new') ? '出牌' : '桌面接龍延伸';
                     this.showToast(`🤖 ${aiPlayer.name} ${actionText}: ${move.word.toUpperCase()} (${getWordChineseMeaning(move.word)})`);
+                    
+                    await this.animateAITilePlacement(placedPositions);
                     this.renderAll();
-                    await this.sleep(1800);
+                    await this.sleep(1200);
 
                     if (aiPlayer.hand.length === 0) {
                         this.handleVictory(aiPlayer);
@@ -1107,13 +1111,17 @@ class RummikubGame {
         this.nextTurn();
     }
 
-    executeBoardExtensionMove(move) {
+    async executeBoardExtensionMove(move) {
         const { row, startCol, tiles } = move;
+        const placedPositions = [];
         for (let i = 0; i < tiles.length; i++) {
-            this.boardGrid[row][startCol + i] = tiles[i];
+            if (this.boardGrid[row][startCol + i] === null) {
+                this.boardGrid[row][startCol + i] = tiles[i];
+                placedPositions.push({ r: row, c: startCol + i, tile: tiles[i] });
+            }
         }
         this.autoFixRowWordSpacings(row);
-        return true;
+        return placedPositions;
     }
 
     canPlaceWordAt(r, startC, len) {
@@ -1130,21 +1138,38 @@ class RummikubGame {
         return true;
     }
 
-    placeTilesSequenceOnGrid(tiles) {
+    async placeTilesSequenceOnGrid(tiles) {
         const len = tiles.length;
 
         for (let r = 0; r < this.GRID_ROWS; r++) {
             for (let startC = 0; startC <= this.GRID_COLS - len; startC++) {
                 if (this.canPlaceWordAt(r, startC, len)) {
+                    const placedPositions = [];
                     for (let i = 0; i < len; i++) {
                         this.boardGrid[r][startC + i] = tiles[i];
+                        placedPositions.push({ r, c: startC + i, tile: tiles[i] });
                     }
                     this.autoFixRowWordSpacings(r);
-                    return true;
+                    return placedPositions;
                 }
             }
         }
-        return false;
+        return null;
+    }
+
+    async animateAITilePlacement(placedPositions) {
+        if (!placedPositions || placedPositions.length === 0) return;
+        for (const item of placedPositions) {
+            const cellEl = this.boardGridEl.querySelector(`.board-cell[data-row="${item.r}"][data-col="${item.c}"]`);
+            if (cellEl) {
+                cellEl.innerHTML = '';
+                const tileEl = this.createTileElement(item.tile, 'board', item.r, item.c);
+                tileEl.classList.add('tile-drop-anim');
+                cellEl.appendChild(tileEl);
+                sfx.playTileDrop();
+            }
+            await this.sleep(280);
+        }
     }
 
     findAIIceBreakingMove(hand) {
