@@ -722,8 +722,8 @@ class RummikubGame {
         this.startTimer();
 
         if (p.isAI) {
-            this.turnMessageEl.innerHTML = `⏳ 輪到 <strong>${p.name}</strong> 正在仔細看手牌與思考單字中...`;
-            setTimeout(() => this.executeAITurn(p), 3800);
+            this.turnMessageEl.innerHTML = `⏳ 輪到 <strong>${p.name}</strong> 正在思考中...`;
+            setTimeout(() => this.executeAITurn(p), 500);
         } else {
             if (!p.isIceBroken) {
                 this.turnMessageEl.innerHTML = `👉 輪到 <strong>你的回合</strong>！【尚未破冰】請打出至少 4 個字母的單字進行破冰 (或點擊 💡 提示 觀看建議)`;
@@ -1064,9 +1064,9 @@ class RummikubGame {
     async executeAITurn(aiPlayer) {
         if (this.gameEnded) return;
 
-        // 1. 延長 AI 思考時間，提升對弈沉浸感與真實感
+        // 1. 適度模擬 AI 思考時間 (300ms) 確保對弈流暢
         this.showToast(`🤖 ${aiPlayer.name} 思考中...`);
-        await this.sleep(2500);
+        await this.sleep(300);
 
         let hasPlayedTile = false;
 
@@ -1086,7 +1086,7 @@ class RummikubGame {
                     
                     await this.animateAITilePlacement(placedPositions);
                     this.renderAll();
-                    await this.sleep(1200);
+                    await this.sleep(400);
 
                     if (aiPlayer.hand.length === 0) {
                         this.handleVictory(aiPlayer);
@@ -1117,7 +1117,7 @@ class RummikubGame {
                     
                     await this.animateAITilePlacement(placedPositions);
                     this.renderAll();
-                    await this.sleep(1200);
+                    await this.sleep(400);
 
                     if (aiPlayer.hand.length === 0) {
                         this.handleVictory(aiPlayer);
@@ -1136,7 +1136,7 @@ class RummikubGame {
             } else {
                 this.showToast(`🤖 ${aiPlayer.name} 無法出牌且抽牌堆已空，跳過回合`);
             }
-            await this.sleep(1200);
+            await this.sleep(400);
         }
 
         this.renderAll();
