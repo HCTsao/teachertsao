@@ -1570,6 +1570,7 @@
 
     let currentPlayerIdx = 0;
     let isRolling = false;
+    let gameActive = true;
     let currentFateTargetVal = 0;
     let currentPendingProduct = null;
     let currentPendingShop = null;
@@ -1591,6 +1592,9 @@
       });
       SHOPS_DATA.forEach(s => { s.owner = null; s.boughtPrice = 0; s.level = 1; });
       isRolling = false;
+      gameActive = true;
+      gameStateHistory = [];
+      updateUndoButtonState();
       renderBoard();
       updateDashboard();
     }
@@ -2992,19 +2996,23 @@
     let gameStateHistory = [];
 
     function saveGameState() {
-      const snapshot = {
-        currentPlayerIdx: currentPlayerIdx,
-        gameActive: gameActive,
-        players: JSON.parse(JSON.stringify(players)),
-        shops: JSON.parse(JSON.stringify(SHOPS_DATA.map(s => ({
-          id: s.id, owner: s.owner, boughtPrice: s.boughtPrice, level: s.level || 1
-        })))),
-        eventBannerText: document.getElementById('event-banner') ? document.getElementById('event-banner').innerHTML : '',
-        lastRolledSteps: typeof lastRolledSteps !== 'undefined' ? lastRolledSteps : 2
-      };
-      gameStateHistory.push(snapshot);
-      if (gameStateHistory.length > 25) gameStateHistory.shift(); // 保留最多 25 步歷史紀錄
-      updateUndoButtonState();
+      try {
+        const snapshot = {
+          currentPlayerIdx: currentPlayerIdx,
+          gameActive: typeof gameActive !== 'undefined' ? gameActive : true,
+          players: JSON.parse(JSON.stringify(players)),
+          shops: JSON.parse(JSON.stringify(SHOPS_DATA.map(s => ({
+            id: s.id, owner: s.owner, boughtPrice: s.boughtPrice, level: s.level || 1
+          })))),
+          eventBannerText: document.getElementById('event-banner') ? document.getElementById('event-banner').innerHTML : '',
+          lastRolledSteps: typeof lastRolledSteps !== 'undefined' ? lastRolledSteps : 2
+        };
+        gameStateHistory.push(snapshot);
+        if (gameStateHistory.length > 25) gameStateHistory.shift(); // 保留最多 25 步歷史紀錄
+        updateUndoButtonState();
+      } catch (err) {
+        console.error("saveGameState error:", err);
+      }
     }
 
     function undoLastStep() {
