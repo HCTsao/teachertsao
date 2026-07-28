@@ -1074,7 +1074,7 @@ class RummikubGame {
         if (!aiPlayer.isIceBroken) {
             const move = this.findAIIceBreakingMove(aiPlayer.hand);
             if (move) {
-                const placedPositions = await this.placeTilesSequenceOnGrid(move.tiles);
+                const placedPositions = this.placeTilesSequenceOnGrid(move.tiles);
                 if (placedPositions) {
                     const playedIds = new Set(move.tiles.map(mt => mt.id));
                     aiPlayer.hand = aiPlayer.hand.filter(t => !playedIds.has(t.id));
@@ -1100,9 +1100,9 @@ class RummikubGame {
             if (move) {
                 let placedPositions = null;
                 if (move.type === 'new') {
-                    placedPositions = await this.placeTilesSequenceOnGrid(move.tiles);
+                    placedPositions = this.placeTilesSequenceOnGrid(move.tiles);
                 } else if (move.type === 'extend_suffix' || move.type === 'extend_prefix') {
-                    placedPositions = await this.executeBoardExtensionMove(move);
+                    placedPositions = this.executeBoardExtensionMove(move);
                 }
 
                 if (placedPositions && placedPositions.length > 0) {
@@ -1143,7 +1143,7 @@ class RummikubGame {
         this.nextTurn();
     }
 
-    async executeBoardExtensionMove(move) {
+    executeBoardExtensionMove(move) {
         const { row, startCol, tiles } = move;
         const placedPositions = [];
         for (let i = 0; i < tiles.length; i++) {
@@ -1170,7 +1170,7 @@ class RummikubGame {
         return true;
     }
 
-    async placeTilesSequenceOnGrid(tiles) {
+    placeTilesSequenceOnGrid(tiles) {
         const len = tiles.length;
 
         for (let r = 0; r < this.GRID_ROWS; r++) {
