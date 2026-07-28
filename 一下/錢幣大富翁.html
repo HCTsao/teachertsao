@@ -1722,6 +1722,9 @@
     function openDiceModal() {
       if (isRolling) return;
       
+      // 在玩家丟骰子前保存完整狀態 snapshot，供「上一步」精準回到丟骰前
+      saveGameState();
+
       // 重置兩個骰子旋轉角度到基準狀態
       const cube1 = document.getElementById('cube-lg-1');
       const cube2 = document.getElementById('cube-lg-2');
@@ -2985,7 +2988,7 @@
     window.addEventListener('resize', fitToScreen);
     window.addEventListener('orientationchange', fitToScreen);
     document.addEventListener('DOMContentLoaded', fitToScreen);
-    // 歷史狀態回復 (上一步 Undo 功能)
+    // 歷史狀態回復 (上一步 Undo 功能 - 返回該玩家丟骰子前的狀態)
     let gameStateHistory = [];
 
     function saveGameState() {
@@ -2996,10 +2999,11 @@
         shops: JSON.parse(JSON.stringify(SHOPS_DATA.map(s => ({
           id: s.id, owner: s.owner, boughtPrice: s.boughtPrice, level: s.level || 1
         })))),
-        eventBannerText: document.getElementById('event-banner') ? document.getElementById('event-banner').innerHTML : ''
+        eventBannerText: document.getElementById('event-banner') ? document.getElementById('event-banner').innerHTML : '',
+        lastRolledSteps: typeof lastRolledSteps !== 'undefined' ? lastRolledSteps : 2
       };
       gameStateHistory.push(snapshot);
-      if (gameStateHistory.length > 15) gameStateHistory.shift(); // 保留最多 15 步歷史紀錄
+      if (gameStateHistory.length > 25) gameStateHistory.shift(); // 保留最多 25 步歷史紀錄
       updateUndoButtonState();
     }
 
@@ -3007,16 +3011,23 @@
       if (gameStateHistory.length === 0) return;
       playSound('step');
 
-      // 關閉所有開啟中的 Modal 彈窗
+      // 1. 停止任何動畫或丟骰狀態
+      isRolling = false;
+
+      // 2. 關閉所有開啟中的 Modal 彈窗
       const openModals = document.querySelectorAll('.modal-overlay.show');
       openModals.forEach(m => m.classList.remove('show'));
 
+      // 3. 取出上一個保存的狀態
       const lastState = gameStateHistory.pop();
       currentPlayerIdx = lastState.currentPlayerIdx;
       gameActive = lastState.gameActive;
       players = JSON.parse(JSON.stringify(lastState.players));
+      if (typeof lastRolledSteps !== 'undefined') {
+        lastRolledSteps = lastState.lastRolledSteps || 2;
+      }
 
-      // 復原商店狀態
+      // 4. 復原商店狀態與產權
       lastState.shops.forEach(savedShop => {
         const s = SHOPS_DATA.find(item => item.id === savedShop.id);
         if (s) {
@@ -3026,17 +3037,33 @@
         }
       });
 
-      if (document.getElementById('event-banner')) {
-        document.getElementById('event-banner').innerHTML = lastState.eventBannerText;
+      // 5. 重置 3D 骰子動畫角度
+      const cube1 = document.getElementById('cube-lg-1');
+      const cube2 = document.getElementById('cube-lg-2');
+      if (cube1) {
+        cube1.style.transition = 'none';
+        cube1.style.transform = 'rotateX(-15deg) rotateY(45deg) rotateZ(0deg)';
+      }
+      if (cube2) {
+        cube2.style.transition = 'none';
+        cube2.style.transform = 'rotateX(-15deg) rotateY(45deg) rotateZ(0deg)';
       }
 
-      isRolling = false;
+      // 6. 復原中央儀表板與丟骰按鈕
+      const curP = players[currentPlayerIdx];
+      const banner = document.getElementById('event-banner');
+      if (banner) {
+        banner.innerHTML = `輪到 【${curP.avatar} ${curP.name}】 囉！請點擊丟骰子！`;
+      }
+      unlockBtns(['roll-trigger-btn']);
+
+      // 7. 重新渲染地圖、棋子與玩家資訊
       renderBoard();
       renderPlayersBar();
       updateDashboard();
       updateUndoButtonState();
 
-      speakText(`已復原回到上一步！`);
+      speakText(`已復原回到 ${curP.name} 丟骰子前的狀態！`);
     }
 
     function updateUndoButtonState() {
