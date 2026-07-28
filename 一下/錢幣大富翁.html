@@ -1075,6 +1075,9 @@
         <h1>使用錢幣大富翁</h1>
       </div>
       <div class="header-btns">
+        <button class="btn btn-warning" id="undo-step-btn" onclick="undoLastStep()" style="background: #e67e22; color: white; opacity: 0.5; cursor: not-allowed;" title="回復回到上一步" disabled>
+          <span>↩️</span> 上一步
+        </button>
         <button class="btn btn-info" onclick="showTutorial()">
           <span>📖</span> 教學引導
         </button>
@@ -1193,9 +1196,15 @@
             </div>
           </div>
 
-          <button class="btn btn-purple" id="bank-exchange-btn" style="margin-bottom: 12px; width: 100%; justify-content: center; font-size: 1.1rem; padding: 10px;" onclick="openBankNeedExchangeModal()">
-            🏦 錢不夠嗎？找銀行換錢吧！
-          </button>
+          <!-- 付款彈窗內的換錢與抵押商店按鈕區 -->
+          <div style="display: flex; gap: 10px; width: 100%; margin-bottom: 12px;">
+            <button class="btn btn-purple" id="bank-exchange-btn" style="flex: 1; justify-content: center; font-size: 1.05rem; padding: 10px;" onclick="openBankNeedExchangeModal()">
+              🏦 找銀行換錢
+            </button>
+            <button class="btn btn-danger" id="pay-mortgage-btn" style="flex: 1; justify-content: center; font-size: 1.05rem; padding: 10px;" onclick="openMortgageModal()">
+              🏚️ 抵押/賣出商店
+            </button>
+          </div>
 
           <button class="btn btn-success" id="pay-approve-btn" style="padding: 14px 35px; font-size: 1.35rem; width: 100%; justify-content: center;" onclick="teacherApprovePayment()">
             ✅ 老師驗證
@@ -1878,22 +1887,7 @@
         }
         randomProduct.finalPrice = finalPrice;
 
-        // 如果這是別人的店，檢查踩中的玩家扣除房租後是否會破產（無法支付且無足夠店面可抵押）
-        if (tile.owner !== null && tile.owner !== currentPlayerIdx) {
-          const ownedShops = SHOPS_DATA.filter(s => s.owner === currentPlayerIdx);
-          const maxMortgageValue = ownedShops.reduce((sum, s) => sum + s.boughtPrice, 0);
-
-          if (player.money + maxMortgageValue < finalPrice) {
-            // 直接破產，不開啟付款視窗，扣除金額後直接進入頒獎結算畫面
-            player.money -= finalPrice;
-            updateDashboard();
-            speakText(`${player.name} 無法支付過路費，破產了！`).then(() => {
-              triggerGameOver('bankrupt', player);
-            });
-            return;
-          }
-        }
-
+        // 允許玩家開啟付款視窗（視窗內亦提供抵押商店按鈕供缺錢時變賣店面）
         const arrivalText = tile.owner === null
           ? `${player.name} 到達 ${tile.name}！回答正確就能成為老闆！`
           : tile.owner === currentPlayerIdx
@@ -2264,6 +2258,8 @@
     }
 
     function teacherApprovePayment() {
+      saveGameState();
+
       const curP = players[currentPlayerIdx];
       const shop = currentPendingShop;
       const product = currentPendingProduct;
@@ -2510,6 +2506,8 @@
     function mortgageShop(shopId) {
       const shop = SHOPS_DATA.find(s => s.id === shopId);
       if (!shop || shop.owner === null) return;
+
+      saveGameState();
 
       const oldOwnerP = players[shop.owner];
       const refundPrice = shop.boughtPrice;
@@ -2987,6 +2985,68 @@
     window.addEventListener('resize', fitToScreen);
     window.addEventListener('orientationchange', fitToScreen);
     document.addEventListener('DOMContentLoaded', fitToScreen);
+    // 歷史狀態回復 (上一步 Undo 功能)
+    let gameStateHistory = [];
+
+    function saveGameState() {
+      const snapshot = {
+        currentPlayerIdx: currentPlayerIdx,
+        gameActive: gameActive,
+        players: JSON.parse(JSON.stringify(players)),
+        shops: JSON.parse(JSON.stringify(SHOPS_DATA.map(s => ({
+          id: s.id, owner: s.owner, boughtPrice: s.boughtPrice, level: s.level || 1
+        })))),
+        eventBannerText: document.getElementById('event-banner') ? document.getElementById('event-banner').innerHTML : ''
+      };
+      gameStateHistory.push(snapshot);
+      if (gameStateHistory.length > 15) gameStateHistory.shift(); // 保留最多 15 步歷史紀錄
+      updateUndoButtonState();
+    }
+
+    function undoLastStep() {
+      if (gameStateHistory.length === 0) return;
+      playSound('step');
+
+      // 關閉所有開啟中的 Modal 彈窗
+      const openModals = document.querySelectorAll('.modal-overlay.show');
+      openModals.forEach(m => m.classList.remove('show'));
+
+      const lastState = gameStateHistory.pop();
+      currentPlayerIdx = lastState.currentPlayerIdx;
+      gameActive = lastState.gameActive;
+      players = JSON.parse(JSON.stringify(lastState.players));
+
+      // 復原商店狀態
+      lastState.shops.forEach(savedShop => {
+        const s = SHOPS_DATA.find(item => item.id === savedShop.id);
+        if (s) {
+          s.owner = savedShop.owner;
+          s.boughtPrice = savedShop.boughtPrice;
+          s.level = savedShop.level || 1;
+        }
+      });
+
+      if (document.getElementById('event-banner')) {
+        document.getElementById('event-banner').innerHTML = lastState.eventBannerText;
+      }
+
+      isRolling = false;
+      renderBoard();
+      renderPlayersBar();
+      updateDashboard();
+      updateUndoButtonState();
+
+      speakText(`已復原回到上一步！`);
+    }
+
+    function updateUndoButtonState() {
+      const btn = document.getElementById('undo-step-btn');
+      if (btn) {
+        btn.disabled = (gameStateHistory.length === 0);
+        btn.style.opacity = (gameStateHistory.length === 0) ? '0.5' : '1';
+        btn.style.cursor = (gameStateHistory.length === 0) ? 'not-allowed' : 'pointer';
+      }
+    }
   </script>
 </div>
 </body>
