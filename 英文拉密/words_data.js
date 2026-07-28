@@ -4420,7 +4420,7 @@ const WORD_CHINESE_MAP = {
     "the": "這/那",
     "and": "和",
     "would": "會",
-    "could": "能"
+    "could": "能",
     "america": "美國",
     "american": "美國的",
     "beside": "在…旁邊",
