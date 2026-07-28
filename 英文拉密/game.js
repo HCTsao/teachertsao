@@ -974,10 +974,10 @@ class RummikubGame {
         const boardWords = this.getExistingBoardWords();
 
         if (!p.isIceBroken) {
-            // 未破冰提示：長度 >= 3，且不可使用百搭牌 (allowJoker = false)，僅限原型單字
+            // 未破冰提示：長度 >= 4，且不可使用百搭牌 (allowJoker = false)，僅限原型單字
             ELEMENTARY_WORDS_LIST.forEach(word => {
                 const wordLower = word.toLowerCase();
-                if (wordLower === getWordBaseLemma(wordLower) && word.length >= 3 && !boardWords.has(wordLower)) {
+                if (wordLower === getWordBaseLemma(wordLower) && word.length >= 4 && !boardWords.has(wordLower)) {
                     const tilesMatched = this.matchWordWithHand(word, availableHand, false);
                     if (tilesMatched) {
                         const meaning = getWordChineseMeaning(word);
@@ -987,68 +987,65 @@ class RummikubGame {
             });
 
             if (allPossibleHints.length === 0) {
-                this.showToast('💡 破冰提示：尚未破冰（首次出牌需長度 >= 3 且不能用鬼牌），目前手牌無法完成破冰，建議選擇「抽牌」！');
+                this.showToast('💡 破冰提示：尚未破冰（首次出牌需長度 >= 4 且不能用鬼牌），目前手牌無法完成破冰，建議選擇「抽牌」！');
                 return;
             }
+        } else {
+            // 已破冰提示 1：搜尋桌面接龍延伸 (僅限原型單字)
+            const wordSets = this.getBoardWordSets();
+            for (const setItem of wordSets) {
+                const currentStr = this.getSetWordString(setItem.map(i => i.tile)).toLowerCase();
 
-            const selectedHint = allPossibleHints[this.hintIndex % allPossibleHints.length];
-            this.hintIndex++;
-            this.showToast(selectedHint);
-            return;
-        }
+                for (const targetWord of ELEMENTARY_WORDS_LIST) {
+                    const targetLower = targetWord.toLowerCase();
+                    // 僅限原型單字，排除態變化與複數型態
+                    if (targetLower !== getWordBaseLemma(targetLower)) continue;
+                    if (targetLower.length <= currentStr.length) continue;
+                    if (boardWords.has(targetLower)) continue;
 
-        // 已破冰提示 1：搜尋桌面接龍延伸 (僅限原型單字)
-        const wordSets = this.getBoardWordSets();
-        for (const setItem of wordSets) {
-            const currentStr = this.getSetWordString(setItem.map(i => i.tile)).toLowerCase();
-
-            for (const targetWord of ELEMENTARY_WORDS_LIST) {
-                const targetLower = targetWord.toLowerCase();
-                // 僅限原型單字，排除態變化與複數型態
-                if (targetLower !== getWordBaseLemma(targetLower)) continue;
-                if (targetLower.length <= currentStr.length) continue;
-                if (boardWords.has(targetLower)) continue;
-
-                // 後綴接龍
-                if (targetLower.startsWith(currentStr)) {
-                    const suffixNeeded = targetLower.substring(currentStr.length);
-                    const tilesMatched = this.matchWordWithHand(suffixNeeded, availableHand, true);
-                    if (tilesMatched) {
-                        const meaning = getWordChineseMeaning(targetWord);
-                        allPossibleHints.push(`💡 接龍提示：手上的牌可以接在桌面「${currentStr.toUpperCase()}」後面，變成「${meaning}」的意思！`);
+                    // 後綴接龍
+                    if (targetLower.startsWith(currentStr)) {
+                        const suffixNeeded = targetLower.substring(currentStr.length);
+                        const tilesMatched = this.matchWordWithHand(suffixNeeded, availableHand, true);
+                        if (tilesMatched) {
+                            const meaning = getWordChineseMeaning(targetWord);
+                            allPossibleHints.push(`💡 接龍提示：手上的牌可以接在桌面「${currentStr.toUpperCase()}」後面，變成「${meaning}」的意思！`);
+                        }
                     }
-                }
 
-                // 前綴接龍
-                if (targetLower.endsWith(currentStr)) {
-                    const prefixNeeded = targetLower.substring(0, targetLower.length - currentStr.length);
-                    const tilesMatched = this.matchWordWithHand(prefixNeeded, availableHand, true);
-                    if (tilesMatched) {
-                        const meaning = getWordChineseMeaning(targetWord);
-                        allPossibleHints.push(`💡 接龍提示：手上的牌可以接在桌面「${currentStr.toUpperCase()}」前面，變成「${meaning}」的意思！`);
+                    // 前綴接龍
+                    if (targetLower.endsWith(currentStr)) {
+                        const prefixNeeded = targetLower.substring(0, targetLower.length - currentStr.length);
+                        const tilesMatched = this.matchWordWithHand(prefixNeeded, availableHand, true);
+                        if (tilesMatched) {
+                            const meaning = getWordChineseMeaning(targetWord);
+                            allPossibleHints.push(`💡 接龍提示：手上的牌可以接在桌面「${currentStr.toUpperCase()}」前面，變成「${meaning}」的意思！`);
+                        }
                     }
                 }
             }
-        }
 
-        // 已破冰提示 2：手牌獨立組字 (僅限原型單字)
-        ELEMENTARY_WORDS_LIST.forEach(word => {
-            const wordLower = word.toLowerCase();
-            if (wordLower === getWordBaseLemma(wordLower) && word.length >= 2 && !boardWords.has(wordLower)) {
-                const tilesMatched = this.matchWordWithHand(word, availableHand, true);
-                if (tilesMatched) {
-                    const meaning = getWordChineseMeaning(word);
-                    allPossibleHints.push(`💡 出牌提示：手上的牌可以拼出一個 ${word.length} 個字母，意思是「${meaning}」的單字！`);
+            // 已破冰提示 2：手牌獨立組字 (僅限原型單字)
+            ELEMENTARY_WORDS_LIST.forEach(word => {
+                const wordLower = word.toLowerCase();
+                if (wordLower === getWordBaseLemma(wordLower) && word.length >= 2 && !boardWords.has(wordLower)) {
+                    const tilesMatched = this.matchWordWithHand(word, availableHand, true);
+                    if (tilesMatched) {
+                        const meaning = getWordChineseMeaning(word);
+                        allPossibleHints.push(`💡 出牌提示：手上的牌可以拼出一個 ${word.length} 個字母，意思是「${meaning}」的單字！`);
+                    }
                 }
-            }
-        });
+            });
 
-        if (allPossibleHints.length === 0) {
-            this.showToast('💡 出牌提示：目前手牌無法組成或接龍任何單字，建議選擇「抽牌」！');
-            return;
+            if (allPossibleHints.length === 0) {
+                this.showToast('💡 出牌提示：目前手牌無法組成或接龍任何單字，建議選擇「抽牌」！');
+                return;
+            }
         }
 
-        const selectedHint = allPossibleHints[this.hintIndex % allPossibleHints.length];
+        // 限制最多固定 3 個以內的提示，重複點擊按鈕時在此 3 個提示間循環輪流顯示
+        const topHints = allPossibleHints.slice(0, 3);
+        const selectedHint = topHints[this.hintIndex % topHints.length];
         this.hintIndex++;
         this.showToast(selectedHint);
     }
