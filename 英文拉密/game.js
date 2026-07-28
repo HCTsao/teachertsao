@@ -1207,8 +1207,8 @@ class RummikubGame {
     findAIIceBreakingMove(hand) {
         const existingWords = this.getExistingBoardWords();
         for (const word of AI_1200_WORDS_LIST) {
-            // 破冰：需為全新單字 (長度 >= 3)，且不在桌面上，且【不允許使用百搭牌 (Joker)】
-            if (word.length >= 3 && !existingWords.has(word.toLowerCase())) {
+            // 破冰：需為全新單字 (長度 >= 4)，且不在桌面上，且【不允許使用百搭牌 (Joker)】
+            if (word.length >= 4 && !existingWords.has(word.toLowerCase())) {
                 const tilesMatched = this.matchWordWithHand(word, hand, false);
                 if (tilesMatched) {
                     return { type: 'new', word, tiles: tilesMatched };
@@ -1441,6 +1441,13 @@ class RummikubGame {
     moveTileFromBoardToRack(tileId) {
         const p = this.players[this.currentPlayerIndex];
         if (p.isAI) return;
+
+        // 規則限制：僅能收回當前回合自己打出的手牌，不能把先前回合已在桌面上的牌拿回牌架
+        if (!this.playedFromHandThisTurn.has(tileId)) {
+            sfx.playError();
+            this.showToast('⚠️ 不能拿回先前回合已在桌面上的牌！只能收回本回合自己剛打出的手牌。');
+            return;
+        }
 
         let tile = null;
         for (let r = 0; r < this.GRID_ROWS; r++) {
