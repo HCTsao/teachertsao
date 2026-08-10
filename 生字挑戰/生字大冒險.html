@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>「一字千金」節目聽寫大戰 | 18課國語生字互動教具</title>
+  <meta name="description" content="專為國小低年級設計的「一字千金」聽寫競賽雙介面系統（教師現場控場 + 學生手寫板實時連線）。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Outfit:wght@600;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="adventure.css">
+</head>
+<body>
+
+  <!-- 頂部標題列與房間代碼 -->
+  <header class="app-header">
+    <div class="brand-title">
+      <span>🏆 一字千金：生字聽寫大賽</span>
+    </div>
+    <div style="display:flex; gap:12px; align-items:center;">
+      <div id="connectedCountBadge" class="room-code-badge" style="border-color:#38bdf8; color:#38bdf8;">
+        👥 參賽人數：0 人
+      </div>
+      <div id="teacherRoomCodeDisplay" class="room-code-badge" style="display:none; font-size:1.3rem; font-weight:900; color:#fef08a;">
+        🔑 房間代碼：8888
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="flex:1; display:flex; flex-direction:column; justify-content:center;">
+
+    <!-- PANEL 1: 角色選擇入口 -->
+    <section id="roleChoicePanel" class="view-panel active">
+      <div style="text-align:center; margin-top:20px;">
+        <h1 style="font-size:2.8rem; font-weight:900; background:linear-gradient(135deg, #fbbf24, #f59e0b); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">
+          一字千金 節目現場聽寫大戰
+        </h1>
+        <p style="color:var(--text-muted); font-size:1.1rem; margin-top:8px;">請選擇您的參與角色進入系統：</p>
+      </div>
+
+      <div class="role-choice-grid">
+        <div class="role-card" onclick="selectRole('TEACHER')">
+          <div class="role-icon">👨‍🏫</div>
+          <div class="role-title">我是教師 (主持 / 出題控場)</div>
+          <p style="color:var(--text-muted); font-size:0.95rem;">選擇 18 課課次、自動打亂題目順序、產生房間代碼與控制比賽發音。</p>
+        </div>
+        <div class="role-card" onclick="selectRole('STUDENT')">
+          <div class="role-icon">🎓</div>
+          <div class="role-title">我是參賽者 (輸入代碼連線)</div>
+          <p style="color:var(--text-muted); font-size:0.95rem;">輸入代碼加入房間，使用純手寫板作答並於 60 秒內鎖定答案。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- PANEL 2: 教師端 - 初始畫面選擇課次 -->
+    <section id="teacherLessonSelectPanel" class="view-panel">
+      <div style="text-align:center; margin-bottom:20px;">
+        <h2 style="color:var(--light-gold); font-size:1.8rem; font-weight:900;">📌 請選擇比賽課次 (自動打亂題庫順序)</h2>
+        <p style="color:var(--text-muted);">選擇課次後將重置分數並開啟隨機題庫現場</p>
+      </div>
+
+      <div class="lesson-grid" id="teacherLessonGrid"></div>
+    </section>
+
+    <!-- PANEL 3: 教師端 - 節目主持現場卡片 -->
+    <section id="teacherStagePanel" class="view-panel">
+      <div class="stage-card">
+
+        <!-- 頂部控制條 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:16px;">
+          <div>
+            <span style="font-size:1.2rem; font-weight:900; color:var(--light-gold);" id="teacherQuestionHeader">一上 第一課 （第 1 / 9 題）</span>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn-dark" onclick="teacherReselectLesson()">📋 重選課次</button>
+            <button class="btn-gold" onclick="teacherNextQuestion()">➡️ 下一題</button>
+          </div>
+        </div>
+
+        <!-- 累積答對題數 Scoreboard Bar -->
+        <div class="scoreboard-bar" id="teacherScoreboardBar">
+          <div style="color:var(--text-muted); text-align:center; width:100%;">📡 等待參賽者輸入房間代碼連線...</div>
+        </div>
+
+        <!-- 60秒倒數計時器 -->
+        <div class="timer-ring-box">
+          <span>⏱️</span>
+          <span id="teacherTimerDisplay">60</span>
+        </div>
+
+        <!-- 節目題目句型 -->
+        <div class="sentence-display-box">
+          <div class="sentence-text" id="teacherSentenceDisplay"></div>
+        </div>
+
+        <!-- 答題控制鍵 -->
+        <div style="display:flex; justify-content:center; gap:16px; margin-bottom:24px;">
+          <button class="btn-gold" id="startRoundBtn" onclick="start3sPrepCountdown()" style="font-size:1.2rem; padding:14px 36px;">
+            ▶️ 開始答題
+          </button>
+          <button class="btn-gold" onclick="teacherRevealAnswer()" style="background:linear-gradient(135deg, #38bdf8, #818cf8); color:#fff; font-size:1.2rem; padding:14px 36px;">
+            🎴 揭曉答案
+          </button>
+        </div>
+
+        <!-- 參賽學生手寫板 -->
+        <h4 style="color:var(--light-gold); margin-bottom:12px;">參賽者畫面</h4>
+        <div class="teacher-contestants-grid" id="teacherContestantsGrid"></div>
+
+        <!-- 掀牌答案盒 (要求: 移除部首，僅保留正解國字與常用語詞) -->
+        <div class="reveal-result-box" id="teacherRevealBox">
+          <div style="font-size:1rem; font-weight:800;">✨ 『一字千金』正解揭曉 ✨</div>
+          <div style="font-size:5rem; font-weight:900;" id="teacherRevealChar">拍</div>
+          <div style="font-size:1.1rem; font-weight:700;" id="teacherRevealInfo">常用語詞：【拍手】</div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- PANEL 4: 參賽者端 - 輸入代碼連線 -->
+    <section id="studentLoginPanel" class="view-panel">
+      <div style="max-width:440px; margin:40px auto; background:var(--card-bg); border:2px solid var(--card-border); border-radius:28px; padding:36px; text-align:center;">
+        <div style="font-size:3.5rem; margin-bottom:12px;">📲</div>
+        <h2 style="color:var(--light-gold); margin-bottom:20px;">參賽者連線登入</h2>
+
+        <div style="text-align:left; margin-bottom:16px;">
+          <label style="font-size:0.9rem; color:var(--text-muted);">4 位數房間代碼：</label>
+          <input type="text" id="inputRoomCode" placeholder="請輸入教師端代碼" style="width:100%; padding:12px 16px; border-radius:12px; background:#020617; border:1px solid var(--card-border); color:#fff; font-size:1.2rem; font-weight:800; margin-top:6px;">
+        </div>
+
+        <div style="text-align:left; margin-bottom:24px;">
+          <label style="font-size:0.9rem; color:var(--text-muted);">選擇參賽者姓名：</label>
+          <select id="inputStudentName" style="width:100%; padding:12px 16px; border-radius:12px; background:#020617; border:1px solid var(--card-border); color:#fff; font-size:1.1rem; font-weight:800; margin-top:6px;">
+            <option value="洪福">🎓 洪福</option>
+            <option value="廷恩">🎓 廷恩</option>
+            <option value="岳泰">🎓 岳泰</option>
+          </select>
+        </div>
+
+        <button class="btn-gold" onclick="joinStudentRoom()" style="width:100%;">加入房間進行比賽</button>
+      </div>
+    </section>
+
+    <!-- PANEL 5: 參賽者端 - 極簡純手寫板介面 -->
+    <section id="studentPadPanel" class="view-panel">
+      <div class="student-pad-container">
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <span style="font-size:1.1rem; font-weight:800; color:var(--light-gold);" id="studentHeaderInfo">參賽者：洪福</span>
+          <span style="font-size:0.95rem; font-weight:800; color:#fbbf24; background:rgba(245,158,11,0.2); padding:4px 12px; border-radius:14px; border:1px solid var(--card-border);" id="studentScoreBadge">累積答對：0 題</span>
+          <span style="font-size:1.3rem; font-weight:900; color:#ef4444; background:rgba(239, 68, 68, 0.15); padding:4px 16px; border-radius:20px; border:1px solid #ef4444;" id="studentTimerBadge">60s</span>
+        </div>
+
+        <div class="pad-tools-bar">
+          <button class="btn-dark" onclick="clearStudentPad()">🧹 清除重寫</button>
+          <button class="btn-gold" id="lockAnswerBtn" onclick="lockStudentPad()">🔒 鎖定答案</button>
+        </div>
+
+        <div class="pad-canvas-box">
+          <canvas class="student-canvas" id="studentHandwritingCanvas"></canvas>
+
+          <div class="pad-locked-overlay" id="studentPadOverlay">
+            <div style="font-size:4rem; margin-bottom:12px;">🔒</div>
+            <h2 style="color:var(--light-gold);">答案已鎖定</h2>
+            <p style="color:var(--text-muted); margin-top:8px;">您的手寫筆跡已傳送至教師節目現場！</p>
+          </div>
+
+          <div class="mark-overlay" id="studentMarkOverlay">
+            <div class="mark-symbol" id="studentMarkSymbol">⭕</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <script src="vocab_data.js"></script>
+  <script src="adventure.js"></script>
+</body>
+</html>

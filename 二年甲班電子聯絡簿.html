@@ -361,6 +361,37 @@
       justify-content: center;
       border: 1px solid rgba(255,255,255,0.2);
     }
+
+    /* 頁籤導覽列 (Tab Navigation Bar) */
+    .contact-nav-tabs {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 15px;
+    }
+
+    .contact-tab-btn {
+      padding: 10px 18px;
+      border-radius: 20px;
+      border: none;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      background: #e2e8f0;
+      color: #475569;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+    }
+
+    .contact-tab-btn:hover {
+      transform: translateY(-2px);
+    }
   </style>
 </head>
 <body>
@@ -384,12 +415,15 @@
         <div class="date-roc" id="dateRoc">民國 115 年 7 月 2 日 (星期四)</div>
       </div>
       
-      <!-- 寶可夢訓練師連結與教師後台連結 -->
-      <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 15px;">
-        <a href="pokemon_trainer.html" style="display: inline-block; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: white; padding: 10px 20px; border-radius: 20px; font-weight: 700; text-decoration: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); transition: transform 0.2s;">
-          <i class="fa-solid fa-gamepad"></i> 寶可夢訓練師集點卡
+      <!-- 要求: 點擊 ｢一字千金｣ 頁籤直接打開獨立新視窗頁面 -->
+      <div class="contact-nav-tabs">
+        <a href="生字挑戰/生字大冒險.html" target="_blank" class="contact-tab-btn" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.3);">
+          <i class="fa-solid fa-trophy"></i> 一字千金
         </a>
-        <button onclick="showAdminPasswordModal()" style="display: inline-block; background: linear-gradient(135deg, #64748b 0%, #475569 100%); color: white; padding: 10px 20px; border-radius: 20px; font-weight: 700; border: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s; font-family: inherit; font-size: 0.95rem;">
+        <a href="pokemon_trainer.html" class="contact-tab-btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white;">
+          <i class="fa-solid fa-gamepad"></i> 寶可夢集點卡
+        </a>
+        <button onclick="showAdminPasswordModal()" class="contact-tab-btn" style="background: linear-gradient(135deg, #64748b 0%, #475569 100%); color: white;">
           <i class="fa-solid fa-shield-halved"></i> 教師後台
         </button>
       </div>
@@ -398,380 +432,232 @@
     <!-- 今日作業區 -->
     <div class="glass-card">
       <h2 class="section-title homework">
-        <i class="fa-solid fa-book-open"></i> 今日作業
+        <i class="fa-solid fa-pencil"></i> 今日作業
       </h2>
-      <div class="homework-container" id="homeworkContainer">
-        <!-- 內容由 JavaScript 動態填入 -->
+      <div id="homeworkContainer" class="homework-container">
+        <!-- 由 JS 動態生成作業項目或暑假無作業卡片 -->
       </div>
     </div>
 
-    <!-- 通知單區塊 -->
-    <div class="glass-card notice-card" id="noticeCard" style="display: none;">
+    <!-- 聯絡事項與通知單照片區 -->
+    <div class="glass-card notice-card">
       <h2 class="section-title notices">
-        <i class="fa-solid fa-images"></i> 通知單
+        <i class="fa-solid fa-bell"></i> 聯絡事項 / 重要通知單
       </h2>
-      <div class="notice-gallery">
-        <div class="notice-image-container" id="noticeImgContainer">
-          <img src="summer_notice_sample.jpg" id="noticeImg" alt="通知單" onerror="this.src='https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=400&q=80'">
-          <div class="image-overlay">
-            <i class="fa-solid fa-magnifying-glass-plus"></i> 點擊放大查看
-          </div>
-        </div>
+      <div id="noticeContainer">
+        <!-- 由 JS 動態生成通知單圖片或提示訊息 -->
       </div>
     </div>
 
   </div>
 
-  <!-- 燈箱彈窗 (Lightbox Modal) -->
-  <div class="modal" id="lightboxModal" onclick="closeLightbox()">
-    <span class="modal-close" onclick="closeLightbox()">&times;</span>
-    <img class="modal-content" id="lightboxImg">
+  <!-- 圖片放大燈箱 (Lightbox Modal) -->
+  <div id="imageModal" class="modal" onclick="closeImageModal()">
+    <div class="modal-close" onclick="closeImageModal()">&times;</div>
+    <img id="modalImage" class="modal-content" src="" alt="放大通知單圖片" onclick="event.stopPropagation()">
+  </div>
+
+  <!-- 教師後台密碼驗證 Modal -->
+  <div id="adminPasswordModal" class="modal" onclick="closeAdminPasswordModal()">
+    <div class="glass-card" style="max-width: 360px; width: 90%; text-align: center; margin: 0 auto; background: rgba(255, 255, 255, 0.95);" onclick="event.stopPropagation()">
+      <div style="font-size: 2.5rem; color: #475569; margin-bottom: 8px;">
+        <i class="fa-solid fa-lock"></i>
+      </div>
+      <h3 style="font-size: 1.3rem; color: #1e293b; margin-bottom: 6px;">教師後台安全驗證</h3>
+      <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 16px;">請輸入管理員密碼進入維護後台</p>
+      
+      <input type="password" id="adminPasswordInput" placeholder="請輸入後台密碼" style="width: 100%; padding: 10px 14px; border-radius: 12px; border: 1px solid #cbd5e1; font-size: 1rem; margin-bottom: 16px; text-align: center; font-family: inherit; outline: none;">
+      
+      <div style="display: flex; gap: 10px; justify-content: center;">
+        <button onclick="closeAdminPasswordModal()" style="flex: 1; padding: 8px 16px; border-radius: 10px; border: 1px solid #cbd5e1; background: white; color: #64748b; font-weight: 700; cursor: pointer; font-family: inherit;">取消</button>
+        <button onclick="verifyAdminPassword()" style="flex: 1; padding: 8px 16px; border-radius: 10px; border: none; background: #0284c7; color: white; font-weight: 700; cursor: pointer; font-family: inherit;">確定進入</button>
+      </div>
+    </div>
   </div>
 
   <script>
+    // 民國年份與星期轉換字典
+    const weekNames = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+
+    // 格式化日期字串為 民國 XXX 年 X 月 X 日 (星期X)
+    function formatRocDate(dateObj) {
+      const yearRoc = dateObj.getFullYear() - 1911;
+      const month = dateObj.getMonth() + 1;
+      const day = dateObj.getDate();
+      const weekDay = weekNames[dateObj.getDay()];
+      return `民國 ${yearRoc} 年 ${month} 月 ${day} 日 (${weekDay})`;
+    }
+
+    // 格式化西元 Date 為 YYYY-MM-DD key 用於存取資料庫
+    function formatDateKey(dateObj) {
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // 初始化顯示今日日期
+    const today = new Date();
+    document.getElementById('dateRoc').innerText = formatRocDate(today);
+
+    // 圖片燈箱操作機制
+    function openImageModal(imgSrc) {
+      const modal = document.getElementById('imageModal');
+      const modalImg = document.getElementById('modalImage');
+      modalImg.src = imgSrc;
+      modal.classList.add('show');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeImageModal() {
+      const modal = document.getElementById('imageModal');
+      modal.classList.remove('show');
+      document.body.style.overflow = 'auto';
+    }
+
+    // 教師後台密碼彈窗機制
+    function showAdminPasswordModal() {
+      const modal = document.getElementById('adminPasswordModal');
+      const input = document.getElementById('adminPasswordInput');
+      input.value = '';
+      modal.classList.add('show');
+      setTimeout(() => input.focus(), 100);
+    }
+
+    function closeAdminPasswordModal() {
+      const modal = document.getElementById('adminPasswordModal');
+      modal.classList.remove('show');
+    }
+
+    function verifyAdminPassword() {
+      const pwd = document.getElementById('adminPasswordInput').value;
+      if (pwd === '8888') {
+        window.location.href = 'pokemon_admin.html?tab=homework';
+      } else {
+        alert('密碼錯誤！請輸入正確的後台管理員密碼。');
+      }
+    }
+
+    document.getElementById('adminPasswordInput').addEventListener('keyup', function(e) {
+      if (e.key === 'Enter') {
+        verifyAdminPassword();
+      }
+    });
+
     // ----------------------------------------------------
-    // 📖 作業資料庫 (由導師在此發布，8/28號開始會輸入新作業)
+    // Firebase Realtime Database 初始化與資料監聽
     // ----------------------------------------------------
-    // Firebase Config
     const firebaseConfig = {
-      apiKey: "AIzaSyCQK6Ex0zHb13uAKwhvHAH6OFGVBiyodts",
-      authDomain: "pokemon-7bd40.firebaseapp.com",
-      projectId: "pokemon-7bd40",
-      storageBucket: "pokemon-7bd40.firebasestorage.app",
-      messagingSenderId: "641379923525",
-      appId: "1:641379923525:web:fda369e1f7c84d6218552c",
       databaseURL: "https://pokemon-7bd40-default-rtdb.asia-southeast1.firebasedatabase.app"
     };
 
     let database = null;
     try {
-      if (typeof firebase !== 'undefined') {
-        firebase.initializeApp(firebaseConfig);
-        database = firebase.database();
-      }
-    } catch (err) {
-      console.warn("Firebase 載入失敗，切換為離線模式：", err);
+      firebase.initializeApp(firebaseConfig);
+      database = firebase.database();
+    } catch (e) {
+      console.warn("Firebase 初始化失敗，改用離線或 LocalStorage 模式:", e);
     }
 
-    // 📖 預設作業資料庫 (作為 Firebase 為空時的初始種子)
     let homeworkDatabase = {
-      "2026-08-28": [
-        { type: "國語", content: "發下國語課本，請包書套並寫上姓名" },
-        { type: "數學", content: "數學習作第 1、2 頁" },
-        { type: "備忘", content: "交回暑假生活記趣作業與暑假健康聲明書" },
-        { type: "備忘", content: "攜帶開學潔牙用具、餐盒、衛生紙、抹布" }
-      ],
-      "2026-08-31": [
-        { type: "國語", content: "甲本生字第 1~3 頁" },
-        { type: "數學", content: "課本練習一全部 (P.8-P.9)" },
-        { type: "英文", content: "聽讀 Alphabet Song 三遍並請家長簽名" },
-        { type: "備忘", content: "帶直笛（星期二有音樂課）" }
-      ],
-      "2026-09-01": [
-        { type: "國語", content: "練習簿第二課造詞 (六個)" },
-        { type: "數學", content: "數學習作第 3、4 頁" },
-        { type: "備忘", content: "發下視力篩檢通知單，請家長確認並簽字" }
+      '2026-07-02': [
+        { subject: '國語', text: '預習第九課國語課文與生字造詞' },
+        { subject: '數學', text: '完成數學隨堂練習單 P.45 - P.46' },
+        { subject: '備忘', text: '明天攜帶潔牙工具與雨具' }
       ]
     };
 
-    // 📸 預設通知單資料庫
     let noticeDatabase = {};
 
+    function renderHomeworkAndNotices() {
+      const queryDateStr = formatDateKey(today);
+      const hwContainer = document.getElementById('homeworkContainer');
+      const noticeContainer = document.getElementById('noticeContainer');
 
-    // 教師後台密碼驗證 Modal
-    function showAdminPasswordModal() {
-      const modal = document.createElement('div');
-      modal.style.position = 'fixed';
-      modal.style.inset = '0';
-      modal.style.background = 'rgba(15, 23, 42, 0.9)';
-      modal.style.display = 'flex';
-      modal.style.alignItems = 'center';
-      modal.style.justifyContent = 'center';
-      modal.style.zIndex = '999999';
-      modal.style.fontFamily = "'Noto Sans TC', sans-serif";
-
-      modal.innerHTML = `
-        <div style="background: #1e293b; border: 3px solid #818cf8; border-radius: 20px; padding: 30px; width: 320px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); text-align: center; color: white;">
-          <div style="font-size: 2.5rem; margin-bottom: 10px;">🛡️</div>
-          <h3 style="margin-top: 0; color: #818cf8; font-size: 1.3rem; margin-bottom: 10px;">教師管理後台</h3>
-          <p style="font-size: 0.9rem; color: #cbd5e1; margin-bottom: 20px;">請輸入教師密碼以進入管理後台：</p>
-          <input type="password" id="admin-pwd-input" style="width: 100%; padding: 10px; border-radius: 8px; border: 2px solid #475569; background: #0f172a; color: white; text-align: center; font-size: 1.4rem; letter-spacing: 6px; margin-bottom: 20px; box-sizing: border-box; outline: none; font-weight: bold; font-family: inherit;" maxlength="12" autofocus placeholder="••••••" />
-          <div style="display: flex; gap: 10px; justify-content: center;">
-            <button id="admin-pwd-cancel" style="background: #475569; color: white; border: none; padding: 8px 18px; border-radius: 20px; font-weight: bold; cursor: pointer; font-family: inherit;">取消</button>
-            <button id="admin-pwd-confirm" style="background: #818cf8; color: white; border: none; padding: 8px 18px; border-radius: 20px; font-weight: bold; cursor: pointer; font-family: inherit;">進入後台</button>
-          </div>
-          <p id="admin-pwd-error" style="color: #ef4444; font-size: 0.85rem; margin-top: 12px; min-height: 1.2em;"></p>
-        </div>
-      `;
-
-      document.body.appendChild(modal);
-
-      const input = modal.querySelector('#admin-pwd-input');
-      const confirmBtn = modal.querySelector('#admin-pwd-confirm');
-      const cancelBtn = modal.querySelector('#admin-pwd-cancel');
-      const errorMsg = modal.querySelector('#admin-pwd-error');
-
-      setTimeout(() => input.focus(), 100);
-
-      const handleConfirm = () => {
-        if (input.value === 'hctsao') {
-          modal.remove();
-          window.location.href = 'pokemon_admin.html?tab=homework';
-        } else {
-          errorMsg.textContent = '密碼錯誤，請重新輸入！';
-          input.value = '';
-          input.focus();
-        }
-      };
-
-      confirmBtn.onclick = handleConfirm;
-      cancelBtn.onclick = () => modal.remove();
-      input.onkeydown = (e) => {
-        if (e.key === 'Enter') handleConfirm();
-        if (e.key === 'Escape') modal.remove();
-        errorMsg.textContent = '';
-      };
-    }
-
-    // 目前運作時的目標日期物件 (預設為今天真實日期)
-    let currentTargetDate = new Date();
-
-    // 格式化日期字串 (YYYY-MM-DD)
-    function formatDateString(date) {
-      const y = date.getFullYear();
-      const m = String(date.getMonth() + 1).padStart(2, '0');
-      const d = String(date.getDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
-    }
-
-    // 取得星期中文名稱
-    function getChineseDayName(dayIndex) {
-      const weekdays = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
-      return weekdays[dayIndex];
-    }
-
-    // 2026 與 2027 國定假日與連假對照表（連假期間一律沿用連假前最後一個上學日）
-    const HOLIDAY_FALLBACKS = {
-      // 2026 元旦
-      "2026-01-01": "2025-12-31",
-      // 2026 農曆春節 (2/14 - 2/22)
-      "2026-02-14": "2026-02-13",
-      "2026-02-15": "2026-02-13",
-      "2026-02-16": "2026-02-13",
-      "2026-02-17": "2026-02-13",
-      "2026-02-18": "2026-02-13",
-      "2026-02-19": "2026-02-13",
-      "2026-02-20": "2026-02-13",
-      "2026-02-21": "2026-02-13",
-      "2026-02-22": "2026-02-13",
-      // 2026 228連假 (2/27 - 3/1)
-      "2026-02-27": "2026-02-26",
-      "2026-02-28": "2026-02-26",
-      "2026-03-01": "2026-02-26",
-      // 2026 兒童與清明連假 (4/3 - 4/6)
-      "2026-04-03": "2026-04-02",
-      "2026-04-04": "2026-04-02",
-      "2026-04-05": "2026-04-02",
-      "2026-04-06": "2026-04-02",
-      // 2026 端午連假 (6/19 - 6/21)
-      "2026-06-19": "2026-06-18",
-      "2026-06-20": "2026-06-18",
-      "2026-06-21": "2026-06-18",
-      // 2026 中秋與教師節連假 (9/25 - 9/28)
-      "2026-09-25": "2026-09-24",
-      "2026-09-26": "2026-09-24",
-      "2026-09-27": "2026-09-24",
-      "2026-09-28": "2026-09-24",
-      // 2026 國慶連假 (10/9 - 10/11)
-      "2026-10-09": "2026-10-08",
-      "2026-10-10": "2026-10-08",
-      "2026-10-11": "2026-10-08",
-
-      // 2027 元旦連假 (1/1 - 1/3)
-      "2027-01-01": "2026-12-31",
-      "2027-01-02": "2026-12-31",
-      "2027-01-03": "2026-12-31",
-      // 2027 農曆春節 (2/4 - 2/10)
-      "2027-02-04": "2027-02-03",
-      "2027-02-05": "2027-02-03",
-      "2027-02-06": "2027-02-03",
-      "2027-02-07": "2027-02-03",
-      "2027-02-08": "2027-02-03",
-      "2027-02-09": "2027-02-03",
-      "2027-02-10": "2027-02-03",
-      // 2027 228連假 (2/27 - 3/1)
-      "2027-02-27": "2027-02-26",
-      "2027-02-28": "2027-02-26",
-      "2027-03-01": "2027-02-26",
-      // 2027 兒童與清明連假 (4/3 - 4/6)
-      "2027-04-03": "2027-04-02",
-      "2027-04-04": "2027-04-02",
-      "2027-04-05": "2027-04-02",
-      "2027-04-06": "2027-04-02",
-      // 2027 端午節 (單日放假)
-      "2027-06-09": "2027-06-08",
-      // 2027 中秋節 (單日放假)
-      "2027-09-15": "2027-09-14",
-      // 2027 國慶連假 (10/9 - 10/11)
-      "2027-10-09": "2027-10-08",
-      "2027-10-10": "2027-10-08",
-      "2027-10-11": "2027-10-08",
-      // 2027/2028跨年連假 (12/31 - 1/2)
-      "2027-12-31": "2027-12-30"
-    };
-
-    // ----------------------------------------------------
-    // 核心渲染引擎：根據指定的日期更新網頁所有欄位
-    // ----------------------------------------------------
-    function renderContactBook(date) {
-      const year = date.getFullYear();
-      const month = date.getMonth() + 1;
-      const day = date.getDate();
-      const dayName = getChineseDayName(date.getDay());
-      const rocYear = year - 1911; // 計算中華民國紀年
-      
-      // 1. 更新頂部日期顯示板 (僅顯示民國)
-      document.getElementById('dateRoc').textContent = `民國 ${rocYear} 年 ${month} 月 ${day} 日 (${dayName})`;
-      
-      // 2. 判斷今日作業（若假日，一律沿用禮拜五）
-      const dateStr = formatDateString(date);
-      const homeworkContainer = document.getElementById('homeworkContainer');
-      
-      let queryDateStr = dateStr;
-      const dayOfWeek = date.getDay();
-      if (dayOfWeek === 6) { // 星期六 -> 沿用星期五
-        const fri = new Date(date);
-        fri.setDate(date.getDate() - 1);
-        queryDateStr = formatDateString(fri);
-      } else if (dayOfWeek === 0) { // 星期日 -> 沿用星期五
-        const fri = new Date(date);
-        fri.setDate(date.getDate() - 2);
-        queryDateStr = formatDateString(fri);
-      }
-
-      // 國定假日與連續假期自動沿用判定 -> 自動沿用連假前最後一個上學日
-      if (HOLIDAY_FALLBACKS[queryDateStr]) {
-        queryDateStr = HOLIDAY_FALLBACKS[queryDateStr];
-      }
-
-      // 暑假區間判定：115.07.02 (2026-07-02) 到 115.08.27 (2026-08-27)
-      const startDate = new Date("2026-07-02T00:00:00");
-      const endDate = new Date("2026-08-27T23:59:59");
-      
       const todayHomework = homeworkDatabase[queryDateStr];
-      const hasContent = todayHomework && (
-        (typeof todayHomework === 'string' && todayHomework.trim().length > 0) ||
-        (Array.isArray(todayHomework) && todayHomework.length > 0)
-      );
 
-      if (hasContent) {
-        // 渲染作業
-        let html = '';
-        if (typeof todayHomework === 'string') {
-          html = `<div style="white-space: pre-wrap; font-size: 24px; color: var(--text-dark); line-height: 1.8; font-weight: 500; padding: 15px 20px; background: white; border-radius: 14px; border: 1px solid #f1f5f9; word-break: break-all; text-align: left; box-shadow: inset 0 2px 4px rgba(0,0,0,0.01);">${todayHomework}</div>`;
-        } else if (Array.isArray(todayHomework)) {
-          let listHtml = '<ul class="homework-list">';
-          todayHomework.forEach((item, index) => {
-            let tagClass = 'tag-memo';
-            if (item.type === '國語') tagClass = 'tag-chinese';
-            else if (item.type === '數學') tagClass = 'tag-math';
-            else if (item.type === '英語' || item.type === '英文') tagClass = 'tag-english';
-            
-            listHtml += `
-              <li class="homework-item">
-                <span class="subject-tag ${tagClass}">${item.type}</span>
-                <span class="homework-text">${index + 1}. ${item.content}</span>
-              </li>
-            `;
-          });
-          listHtml += '</ul>';
-          html = listHtml;
-        }
-        homeworkContainer.innerHTML = html;
+      if (!todayHomework || todayHomework.length === 0) {
+        hwContainer.innerHTML = `
+          <div class="no-homework-card">
+            <div class="no-homework-icon">
+              <i class="fa-solid fa-umbrella-beach"></i>
+            </div>
+            <div class="no-homework-title">今日無作業</div>
+            <div style="font-size: 0.95rem; color: #d97706; margin-top: 6px; font-weight: 500;">
+              好好享受學習與放鬆的時光喔！
+            </div>
+          </div>
+        `;
       } else {
-        // 今日無作業或被清除，顯示預設文字
-        if (date >= startDate && date <= endDate) {
-          homeworkContainer.innerHTML = `
-            <div class="no-homework-card">
-              <div class="no-homework-icon"><i class="fa-solid fa-umbrella-beach"></i></div>
-              <h3 class="no-homework-title">暑假期間，請記得完成暑假作業</h3>
-            </div>
+        let listHtml = '<ul class="homework-list">';
+        todayHomework.forEach(item => {
+          let tagClass = 'tag-memo';
+          if (item.subject === '國語') tagClass = 'tag-chinese';
+          else if (item.subject === '數學') tagClass = 'tag-math';
+          else if (item.subject === '英文') tagClass = 'tag-english';
+
+          listHtml += `
+            <li class="homework-item">
+              <span class="subject-tag ${tagClass}">${item.subject}</span>
+              <span class="homework-text">${item.text}</span>
+            </li>
           `;
-        } else {
-          homeworkContainer.innerHTML = `
-            <div class="no-homework-card" style="background: radial-gradient(circle at top right, #f0fdf4 0%, #dcfce7 100%); border-color: #bbf7d0;">
-              <div class="no-homework-icon" style="color: #22c55e;"><i class="fa-solid fa-book-open"></i></div>
-              <h3 class="no-homework-title" style="color: #15803d; font-size: 24px;">今日無作業，請記得多閱讀</h3>
-            </div>
-          `;
-        }
+        });
+        listHtml += '</ul>';
+        hwContainer.innerHTML = listHtml;
       }
 
-      // 3. 通知單區塊自動隱藏邏輯（若假日，一律沿用禮拜五）
-      const noticeCard = document.getElementById('noticeCard');
-      const noticeImg = document.getElementById('noticeImg');
-      const noticeImgContainer = document.getElementById('noticeImgContainer');
       const noticeImgSrc = noticeDatabase[queryDateStr];
-      
-      if (noticeImgSrc) {
-        // 當日有通知單：顯示區塊並載入圖片
-        noticeCard.style.display = 'block';
-        noticeImg.src = noticeImgSrc;
-        noticeImgContainer.onclick = function() {
-          openLightbox(noticeImgSrc);
-        };
+      if (!noticeImgSrc) {
+        noticeContainer.innerHTML = `
+          <div style="text-align: center; padding: 20px; color: #94a3b8; font-size: 0.95rem;">
+            <i class="fa-solid fa-folder-open" style="font-size: 2rem; margin-bottom: 8px; color: #cbd5e1; display: block;"></i>
+            今日無特殊聯絡事項或通知單
+          </div>
+        `;
       } else {
-        // 當日沒有通知單：完全隱藏該區塊
-        noticeCard.style.display = 'none';
+        noticeContainer.innerHTML = `
+          <div class="notice-gallery">
+            <div class="notice-image-container" onclick="openImageModal('${noticeImgSrc}')">
+              <img src="${noticeImgSrc}" alt="重要通知單">
+              <div class="image-overlay">
+                <i class="fa-solid fa-magnifying-glass-plus" style="margin-right: 6px;"></i> 點擊放大查看通知單
+              </div>
+            </div>
+          </div>
+        `;
       }
     }
 
-    // ----------------------------------------------------
-    // 圖片燈箱 (Lightbox) 控制邏輯
-    // ----------------------------------------------------
-    function openLightbox(imgSrc) {
-      const modal = document.getElementById('lightboxModal');
-      const modalImg = document.getElementById('lightboxImg');
-      modal.classList.add('show');
-      modalImg.src = imgSrc;
-    }
-
-    // 關閉燈箱
-    function closeLightbox() {
-      const modal = document.getElementById('lightboxModal');
-      modal.classList.remove('show');
-    }
-
-    // 頁面初次載入時自動初始化
-    window.addEventListener('DOMContentLoaded', () => {
-      // 實時監聽 Firebase (確保 DOM 元素皆已就緒後載入資料)
+    function initDataSync() {
       if (database) {
-        // 1. 作業監聽
         database.ref('homeworkDatabase').on('value', (snapshot) => {
           const val = snapshot.val();
           if (val) {
             homeworkDatabase = val;
-            renderContactBook(currentTargetDate);
-          } else {
-            database.ref('homeworkDatabase').set(homeworkDatabase);
+            renderHomeworkAndNotices();
           }
+        }, (error) => {
+          console.warn("無法自 Realtime Database 讀取作業:", error);
+          renderHomeworkAndNotices();
         });
 
-        // 2. 通知單監聽
         database.ref('noticeDatabase').on('value', (snapshot) => {
           const val = snapshot.val();
           if (val) {
             noticeDatabase = val;
-            renderContactBook(currentTargetDate);
-          } else {
-            database.ref('noticeDatabase').set(noticeDatabase);
+            renderHomeworkAndNotices();
           }
+        }, (error) => {
+          console.warn("無法自 Realtime Database 讀取通知單:", error);
+          renderHomeworkAndNotices();
         });
       } else {
-        // 執行初次渲染（使用系統今日時間）
-        renderContactBook(currentTargetDate);
+        renderHomeworkAndNotices();
       }
-    });
+    }
+
+    document.addEventListener('DOMContentLoaded', initDataSync);
   </script>
 </body>
 </html>
