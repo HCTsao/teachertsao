@@ -832,19 +832,40 @@
             if (currentTarget === max) return;
 
             // 3. 生成 2 個錯誤飼料，確保總共 3 個
-            //    優先取 currentTarget 後面的數字；若超過 max，改取前面的數字補充
+            //    當正確答案為整十數（如 150, 160 等）時，誘答選項改為 +10, +20
             const usedVals = new Set([currentTarget]);
             let wrongVals = [];
+            const distractorStep = (currentTarget % 10 === 0) ? 10 : step;
 
             // 先嘗試向後取
-            const next1 = currentTarget + step;
-            const next2 = currentTarget + 2 * step;
+            const next1 = currentTarget + distractorStep;
+            const next2 = currentTarget + 2 * distractorStep;
             if (next1 <= max) { wrongVals.push(next1); usedVals.add(next1); }
             if (next2 <= max && wrongVals.length < 2) { wrongVals.push(next2); usedVals.add(next2); }
 
-            // 若還不足 2 個，往前取數字補充
+            // 若還不足 2 個，往前按 distractorStep 取數字補充
             if (wrongVals.length < 2) {
-                let candidate = currentTarget - step;
+                let candidate = currentTarget - distractorStep;
+                while (wrongVals.length < 2 && candidate >= levelConfig.firstTarget) {
+                    if (!usedVals.has(candidate)) {
+                        wrongVals.push(candidate);
+                        usedVals.add(candidate);
+                    }
+                    candidate -= distractorStep;
+                }
+            }
+
+            // 若仍然不足 2 個，按原 step 往後/往前補充
+            if (wrongVals.length < 2) {
+                let candidate = currentTarget + step;
+                while (wrongVals.length < 2 && candidate <= max) {
+                    if (!usedVals.has(candidate)) {
+                        wrongVals.push(candidate);
+                        usedVals.add(candidate);
+                    }
+                    candidate += step;
+                }
+                candidate = currentTarget - step;
                 while (wrongVals.length < 2 && candidate >= levelConfig.firstTarget) {
                     if (!usedVals.has(candidate)) {
                         wrongVals.push(candidate);
