@@ -384,10 +384,51 @@
             display: none;
         }
 
+        /* 速度選擇器樣式 */
+        .speed-select-group {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin: 6px 0 10px 0;
+            flex-wrap: wrap;
+        }
+        .speed-label {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-color);
+        }
+        .speed-btn {
+            background: #ffffff;
+            border: 2px solid var(--border-color);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-color);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+        }
+        .speed-btn:hover {
+            border-color: var(--primary-btn);
+            transform: translateY(-1px);
+        }
+        .speed-btn.active {
+            background-color: var(--primary-btn);
+            color: #ffffff;
+            border-color: var(--primary-btn);
+            box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3);
+        }
+
         /* 行動裝置隱藏鍵盤提示與優化版面 */
         @media (max-width: 600px) {
             .keyboard-tips {
                 display: none;
+            }
+            .speed-btn {
+                padding: 4px 10px !important;
+                font-size: 0.85rem !important;
             }
             .level-select-grid {
                 grid-template-columns: repeat(2, 1fr) !important;
@@ -470,6 +511,15 @@
             <div class="overlay active" id="startOverlay">
                 <div class="overlay-content">
                     <h2 style="color: var(--text-color); margin-bottom: 8px; font-size: 2.2rem;">數字貪食蛇</h2>
+                    
+                    <!-- 速度選擇調節鈕 -->
+                    <div class="speed-select-group">
+                        <span class="speed-label">遊戲速度：</span>
+                        <button class="speed-btn" data-speed="0.5">簡單</button>
+                        <button class="speed-btn" data-speed="0.75">一般</button>
+                        <button class="speed-btn active" data-speed="1.0">困難</button>
+                    </div>
+
                     <p style="margin-bottom: 12px; font-size: 1.1rem; color: var(--text-muted);">請點擊選擇關卡開始挑戰：</p>
                     <div class="level-select-grid" id="levelSelectGrid">
                         <!-- 關卡按鈕將由 JS 動態生成 -->
@@ -724,7 +774,9 @@
         let particles = [];    // 備用
         let gameInterval = null;
         let isGameRunning = false;
-        let speed = 200;       // 移動速度（毫秒）
+        let selectedSpeedFactor = 1.0;   // 速度係數：簡單 0.5, 一般 0.75, 困難 1.0
+        const BASE_SPEED_INTERVAL = 200; // 困難模式基準移動間隔（毫秒）
+        let speed = BASE_SPEED_INTERVAL; // 移動速度（毫秒）
 
         // 監聽視窗縮放以確保 Canvas 的高解析度繪製
         function resizeCanvas() {
@@ -1345,6 +1397,9 @@
             generateFeeds();
             isGameRunning = true;
 
+            // 依據選擇的速度係數計算移動間隔 milliseconds
+            speed = Math.round(BASE_SPEED_INTERVAL / selectedSpeedFactor);
+
             // 啟動主迴圈
             if (gameInterval) clearInterval(gameInterval);
             gameInterval = setInterval(() => {
@@ -1413,6 +1468,15 @@
         // 音量滑桿事件 - 直接控制 utter.volume
         document.getElementById('volumeSlider').addEventListener('input', function() {
             speechVolume = parseFloat(this.value);
+        });
+
+        // 速度選擇鈕事件綁定
+        document.querySelectorAll('.speed-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                selectedSpeedFactor = parseFloat(this.getAttribute('data-speed'));
+            });
         });
 
         // 初始化
