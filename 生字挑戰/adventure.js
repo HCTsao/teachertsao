@@ -639,6 +639,11 @@ function gradeStudentMark(name, resultType) {
   const overlay = document.getElementById(`tcMarkOverlay_${name}`);
   const symbol = document.getElementById(`tcMarkSymbol_${name}`);
 
+  if (overlay) {
+    overlay.classList.remove('active');
+    void overlay.offsetWidth; // 觸發 DOM 重繪以重新播放動畫
+  }
+
   if (resultType === 'CIRCLE') {
     playSound('fanfare');
     if (symbol) {
