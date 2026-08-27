@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini 融入國小數學教學與互動教具實作 - 研習簡報</title>
+  <link rel="stylesheet" href="workshop_style.css">
+  <script src="workshop_data.js"></script>
+</head>
+<body>
+
+  <div class="presentation-container">
+    <!-- 頂部進度條 -->
+    <div class="progress-bar-container">
+      <div class="progress-bar-fill" id="progress-fill"></div>
+    </div>
+
+    <!-- 頂部導覽工具列 -->
+    <header class="pres-header">
+      <div class="brand-title">
+        <span>🤖</span>
+        <span id="header-title">Gemini 國小數學教具研習</span>
+        <span class="brand-badge" id="header-badge">3節課 / 180 mins</span>
+      </div>
+
+      <div class="pres-header-actions">
+        <!-- 倒數計時器 -->
+        <div class="timer-badge" id="timer-display" title="點擊暫停/繼續計時">
+          <span>⏱️ 研習計時:</span>
+          <span id="timer-time">03:00:00</span>
+        </div>
+
+        <button class="btn-ctrl" onclick="toggleOverview()" title="快捷鍵 O">📜 總覽 (O)</button>
+        <button class="btn-ctrl" onclick="toggleNotes()" title="快捷鍵 N">📝 備忘錄 (N)</button>
+        <button class="btn-ctrl" onclick="toggleFullScreen()" title="快捷鍵 F">🖥️ 全螢幕 (F)</button>
+        <a href="研習簡報後台.html" class="btn-ctrl" style="background: linear-gradient(135deg, var(--primary), var(--accent-cyan)); color: white;">⚙️ 管理後台</a>
+      </div>
+    </header>
+
+    <!-- 投影片展示區域 -->
+    <main class="slide-stage">
+      <div class="slide-wrapper" id="slide-card">
+        <div class="slide-header">
+          <div class="slide-section-tag" id="slide-section">研習封面</div>
+          <h1 class="slide-title" id="slide-title">Gemini 融入國小數學教學與互動教具實作</h1>
+          <div class="slide-subtitle" id="slide-subtitle">3 小時 (180分鐘) 教師專業成長研習</div>
+        </div>
+
+        <div class="slide-body" id="slide-content">
+          <!-- 動態載入 content -->
+        </div>
+      </div>
+    </main>
+
+    <!-- 底部控制導覽列 -->
+    <footer class="pres-footer">
+      <div class="slide-counter" id="slide-counter">
+        <span id="current-slide-num">1</span> / <span id="total-slides-num">10</span>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn-ctrl" id="btn-prev" onclick="prevSlide()">← 上一頁 (Left)</button>
+        <button class="btn-ctrl" id="btn-next" onclick="nextSlide()">下一頁 (Right / Space) →</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Toast 提示視窗 -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- 講師備忘錄 Popup -->
+  <div class="notes-drawer" id="notes-drawer">
+    <div class="notes-title">📝 講師備忘錄 (Speaker Notes)</div>
+    <div class="notes-body" id="notes-content">無備忘錄內容</div>
+  </div>
+
+  <!-- 投影片九宮格總覽 Modal -->
+  <div class="modal-overlay" id="overview-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">📜 投影片總覽 (Overview)</div>
+        <button class="btn-close" onclick="toggleOverview()">✕</button>
+      </div>
+      <div class="overview-grid" id="overview-grid">
+        <!-- 動態渲染 Overview Items -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let workshopData = getWorkshopData();
+    let slides = workshopData.slides || [];
+    let currentIndex = 0;
+
+    // 研習計時器 (3 小時 = 180 分鐘)
+    let totalSeconds = (workshopData.meta.duration || 180) * 60;
+    let timerInterval = null;
+    let isTimerRunning = false;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // 初始化標題
+      document.getElementById('header-title').textContent = workshopData.meta.title;
+      document.getElementById('total-slides-num').textContent = slides.length;
+
+      // 渲染初始投影片
+      renderSlide(currentIndex);
+      startTimer();
+
+      // 綁定鍵盤事件
+      document.addEventListener('keydown', handleKeyDown);
+    });
+
+    // 渲染特定投影片
+    function renderSlide(index) {
+      if (index < 0 || index >= slides.length) return;
+      currentIndex = index;
+      const slide = slides[currentIndex];
+
+      // 觸發重新繪製動畫
+      const card = document.getElementById('slide-card');
+      card.style.animation = 'none';
+      card.offsetHeight; // trigger reflow
+      card.style.animation = 'slideFadeIn 0.4s ease-out';
+
+      // 填入內容
+      document.getElementById('slide-section').textContent = slide.section || `第 ${currentIndex + 1} 頁`;
+      document.getElementById('slide-title').textContent = slide.title || '';
+      document.getElementById('slide-subtitle').textContent = slide.subtitle || '';
+      document.getElementById('slide-content').innerHTML = slide.content || '';
+      document.getElementById('notes-content').textContent = slide.notes || '無備忘錄內容';
+
+      // 更新頁碼與進度條
+      document.getElementById('current-slide-num').textContent = currentIndex + 1;
+      const progressPercent = ((currentIndex + 1) / slides.length) * 100;
+      document.getElementById('progress-fill').style.width = `${progressPercent}%`;
+
+      // 按鈕狀態
+      document.getElementById('btn-prev').disabled = (currentIndex === 0);
+      document.getElementById('btn-next').disabled = (currentIndex === slides.length - 1);
+    }
+
+    function nextSlide() {
+      if (currentIndex < slides.length - 1) {
+        renderSlide(currentIndex + 1);
+      }
+    }
+
+    function prevSlide() {
+      if (currentIndex > 0) {
+        renderSlide(currentIndex - 1);
+      }
+    }
+
+    function restartPresentation() {
+      renderSlide(0);
+    }
+
+    // 快捷鍵監聽
+    function handleKeyDown(e) {
+      // 若有開啟 Modal 則 Escape 關閉
+      if (e.key === 'Escape') {
+        closeOverview();
+        closeNotes();
+        return;
+      }
+
+      // 常規翻頁
+      if (e.key === 'ArrowRight' || e.key === 'Space' || e.key === 'PageDown') {
+        e.preventDefault();
+        nextSlide();
+      } else if (e.key === 'ArrowLeft' || e.key === 'Backspace' || e.key === 'PageUp') {
+        e.preventDefault();
+        prevSlide();
+      } else if (e.key === 'f' || e.key === 'F') {
+        toggleFullScreen();
+      } else if (e.key === 'o' || e.key === 'O') {
+        toggleOverview();
+      } else if (e.key === 'n' || e.key === 'N') {
+        toggleNotes();
+      }
+    }
+
+    // 複製 Prompt 模組
+    function copyPromptFromSlide(slideId) {
+      const slide = slides.find(s => s.id === slideId) || slides[currentIndex];
+      let textToCopy = slide.promptText || '';
+
+      if (!textToCopy) {
+        const promptElem = document.getElementById(`prompt-code-${slideId}`);
+        if (promptElem) textToCopy = promptElem.textContent;
+      }
+
+      if (textToCopy) {
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          showToast('✅ 提示詞 (Prompt) 已成功複製到剪貼簿！');
+        }).catch(err => {
+          showToast('❌ 複製失敗，請手動選取文字複製。');
+        });
+      }
+    }
+
+    // Toast 通知
+    function showToast(msg) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.textContent = msg;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.4s ease';
+        setTimeout(() => toast.remove(), 400);
+      }, 2500);
+    }
+
+    // 投影片總覽 Modal
+    function toggleOverview() {
+      const modal = document.getElementById('overview-modal');
+      if (modal.classList.contains('active')) {
+        closeOverview();
+      } else {
+        renderOverviewGrid();
+        modal.classList.add('active');
+      }
+    }
+
+    function closeOverview() {
+      document.getElementById('overview-modal').classList.remove('active');
+    }
+
+    function renderOverviewGrid() {
+      const grid = document.getElementById('overview-grid');
+      grid.innerHTML = '';
+
+      slides.forEach((slide, idx) => {
+        const item = document.createElement('div');
+        item.className = `overview-item ${idx === currentIndex ? 'active' : ''}`;
+        item.onclick = () => {
+          renderSlide(idx);
+          closeOverview();
+        };
+
+        item.innerHTML = `
+          <div class="overview-num">P.${idx + 1} ‧ ${slide.section || ''}</div>
+          <div class="overview-item-title">${slide.title}</div>
+        `;
+        grid.appendChild(item);
+      });
+    }
+
+    // 備忘錄 Drawer
+    function toggleNotes() {
+      const drawer = document.getElementById('notes-drawer');
+      drawer.classList.toggle('active');
+    }
+
+    function closeNotes() {
+      document.getElementById('notes-drawer').classList.remove('active');
+    }
+
+    // 全螢幕切換
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.error(err);
+        });
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    // 研習倒數計時器
+    function startTimer() {
+      if (timerInterval) clearInterval(timerInterval);
+      isTimerRunning = true;
+      updateTimerDisplay();
+
+      timerInterval = setInterval(() => {
+        if (isTimerRunning && totalSeconds > 0) {
+          totalSeconds--;
+          updateTimerDisplay();
+        }
+      }, 1000);
+
+      document.getElementById('timer-display').onclick = () => {
+        isTimerRunning = !isTimerRunning;
+        showToast(isTimerRunning ? '▶️ 計時器已恢復' : '⏸️ 計時器已暫停');
+      };
+    }
+
+    function updateTimerDisplay() {
+      const hrs = Math.floor(totalSeconds / 3600);
+      const mins = Math.floor((totalSeconds % 3600) / 60);
+      const secs = totalSeconds % 60;
+      
+      const pad = n => n.toString().padStart(2, '0');
+      document.getElementById('timer-time').textContent = `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+    }
+  </script>
+</body>
+</html>

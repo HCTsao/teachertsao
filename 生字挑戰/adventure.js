@@ -1,6 +1,6 @@
 // 「一字千金」電視節目聽寫大賽 核心 JS (節目主播掀牌語音：「正確答案揭曉，恭喜xx、xx寫對了！」)
 
-const STUDENT_NAMES = ['洪福', '廷恩', '岳泰'];
+const STUDENT_NAMES = ['洪福', '廷恩', '岳泰', '冠宏'];
 
 // 全域狀態
 let userRole = '';
@@ -25,20 +25,23 @@ let connectedSet = new Set();
 let studentScores = {
   '洪福': 0,
   '廷恩': 0,
-  '岳泰': 0
+  '岳泰': 0,
+  '冠宏': 0
 };
 
 // 參賽者鎖定、畫布圖片與筆跡 coordinates 數據
 let contestantState = {
   '洪福': { isLocked: false, imgData: null, strokeData: [] },
   '廷恩': { isLocked: false, imgData: null, strokeData: [] },
-  '岳泰': { isLocked: false, imgData: null, strokeData: [] }
+  '岳泰': { isLocked: false, imgData: null, strokeData: [] },
+  '冠宏': { isLocked: false, imgData: null, strokeData: [] }
 };
 
 let currentMarks = {
   '洪福': null,
   '廷恩': null,
-  '岳泰': null
+  '岳泰': null,
+  '冠宏': null
 };
 
 // 參賽者目前繪製中的筆劃數據
@@ -161,7 +164,8 @@ function resetStudentScores() {
   studentScores = {
     '洪福': 0,
     '廷恩': 0,
-    '岳泰': 0
+    '岳泰': 0,
+    '冠宏': 0
   };
   saveScores();
   
@@ -374,11 +378,12 @@ function loadTeacherQuestion(lIdx, wIdx) {
   selectedLessonIdx = lIdx;
   selectedWordIdx = wIdx;
 
-  currentMarks = { '洪福': null, '廷恩': null, '岳泰': null };
+  currentMarks = { '洪福': null, '廷恩': null, '岳泰': null, '冠宏': null };
   contestantState = {
     '洪福': { isLocked: false, imgData: null, strokeData: [] },
     '廷恩': { isLocked: false, imgData: null, strokeData: [] },
-    '岳泰': { isLocked: false, imgData: null, strokeData: [] }
+    '岳泰': { isLocked: false, imgData: null, strokeData: [] },
+    '冠宏': { isLocked: false, imgData: null, strokeData: [] }
   };
 
   document.getElementById('teacherQuestionHeader').innerText = `${lesson.vol} ${lesson.lesson} （第 ${wIdx+1} / ${shuffledWords.length} 題）`;
@@ -648,7 +653,7 @@ function renderDynamicContestantsGrid() {
       <div style="text-align:center; padding: 40px; background: #020617; border: 2px dashed var(--card-border); border-radius: 20px; color: var(--text-muted);">
         <div style="font-size:3rem; margin-bottom:12px;">📡</div>
         <h3>等待參賽者輸入房間代碼加入...</h3>
-        <p style="margin-top:6px;">請參賽學生（洪福、廷恩、岳泰）在裝置上輸入代碼 <strong>${roomCode || '8888'}</strong> 加入比賽</p>
+        <p style="margin-top:6px;">請參賽學生（${STUDENT_NAMES.join('、')}）在裝置上輸入代碼 <strong>${roomCode || '8888'}</strong> 加入比賽</p>
       </div>
     `;
     updateScoreboardUI();

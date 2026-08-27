@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini 國小數學教具研習 - 簡報文字管理後台</title>
+  <link rel="stylesheet" href="workshop_style.css">
+  <script src="workshop_data.js"></script>
+</head>
+<body>
+
+  <div class="admin-layout">
+    <!-- 後台頂部列 -->
+    <header class="admin-header">
+      <div class="brand-title">
+        <span>⚙️</span>
+        <span>研習簡報文字管理後台</span>
+        <span class="brand-badge" id="admin-status">即時同步中</span>
+      </div>
+
+      <div class="pres-header-actions">
+        <button class="btn-ctrl" style="background: var(--accent-emerald); color: white;" onclick="saveChanges()">💾 儲存修改</button>
+        <a href="研習簡報.html" target="_blank" class="btn-ctrl">▶️ 開啟簡報前台</a>
+        <button class="btn-ctrl" onclick="exportJSON()">📥 匯出 JSON 備份</button>
+        <button class="btn-ctrl" onclick="triggerImport()">📤 匯入 JSON</button>
+        <input type="file" id="json-file-input" style="display: none;" accept=".json" onchange="importJSON(event)">
+        <button class="btn-ctrl" style="background: rgba(239, 68, 68, 0.2); color: #f87171;" onclick="resetToDefault()">🔄 重置預設大綱</button>
+      </div>
+    </header>
+
+    <!-- 主內容三欄區域 -->
+    <div class="admin-body">
+      
+      <!-- 左側：投影片清單 -->
+      <aside class="admin-sidebar">
+        <div class="sidebar-header">
+          <strong>投影片列表 (<span id="slide-count-badge">0</span>)</strong>
+          <button class="btn-ctrl" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="addNewSlide()">➕ 新增</button>
+        </div>
+
+        <div class="slide-list" id="slide-list-container">
+          <!-- 動態載入 Slide List -->
+        </div>
+      </aside>
+
+      <!-- 中間：詳細內容編輯表單 -->
+      <main class="admin-editor">
+        <div class="form-group">
+          <label>章節/主題標籤 (Section Tag)</label>
+          <input type="text" class="form-control" id="edit-section" placeholder="例如：第 1 節：教具選型" oninput="updateLivePreview()">
+        </div>
+
+        <div class="form-group">
+          <label>投影片標題 (Slide Title)</label>
+          <input type="text" class="form-control" id="edit-title" placeholder="請輸入標題" oninput="updateLivePreview()">
+        </div>
+
+        <div class="form-group">
+          <label>副標題 / 說明 (Subtitle)</label>
+          <input type="text" class="form-control" id="edit-subtitle" placeholder="請輸入副標題" oninput="updateLivePreview()">
+        </div>
+
+        <div class="form-group">
+          <label>主要內容 (HTML / 內文排版)</label>
+          <textarea class="form-control" id="edit-content" placeholder="支援 HTML 標籤排版..." oninput="updateLivePreview()"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Prompt 萬用提示詞 (若為 Prompt 實作頁面)</label>
+          <textarea class="form-control" id="edit-prompt" style="min-height: 90px; font-family: monospace;" placeholder="輸入學員複製用的 Prompt 內文..." oninput="updateLivePreview()"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>講師備忘錄 (Speaker Notes)</label>
+          <textarea class="form-control" id="edit-notes" style="min-height: 70px;" placeholder="寫給講師的口述重點或引導提醒..." oninput="updateLivePreview()"></textarea>
+        </div>
+      </main>
+
+      <!-- 右側：Live Preview 擬真預覽 -->
+      <aside class="admin-preview">
+        <div class="preview-header">
+          <span>👁️ 擬真實時預覽 (Live Preview)</span>
+        </div>
+        <div class="preview-screen">
+          <div class="slide-header">
+            <div class="slide-section-tag" id="pv-section">章節標籤</div>
+            <h2 class="slide-title" id="pv-title" style="font-size: 1.6rem;">投影片標題</h2>
+            <div class="slide-subtitle" id="pv-subtitle" style="font-size: 1rem;">副標題與說明</div>
+          </div>
+          <div class="slide-body" id="pv-content">
+            內文預覽區
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </div>
+
+  <!-- Toast 提示 -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script>
+    let workshopData = getWorkshopData();
+    let slides = workshopData.slides || [];
+    let activeIndex = 0;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderSlideList();
+      selectSlide(0);
+    });
+
+    // 渲染左側 Slide 列表
+    function renderSlideList() {
+      const container = document.getElementById('slide-list-container');
+      container.innerHTML = '';
+      document.getElementById('slide-count-badge').textContent = slides.length;
+
+      slides.forEach((slide, idx) => {
+        const item = document.createElement('div');
+        item.className = `slide-list-item ${idx === activeIndex ? 'active' : ''}`;
+        item.onclick = () => selectSlide(idx);
+
+        item.innerHTML = `
+          <div class="slide-list-info">
+            <span class="slide-list-num">P.${idx + 1} ‧ ${slide.section || '未分類'}</span>
+            <span class="slide-list-title">${slide.title || '無標題'}</span>
+          </div>
+          <div class="slide-item-actions">
+            <button class="btn-icon" title="上移" onclick="moveSlide(event, ${idx}, -1)">▲</button>
+            <button class="btn-icon" title="下移" onclick="moveSlide(event, ${idx}, 1)">▼</button>
+            <button class="btn-icon" title="複製" onclick="duplicateSlide(event, ${idx})">📋</button>
+            <button class="btn-icon" title="刪除" style="color: #f87171;" onclick="deleteSlide(event, ${idx})">🗑️</button>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    // 選取特定 Slide 並載入編輯器
+    function selectSlide(index) {
+      if (index < 0 || index >= slides.length) return;
+      activeIndex = index;
+      const slide = slides[activeIndex];
+
+      document.getElementById('edit-section').value = slide.section || '';
+      document.getElementById('edit-title').value = slide.title || '';
+      document.getElementById('edit-subtitle').value = slide.subtitle || '';
+      document.getElementById('edit-content').value = slide.content || '';
+      document.getElementById('edit-prompt').value = slide.promptText || '';
+      document.getElementById('edit-notes').value = slide.notes || '';
+
+      renderSlideList();
+      updateLivePreview();
+    }
+
+    // 更新右側 Live Preview 畫面
+    function updateLivePreview() {
+      if (activeIndex < 0 || activeIndex >= slides.length) return;
+
+      const section = document.getElementById('edit-section').value;
+      const title = document.getElementById('edit-title').value;
+      const subtitle = document.getElementById('edit-subtitle').value;
+      const content = document.getElementById('edit-content').value;
+      const promptText = document.getElementById('edit-prompt').value;
+      const notes = document.getElementById('edit-notes').value;
+
+      // 同步到記憶體中的 active slide
+      slides[activeIndex].section = section;
+      slides[activeIndex].title = title;
+      slides[activeIndex].subtitle = subtitle;
+      slides[activeIndex].content = content;
+      slides[activeIndex].promptText = promptText;
+      slides[activeIndex].notes = notes;
+
+      // 即時更新 Preview 畫面
+      document.getElementById('pv-section').textContent = section || `P.${activeIndex + 1}`;
+      document.getElementById('pv-title').textContent = title || '（無標題）';
+      document.getElementById('pv-subtitle').textContent = subtitle || '';
+      document.getElementById('pv-content').innerHTML = content || '';
+    }
+
+    // 儲存變更至 LocalStorage
+    function saveChanges() {
+      updateLivePreview();
+      workshopData.slides = slides;
+      if (saveWorkshopData(workshopData)) {
+        showToast('✅ 簡報文字內容已成功儲存！前台簡報將同步更新。');
+      } else {
+        showToast('❌ 儲存失敗，請檢查瀏覽器設定。');
+      }
+    }
+
+    // 新增 Slide
+    function addNewSlide() {
+      const newSlide = {
+        id: "slide-" + Date.now(),
+        section: "自訂章節",
+        title: "新投影片主題",
+        subtitle: "點擊編輯器修改內文說明",
+        content: "<p>請在編輯器中輸入主要內容...</p>",
+        notes: ""
+      };
+      slides.push(newSlide);
+      saveChanges();
+      selectSlide(slides.length - 1);
+      showToast('➕ 已新增一頁投影片');
+    }
+
+    // 複製 Slide
+    function duplicateSlide(e, idx) {
+      e.stopPropagation();
+      const target = slides[idx];
+      const copied = JSON.parse(JSON.stringify(target));
+      copied.id = "slide-" + Date.now();
+      copied.title += " (副本)";
+      slides.splice(idx + 1, 0, copied);
+      saveChanges();
+      selectSlide(idx + 1);
+      showToast('📋 已成功複製投影片');
+    }
+
+    // 刪除 Slide
+    function deleteSlide(e, idx) {
+      e.stopPropagation();
+      if (slides.length <= 1) {
+        showToast('⚠️ 至少需保留一頁投影片！');
+        return;
+      }
+      if (confirm(`確定要刪除第 ${idx + 1} 頁「${slides[idx].title}」嗎？`)) {
+        slides.splice(idx, 1);
+        saveChanges();
+        selectSlide(Math.max(0, idx - 1));
+        showToast('🗑️ 投影片已刪除');
+      }
+    }
+
+    // 上移 / 下移 Slide 順序
+    function moveSlide(e, idx, direction) {
+      e.stopPropagation();
+      const targetIdx = idx + direction;
+      if (targetIdx < 0 || targetIdx >= slides.length) return;
+
+      const temp = slides[idx];
+      slides[idx] = slides[targetIdx];
+      slides[targetIdx] = temp;
+
+      saveChanges();
+      selectSlide(targetIdx);
+    }
+
+    // 匯出 JSON 備份檔
+    function exportJSON() {
+      saveChanges();
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(workshopData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `gemini_workshop_slides_${Date.now()}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('📥 備份 JSON 已匯出下載！');
+    }
+
+    // 觸發檔案選擇
+    function triggerImport() {
+      document.getElementById('json-file-input').click();
+    }
+
+    // 匯入 JSON 檔
+    function importJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const importedData = JSON.parse(e.target.result);
+          if (importedData && importedData.slides) {
+            workshopData = importedData;
+            slides = importedData.slides;
+            saveWorkshopData(workshopData);
+            renderSlideList();
+            selectSlide(0);
+            showToast('📤 JSON 資料已成功匯入載入！');
+          } else {
+            showToast('❌ JSON 格式不符，找不到 slides 陣列。');
+          }
+        } catch (err) {
+          showToast('❌ 讀取 JSON 失敗，請確認檔案內容。');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // 重置為預設大綱
+    function resetToDefault() {
+      if (confirm("⚠️ 警告：這將會清除所有您修改過的投影片文字，復原為初始研習大綱。確定繼續嗎？")) {
+        workshopData = resetWorkshopData();
+        slides = workshopData.slides;
+        renderSlideList();
+        selectSlide(0);
+        showToast('🔄 已重置為預設研習大綱與內容！');
+      }
+    }
+
+    // Toast 提示
+    function showToast(msg) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.textContent = msg;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.4s ease';
+        setTimeout(() => toast.remove(), 400);
+      }, 2500);
+    }
+  </script>
+</body>
+</html>

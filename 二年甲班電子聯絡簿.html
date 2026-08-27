@@ -141,20 +141,55 @@
       border: 1px solid rgba(3, 105, 161, 0.15);
     }
 
-    /* 日期顯示區 */
+    /* 日期顯示區 (點擊月曆選單) */
     .date-badge-container {
-      background: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 100%);
+      background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%);
       color: white;
       border-radius: 16px;
-      padding: 12px;
+      padding: 14px 16px;
       box-shadow: var(--shadow-md);
       margin-bottom: 8px;
+      position: relative;
+      cursor: pointer;
+      overflow: hidden;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .date-badge-container:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px -3px rgba(2, 132, 199, 0.4);
+    }
+
+    .date-badge-container input[type="date"] {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+      z-index: 10;
     }
 
     .date-roc {
       font-size: 1.25rem;
       font-weight: 700;
       letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .date-picker-hint {
+      font-size: 0.82rem;
+      opacity: 0.95;
+      margin-top: 4px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      color: #f0f9ff;
     }
 
     .section-title {
@@ -249,6 +284,7 @@
     .tag-math { background-color: var(--color-math); }
     .tag-english { background-color: var(--color-english); }
     .tag-memo { background-color: var(--color-memo); }
+    .tag-notice { background-color: #8b5cf6; }
 
     .homework-text {
       font-size: 24px;
@@ -264,8 +300,8 @@
 
     .notice-gallery {
       display: grid;
-      grid-template-columns: 1fr;
-      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
       margin-top: 10px;
     }
 
@@ -410,9 +446,17 @@
       </h1>
       <div class="teacher-badge">導師：曹泓棋</div>
       
-      <!-- 日期顯示看板 -->
-      <div class="date-badge-container">
-        <div class="date-roc" id="dateRoc">民國 115 年 7 月 2 日 (星期四)</div>
+      <!-- 日期顯示看板 (點擊選取月曆切換日期) -->
+      <div class="date-badge-container" onclick="triggerDatePicker()" title="點擊開啟月曆選單調整日期">
+        <input type="date" id="hiddenDatePicker" onchange="onDateInputChange(this.value)" onclick="event.stopPropagation()">
+        <div class="date-roc">
+          <i class="fa-regular fa-calendar-days" style="margin-right: 8px;"></i>
+          <span id="dateRoc">民國 115 年 8 月 31 日 (星期一)</span>
+          <i class="fa-solid fa-chevron-down" style="font-size: 0.85em; margin-left: 8px; opacity: 0.85;"></i>
+        </div>
+        <div class="date-picker-hint">
+          <i class="fa-solid fa-hand-pointer"></i> 點擊選取月曆切換日期
+        </div>
       </div>
       
       <!-- 要求: 點擊 ｢一字千金｣ 頁籤直接打開獨立新視窗頁面 -->
@@ -496,9 +540,58 @@
       return `${year}-${month}-${day}`;
     }
 
-    // 初始化顯示今日日期
-    const today = new Date();
+    // 初始化顯示今日日期 (支援 URL ?date=YYYY-MM-DD，預設載入 2026-08-31 開學日)
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramDate = urlParams.get('date');
+    let today = new Date();
+
+    if (paramDate) {
+      const parts = paramDate.split('-');
+      if (parts.length === 3) {
+        today = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      }
+    } else {
+      const targetDefault = new Date(2026, 7, 31);
+      if (today < targetDefault || today.getFullYear() < 2026) {
+        today = targetDefault;
+      }
+    }
+
+    // 主動觸發月曆選單
+    function triggerDatePicker() {
+      const picker = document.getElementById('hiddenDatePicker');
+      if (picker) {
+        try {
+          if (typeof picker.showPicker === 'function') {
+            picker.showPicker();
+          } else {
+            picker.focus();
+            picker.click();
+          }
+        } catch (err) {
+          picker.focus();
+          picker.click();
+        }
+      }
+    }
+
+    // 當月曆選擇日期改變時觸發
+    function onDateInputChange(val) {
+      if (!val) return;
+      const parts = val.split('-');
+      if (parts.length === 3) {
+        today = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        document.getElementById('dateRoc').innerText = formatRocDate(today);
+        renderHomeworkAndNotices();
+      }
+    }
+
+    // 初始化設定看板日期與隱藏 datepicker 之 value
     document.getElementById('dateRoc').innerText = formatRocDate(today);
+    const initialPicker = document.getElementById('hiddenDatePicker');
+    if (initialPicker) {
+      initialPicker.value = formatDateKey(today);
+    }
 
     // 圖片燈箱操作機制
     function openImageModal(imgSrc) {
@@ -560,14 +653,27 @@
     }
 
     let homeworkDatabase = {
-      '2026-07-02': [
-        { subject: '國語', text: '預習第九課國語課文與生字造詞' },
-        { subject: '數學', text: '完成數學隨堂練習單 P.45 - P.46' },
-        { subject: '備忘', text: '明天攜帶潔牙工具與雨具' }
+      '2026-08-31': [
+        { subject: '國語', type: '國語', text: '第一冊L1~L6造詞x2', content: '第一冊L1~L6造詞x2' },
+        { subject: '數學', type: '數學', text: '8題', content: '8題' },
+        { subject: '通知', type: '通知', text: '交通知單2張', content: '交通知單2張' }
       ]
     };
 
-    let noticeDatabase = {};
+    let noticeDatabase = {
+      '2026-08-31': [
+        {
+          title: '顧齒專車回條',
+          src: 'notices/S__120537197.jpg',
+          note: '回條不用撕下來'
+        },
+        {
+          title: '緊急聯絡卡',
+          src: 'notices/S__120537198.jpg',
+          note: '填寫二年級的欄位即可'
+        }
+      ]
+    };
 
     function renderHomeworkAndNotices() {
       const queryDateStr = formatDateKey(today);
@@ -591,15 +697,19 @@
       } else {
         let listHtml = '<ul class="homework-list">';
         todayHomework.forEach(item => {
+          const subj = item.subject || item.type || '備忘';
+          const text = item.text || item.content || '';
+
           let tagClass = 'tag-memo';
-          if (item.subject === '國語') tagClass = 'tag-chinese';
-          else if (item.subject === '數學') tagClass = 'tag-math';
-          else if (item.subject === '英文') tagClass = 'tag-english';
+          if (subj.includes('國')) tagClass = 'tag-chinese';
+          else if (subj.includes('數')) tagClass = 'tag-math';
+          else if (subj.includes('英')) tagClass = 'tag-english';
+          else if (subj.includes('通')) tagClass = 'tag-notice';
 
           listHtml += `
             <li class="homework-item">
-              <span class="subject-tag ${tagClass}">${item.subject}</span>
-              <span class="homework-text">${item.text}</span>
+              <span class="subject-tag ${tagClass}">${subj}</span>
+              <span class="homework-text">${text}</span>
             </li>
           `;
         });
@@ -607,8 +717,8 @@
         hwContainer.innerHTML = listHtml;
       }
 
-      const noticeImgSrc = noticeDatabase[queryDateStr];
-      if (!noticeImgSrc) {
+      const noticeData = noticeDatabase[queryDateStr];
+      if (!noticeData || (Array.isArray(noticeData) && noticeData.length === 0)) {
         noticeContainer.innerHTML = `
           <div style="text-align: center; padding: 20px; color: #94a3b8; font-size: 0.95rem;">
             <i class="fa-solid fa-folder-open" style="font-size: 2rem; margin-bottom: 8px; color: #cbd5e1; display: block;"></i>
@@ -616,16 +726,30 @@
           </div>
         `;
       } else {
-        noticeContainer.innerHTML = `
-          <div class="notice-gallery">
-            <div class="notice-image-container" onclick="openImageModal('${noticeImgSrc}')">
-              <img src="${noticeImgSrc}" alt="重要通知單">
-              <div class="image-overlay">
-                <i class="fa-solid fa-magnifying-glass-plus" style="margin-right: 6px;"></i> 點擊放大查看通知單
+        const items = Array.isArray(noticeData) ? noticeData : [noticeData];
+        let galleryHtml = '<div class="notice-gallery">';
+        
+        items.forEach(item => {
+          const src = typeof item === 'string' ? item : (item.src || item.base64);
+          const title = (typeof item === 'object' && item.title) ? item.title : '';
+          const note = (typeof item === 'object' && item.note) ? item.note : '';
+          
+          galleryHtml += `
+            <div class="notice-card-item" style="background: #ffffff; border-radius: 16px; padding: 14px; box-shadow: var(--shadow-sm); border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 10px;">
+              ${title ? `<div style="font-weight: 700; color: #0369a1; font-size: 1.05rem; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-file-signature" style="color: #0284c7;"></i> ${title}</div>` : ''}
+              <div class="notice-image-container" onclick="openImageModal('${src}')">
+                <img src="${src}" alt="${title || '重要通知單'}">
+                <div class="image-overlay">
+                  <i class="fa-solid fa-magnifying-glass-plus" style="margin-right: 6px;"></i> 點擊放大查看通知單
+                </div>
               </div>
+              ${note ? `<div style="background-color: #fff7ed; color: #c2410c; padding: 8px 12px; border-radius: 10px; font-size: 0.9rem; font-weight: 600; border: 1px solid #ffedd5; display: flex; align-items: flex-start; gap: 6px;"><i class="fa-solid fa-circle-info" style="margin-top: 3px; color: #ea580c; flex-shrink: 0;"></i> <span>${note}</span></div>` : ''}
             </div>
-          </div>
-        `;
+          `;
+        });
+        
+        galleryHtml += '</div>';
+        noticeContainer.innerHTML = galleryHtml;
       }
     }
 
