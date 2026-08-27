@@ -434,6 +434,12 @@ function start3sPrepCountdown() {
     timerBadge.style.color = '#fbbf24';
     timerBadge.innerText = `準備 3`;
 
+    broadcastMsg({
+      type: 'PREP_COUNTDOWN',
+      roomCode: roomCode,
+      prepCount: 3
+    });
+
     stopAllTimers();
 
     prepTimer = setInterval(() => {
@@ -441,6 +447,11 @@ function start3sPrepCountdown() {
       if (prepCount > 0) {
         timerBadge.innerText = `準備 ${prepCount}`;
         playSound('beep');
+        broadcastMsg({
+          type: 'PREP_COUNTDOWN',
+          roomCode: roomCode,
+          prepCount: prepCount
+        });
       } else {
         clearInterval(prepTimer);
         prepTimer = null;
@@ -649,21 +660,15 @@ function renderDynamicContestantsGrid() {
 
   const activeNames = Array.from(connectedSet);
   if (activeNames.length === 0) {
-    const joinUrl = getStudentJoinUrl(roomCode);
-    const qrImgSrc = getQrCodeImageUrl(joinUrl, 200);
     grid.style.gridTemplateColumns = '1fr';
     grid.innerHTML = `
-      <div style="text-align:center; padding: 28px 20px; background: #020617; border: 2px dashed var(--card-border); border-radius: 24px; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: 14px;">
-        <div style="background: white; padding: 12px; border-radius: 18px; box-shadow: 0 8px 20px rgba(0,0,0,0.4); cursor: pointer;" onclick="openQrCodeModal()" title="點擊放大 QR Code">
-          <img src="${qrImgSrc}" alt="參賽者掃碼 QR Code" style="width: 180px; height: 180px; display: block;">
-        </div>
-        <div>
-          <h3 style="color: var(--light-gold); font-size: 1.3rem; margin-bottom: 6px;">📱 學生使用平板相機掃碼即可自動連線</h3>
-          <p style="font-size: 1.05rem; color: #e2e8f0; margin-bottom: 4px;">
-            請參賽學生（${STUDENT_NAMES.join('、')}）掃瞄上方 QR Code，或手動輸入房間代碼 <strong style="color: #fef08a; font-size: 1.25rem;">${roomCode || '8888'}</strong>
-          </p>
-          <div style="font-size: 0.85rem; color: #94a3b8;">(掃碼將自動填入房間代碼，選擇姓名即可直接加入比賽)</div>
-        </div>
+      <div style="text-align:center; padding: 40px 20px; background: #020617; border: 2px dashed var(--card-border); border-radius: 20px; color: var(--text-muted);">
+        <div style="font-size:3rem; margin-bottom:12px;">📡</div>
+        <h3 style="color:var(--light-gold); font-size:1.3rem;">等待參賽學生選擇姓名連線加入...</h3>
+        <p style="margin-top:8px; color:#e2e8f0; font-size:1.05rem;">
+          請參賽學生（${STUDENT_NAMES.join('、')}）在裝置上輸入房間代碼 <strong style="color: #fef08a; font-size:1.25rem;">${roomCode || '8888'}</strong>
+        </p>
+        <p style="margin-top:6px; font-size:0.9rem; color:#94a3b8;">(教師可點擊右上角『📱 學生掃碼』按鈕彈出大 QR Code 供學生相機掃碼)</p>
       </div>
     `;
     updateScoreboardUI();
@@ -695,9 +700,9 @@ function renderDynamicContestantsGrid() {
 // ----------------------------------------------------
 function joinStudentRoom() {
   const codeInput = document.getElementById('inputRoomCode').value.trim();
-  const nameSelect = document.getElementById('inputStudentName').value.trim();
+  const nameSelect = document.getElementById('inputStudentName').value;
 
-  if (!codeInput) {
+  if (!codeInput || codeInput.length !== 4) {
     alert('請輸入 4 位數房間代碼！');
     return;
   }
@@ -705,12 +710,41 @@ function joinStudentRoom() {
   roomCode = codeInput;
   studentName = nameSelect || STUDENT_NAMES[0];
 
+  // 檢查選取的學生姓名是否已被使用
+  if (database && roomCode) {
+    database.ref(`yizi_rooms/${roomCode}/connectedStudents/${studentName}`).once('value', (snapshot) => {
+      if (snapshot.exists()) {
+        const val = snapshot.val();
+        if (val && val.lastActive && (Date.now() - val.lastActive < 180000)) {
+          alert(`❌ 無法登入：【${studentName}】已經在其他裝置上加入房間了！請確認您的姓名或聯繫教師。`);
+          return;
+        }
+      }
+
+      database.ref(`yizi_rooms/${roomCode}/connectedStudents/${studentName}`).set({
+        name: studentName,
+        lastActive: Date.now()
+      });
+
+      completeStudentJoinProcess();
+    });
+  } else {
+    if (connectedSet.has(studentName)) {
+      alert(`❌ 無法登入：【${studentName}】已經在其他裝置上加入房間了！請確認您的姓名或聯繫教師。`);
+      return;
+    }
+    completeStudentJoinProcess();
+  }
+}
+
+function completeStudentJoinProcess() {
   loadSavedScores();
 
   const codeElem = document.getElementById('teacherRoomCodeDisplay');
+  const roomText = document.getElementById('roomCodeTextDisplay');
   if (codeElem) {
-    codeElem.style.display = 'inline-block';
-    codeElem.innerText = `🔑 房間代碼：${roomCode}`;
+    codeElem.style.display = 'inline-flex';
+    if (roomText) roomText.innerText = roomCode;
   }
 
   document.getElementById('studentHeaderInfo').innerText = `參賽者：${studentName} （代碼：${roomCode}）`;
@@ -810,10 +844,33 @@ function lockStudentPad() {
   sendPadDrawingToTeacher(true);
 }
 
+// ----------------------------------------------------
+// Firebase Realtime Database 初始化與跨裝置同步
+// ----------------------------------------------------
+const firebaseConfig = {
+  databaseURL: "https://pokemon-7bd40-default-rtdb.asia-southeast1.firebasedatabase.app"
+};
+
+let database = null;
+try {
+  if (window.firebase) {
+    firebase.initializeApp(firebaseConfig);
+    database = firebase.database();
+  }
+} catch (e) {
+  console.warn("Firebase RTDB init notice:", e);
+}
+
+let lastProcessedMsgTime = 0;
+
 function sendPadDrawingToTeacher(forceLock = false) {
   const cvs = document.getElementById('studentHandwritingCanvas');
   if (!cvs) return;
   const imgData = cvs.toDataURL('image/png');
+
+  if (database && roomCode && studentName) {
+    database.ref(`yizi_rooms/${roomCode}/connectedStudents/${studentName}/lastActive`).set(Date.now());
+  }
 
   broadcastMsg({
     type: 'PAD_UPDATE',
@@ -826,7 +883,9 @@ function sendPadDrawingToTeacher(forceLock = false) {
 }
 
 function initBroadcastChannel() {
-  if (bcChannel) bcChannel.close();
+  if (bcChannel) {
+    try { bcChannel.close(); } catch(e) {}
+  }
 
   try {
     bcChannel = new BroadcastChannel('yizi_qianjin_channel_' + roomCode);
@@ -835,14 +894,36 @@ function initBroadcastChannel() {
 
   window.addEventListener('storage', (e) => {
     if (e.key === 'yizi_msg_' + roomCode && e.newValue) {
-      handleNetworkMessage(JSON.parse(e.newValue));
+      try { handleNetworkMessage(JSON.parse(e.newValue)); } catch(err) {}
     }
   });
+
+  if (database && roomCode) {
+    database.ref('yizi_rooms/' + roomCode + '/lastMsg').off();
+    database.ref('yizi_rooms/' + roomCode + '/lastMsg').on('value', (snapshot) => {
+      const val = snapshot.val();
+      if (val && val.timestamp && val.timestamp > lastProcessedMsgTime) {
+        lastProcessedMsgTime = val.timestamp;
+        handleNetworkMessage(val);
+      }
+    });
+  }
 }
 
 function broadcastMsg(msgObj) {
-  if (bcChannel) bcChannel.postMessage(msgObj);
-  localStorage.setItem('yizi_msg_' + roomCode, JSON.stringify(msgObj));
+  msgObj.timestamp = Date.now();
+
+  if (bcChannel) {
+    try { bcChannel.postMessage(msgObj); } catch(e) {}
+  }
+
+  try {
+    localStorage.setItem('yizi_msg_' + roomCode, JSON.stringify(msgObj));
+  } catch(e) {}
+
+  if (database && roomCode) {
+    database.ref('yizi_rooms/' + roomCode + '/lastMsg').set(msgObj);
+  }
 }
 
 function handleNetworkMessage(msg) {
@@ -884,13 +965,37 @@ function handleNetworkMessage(msg) {
       document.getElementById('studentMarkOverlay').classList.remove('active');
       document.getElementById('lockAnswerBtn').disabled = false;
       clearStudentPad();
-      document.getElementById('studentTimerBadge').innerText = '60s';
+      const badge = document.getElementById('studentTimerBadge');
+      if (badge) {
+        badge.innerText = '60s';
+        badge.style.color = '#ef4444';
+        badge.style.borderColor = '#ef4444';
+      }
+    } else if (msg.type === 'PREP_COUNTDOWN') {
+      const badge = document.getElementById('studentTimerBadge');
+      if (badge) {
+        badge.innerText = `準備 ${msg.prepCount}`;
+        badge.style.color = '#fbbf24';
+        badge.style.borderColor = '#fbbf24';
+      }
+      playSound('beep');
     } else if (msg.type === 'START_ROUND') {
       isLocked = false;
       document.getElementById('studentPadOverlay').classList.remove('active');
       document.getElementById('lockAnswerBtn').disabled = false;
+      const badge = document.getElementById('studentTimerBadge');
+      if (badge) {
+        badge.innerText = `${msg.seconds || 60}s`;
+        badge.style.color = '#ef4444';
+        badge.style.borderColor = '#ef4444';
+      }
     } else if (msg.type === 'TIMER_TICK') {
-      document.getElementById('studentTimerBadge').innerText = `${msg.seconds}s`;
+      const badge = document.getElementById('studentTimerBadge');
+      if (badge) {
+        badge.innerText = `${msg.seconds}s`;
+        badge.style.color = '#ef4444';
+        badge.style.borderColor = '#ef4444';
+      }
     } else if (msg.type === 'FORCE_LOCK') {
       lockStudentPad();
     } else if (msg.type === 'MARK_RESULT' && msg.studentName === studentName) {
