@@ -358,9 +358,10 @@ function startTeacherStage(lessonIdx) {
   roomCode = Math.floor(1000 + Math.random() * 9000).toString();
 
   const codeElem = document.getElementById('teacherRoomCodeDisplay');
+  const roomText = document.getElementById('roomCodeTextDisplay');
   if (codeElem) {
-    codeElem.style.display = 'inline-block';
-    codeElem.innerText = `🔑 房間代碼：${roomCode}`;
+    codeElem.style.display = 'inline-flex';
+    if (roomText) roomText.innerText = roomCode;
   }
 
   connectedSet.clear();
@@ -648,12 +649,21 @@ function renderDynamicContestantsGrid() {
 
   const activeNames = Array.from(connectedSet);
   if (activeNames.length === 0) {
+    const joinUrl = getStudentJoinUrl(roomCode);
+    const qrImgSrc = getQrCodeImageUrl(joinUrl, 200);
     grid.style.gridTemplateColumns = '1fr';
     grid.innerHTML = `
-      <div style="text-align:center; padding: 40px; background: #020617; border: 2px dashed var(--card-border); border-radius: 20px; color: var(--text-muted);">
-        <div style="font-size:3rem; margin-bottom:12px;">📡</div>
-        <h3>等待參賽者輸入房間代碼加入...</h3>
-        <p style="margin-top:6px;">請參賽學生（${STUDENT_NAMES.join('、')}）在裝置上輸入代碼 <strong>${roomCode || '8888'}</strong> 加入比賽</p>
+      <div style="text-align:center; padding: 28px 20px; background: #020617; border: 2px dashed var(--card-border); border-radius: 24px; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: 14px;">
+        <div style="background: white; padding: 12px; border-radius: 18px; box-shadow: 0 8px 20px rgba(0,0,0,0.4); cursor: pointer;" onclick="openQrCodeModal()" title="點擊放大 QR Code">
+          <img src="${qrImgSrc}" alt="參賽者掃碼 QR Code" style="width: 180px; height: 180px; display: block;">
+        </div>
+        <div>
+          <h3 style="color: var(--light-gold); font-size: 1.3rem; margin-bottom: 6px;">📱 學生使用平板相機掃碼即可自動連線</h3>
+          <p style="font-size: 1.05rem; color: #e2e8f0; margin-bottom: 4px;">
+            請參賽學生（${STUDENT_NAMES.join('、')}）掃瞄上方 QR Code，或手動輸入房間代碼 <strong style="color: #fef08a; font-size: 1.25rem;">${roomCode || '8888'}</strong>
+          </p>
+          <div style="font-size: 0.85rem; color: #94a3b8;">(掃碼將自動填入房間代碼，選擇姓名即可直接加入比賽)</div>
+        </div>
       </div>
     `;
     updateScoreboardUI();
@@ -907,6 +917,61 @@ function handleNetworkMessage(msg) {
   }
 }
 
+// --------------------------------------------------
+// QR Code 生成與彈窗控制機制
+// --------------------------------------------------
+function getStudentJoinUrl(code) {
+  const targetCode = code || roomCode || '8888';
+  const baseUrl = window.location.href.split('?')[0].split('#')[0];
+  return `${baseUrl}?role=STUDENT&code=${targetCode}`;
+}
+
+function getQrCodeImageUrl(urlData, size = 240) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=10&data=${encodeURIComponent(urlData)}`;
+}
+
+function toggleQrCodeModal() {
+  const modal = document.getElementById('qrCodeModal');
+  if (!modal) return;
+  
+  if (modal.style.display === 'flex') {
+    closeQrCodeModal();
+  } else {
+    openQrCodeModal();
+  }
+}
+
+function openQrCodeModal() {
+  const modal = document.getElementById('qrCodeModal');
+  const img = document.getElementById('qrCodeModalImg');
+  const txt = document.getElementById('qrModalRoomCode');
+  if (!modal || !img) return;
+
+  const joinUrl = getStudentJoinUrl(roomCode);
+  img.src = getQrCodeImageUrl(joinUrl, 250);
+  if (txt) txt.innerText = roomCode || '8888';
+  
+  modal.style.display = 'flex';
+}
+
+function closeQrCodeModal() {
+  const modal = document.getElementById('qrCodeModal');
+  if (modal) modal.style.display = 'none';
+}
+
 window.onload = function() {
-  showPanel('roleChoicePanel');
+  const urlParams = new URLSearchParams(window.location.search);
+  const paramRole = urlParams.get('role');
+  const paramCode = urlParams.get('code');
+
+  if (paramCode) {
+    const inputCode = document.getElementById('inputRoomCode');
+    if (inputCode) inputCode.value = paramCode;
+  }
+
+  if (paramRole === 'STUDENT' || (paramCode && !paramRole)) {
+    selectRole('STUDENT');
+  } else {
+    showPanel('roleChoicePanel');
+  }
 };
