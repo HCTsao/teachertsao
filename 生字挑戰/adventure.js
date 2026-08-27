@@ -513,12 +513,12 @@ function speakHostQuestion() {
 
 function checkAllContestantsLocked() {
   const activeNames = Array.from(connectedSet);
-  if (activeNames.length === 0) return;
-
-  const allActiveLocked = activeNames.every(name => contestantState[name] && contestantState[name].isLocked);
-  if (allActiveLocked && isRoundActive) {
-    stopAllTimers();
-    triggerSuspenseAndAutoGrading();
+  if (activeNames.length >= STUDENT_NAMES.length) {
+    const allActiveLocked = activeNames.every(name => contestantState[name] && contestantState[name].isLocked);
+    if (allActiveLocked && isRoundActive) {
+      stopAllTimers();
+      triggerSuspenseAndAutoGrading();
+    }
   }
 }
 
@@ -567,7 +567,7 @@ function lockAllContestants() {
   });
 }
 
-// 要求: 揭曉答案語音播報：「正確答案揭曉，恭喜xx、xx寫對了！」
+// 要求: 揭曉答案語音播報：「正確答案揭曉，恭喜xx、xx寫對了！」並播放 3D 卡牌翻轉動畫
 function teacherRevealAnswer() {
   stopAllTimers();
   lockAllContestants();
@@ -576,9 +576,23 @@ function teacherRevealAnswer() {
   const qObj = shuffledWords[selectedWordIdx];
   playSound('fanfare');
 
-  document.getElementById('teacherRevealChar').innerText = qObj.char;
-  document.getElementById('teacherRevealInfo').innerText = `常用語詞：【${qObj.compound}】`;
-  document.getElementById('teacherRevealBox').classList.add('active');
+  const revealBox = document.getElementById('teacherRevealBox');
+  const charElem = document.getElementById('teacherRevealChar');
+  const infoElem = document.getElementById('teacherRevealInfo');
+
+  if (revealBox && charElem) {
+    revealBox.classList.remove('active');
+    charElem.classList.remove('reveal-char-anim');
+
+    // 觸發強迫 DOM 重繪 restart 動畫
+    void revealBox.offsetWidth;
+
+    charElem.innerText = qObj.char;
+    if (infoElem) infoElem.innerText = `常用語詞：【${qObj.compound}】`;
+
+    revealBox.classList.add('active');
+    charElem.classList.add('reveal-char-anim');
+  }
 
   // 收集所有答對 (🟢 圈) 的已連線參賽學生
   const correctStudents = Array.from(connectedSet).filter(name => currentMarks[name] === 'CIRCLE');
@@ -698,6 +712,15 @@ function renderDynamicContestantsGrid() {
 // ----------------------------------------------------
 // 參賽者端邏輯
 // ----------------------------------------------------
+function getStudentDeviceToken() {
+  let token = sessionStorage.getItem('yizi_device_token');
+  if (!token) {
+    token = 'dev_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+    sessionStorage.setItem('yizi_device_token', token);
+  }
+  return token;
+}
+
 function joinStudentRoom() {
   const codeInput = document.getElementById('inputRoomCode').value.trim();
   const nameSelect = document.getElementById('inputStudentName').value;
@@ -709,13 +732,17 @@ function joinStudentRoom() {
 
   roomCode = codeInput;
   studentName = nameSelect || STUDENT_NAMES[0];
+  const deviceToken = getStudentDeviceToken();
 
-  // 檢查選取的學生姓名是否已被使用
+  // 檢查選取的學生姓名是否已被其他裝置使用
   if (database && roomCode) {
     database.ref(`yizi_rooms/${roomCode}/connectedStudents/${studentName}`).once('value', (snapshot) => {
       if (snapshot.exists()) {
         const val = snapshot.val();
-        if (val && val.lastActive && (Date.now() - val.lastActive < 180000)) {
+        const isSameDevice = (val && val.deviceToken === deviceToken);
+        const isInactive = (val && val.lastActive && (Date.now() - val.lastActive > 45000));
+
+        if (!isSameDevice && !isInactive) {
           alert(`❌ 無法登入：【${studentName}】已經在其他裝置上加入房間了！請確認您的姓名或聯繫教師。`);
           return;
         }
@@ -723,16 +750,13 @@ function joinStudentRoom() {
 
       database.ref(`yizi_rooms/${roomCode}/connectedStudents/${studentName}`).set({
         name: studentName,
+        deviceToken: deviceToken,
         lastActive: Date.now()
       });
 
       completeStudentJoinProcess();
     });
   } else {
-    if (connectedSet.has(studentName)) {
-      alert(`❌ 無法登入：【${studentName}】已經在其他裝置上加入房間了！請確認您的姓名或聯繫教師。`);
-      return;
-    }
     completeStudentJoinProcess();
   }
 }
