@@ -387,6 +387,10 @@ function loadTeacherQuestion(lIdx, wIdx) {
     '冠宏': { isLocked: false, imgData: null, strokeData: [] }
   };
 
+  if (database && roomCode) {
+    database.ref(`yizi_rooms/${roomCode}/pads`).remove();
+  }
+
   document.getElementById('teacherQuestionHeader').innerText = `${lesson.vol} ${lesson.lesson} （第 ${wIdx+1} / ${shuffledWords.length} 題）`;
   
   if (isFirstQuestionOfLesson) {
@@ -567,13 +571,17 @@ function lockAllContestants() {
   });
 }
 
-// 要求: 揭曉答案語音播報：「正確答案揭曉，恭喜xx、xx寫對了！」並播放 3D 卡牌翻轉動畫
-function teacherRevealAnswer() {
+// 要求: 按「揭曉答案」時即時進行筆劃 AI 判定，並播報：「正確答案揭曉，恭喜xx、xx寫對了！」
+async function teacherRevealAnswer() {
   stopAllTimers();
   lockAllContestants();
 
   if (!shuffledWords || !shuffledWords[selectedWordIdx]) return;
   const qObj = shuffledWords[selectedWordIdx];
+
+  // 1. 自動進行 4 位參賽者手寫筆劃 AI 判定 (⭕ / ❌)
+  await autoGradeAllContestants();
+
   playSound('fanfare');
 
   const revealBox = document.getElementById('teacherRevealBox');
@@ -899,6 +907,15 @@ function sendPadDrawingToTeacher(forceLock = false) {
 
   if (database && roomCode && studentName) {
     database.ref(`yizi_rooms/${roomCode}/connectedStudents/${studentName}/lastActive`).set(Date.now());
+
+    // 寫入各學生專屬 Firebase 節點，防止多位學生數據覆蓋碰撞
+    database.ref(`yizi_rooms/${roomCode}/pads/${studentName}`).set({
+      studentName: studentName,
+      imgData: imgData,
+      strokeData: currentPadStrokes,
+      isLocked: isLocked || forceLock,
+      timestamp: Date.now()
+    });
   }
 
   broadcastMsg({
@@ -909,6 +926,32 @@ function sendPadDrawingToTeacher(forceLock = false) {
     strokeData: currentPadStrokes,
     isLocked: isLocked || forceLock
   });
+}
+
+function updateTeacherContestantPad(name, data) {
+  if (!name) return;
+  if (!connectedSet.has(name)) {
+    connectedSet.add(name);
+    renderDynamicContestantsGrid();
+  }
+
+  if (!contestantState[name]) contestantState[name] = {};
+  contestantState[name].isLocked = !!data.isLocked;
+  if (data.imgData !== undefined) contestantState[name].imgData = data.imgData;
+  if (data.strokeData !== undefined) contestantState[name].strokeData = data.strokeData;
+
+  const tag = document.getElementById(`tcTag_${name}`);
+  const img = document.getElementById(`tcImg_${name}`);
+
+  if (tag) {
+    tag.innerText = data.isLocked ? '🔒 已鎖定' : '✏️ 連線中';
+    tag.className = `contestant-lock-tag ${data.isLocked ? 'locked' : ''}`;
+  }
+  if (img) {
+    img.src = data.imgData || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><text x='20' y='50' fill='%23666'>等待筆跡</text></svg>";
+  }
+
+  checkAllContestantsLocked();
 }
 
 function initBroadcastChannel() {
@@ -936,6 +979,22 @@ function initBroadcastChannel() {
         handleNetworkMessage(val);
       }
     });
+
+    if (userRole === 'TEACHER') {
+      database.ref(`yizi_rooms/${roomCode}/pads`).off();
+      database.ref(`yizi_rooms/${roomCode}/pads`).on('child_changed', (snapshot) => {
+        const val = snapshot.val();
+        if (val && val.studentName) {
+          updateTeacherContestantPad(val.studentName, val);
+        }
+      });
+      database.ref(`yizi_rooms/${roomCode}/pads`).on('child_added', (snapshot) => {
+        const val = snapshot.val();
+        if (val && val.studentName) {
+          updateTeacherContestantPad(val.studentName, val);
+        }
+      });
+    }
   }
 }
 
