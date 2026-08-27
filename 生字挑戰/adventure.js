@@ -571,7 +571,7 @@ function lockAllContestants() {
   });
 }
 
-// 要求: 按「揭曉答案」時即時進行筆劃 AI 判定，並播報：「正確答案揭曉，恭喜xx、xx寫對了！」
+// 要求: 按「揭曉答案」時先進行 2 秒 TV 節目閃爍緊張燈光與懸疑音效，接著 AI 判定與 3D 正解登場
 async function teacherRevealAnswer() {
   stopAllTimers();
   lockAllContestants();
@@ -579,41 +579,60 @@ async function teacherRevealAnswer() {
   if (!shuffledWords || !shuffledWords[selectedWordIdx]) return;
   const qObj = shuffledWords[selectedWordIdx];
 
-  // 1. 自動進行 4 位參賽者手寫筆劃 AI 判定 (⭕ / ❌)
-  await autoGradeAllContestants();
+  // 1. 啟動 TV 節目「一字千金」閃爍緊張燈光特效與懸疑音效
+  const stageCard = document.querySelector('.stage-card');
+  if (stageCard) stageCard.classList.add('flashing-suspense');
 
-  playSound('fanfare');
+  playSound('suspense');
+  let intervalCount = 0;
+  const suspenseInterval = setInterval(() => {
+    intervalCount++;
+    playSound('suspense');
+    if (intervalCount >= 5) clearInterval(suspenseInterval);
+  }, 400);
 
-  const revealBox = document.getElementById('teacherRevealBox');
-  const charElem = document.getElementById('teacherRevealChar');
-  const infoElem = document.getElementById('teacherRevealInfo');
+  // 2. 在 2.2 秒緊張燈光閃爍期間，同步完成 AI 國字/筆劃自動判定 (⭕ / ❌)
+  const gradingPromise = autoGradeAllContestants();
 
-  if (revealBox && charElem) {
-    revealBox.classList.remove('active');
-    charElem.classList.remove('reveal-char-anim');
+  setTimeout(async () => {
+    if (suspenseInterval) clearInterval(suspenseInterval);
+    if (stageCard) stageCard.classList.remove('flashing-suspense');
 
-    // 觸發強迫 DOM 重繪 restart 動畫
-    void revealBox.offsetWidth;
+    await gradingPromise;
 
-    charElem.innerText = qObj.char;
-    if (infoElem) infoElem.innerText = `常用語詞：【${qObj.compound}】`;
+    // 3. 懸疑結束，歡呼音樂 + 正確解答 3D 卡牌翻轉亮相
+    playSound('fanfare');
 
-    revealBox.classList.add('active');
-    charElem.classList.add('reveal-char-anim');
-  }
+    const revealBox = document.getElementById('teacherRevealBox');
+    const charElem = document.getElementById('teacherRevealChar');
+    const infoElem = document.getElementById('teacherRevealInfo');
 
-  // 收集所有答對 (🟢 圈) 的已連線參賽學生
-  const correctStudents = Array.from(connectedSet).filter(name => currentMarks[name] === 'CIRCLE');
+    if (revealBox && charElem) {
+      revealBox.classList.remove('active');
+      charElem.classList.remove('reveal-char-anim');
 
-  let announcement = "";
-  if (correctStudents.length > 0) {
-    const namesStr = correctStudents.join('、');
-    announcement = `正確答案揭曉，恭喜${namesStr}寫對了！`;
-  } else {
-    announcement = `正確答案揭曉，正確漢字是：${qObj.char}。`;
-  }
+      void revealBox.offsetWidth; // 觸發 DOM 重繪 restart 動畫
 
-  speak(announcement);
+      charElem.innerText = qObj.char;
+      if (infoElem) infoElem.innerText = `常用語詞：【${qObj.compound}】`;
+
+      revealBox.classList.add('active');
+      charElem.classList.add('reveal-char-anim');
+    }
+
+    // 4. 收集所有答對 (🟢 圈) 的參賽學生並進行廣播 speech
+    const correctStudents = Array.from(connectedSet).filter(name => currentMarks[name] === 'CIRCLE');
+
+    let announcement = "";
+    if (correctStudents.length > 0) {
+      const namesStr = correctStudents.join('、');
+      announcement = `正確答案揭曉，恭喜${namesStr}寫對了！`;
+    } else {
+      announcement = `正確答案揭曉，正確漢字是：${qObj.char}。`;
+    }
+
+    speak(announcement);
+  }, 2200);
 }
 
 function teacherNextQuestion() {
@@ -861,11 +880,32 @@ function initStudentHandwritingPad() {
 }
 
 function clearStudentPad() {
-  if (isLocked) return;
+  forceClearStudentPad();
+}
+
+function forceClearStudentPad() {
+  isLocked = false;
+
+  const overlay = document.getElementById('studentPadOverlay');
+  if (overlay) overlay.classList.remove('active');
+
+  const markOverlay = document.getElementById('studentMarkOverlay');
+  if (markOverlay) markOverlay.classList.remove('active');
+
+  const lockBtn = document.getElementById('lockAnswerBtn');
+  if (lockBtn) lockBtn.disabled = false;
+
   const cvs = document.getElementById('studentHandwritingCanvas');
-  if (!cvs) return;
-  const ctx = cvs.getContext('2d');
-  ctx.clearRect(0, 0, cvs.width, cvs.height);
+  if (cvs) {
+    const ctx = cvs.getContext('2d');
+    cvs.width = cvs.clientWidth || 600;
+    cvs.height = cvs.clientHeight || 380;
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+  }
+
   currentPadStrokes = [];
   sendPadDrawingToTeacher();
 }
@@ -1048,11 +1088,7 @@ function handleNetworkMessage(msg) {
 
   if (userRole === 'STUDENT') {
     if (msg.type === 'PREPARE_QUESTION') {
-      isLocked = false;
-      document.getElementById('studentPadOverlay').classList.remove('active');
-      document.getElementById('studentMarkOverlay').classList.remove('active');
-      document.getElementById('lockAnswerBtn').disabled = false;
-      clearStudentPad();
+      forceClearStudentPad();
       const badge = document.getElementById('studentTimerBadge');
       if (badge) {
         badge.innerText = '60s';
