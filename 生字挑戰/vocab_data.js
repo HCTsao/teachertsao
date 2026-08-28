@@ -284,7 +284,7 @@ const VOCAB_DATA = [
       },
       {
         "char": "陪",
-        "zhuyin": "ㄆㄟ",
+        "zhuyin": "ㄆㄟˊ",
         "compound": "陪伴",
         "displaySentence": "小狗開心的 ㄆㄟ 伴在奶奶身旁。",
         "ttsText": "小狗開心的陪伴在奶奶身旁。請寫出陪伴的陪。",
@@ -811,7 +811,7 @@ const VOCAB_DATA = [
       },
       {
         "char": "朵",
-        "zhuyin": "ㄉㄨㄛ",
+        "zhuyin": "ㄉㄨㄛˇ",
         "compound": "朵字",
         "displaySentence": "學習 ㄉㄨㄛ 字能讓我們認識更多美麗的繁體國字。",
         "ttsText": "學習朵字能讓我們認識更多美麗的繁體國字。請寫出朵字的朵。",
