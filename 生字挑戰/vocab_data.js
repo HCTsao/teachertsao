@@ -134,9 +134,9 @@ const VOCAB_DATA = [
       },
       {
         "char": "誰",
-        "zhuyin": "ㄕㄨㄟˊ",
+        "zhuyin": "ㄕㄟˊ",
         "compound": "是誰",
-        "displaySentence": "門口傳來敲門聲，請問是 ㄕㄨㄟˊ 在外面？。",
+        "displaySentence": "門口傳來敲門聲，請問是 ㄕㄟˊ 在外面？。",
         "ttsText": "門口傳來敲門聲，請問是誰在外面？。請寫出是誰的誰。",
         "radical": "字",
         "words": [
@@ -2608,9 +2608,9 @@ const VOCAB_DATA = [
       },
       {
         "char": "件",
-        "zhuyin": "件",
+        "zhuyin": "ㄐㄧㄢˋ",
         "compound": "件字",
-        "displaySentence": "學習 件 字能讓我們認識更多美麗的繁體國字。",
+        "displaySentence": "學習 ㄐㄧㄢˋ 字能讓我們認識更多美麗的繁體國字。",
         "ttsText": "學習件字能讓我們認識更多美麗的繁體國字。請寫出件字的件。",
         "radical": "字",
         "words": [
@@ -2802,9 +2802,9 @@ const VOCAB_DATA = [
       },
       {
         "char": "次",
-        "zhuyin": "ㄧˋ",
+        "zhuyin": "ㄘˋ",
         "compound": "次字",
-        "displaySentence": "學習 ㄧˋ 字能讓我們認識更多美麗的繁體國字。",
+        "displaySentence": "學習 ㄘˋ 字能讓我們認識更多美麗的繁體國字。",
         "ttsText": "學習次字能讓我們認識更多美麗的繁體國字。請寫出次字的次。",
         "radical": "字",
         "words": [

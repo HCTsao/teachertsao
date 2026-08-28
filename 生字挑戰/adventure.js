@@ -734,7 +734,7 @@ function renderDynamicContestantsGrid() {
     return;
   }
 
-  grid.style.gridTemplateColumns = 'repeat(3, 1fr)';
+  grid.style.gridTemplateColumns = 'repeat(4, 1fr)';
   grid.innerHTML = activeNames.map(name => `
     <div class="teacher-contestant-card" id="tcCard_${name}" onclick="toggleStudentMark('${name}')" style="cursor:pointer;" title="點擊可手動修正 🟢/🔴 判定">
       <div class="mark-overlay" id="tcMarkOverlay_${name}">
