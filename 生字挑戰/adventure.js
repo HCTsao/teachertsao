@@ -216,7 +216,11 @@ function formatZhuyinVertical(zhuyinStr) {
     'ˊ': 'tone-2nd',
     'ˇ': 'tone-3rd',
     'ˋ': 'tone-4th',
-    '˙': 'tone-5th'
+    '˙': 'tone-5th',
+    '•': 'tone-5th',
+    '‧': 'tone-5th',
+    '・': 'tone-5th',
+    '.': 'tone-5th'
   };
   
   let toneChar = null;
@@ -225,7 +229,7 @@ function formatZhuyinVertical(zhuyinStr) {
   
   for (const ch of clean) {
     if (toneMap[ch]) {
-      toneChar = ch;
+      toneChar = (ch === '.' || ch === '•' || ch === '‧' || ch === '・') ? '˙' : ch;
       toneClass = toneMap[ch];
     } else {
       phonetics.push(ch);
@@ -389,6 +393,13 @@ function loadTeacherQuestion(lIdx, wIdx) {
 
   if (database && roomCode) {
     database.ref(`yizi_rooms/${roomCode}/pads`).remove();
+    database.ref(`yizi_rooms/${roomCode}/currentQuestion`).set({
+      lIdx: lIdx,
+      wIdx: wIdx,
+      questionId: `${lIdx}_${wIdx}_${Date.now()}`,
+      status: 'PREPARE',
+      timestamp: Date.now()
+    });
   }
 
   document.getElementById('teacherQuestionHeader').innerText = `${lesson.vol} ${lesson.lesson} （第 ${wIdx+1} / ${shuffledWords.length} 題）`;
@@ -571,10 +582,16 @@ function lockAllContestants() {
   });
 }
 
-// 要求: 按「揭曉答案」時先進行 2 秒 TV 節目閃爍緊張燈光與懸疑音效，接著 AI 判定與 3D 正解登場
+// 要求: 按「揭曉答案」時停止倒數計時，先進行 2 秒 TV 節目閃爍緊張燈光與懸疑音效，接著 AI 判定與 3D 正解登場
 async function teacherRevealAnswer() {
   stopAllTimers();
   lockAllContestants();
+
+  broadcastMsg({
+    type: 'STOP_TIMER',
+    roomCode: roomCode,
+    seconds: countdownSeconds
+  });
 
   if (!shuffledWords || !shuffledWords[selectedWordIdx]) return;
   const qObj = shuffledWords[selectedWordIdx];
@@ -681,13 +698,9 @@ function gradeStudentMark(name, resultType) {
 
     studentScores[name] = (studentScores[name] || 0) + 1;
     saveScores();
-  } else if (resultType === 'CROSS') {
-    playSound('wrong');
-    if (symbol) {
-      symbol.innerText = '❌';
-      symbol.className = 'mark-symbol cross';
-    }
-    if (overlay) overlay.classList.add('active');
+  } else {
+    // 錯的不用打叉：隱藏 overlay，保持學生原始手寫筆跡 100% 清晰
+    if (overlay) overlay.classList.remove('active');
     saveScores();
   }
 
@@ -994,6 +1007,8 @@ function updateTeacherContestantPad(name, data) {
   checkAllContestantsLocked();
 }
 
+let lastHandledQuestionId = '';
+
 function initBroadcastChannel() {
   if (bcChannel) {
     try { bcChannel.close(); } catch(e) {}
@@ -1019,6 +1034,19 @@ function initBroadcastChannel() {
         handleNetworkMessage(val);
       }
     });
+
+    if (userRole === 'STUDENT') {
+      database.ref('yizi_rooms/' + roomCode + '/currentQuestion').off();
+      database.ref('yizi_rooms/' + roomCode + '/currentQuestion').on('value', (snapshot) => {
+        const val = snapshot.val();
+        if (val && val.questionId) {
+          if (val.questionId !== lastHandledQuestionId) {
+            lastHandledQuestionId = val.questionId;
+            forceClearStudentPad();
+          }
+        }
+      });
+    }
 
     if (userRole === 'TEACHER') {
       database.ref(`yizi_rooms/${roomCode}/pads`).off();
@@ -1113,9 +1141,9 @@ function handleNetworkMessage(msg) {
         badge.style.color = '#ef4444';
         badge.style.borderColor = '#ef4444';
       }
-    } else if (msg.type === 'TIMER_TICK') {
+    } else if (msg.type === 'TIMER_TICK' || msg.type === 'STOP_TIMER') {
       const badge = document.getElementById('studentTimerBadge');
-      if (badge) {
+      if (badge && msg.seconds !== undefined) {
         badge.innerText = `${msg.seconds}s`;
         badge.style.color = '#ef4444';
         badge.style.borderColor = '#ef4444';
@@ -1127,17 +1155,19 @@ function handleNetworkMessage(msg) {
       const symbol = document.getElementById('studentMarkSymbol');
       
       if (msg.resultType === 'CIRCLE') {
-        symbol.innerText = '⭕';
-        symbol.className = 'mark-symbol circle';
+        if (symbol) {
+          symbol.innerText = '⭕';
+          symbol.className = 'mark-symbol circle';
+        }
         playSound('fanfare');
-        overlay.classList.add('active');
-      } else if (msg.resultType === 'CROSS') {
-        symbol.innerText = '❌';
-        symbol.className = 'mark-symbol cross';
-        playSound('wrong');
-        overlay.classList.add('active');
+        if (overlay) {
+          overlay.classList.remove('active');
+          void overlay.offsetWidth;
+          overlay.classList.add('active');
+        }
       } else {
-        overlay.classList.remove('active');
+        // 錯的不用打叉，隱藏標記，保持學生原始手寫筆跡 100% 清晰
+        if (overlay) overlay.classList.remove('active');
       }
 
       studentScores[studentName] = msg.totalScore || 0;
