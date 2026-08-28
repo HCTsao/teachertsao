@@ -299,26 +299,26 @@ async function evaluateHandwritingStrokes(imgData, strokeData, targetChar) {
     if (st && st[0]) pointCount += st[0].length;
   });
 
-  if (pointCount < 4) {
+  // 筆劃點數太少 (潦草亂劃) -> 嚴格判定為錯誤
+  if (pointCount < 6) {
     return 'CROSS';
   }
 
   const candidates = await recognizeChineseHandwriting(strokeData);
 
   if (candidates && candidates.length > 0) {
-    const topCandidates = candidates.slice(0, 8);
-    console.log(`[AI OCR] 正解目標: "${targetChar}", 學生手寫辨識結果:`, topCandidates);
+    // 提高判定標準：只取前 3 個高信心度 OCR 辨識結果
+    const topCandidates = candidates.slice(0, 3);
+    console.log(`[AI 嚴格 OCR 檢測] 正解目標: "${targetChar}", 前三名辨識結果:`, topCandidates);
 
     if (topCandidates.includes(targetChar)) {
       return 'CIRCLE';
     } else {
+      // 字跡太醜、寫錯字或辨識信心不足 -> 嚴格判定為錯誤
       return 'CROSS';
     }
   }
 
-  if (imgData && imgData.length > 1500 && pointCount >= 8) {
-    return 'CIRCLE';
-  }
   return 'CROSS';
 }
 
@@ -658,12 +658,103 @@ function teacherNextQuestion() {
   if (selectedWordIdx + 1 < shuffledWords.length) {
     isFirstQuestionOfLesson = false;
     loadTeacherQuestion(selectedLessonIdx, selectedWordIdx + 1);
-  } else if (selectedLessonIdx + 1 < VOCAB_DATA.length) {
+  } else {
+    // 本課全部題目答完 -> 進入頒獎台榮耀結算畫面！
+    showLessonPodium();
+  }
+}
+
+function showLessonPodium() {
+  stopAllTimers();
+  const lesson = VOCAB_DATA[selectedLessonIdx];
+  const lessonName = lesson ? `${lesson.vol} ${lesson.lesson}` : '';
+
+  const podiumTitle = document.getElementById('podiumLessonTitle');
+  if (podiumTitle) podiumTitle.innerText = `🏆 ${lessonName} 最終成績結算`;
+
+  const sortedStudents = STUDENT_NAMES.map(name => ({
+    name: name,
+    score: studentScores[name] || 0
+  })).sort((a, b) => b.score - a.score);
+
+  const p1 = sortedStudents[0];
+  const p2 = sortedStudents[1];
+  const p3 = sortedStudents[2];
+  const p4 = sortedStudents[3];
+
+  const podiumGrid = document.getElementById('podiumGrid');
+  if (podiumGrid) {
+    podiumGrid.innerHTML = `
+      <!-- 亞軍 2nd (Left) -->
+      ${p2 ? `
+        <div style="flex:1; max-width:200px; display:flex; flex-direction:column; align-items:center;">
+          <div style="font-size:1.3rem; font-weight:900; color:#e2e8f0; margin-bottom:8px;">🥈 亞軍</div>
+          <div style="font-size:1.2rem; font-weight:800; color:#cbd5e1; margin-bottom:6px;">🎓 ${p2.name}</div>
+          <div style="font-size:1.4rem; font-weight:900; color:#fbbf24; margin-bottom:10px;">${p2.score} 分</div>
+          <div style="width:100%; height:140px; background:linear-gradient(180deg, #475569, #1e293b); border:2px solid #94a3b8; border-radius:18px 18px 0 0; display:flex; justify-content:center; align-items:center; font-size:3rem; font-weight:900; color:#e2e8f0; box-shadow:0 10px 25px rgba(0,0,0,0.5);">2</div>
+        </div>
+      ` : ''}
+
+      <!-- 冠軍 1st (Center) -->
+      ${p1 ? `
+        <div style="flex:1.1; max-width:230px; display:flex; flex-direction:column; align-items:center;">
+          <div style="font-size:2.2rem; margin-bottom:2px;">👑</div>
+          <div style="font-size:1.5rem; font-weight:900; color:#fef08a; margin-bottom:8px;">🏆 冠軍</div>
+          <div style="font-size:1.4rem; font-weight:900; color:#fff; margin-bottom:6px;">🎓 ${p1.name}</div>
+          <div style="font-size:1.7rem; font-weight:900; color:#fef08a; margin-bottom:10px;">${p1.score} 分</div>
+          <div style="width:100%; height:200px; background:linear-gradient(180deg, #f59e0b, #b45309); border:3px solid #fef08a; border-radius:22px 22px 0 0; display:flex; justify-content:center; align-items:center; font-size:4rem; font-weight:900; color:#fff; box-shadow:0 0 35px rgba(245, 158, 11, 0.8);">1</div>
+        </div>
+      ` : ''}
+
+      <!-- 季軍 3rd (Right) -->
+      ${p3 ? `
+        <div style="flex:1; max-width:200px; display:flex; flex-direction:column; align-items:center;">
+          <div style="font-size:1.3rem; font-weight:900; color:#fdba74; margin-bottom:8px;">🥉 季軍</div>
+          <div style="font-size:1.2rem; font-weight:800; color:#fed7aa; margin-bottom:6px;">🎓 ${p3.name}</div>
+          <div style="font-size:1.4rem; font-weight:900; color:#fbbf24; margin-bottom:10px;">${p3.score} 分</div>
+          <div style="width:100%; height:100px; background:linear-gradient(180deg, #9a3412, #431407); border:2px solid #ea580c; border-radius:18px 18px 0 0; display:flex; justify-content:center; align-items:center; font-size:2.6rem; font-weight:900; color:#fdba74; box-shadow:0 10px 25px rgba(0,0,0,0.5);">3</div>
+        </div>
+      ` : ''}
+    `;
+  }
+
+  const otherList = document.getElementById('podiumOtherList');
+  if (otherList && p4) {
+    otherList.innerHTML = `
+      <div style="background:rgba(255,255,255,0.06); border:1px solid var(--card-border); padding:10px 24px; border-radius:16px; font-size:1.15rem; font-weight:800; color:#cbd5e1;">
+        🎖️ 第 4 名：🎓 ${p4.name} （${p4.score} 分）
+      </div>
+    `;
+  }
+
+  showPanel('lessonPodiumPanel');
+  playSound('fanfare');
+
+  if (p1 && p1.score > 0) {
+    speak(`恭喜${lessonName}生字大考驗圓滿結束！恭喜第一名${p1.name}榮獲本課生字王稱號！`);
+  } else {
+    speak(`恭喜${lessonName}生字大考驗圓滿結束！大家表現得非常精彩！`);
+  }
+
+  broadcastMsg({
+    type: 'PODIUM_SHOW',
+    roomCode: roomCode,
+    lessonName: lessonName
+  });
+}
+
+function goToNextLessonFromPodium() {
+  if (selectedLessonIdx + 1 < VOCAB_DATA.length) {
     isFirstQuestionOfLesson = true;
     startTeacherStage(selectedLessonIdx + 1);
   } else {
     alert('🎉 恭喜已完成全部 18 課的「一字千金」題目大拷問！');
   }
+}
+
+function replayCurrentLessonFromPodium() {
+  isFirstQuestionOfLesson = true;
+  startTeacherStage(selectedLessonIdx);
 }
 
 function toggleStudentMark(name) {
