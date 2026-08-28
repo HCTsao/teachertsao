@@ -222,9 +222,9 @@ const VOCAB_DATA = [
       },
       {
         "char": "個",
-        "zhuyin": "ㄍㄜˋ",
+        "zhuyin": "ㄍㄜ˙",
         "compound": "這個",
-        "displaySentence": "這 ㄍㄜˋ 紅蘋果又甜又多汁。",
+        "displaySentence": "這 ㄍㄜ˙ 紅蘋果又甜又多汁。",
         "ttsText": "這個紅蘋果又甜又多汁。請寫出這個的個。",
         "radical": "字",
         "words": [
@@ -401,10 +401,10 @@ const VOCAB_DATA = [
     "words": [
       {
         "char": "子",
-        "zhuyin": "ㄗˇ",
-        "compound": "子字",
-        "displaySentence": "學習 ㄗˇ 字能讓我們認識更多美麗的繁體國字。",
-        "ttsText": "學習子字能讓我們認識更多美麗的繁體國字。請寫出子字的子。",
+        "zhuyin": "ㄗ˙",
+        "compound": "種子",
+        "displaySentence": "農夫把種 ㄗ˙ 撒在田裡。",
+        "ttsText": "農夫把種子撒在田裡。請寫出種子的子。",
         "radical": "字",
         "words": [
           "子字"
@@ -1196,9 +1196,9 @@ const VOCAB_DATA = [
       {
         "char": "媽",
         "zhuyin": "ㄇㄚ",
-        "compound": "媽字",
-        "displaySentence": "學習 ㄇㄚ 字能讓我們認識更多美麗的繁體國字。",
-        "ttsText": "學習媽字能讓我們認識更多美麗的繁體國字。請寫出媽字的媽。",
+        "compound": "媽媽",
+        "displaySentence": "慈祥的 ㄇㄚ ㄇㄚ˙ 照顧我們長大。",
+        "ttsText": "慈祥的媽媽照顧我們長大。請寫出媽媽的媽。",
         "radical": "字",
         "words": [
           "媽字"
@@ -1434,9 +1434,9 @@ const VOCAB_DATA = [
       {
         "char": "爸",
         "zhuyin": "ㄅㄚˋ",
-        "compound": "爸字",
-        "displaySentence": "學習 ㄅㄚˋ 字能讓我們認識更多美麗的繁體國字。",
-        "ttsText": "學習爸字能讓我們認識更多美麗的繁體國字。請寫出爸字的爸。",
+        "compound": "爸爸",
+        "displaySentence": "我有一位愛我的 ㄅㄚˋ ㄅㄚ˙ 。",
+        "ttsText": "我有一位愛我的爸爸。請寫出爸爸的爸。",
         "radical": "字",
         "words": [
           "爸字"
@@ -1745,9 +1745,9 @@ const VOCAB_DATA = [
       {
         "char": "奶",
         "zhuyin": "ㄋㄞˇ",
-        "compound": "奶字",
-        "displaySentence": "學習 ㄋㄞˇ 字能讓我們認識更多美麗的繁體國字。",
-        "ttsText": "學習奶字能讓我們認識更多美麗的繁體國字。請寫出奶字的奶。",
+        "compound": "奶奶",
+        "displaySentence": "親切的 ㄋㄞˇ ㄋㄞ˙ 常說故事給我聽。",
+        "ttsText": "親切的奶奶常說故事給我聽。請寫出奶奶的奶。",
         "radical": "字",
         "words": [
           "奶字"
@@ -1789,9 +1789,9 @@ const VOCAB_DATA = [
       {
         "char": "弟",
         "zhuyin": "ㄉㄧˋ",
-        "compound": "弟字",
-        "displaySentence": "學習 ㄉㄧˋ 字能讓我們認識更多美麗的繁體國字。",
-        "ttsText": "學習弟字能讓我們認識更多美麗的繁體國字。請寫出弟字的弟。",
+        "compound": "弟弟",
+        "displaySentence": "可愛的 ㄉㄧˋ ㄉㄧ˙ 喜歡玩積木。",
+        "ttsText": "可愛的弟弟喜歡玩積木。請寫出弟弟的弟。",
         "radical": "字",
         "words": [
           "弟字"
@@ -2100,9 +2100,9 @@ const VOCAB_DATA = [
       {
         "char": "妹",
         "zhuyin": "ㄇㄟˋ",
-        "compound": "妹字",
-        "displaySentence": "學習 ㄇㄟˋ 字能讓我們認識更多美麗的繁體國字。",
-        "ttsText": "學習妹字能讓我們認識更多美麗的繁體國字。請寫出妹字的妹。",
+        "compound": "妹妹",
+        "displaySentence": "小 ㄇㄟˋ ㄇㄟ˙ 手裡拿著風車。",
+        "ttsText": "小妹妹手裡拿著風車。請寫出妹妹的妹。",
         "radical": "字",
         "words": [
           "妹字"
@@ -2814,9 +2814,9 @@ const VOCAB_DATA = [
       {
         "char": "謝",
         "zhuyin": "ㄒㄧㄝˋ",
-        "compound": "謝字",
-        "displaySentence": "學習 ㄒㄧㄝˋ 字能讓我們認識更多美麗的繁體國字。",
-        "ttsText": "學習謝字能讓我們認識更多美麗的繁體國字。請寫出謝字的謝。",
+        "compound": "謝謝",
+        "displaySentence": "非常 ㄒㄧㄝˋ ㄒㄧㄝ˙ 老師的指導。",
+        "ttsText": "非常謝謝老師的指導。請寫出謝謝的謝。",
         "radical": "字",
         "words": [
           "謝字"

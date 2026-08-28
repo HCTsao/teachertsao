@@ -246,10 +246,12 @@ function revealCurrentQuestionText() {
   const lesson = VOCAB_DATA[selectedLessonIdx];
   if (!lesson || !shuffledWords[selectedWordIdx]) return;
   const qObj = shuffledWords[selectedWordIdx];
-  const formattedSentence = qObj.displaySentence.replace(
-    qObj.zhuyin,
-    formatZhuyinVertical(qObj.zhuyin)
-  );
+  
+  // 自動將題目句子中的所有注音單詞 (如 ㄇㄚ ㄇㄚ˙、ㄅㄚˋ ㄅㄚ˙ 等) 轉為精美直排注音標籤
+  const formattedSentence = qObj.displaySentence.replace(/[\u3105-\u3129ˊˇˋ˙•‧・.]+/g, (match) => {
+    return formatZhuyinVertical(match);
+  });
+
   document.getElementById('teacherSentenceDisplay').innerHTML = formattedSentence;
 }
 
