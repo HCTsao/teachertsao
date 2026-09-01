@@ -767,8 +767,17 @@ function toggleStudentMark(name) {
 }
 
 function gradeStudentMark(name, resultType) {
-  if (currentMarks[name] === 'CIRCLE' && resultType === 'CROSS') {
+  const prevMark = currentMarks[name];
+
+  // 防重複計分機制：只有當狀態從「非 ⭕」變更為「⭕」時才 +1
+  if (prevMark !== 'CIRCLE' && resultType === 'CIRCLE') {
+    studentScores[name] = (studentScores[name] || 0) + 1;
+    saveScores();
+  } 
+  // 若原本是 ⭕ 倒扣改標為 CROSS/null 時才 -1
+  else if (prevMark === 'CIRCLE' && resultType !== 'CIRCLE') {
     studentScores[name] = Math.max(0, (studentScores[name] || 0) - 1);
+    saveScores();
   }
 
   currentMarks[name] = resultType;
@@ -788,14 +797,12 @@ function gradeStudentMark(name, resultType) {
       symbol.className = 'mark-symbol circle';
     }
     if (overlay) overlay.classList.add('active');
-
-    studentScores[name] = (studentScores[name] || 0) + 1;
-    saveScores();
   } else {
     // 錯的不用打叉：隱藏 overlay，保持學生原始手寫筆跡 100% 清晰
     if (overlay) overlay.classList.remove('active');
-    saveScores();
   }
+
+  updateScoreboardUI();
 
   broadcastMsg({
     type: 'MARK_RESULT',
