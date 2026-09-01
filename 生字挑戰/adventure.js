@@ -110,7 +110,11 @@ function playSound(type) {
 function speak(text) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
-  const pureChineseText = text.replace(/[\u3105-\u3129\u02CA\u02C7\u02CB\u02D9]/g, '');
+  let pureChineseText = text.replace(/[\u3105-\u3129\u02CA\u02C7\u02CB\u02D9]/g, '');
+  
+  // 修正「冠宏」的發音，讓 TTS 語音朗讀時將「冠」精確發四聲「罐 (ㄍㄨㄢˋ)」
+  pureChineseText = pureChineseText.replace(/冠宏/g, '罐宏');
+
   const utter = new SpeechSynthesisUtterance(pureChineseText);
   utter.lang = 'zh-TW';
   utter.rate = 0.85;
