@@ -808,6 +808,18 @@
       });
     });
 
+    // 招式 PP 限定使用次數：威力越強使用次數越少
+    function getMoveMaxPp(move) {
+      if (!move) return 10;
+      if (move.maxPp !== undefined) return move.maxPp;
+      const power = move.power || 0;
+      if (power <= 0) return 25;
+      if (power <= 18) return 20;
+      if (power <= 25) return 12;
+      if (power <= 42) return 7;
+      return 4;
+    }
+
     // Initial Data Structure
     const defaultStudents = {
       "1": { name: "陳洪福", pokemons: [] },
@@ -1185,7 +1197,7 @@
           const move = MOVES_DETAILS_MAP[m];
           return `
             <span style="background: rgba(255,255,255,0.6); border: 1px solid rgba(0,0,0,0.15); padding: 8px 12px; border-radius: 12px; font-weight: 700; font-size: 0.85rem; color: #334155; display: inline-flex; align-items: center; justify-content: center; gap: 4px; box-shadow: var(--shadow-sm);">
-              ${m} ${getTypeLabel(move.type)}
+              ${m} ${getTypeLabel(move.type)} <span style="font-size:0.75rem; color:#64748b; font-weight:800; margin-left:2px;">PP:${getMoveMaxPp(move)}</span>
             </span>
           `;
         }).join('');
@@ -1548,7 +1560,7 @@
           <div style="display: flex; align-items: center; gap: 8px; font-weight: 700;">
             <span>${name}</span>
             ${getTypeLabel(move.type)}
-            <span style="font-size: 0.75rem; color: #94a3b8;">(威力: ${move.power || '-'})</span>
+            <span style="font-size: 0.75rem; color: #94a3b8;">(威力: ${move.power || '-'} | PP: ${getMoveMaxPp(move)})</span>
           </div>
           <input type="checkbox" style="width: 18px; height: 18px; cursor: pointer;" ${isChecked ? 'checked' : ''}>
         `;
@@ -1869,6 +1881,15 @@
       const p1Moves = active1.moves || initializeDefaultMoves(active1);
       const p2Moves = active2.moves || initializeDefaultMoves(active2);
 
+      // Initialize PP for Player 1's moves
+      const p1MovePP = {};
+      p1Moves.forEach(mName => {
+        const mObj = MOVES_DETAILS_MAP[mName];
+        if (mObj) {
+          p1MovePP[mName] = getMoveMaxPp(mObj);
+        }
+      });
+
       battleState.active = true;
       battleState.logQueue = [];
       battleState.isNarrating = false;
@@ -1896,7 +1917,8 @@
         atkMod: 1,
         defMod: 1,
         poisoned: false,
-        moves: p1Moves
+        moves: p1Moves,
+        movePP: p1MovePP
       };
       
       battleState.p2 = {
@@ -1991,25 +2013,67 @@
         // Player 1's turn (Manual Control)
         document.getElementById('battle-auto-indicator').style.display = 'none';
         document.getElementById('battle-moves-grid').style.display = 'grid';
-        document.getElementById('battle-log').textContent = `請選擇 ${battleState.p1.name}的${battleState.p1.pokeDetails.name} 要使用的招式...`;
         
         const fighterMoves = battleState.p1.moves;
+        let anyPpAvailable = false;
+
         for (let i = 0; i < 4; i++) {
           const btn = document.getElementById(`move-btn-${i}`);
           const moveName = fighterMoves[i];
           if (moveName) {
             const move = MOVES_DETAILS_MAP[moveName];
-            btn.innerHTML = `${moveName} ${getTypeLabel(move.type, "2px 6px", "0.75rem", "4px", "5px")}`;
-            btn.disabled = false;
-            btn.style.borderColor = move.type === 'normal' ? '#94a3b8' : (move.type === 'status' ? '#eab308' : '#ef4444');
+            const maxPp = getMoveMaxPp(move);
+            const currentPp = (battleState.p1.movePP && battleState.p1.movePP[moveName] !== undefined)
+              ? battleState.p1.movePP[moveName]
+              : maxPp;
+
+            const ppColor = currentPp === 0 ? '#ef4444' : (currentPp <= Math.ceil(maxPp * 0.3) ? '#f59e0b' : '#fef08a');
+            btn.innerHTML = `
+              <div style="display:flex; justify-content:space-between; align-items:center; width:100%; font-size:0.85rem; font-weight:700;">
+                <span>${moveName} ${getTypeLabel(move.type, "2px 6px", "0.75rem", "4px", "5px")}</span>
+                <span style="font-size:0.75rem; font-weight:900; color:${ppColor}; margin-left:4px;">PP ${currentPp}/${maxPp}</span>
+              </div>
+            `;
+
+            if (currentPp <= 0) {
+              btn.disabled = true;
+              btn.style.opacity = '0.45';
+              btn.style.borderColor = '#64748b';
+              btn.style.cursor = 'not-allowed';
+            } else {
+              btn.disabled = false;
+              btn.style.opacity = '1';
+              btn.style.borderColor = move.type === 'normal' ? '#94a3b8' : (move.type === 'status' ? '#eab308' : '#ef4444');
+              btn.style.cursor = 'pointer';
+              anyPpAvailable = true;
+            }
           } else {
             btn.innerHTML = "-";
             btn.disabled = true;
+            btn.style.opacity = '0.4';
             btn.style.borderColor = 'rgba(255,255,255,0.1)';
+            btn.style.cursor = 'not-allowed';
           }
         }
+
+        if (!anyPpAvailable) {
+          const btn0 = document.getElementById('move-btn-0');
+          btn0.disabled = false;
+          btn0.style.opacity = '1';
+          btn0.style.borderColor = '#ef4444';
+          btn0.style.cursor = 'pointer';
+          btn0.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; font-size:0.85rem; font-weight:700;">
+              <span style="color:#ef4444;">💥 掙扎 (PP耗盡)</span>
+              <span style="font-size:0.75rem; font-weight:bold; color:#ef4444;">PP ∞</span>
+            </div>
+          `;
+          document.getElementById('battle-log').textContent = `${battleState.p1.name}的${battleState.p1.pokeDetails.name} 所有招式 PP 均已耗盡！只能使用「掙扎」！`;
+        } else {
+          document.getElementById('battle-log').textContent = `請選擇 ${battleState.p1.name}的${battleState.p1.pokeDetails.name} 要使用的招式...`;
+        }
       } else {
-        // Player 2's turn (AI Control)
+        // Player 2's turn (AI Control - 無 PP 限制)
         document.getElementById('battle-moves-grid').style.display = 'none';
         document.getElementById('battle-auto-indicator').style.display = 'block';
         document.getElementById('battle-auto-indicator').innerHTML = `<i class="fa-solid fa-robot"></i> 對手 AI 思考中...`;
@@ -2029,9 +2093,36 @@
     function playerSelectMove(index) {
       if (battleState.isNarrating) return;
       const fighter = battleState.currentTurn === 'p1' ? battleState.p1 : battleState.p2;
-      const moveName = fighter.moves[index];
-      const move = MOVES_DETAILS_MAP[moveName];
-      executeMove(fighter, move);
+
+      if (battleState.currentTurn === 'p1') {
+        let anyPp = false;
+        fighter.moves.forEach(m => {
+          if ((fighter.movePP && fighter.movePP[m] || 0) > 0) anyPp = true;
+        });
+
+        if (!anyPp) {
+          // PP 全數耗盡，施展掙扎
+          const struggleMove = { name: "掙扎", power: 14, type: "normal", status: "none" };
+          executeMove(fighter, struggleMove);
+          return;
+        }
+
+        const moveName = fighter.moves[index];
+        const currentPp = (fighter.movePP && fighter.movePP[moveName]) || 0;
+        if (currentPp <= 0) {
+          alert("該招式的 PP 已耗盡，請選擇其他招式！");
+          return;
+        }
+
+        // 扣除玩家招式的 1 次 PP
+        fighter.movePP[moveName]--;
+        const move = MOVES_DETAILS_MAP[moveName];
+        executeMove(fighter, move);
+      } else {
+        const moveName = fighter.moves[index];
+        const move = MOVES_DETAILS_MAP[moveName];
+        executeMove(fighter, move);
+      }
     }
 
     function getTypeEffectiveness(moveType, defenderFamily) {
