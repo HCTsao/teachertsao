@@ -724,32 +724,37 @@
       transform: translateX(-50%) translateY(-10px);
     }
 
-    /* 全螢幕模式 (Fullscreen Mode) 隱藏最上排工具列與按鈕 */
-    :fullscreen .pres-header,
-    :-webkit-full-screen .pres-header,
-    :-moz-full-screen .pres-header,
-    :-ms-fullscreen .pres-header,
-    .fullscreen-active .pres-header,
-    :fullscreen .progress-bar-wrap,
-    :-webkit-full-screen .progress-bar-wrap,
-    :-moz-full-screen .progress-bar-wrap,
-    :-ms-fullscreen .progress-bar-wrap,
-    .fullscreen-active .progress-bar-wrap {
-      display: none !important;
-    }
+    /* 全螢幕模式 (Fullscreen Mode) 隱藏最上排工具列與按鈕 (分開宣告避免選擇器失效) */
+    :fullscreen .pres-header { display: none !important; }
+    :-webkit-full-screen .pres-header { display: none !important; }
+    :-moz-full-screen .pres-header { display: none !important; }
+    :-ms-fullscreen .pres-header { display: none !important; }
+    body.fullscreen-active .pres-header { display: none !important; }
+    body.is-fullscreen .pres-header { display: none !important; }
+
+    :fullscreen .progress-bar-wrap { display: none !important; }
+    :-webkit-full-screen .progress-bar-wrap { display: none !important; }
+    :-moz-full-screen .progress-bar-wrap { display: none !important; }
+    :-ms-fullscreen .progress-bar-wrap { display: none !important; }
+    body.fullscreen-active .progress-bar-wrap { display: none !important; }
+    body.is-fullscreen .progress-bar-wrap { display: none !important; }
 
     :fullscreen .presentation-stage,
     :-webkit-full-screen .presentation-stage,
-    .fullscreen-active .presentation-stage {
-      padding: 12px 18px !important;
+    body.fullscreen-active .presentation-stage,
+    body.is-fullscreen .presentation-stage {
+      padding: 8px 16px !important;
     }
 
     :fullscreen .slide-card,
     :-webkit-full-screen .slide-card,
-    .fullscreen-active .slide-card {
+    body.fullscreen-active .slide-card,
+    body.is-fullscreen .slide-card {
       max-width: 100vw !important;
-      height: min(900px, calc(100vh - 100px)) !important;
-      border-radius: 24px !important;
+      height: min(920px, calc(100vh - 90px)) !important;
+      border-radius: 20px !important;
+      border: none !important;
+      box-shadow: none !important;
     }
 
     /* 列印樣式 */
@@ -777,15 +782,6 @@
       </button>
       <button class="btn-action btn-save" onclick="saveEdits()">
         <span>💾</span> 儲存修改
-      </button>
-      <button class="btn-action" onclick="resetEdits()">
-        <span>🔄</span> 重置內容
-      </button>
-      <button class="btn-action" onclick="toggleOverview()">
-        <span>📜</span> 總覽 (O)
-      </button>
-      <button class="btn-action" onclick="window.print()">
-        <span>🖨️</span> 列印簡報
       </button>
       <button class="btn-action" onclick="toggleFullscreen()">
         <span>🖥️</span> 全螢幕 (F)
@@ -1203,34 +1199,40 @@
     });
 
     function loadSavedData() {
-      const savedSlides = localStorage.getItem('pts_slides_115_v5');
-      const savedImages = localStorage.getItem('pts_images_115_v5') || localStorage.getItem('pts_images_115_v4') || localStorage.getItem('pts_images_115_v3') || localStorage.getItem('pts_images_115_v2') || localStorage.getItem('pts_images_115');
+      // 1. 深度搜尋全域 localStorage 復原已上傳的圖片（深層自動搜尋機制）
+      storedImages = {};
+      const imgKeys = ['pts_images_115_v6', 'pts_images_115_v5', 'pts_images_115_v4', 'pts_images_115_v3', 'pts_images_115_v2', 'pts_images_115'];
+      
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        const val = localStorage.getItem(k);
+        if (val) {
+          if (k === 'schedule_img' || (k.includes('schedule') && val.length > 50)) storedImages['schedule_img'] = val;
+          if (k === 'assessment_img' || (k.includes('assessment') && val.length > 50)) storedImages['assessment_img'] = val;
+          if (k.startsWith('pts_images_')) {
+            try {
+              const obj = JSON.parse(val);
+              if (obj.schedule_img && !storedImages['schedule_img']) storedImages['schedule_img'] = obj.schedule_img;
+              if (obj.assessment_img && !storedImages['assessment_img']) storedImages['assessment_img'] = obj.assessment_img;
+            } catch(e) {}
+          }
+        }
+      }
 
-      if (savedSlides) {
-        try { 
-          slides = JSON.parse(savedSlides);
-          // 檢查若包含舊版按鈕 HTML 或殘留文字，強制恢復預設最新模板
-          slides.forEach((s, idx) => {
-            if (s.content && (s.content.includes('btn-sm-upload') || s.content.includes('triggerFileUpload') || s.content.includes('promptImageUrl') || s.content.includes('上傳') || s.content.includes('網址'))) {
-              slides[idx].content = defaultSlides[idx].content;
+      // 2. 載入簡報內文
+      slides = JSON.parse(JSON.stringify(defaultSlides));
+      const savedSlidesRaw = localStorage.getItem('pts_slides_115_v6') || localStorage.getItem('pts_slides_115_v5') || localStorage.getItem('pts_slides_115_v4') || localStorage.getItem('pts_slides_115_v3') || localStorage.getItem('pts_slides_115_v2') || localStorage.getItem('pts_slides_115');
+      if (savedSlidesRaw) {
+        try {
+          const parsedSlides = JSON.parse(savedSlidesRaw);
+          parsedSlides.forEach((ps, idx) => {
+            if (slides[idx] && ps.content) {
+              if (!ps.content.includes('btn-sm-upload') && !ps.content.includes('triggerFileUpload')) {
+                slides[idx].content = ps.content;
+              }
             }
           });
-        } catch(e) { 
-          slides = JSON.parse(JSON.stringify(defaultSlides)); 
-        }
-      } else {
-        slides = JSON.parse(JSON.stringify(defaultSlides));
-      }
-
-      storedImages = {};
-      if (savedImages) {
-        try { storedImages = JSON.parse(savedImages); } catch(e) {}
-      }
-      if (!storedImages['schedule_img'] && localStorage.getItem('schedule_img')) {
-        storedImages['schedule_img'] = localStorage.getItem('schedule_img');
-      }
-      if (!storedImages['assessment_img'] && localStorage.getItem('assessment_img')) {
-        storedImages['assessment_img'] = localStorage.getItem('assessment_img');
+        } catch(e) {}
       }
     }
 
@@ -1307,7 +1309,7 @@
         btn.classList.add('active');
         document.getElementById('edit-text').textContent = "離開編輯";
         card.classList.add('edit-mode-active');
-        showToast('✏️ 編輯模式已開啟，可點擊文字直接修改！');
+        showToast('✏️ 編輯模式已開啟（滑鼠雙擊圖片可更換圖片）');
       } else {
         btn.classList.remove('active');
         document.getElementById('edit-text').textContent = "編輯模式";
@@ -1336,14 +1338,16 @@
 
     function saveEdits() {
       saveCurrentSlideHTML();
-      localStorage.setItem('pts_slides_115_v5', JSON.stringify(slides));
-      localStorage.setItem('pts_images_115_v5', JSON.stringify(storedImages));
+      localStorage.setItem('pts_slides_115_v6', JSON.stringify(slides));
+      localStorage.setItem('pts_images_115_v6', JSON.stringify(storedImages));
+      if (storedImages['schedule_img']) localStorage.setItem('schedule_img', storedImages['schedule_img']);
+      if (storedImages['assessment_img']) localStorage.setItem('assessment_img', storedImages['assessment_img']);
       showToast('💾 簡報內文與圖片已成功儲存至本機！');
     }
 
     function resetEdits() {
       if (confirm('確定要恢復預設簡報內容與圖片嗎？所有修改將會重置。')) {
-        ['pts_slides_115_v5','pts_slides_115_v4','pts_slides_115_v3','pts_slides_115_v2','pts_slides_115','pts_images_115_v5','pts_images_115_v4','pts_images_115_v3','pts_images_115_v2','pts_images_115'].forEach(k => localStorage.removeItem(k));
+        ['pts_slides_115_v6','pts_slides_115_v5','pts_slides_115_v4','pts_slides_115_v3','pts_slides_115_v2','pts_slides_115','pts_images_115_v6','pts_images_115_v5','pts_images_115_v4','pts_images_115_v3','pts_images_115_v2','pts_images_115'].forEach(k => localStorage.removeItem(k));
         slides = JSON.parse(JSON.stringify(defaultSlides));
         storedImages = {};
         renderSlide(curIndex);
@@ -1360,8 +1364,35 @@
 
       if (storedImages[key] && previewBox && dz) {
         dz.classList.add('has-image');
-        previewBox.innerHTML = `<img src="${storedImages[key]}" class="image-preview" alt="圖表" onclick="openLightbox(this.src)" title="點擊放大全螢幕查看">`;
+        previewBox.innerHTML = `<img src="${storedImages[key]}" class="image-preview" alt="圖表" onclick="if(!isEditMode){openLightbox(this.src);}else{promptImageUpload('${key}');}" title="點擊放大全螢幕查看">`;
+      } else if (previewBox && dz) {
+        previewBox.innerHTML = `
+          <div style="cursor:pointer; padding:30px;" onclick="promptImageUpload('${key}')">
+            <span style="font-size: 3.5rem;">📷</span>
+            <p style="font-size: 1.3rem; font-weight: 800; color: #475569; margin-top:8px;">點擊此處選擇圖片上傳</p>
+          </div>
+        `;
       }
+    }
+
+    function promptImageUpload(key) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (evt) => {
+            storedImages[key] = evt.target.result;
+            localStorage.setItem(key, evt.target.result);
+            updateImagePreview(key);
+            saveEdits();
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      input.click();
     }
 
     function openLightbox(src) {
@@ -1416,10 +1447,31 @@
     }
 
     function toggleFullscreen() {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(err => console.log(err));
+      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        const docEl = document.documentElement;
+        const req = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+        if (req) {
+          req.call(docEl).then(() => {
+            document.body.classList.add('fullscreen-active', 'is-fullscreen');
+          }).catch(() => {
+            document.body.classList.toggle('fullscreen-active');
+            document.body.classList.toggle('is-fullscreen');
+          });
+        } else {
+          document.body.classList.toggle('fullscreen-active');
+          document.body.classList.toggle('is-fullscreen');
+        }
       } else {
-        if (document.exitFullscreen) document.exitFullscreen();
+        const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+        if (exit) {
+          exit.call(document).then(() => {
+            document.body.classList.remove('fullscreen-active', 'is-fullscreen');
+          }).catch(() => {
+            document.body.classList.remove('fullscreen-active', 'is-fullscreen');
+          });
+        } else {
+          document.body.classList.remove('fullscreen-active', 'is-fullscreen');
+        }
       }
     }
   </script>
