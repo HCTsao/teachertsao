@@ -917,6 +917,25 @@
             const minBound = Math.min(levelConfig.startNum, levelConfig.firstTarget, end);
             const maxBound = Math.max(levelConfig.startNum, levelConfig.firstTarget, end);
 
+            // 優先考慮特規誘答選項 (如 99 時包含 90、199 時包含 190)
+            let priorityCandidates = [];
+            if (currentTarget === 99) {
+                priorityCandidates.push(90, 100, 98);
+            } else if (currentTarget === 199) {
+                priorityCandidates.push(190, 200, 198);
+            } else if (currentTarget % 10 === 9 && step < 0) {
+                const baseTen = Math.floor(currentTarget / 10) * 10;
+                priorityCandidates.push(baseTen, currentTarget + 1, currentTarget - 1);
+            }
+
+            for (const val of priorityCandidates) {
+                if (wrongVals.length >= 2) break;
+                if (val >= minBound && val <= maxBound && !usedVals.has(val)) {
+                    wrongVals.push(val);
+                    usedVals.add(val);
+                }
+            }
+
             const absStep = Math.abs(step);
             const distractorStep = (currentTarget % 10 === 0 && absStep === 1) ? 10 : absStep;
 
