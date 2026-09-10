@@ -351,12 +351,13 @@
           <div class="card-title"><i class="fa-solid fa-wand-magic-sparkles"></i> 點數操作</div>
           
           <div class="form-group">
-            <label for="student-select">選擇學生</label>
+            <label for="student-select">選擇學生 / 老師</label>
             <select id="student-select" onchange="updateSelectedInfo()">
               <option value="1">1號 陳洪福</option>
               <option value="2">2號 蕭廷恩</option>
               <option value="3">3號 江岳泰</option>
               <option value="4">4號 陳冠宏</option>
+              <option value="teacher">👑 紅旗老師</option>
             </select>
           </div>
 
@@ -371,13 +372,13 @@
 
           <div style="margin-top: 25px; border-top: 1px dashed var(--border-color); padding-top: 20px;">
             <div style="font-weight: 800; font-size: 0.95rem; color: #0369a1; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-              <i class="fa-solid fa-crown" style="color: #eab308;"></i> 老師的寶可夢頁面設定
+              <i class="fa-solid fa-crown" style="color: #eab308;"></i> 紅旗老師的寶可夢頁面設定
             </div>
             <p style="font-size: 0.82rem; color: #64748b; margin-bottom: 12px; line-height: 1.4;">
-              預設曹老師 (水箭龜 Lv.20)。開啟後會在集點卡頁面顯示「👑 曹老師」，並可於對戰中選擇曹老師。
+              預設紅旗老師 (水箭龜)。開啟後會在集點卡頁面顯示「👑 紅旗老師」，並可於對戰中選擇紅旗老師。可在上方下拉選單選擇「👑 紅旗老師」進行增減分操作。
             </p>
             <button id="btn-toggle-teacher-page" onclick="toggleTeacherPageAdmin()" style="width: 100%; padding: 10px; border-radius: 12px; font-weight: 800; font-size: 0.9rem; border: none; cursor: pointer; font-family: inherit; transition: background 0.2s; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white;">
-              <i class="fa-solid fa-circle-check"></i> 老師頁面：已啟用 (點擊關閉)
+              <i class="fa-solid fa-circle-check"></i> 紅旗老師頁面：已啟用 (點擊關閉)
             </button>
           </div>
 
@@ -519,8 +520,21 @@
       "1": { name: "陳洪福", pokemons: [] },
       "2": { name: "蕭廷恩", pokemons: [] },
       "3": { name: "江岳泰", pokemons: [] },
-      "4": { name: "陳冠宏", pokemons: [] }
-    };    // 2026 與 2027 國定假日與連假對照表（連假期間一律沿用連假前最後一個上學日）
+      "4": { name: "陳冠宏", pokemons: [] },
+      "teacher": {
+        name: "紅旗老師",
+        isTeacher: true,
+        pokemons: [
+          {
+            family: "water",
+            points: 200,
+            moves: ["水炮", "加農水炮", "縮入殼中", "水之波動"],
+            moveLibrary: ["撞擊", "縮入殼中", "水槍", "搖尾巴", "水之波動", "咬住", "水炮", "濁流", "加農水炮"]
+          }
+        ]
+      }
+    };
+    // 2026 與 2027 國定假日與連假對照表（連假期間一律沿用連假前最後一個上學日）
     const HOLIDAY_FALLBACKS = {
       // 2026 元旦
       "2026-01-01": "2025-12-31",
@@ -686,11 +700,11 @@
       if (showTeacherPage) {
         btn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
         btn.style.color = 'white';
-        btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> 老師頁面：已啟用 (點擊關閉)';
+        btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> 紅旗老師頁面：已啟用 (點擊關閉)';
       } else {
         btn.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
         btn.style.color = 'white';
-        btn.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> 老師頁面：已取消/關閉 (點擊開啟)';
+        btn.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> 紅旗老師頁面：已取消/關閉 (點擊開啟)';
       }
     }
 
@@ -724,7 +738,7 @@
       container.innerHTML = '';
 
       for(let id in students) {
-        if (id === 'teacher') continue;
+        if (id === 'teacher' && !showTeacherPage) continue;
         const student = students[id];
         const pokes = student.pokemons || [];
         const activeIndex = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < pokes.length) ? student.activePokemonIndex : (pokes.length - 1);
@@ -745,6 +759,10 @@
           }
         }
 
+        const isTeacher = (id === 'teacher' || student.isTeacher);
+        const displayName = isTeacher ? `👑 ${student.name}` : `${id}號 ${student.name}`;
+        const badgeBg = isTeacher ? 'background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : (activePoke && activePoke.points >= 300 ? 'background: #10b981' : 'background: #0369a1');
+
         const item = document.createElement('div');
         item.className = 'student-item';
         item.innerHTML = `
@@ -753,14 +771,14 @@
               <img src="${imgUrl}" alt="${pName}">
             </div>
             <div>
-              <div class="student-name">${id}號 ${student.name}</div>
+              <div class="student-name">${displayName}</div>
               <div class="student-pokemon-desc">
                 寶可夢數量: ${pokes.length} 隻 | 目前夥伴: ${pName}
               </div>
             </div>
           </div>
           <div>
-            <span class="student-badge" style="background: ${activePoke && activePoke.points >= 300 ? '#10b981' : '#0369a1'}">
+            <span class="student-badge" style="${badgeBg}">
               Lv. ${pLv} (${pPoints}分)
             </span>
           </div>
