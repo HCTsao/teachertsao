@@ -709,7 +709,17 @@
         </div>
         
         <!-- Controls area -->
-        <div id="battle-controls" style="display: flex; align-items: center; justify-content: center; padding-left: 10px;">
+        <div id="battle-controls" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding-left: 10px; width: 100%; height: 100%;">
+          <!-- Wild Action Bar -->
+          <div id="battle-wild-bar" style="display: none; width: 100%; margin-bottom: 4px; gap: 4px;">
+            <button id="btn-wild-ball" onclick="throwPokeballInBattle()" style="flex: 1; background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: white; border: 1px solid #fca5a5; padding: 5px 8px; border-radius: 8px; font-weight: 800; font-size: 0.8rem; cursor: pointer; font-family: inherit; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; gap: 4px;">
+              🔴 投擲精靈球 (剩5顆 | 收服率 20%)
+            </button>
+            <button id="btn-wild-run" onclick="runAwayWildInBattle()" style="background: linear-gradient(135deg, #475569 0%, #334155 100%); color: white; border: 1px solid #94a3b8; padding: 5px 10px; border-radius: 8px; font-weight: 800; font-size: 0.8rem; cursor: pointer; font-family: inherit; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; gap: 4px;">
+              🏃 逃跑
+            </button>
+          </div>
+
           <!-- Move options (Manual Mode) -->
           <div id="battle-moves-grid" style="display: none; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; height: 100%;">
             <button class="btn-battle-move" id="move-btn-0" onclick="playerSelectMove(0)"></button>
@@ -2234,6 +2244,24 @@
         document.getElementById('battle-auto-indicator').style.display = 'none';
         document.getElementById('battle-moves-grid').style.display = 'grid';
         
+        const wildBar = document.getElementById('battle-wild-bar');
+        if (battleState.isWild) {
+          if (wildBar) {
+            wildBar.style.display = 'flex';
+            const hpRatio = Math.max(0, battleState.p2.hp) / battleState.p2.maxHp;
+            const catchRate = Math.min(0.90, Math.max(0.20, 0.20 + (1 - hpRatio) * 0.70));
+            const catchPct = Math.round(catchRate * 100);
+            const btnBall = document.getElementById('btn-wild-ball');
+            if (btnBall) {
+              btnBall.innerHTML = `🔴 投擲精靈球 (剩${battleState.wildBallsLeft}顆 | 收服率 ${catchPct}%)`;
+              btnBall.disabled = battleState.wildBallsLeft <= 0;
+              btnBall.style.opacity = battleState.wildBallsLeft <= 0 ? '0.5' : '1';
+            }
+          }
+        } else {
+          if (wildBar) wildBar.style.display = 'none';
+        }
+        
         const fighterMoves = battleState.p1.moves;
         let anyPpAvailable = false;
 
@@ -2290,13 +2318,20 @@
           `;
           document.getElementById('battle-log').textContent = `${battleState.p1.name}的${battleState.p1.pokeDetails.name} 所有招式 PP 均已耗盡！只能使用「掙扎」！`;
         } else {
-          document.getElementById('battle-log').textContent = `請選擇 ${battleState.p1.name}的${battleState.p1.pokeDetails.name} 要使用的招式...`;
+          const promptTxt = battleState.isWild
+            ? `請選擇 ${battleState.p1.name}的${battleState.p1.pokeDetails.name} 的行動（發動攻擊或投擲精靈球）...`
+            : `請選擇 ${battleState.p1.name}的${battleState.p1.pokeDetails.name} 要使用的招式...`;
+          document.getElementById('battle-log').textContent = promptTxt;
         }
       } else {
-        // Player 2's turn (AI Control - 無 PP 限制)
+        // Player 2's turn (AI Control)
         document.getElementById('battle-moves-grid').style.display = 'none';
+        const wildBar = document.getElementById('battle-wild-bar');
+        if (wildBar) wildBar.style.display = 'none';
         document.getElementById('battle-auto-indicator').style.display = 'block';
-        document.getElementById('battle-auto-indicator').innerHTML = `<i class="fa-solid fa-robot"></i> 對手 AI 思考中...`;
+        document.getElementById('battle-auto-indicator').innerHTML = battleState.isWild
+          ? `<i class="fa-solid fa-tree"></i> 野生寶可夢行動中...`
+          : `<i class="fa-solid fa-robot"></i> 對手 AI 思考中...`;
         
         setTimeout(() => {
           const unlockedMoves = getUnlockedMoves(battleState.p2);
@@ -2420,9 +2455,21 @@
               const nextStep = () => {
                 if (defender.hp <= 0) {
                   animateFaint(defenderSide, () => {
-                    queueLog(`${defender.name}的${defender.pokeDetails.name} 倒下了！`, () => {
-                      endBattle(attacker.name);
-                    });
+                    if (battleState.isWild) {
+                      if (defenderSide === 'p2') {
+                        queueLog(`💥 野生的 ${defender.pokeDetails.name} 倒下了！對戰獲勝！`, () => {
+                          endWildBattle(false);
+                        });
+                      } else {
+                        queueLog(`${attacker.name}的${attacker.pokeDetails.name} 倒下了！`, () => {
+                          endWildBattle(false);
+                        });
+                      }
+                    } else {
+                      queueLog(`${defender.name}的${defender.pokeDetails.name} 倒下了！`, () => {
+                        endBattle(attacker.name);
+                      });
+                    }
                   });
                 } else {
                   endTurn();
@@ -3619,34 +3666,7 @@
     function openWildEncounterModal() {
       const student = students[currentStudentId];
       if (!student) return;
-      
-      const modal = document.getElementById('wildEncounterModal');
-      
-      if (!isWildInAdventure) {
-        const pokes = student.pokemons || [];
-        const activeIdx = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < pokes.length) ? student.activePokemonIndex : (pokes.length - 1);
-        const activePoke = pokes.length > 0 ? pokes[activeIdx] : null;
 
-        if (!activePoke || (!student.isTeacher && activePoke.points < 5)) {
-          alert(`⚠️ 你的寶可夢經驗值不足 5 點（目前經驗值：${activePoke ? activePoke.points : 0} 點），無法申請進入野外冒險！\n\n請先完成作業/答題累積經驗值喔！`);
-          return;
-        }
-        modal.style.display = 'flex';
-        startWildAdventure();
-      } else {
-        modal.style.display = 'flex';
-        updateWildUI();
-      }
-    }
-
-    function closeWildEncounterModal() {
-      document.getElementById('wildEncounterModal').style.display = 'none';
-      renderContent();
-    }
-
-    function startWildAdventure() {
-      const student = students[currentStudentId];
-      if (!student) return;
       const pokes = student.pokemons || [];
       const activeIdx = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < pokes.length) ? student.activePokemonIndex : (pokes.length - 1);
       const activePoke = pokes.length > 0 ? pokes[activeIdx] : null;
@@ -3656,225 +3676,248 @@
         return;
       }
 
-      // 申請冒險扣除 5 點經驗值（曹老師免扣除）
+      // 申請冒險扣除 5 點經驗值（曹老師免扣點）
       if (!student.isTeacher) {
         activePoke.points -= 5;
         saveData();
       }
 
-      isWildActionBusy = false;
-      isWildInAdventure = true;
-      wildBallsLeft = 5;
-      wildHpMax = 100;
-      wildHpCurrent = 100;
+      startWildBattle();
+    }
+
+    function startWildBattle() {
+      const student = students[currentStudentId];
+      if (!student) return;
+
+      const pokes = student.pokemons || [];
+      const activeIdx = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < pokes.length) ? student.activePokemonIndex : (pokes.length - 1);
+      const activePoke = pokes.length > 0 ? pokes[activeIdx] : null;
+      if (!activePoke) return;
 
       const randomIdx = Math.floor(Math.random() * WILD_POKEMON_POOL.length);
-      currentWildPoke = WILD_POKEMON_POOL[randomIdx];
+      const wildPoke = WILD_POKEMON_POOL[randomIdx];
 
-      const img = document.getElementById('wild-pokemon-img');
-      if (img) {
-        img.src = currentWildPoke.url;
-        img.style.opacity = '1';
-        img.style.transform = 'scale(1)';
-        img.style.filter = 'drop-shadow(0 10px 15px rgba(0,0,0,0.5))';
-      }
+      const p1Details = getCurrentPokemon(activePoke);
+      const lv1 = Math.floor(activePoke.points / 10);
+      const scale1 = 1.5 + lv1 / 10;
 
-      const titleEl = document.getElementById('wild-pokemon-title');
-      if (titleEl) {
-        titleEl.innerHTML = `
-          野生的 ${currentWildPoke.name} (Lv. 1) ${getTypeLabel(currentWildPoke.type, "2px 6px", "0.8rem", "4px", "6px")}
-        `;
-      }
+      const p1Moves = activePoke.moves || initializeDefaultMoves(activePoke);
+      const p1MovePP = {};
+      p1Moves.forEach(mName => {
+        const mObj = MOVES_DETAILS_MAP[mName];
+        if (mObj) p1MovePP[mName] = getMoveMaxPp(mObj);
+      });
 
-      const logEl = document.getElementById('wild-action-log');
-      if (logEl) {
-        const feeText = student.isTeacher ? "👑 曹老師免扣點！" : "🎯 已扣除 5 點經驗值！";
-        logEl.innerHTML = `
-          ${feeText}獲得 <span style="color:#fef08a; margin: 0 4px;">5 顆精靈球</span>！草叢中發現了野生的 <span style="color:#34d399; margin: 0 4px;">${currentWildPoke.name}</span>！
-        `;
-      }
+      const wildMoves = MOVES_POOL[wildPoke.family]
+        ? MOVES_POOL[wildPoke.family].slice(0, 4).map(m => m.name)
+        : ["撞擊"];
 
-      updateWildUI();
+      battleState.active = true;
+      battleState.isWild = true;
+      battleState.wildCaught = false;
+      battleState.wildBallsLeft = 5;
+      battleState.wildPokeData = wildPoke;
+      battleState.logQueue = [];
+      battleState.isNarrating = false;
+
+      battleState.p1 = {
+        id: currentStudentId,
+        name: student.name,
+        activePoke: activePoke,
+        pokeDetails: p1Details,
+        maxHp: Math.floor(p1Details.hp * scale1 * 0.8),
+        hp: Math.floor(p1Details.hp * scale1 * 0.8),
+        level: lv1,
+        family: activePoke.family,
+        atk: Math.floor(p1Details.atk * scale1),
+        def: Math.floor(p1Details.def * scale1),
+        spatk: Math.floor(p1Details.spatk * scale1),
+        spdef: Math.floor(p1Details.spdef * scale1),
+        speed: Math.floor(p1Details.speed * scale1),
+        atkMod: 1,
+        defMod: 1,
+        poisoned: false,
+        moves: p1Moves,
+        movePP: p1MovePP
+      };
+
+      const wildHp = Math.floor(wildPoke.hp * 1.5);
+      battleState.p2 = {
+        id: 'wild',
+        name: '野生',
+        activePoke: { family: wildPoke.family, points: 10 },
+        pokeDetails: {
+          id: wildPoke.id,
+          name: wildPoke.name,
+          url: wildPoke.url,
+          hp: wildPoke.hp,
+          atk: wildPoke.atk,
+          def: wildPoke.def,
+          spatk: wildPoke.spatk,
+          spdef: wildPoke.spdef,
+          speed: wildPoke.speed
+        },
+        maxHp: wildHp,
+        hp: wildHp,
+        level: 1,
+        family: wildPoke.family,
+        atk: Math.floor(wildPoke.atk * 1.2),
+        def: Math.floor(wildPoke.def * 1.2),
+        spatk: Math.floor(wildPoke.spatk * 1.2),
+        spdef: Math.floor(wildPoke.spdef * 1.2),
+        speed: Math.floor(wildPoke.speed * 1.2),
+        atkMod: 1,
+        defMod: 1,
+        poisoned: false,
+        moves: wildMoves
+      };
+
+      document.getElementById('student-container').style.display = 'none';
+      document.getElementById('battle-container').style.display = 'block';
+      document.getElementById('battle-lobby').style.display = 'none';
+      document.getElementById('battle-arena-card').style.display = 'block';
+
+      document.getElementById('battle-img-p1').src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/${battleState.p1.pokeDetails.id}.png`;
+      document.getElementById('battle-img-p2').src = wildPoke.url;
+
+      document.getElementById('battle-img-p1').style.transform = 'scale(1)';
+      document.getElementById('battle-img-p1').style.opacity = '1';
+      document.getElementById('battle-img-p2').style.transform = 'scale(1)';
+      document.getElementById('battle-img-p2').style.opacity = '1';
+      document.getElementById('battle-img-p2').style.filter = '';
+
+      document.getElementById('battle-name-p1').textContent = `${battleState.p1.name}的${battleState.p1.pokeDetails.name}`;
+      document.getElementById('battle-name-p2').textContent = `野生的${wildPoke.name}`;
+      document.getElementById('battle-lv-p1').textContent = `Lv.${battleState.p1.level}`;
+      document.getElementById('battle-lv-p2').textContent = `Lv.1`;
+
+      updateBattleUI();
+
+      battleBGM.currentTime = 0;
+      battleBGM.play().catch(err => console.log("音訊播放限制：", err));
+
+      const feeText = student.isTeacher ? "👑 曹老師免扣點！" : "🎯 已扣除 5 點經驗值！";
+      queueLog(`${feeText}進入野外草叢... 遇見了野生的 ${wildPoke.name}！`, () => {
+        const speed1 = battleState.p1.speed;
+        const speed2 = battleState.p2.speed;
+        battleState.currentTurn = speed1 >= speed2 ? 'p1' : 'p2';
+        startTurn();
+      });
     }
 
-    function updateWildUI() {
-      const student = students[currentStudentId];
-      const pokes = student ? student.pokemons : [];
-      const activeIdx = (student && student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < pokes.length) ? student.activePokemonIndex : (pokes.length - 1);
-      const activePoke = pokes.length > 0 ? pokes[activeIdx] : null;
-      
-      const activeName = activePoke ? getCurrentPokemon(activePoke).name : '無';
-      const activePts = activePoke ? activePoke.points : 0;
-      
-      document.getElementById('wild-trainer-info').innerHTML = `
-        👤 訓練師：<span style="color:#6ee7b7; font-weight: bold;">${student.name}</span> | 
-        ⚔️ 出戰寶可夢：<span style="color:#fde047; font-weight: bold;">${activeName}</span> | 
-        ⭐ 目前經驗值：<span style="color:#60a5fa; font-weight: bold;">${activePts} 點</span>
-      `;
-
-      document.getElementById('wild-ball-counter').innerHTML = isWildInAdventure
-        ? `🔴 精靈球: ${wildBallsLeft} / 5 顆`
-        : `⚠️ 未進行冒險 (需申請)`;
-
-      // HP Bar UI
-      const hpPct = Math.max(0, Math.round((wildHpCurrent / wildHpMax) * 100));
-      const hpBar = document.getElementById('wild-hp-bar');
-      const hpText = document.getElementById('wild-hp-text');
-      
-      if (hpBar && hpText) {
-        hpBar.style.width = `${hpPct}%`;
-        if (hpPct > 50) {
-          hpBar.style.background = '#22c55e'; // Green
-        } else if (hpPct > 20) {
-          hpBar.style.background = '#eab308'; // Yellow
-        } else {
-          hpBar.style.background = '#ef4444'; // Red
-        }
-        hpText.innerHTML = `體力: ${wildHpCurrent} / ${wildHpMax} HP (${hpPct}%)`;
+    function throwPokeballInBattle() {
+      if (!battleState.active || !battleState.isWild || battleState.isNarrating) return;
+      if (battleState.wildBallsLeft <= 0) {
+        alert("精靈球已經用光囉！");
+        return;
       }
 
-      const ratePct = Math.round(getWildCatchRate() * 100);
+      battleState.isNarrating = true;
+      document.getElementById('battle-moves-grid').style.display = 'none';
+      const wildBar = document.getElementById('battle-wild-bar');
+      if (wildBar) wildBar.style.display = 'none';
 
-      const btnAttack = document.getElementById('btn-attack-wild');
-      const btnThrow = document.getElementById('btn-throw-ball');
-      const btnDefeat = document.getElementById('btn-defeat-wild');
+      battleState.wildBallsLeft--;
 
-      btnAttack.disabled = (!isWildInAdventure || wildHpCurrent <= 0 || isWildActionBusy);
-      btnAttack.style.opacity = btnAttack.disabled ? '0.5' : '1';
-
-      btnThrow.disabled = (!isWildInAdventure || wildBallsLeft <= 0 || wildHpCurrent <= 0 || isWildActionBusy);
-      btnThrow.style.opacity = btnThrow.disabled ? '0.5' : '1';
-      btnThrow.innerHTML = `🔴 投擲精靈球 (收服率 ${ratePct}%)`;
-
-      btnDefeat.disabled = (!isWildInAdventure || wildHpCurrent <= 0 || isWildActionBusy);
-      btnDefeat.style.opacity = btnDefeat.disabled ? '0.5' : '1';
-    }
-
-    function attackWildPokemon() {
-      if (isWildActionBusy || !isWildInAdventure || wildHpCurrent <= 0) return;
-
-      isWildActionBusy = true;
-      const student = students[currentStudentId];
-      const pokes = student.pokemons;
-      const activeIdx = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < pokes.length) ? student.activePokemonIndex : (pokes.length - 1);
-      const activePoke = pokes.length > 0 ? pokes[activeIdx] : null;
-      const activeName = activePoke ? getCurrentPokemon(activePoke).name : '寶可夢';
-
-      const dmg = Math.floor(Math.random() * 12) + 25; // 25~36 damage
-      wildHpCurrent = Math.max(0, wildHpCurrent - dmg);
-      
-      const wildImg = document.getElementById('wild-pokemon-img');
-      wildImg.style.transform = 'scale(0.9) rotate(-8deg)';
-      wildImg.style.filter = 'drop-shadow(0 0 15px #ef4444)';
-
-      setTimeout(() => {
-        wildImg.style.transform = 'scale(1)';
-        wildImg.style.filter = 'drop-shadow(0 10px 15px rgba(0,0,0,0.5))';
-
-        const ratePct = Math.round(getWildCatchRate() * 100);
-        if (wildHpCurrent > 0) {
-          document.getElementById('wild-action-log').innerHTML = `
-            💥 ${activeName} 發動攻擊！造成了 ${dmg} 點傷害！野生的 ${currentWildPoke.name} 體力下降至 <span style="color:#fef08a;">${wildHpCurrent}%</span>！（估計收服成功率提升至 <span style="color:#4ade80;">${ratePct}%</span>）
-          `;
-          isWildActionBusy = false;
-        } else {
-          document.getElementById('wild-action-log').innerHTML = `
-            💥 ${activeName} 發動攻擊！野生的 <span style="color:#f87171;">${currentWildPoke.name}</span> 體力歸零暈倒了！（戰鬥勝利，無法繼續投擲精靈球）
-          `;
-          wildImg.style.opacity = '0.4';
-          wildImg.style.transform = 'scale(0.8) translateY(15px)';
-          isWildActionBusy = true;
-        }
-        updateWildUI();
-      }, 300);
-    }
-
-    function throwPokeballWild() {
-      if (isWildActionBusy || !isWildInAdventure || wildBallsLeft <= 0 || wildHpCurrent <= 0) return;
-
-      isWildActionBusy = true;
-      wildBallsLeft--;
-
-      const catchRate = getWildCatchRate();
+      const hpRatio = Math.max(0, battleState.p2.hp) / battleState.p2.maxHp;
+      const catchRate = Math.min(0.90, Math.max(0.20, 0.20 + (1 - hpRatio) * 0.70));
       const ratePct = Math.round(catchRate * 100);
-      updateWildUI();
 
-      const log = document.getElementById('wild-action-log');
-      const wildImg = document.getElementById('wild-pokemon-img');
+      const wildImg = document.getElementById('battle-img-p2');
+      wildImg.style.transition = 'transform 0.3s ease';
+      wildImg.style.transform = 'scale(0.8) rotate(-15deg)';
 
-      log.innerHTML = `🔴 投出精靈球！咻—— (體力: ${wildHpCurrent}%，收服率: ${ratePct}%)`;
-
-      // 動畫搖動
-      wildImg.style.transform = 'scale(0.85) rotate(-12deg)';
-      setTimeout(() => {
-        wildImg.style.transform = 'scale(1.1) rotate(12deg)';
+      queueLog(`🔴 投出精靈球！咻—— (對方體力: ${Math.round(hpRatio * 100)}%，估計收服率: ${ratePct}%)`, () => {
         setTimeout(() => {
-          wildImg.style.transform = 'scale(1)';
+          wildImg.style.transform = 'scale(1.1) rotate(15deg)';
+          setTimeout(() => {
+            wildImg.style.transform = 'scale(1)';
 
-          const isCaught = Math.random() < catchRate;
+            const isCaught = Math.random() < catchRate;
 
-          if (isCaught) {
-            // 捕捉成功
-            log.innerHTML = `🎉 太棒了！成功收服野生的 <span style="color:#34d399; margin:0 4px;">${currentWildPoke.name}</span>！已加入你的寶可夢倉庫！`;
-            wildImg.style.transform = 'scale(1.25)';
-            
-            const student = students[currentStudentId];
-            const defaultMoves = MOVES_POOL[currentWildPoke.family] 
-              ? MOVES_POOL[currentWildPoke.family].slice(0, 4).map(m => m.name) 
-              : ["撞擊"];
-            
-            student.pokemons.push({
-              family: currentWildPoke.family,
-              points: 0,
-              moves: defaultMoves,
-              moveLibrary: defaultMoves
-            });
+            if (isCaught) {
+              const student = students[currentStudentId];
+              const wildPokeData = battleState.wildPokeData;
+              const defaultMoves = MOVES_POOL[wildPokeData.family]
+                ? MOVES_POOL[wildPokeData.family].slice(0, 4).map(m => m.name)
+                : ["撞擊"];
 
-            saveData();
-            isWildInAdventure = false;
-            isWildActionBusy = true;
-            updateWildUI();
-          } else {
-            // 未抓到
-            if (wildBallsLeft > 0) {
-              log.innerHTML = `💨 哎呀！${currentWildPoke.name} 掙脫精靈球逃出來了！還剩 <span style="color:#fef08a;">${wildBallsLeft}</span> 顆精靈球！`;
-              isWildActionBusy = false;
-              updateWildUI();
+              if (student && student.pokemons) {
+                student.pokemons.push({
+                  family: wildPokeData.family,
+                  points: 0,
+                  moves: defaultMoves,
+                  moveLibrary: defaultMoves
+                });
+                saveData();
+              }
+
+              wildImg.style.transform = 'scale(1.3)';
+              wildImg.style.filter = 'drop-shadow(0 0 20px #eab308)';
+
+              queueLog(`🎉 太棒了！成功收服野生的 ${wildPokeData.name}！已加入你的寶可夢倉庫！`, () => {
+                endWildBattle(true);
+              });
             } else {
-              // 5 顆球用完
-              log.innerHTML = `💨 5 顆精靈球都用光了，野生的 <span style="color:#f87171;">${currentWildPoke.name}</span> 逃走了！`;
-              wildImg.style.opacity = '0.3';
-              wildImg.style.transform = 'scale(0.8)';
-              isWildInAdventure = false;
-              isWildActionBusy = true;
-              updateWildUI();
+              if (battleState.wildBallsLeft > 0) {
+                queueLog(`💨 哎呀！${battleState.p2.pokeDetails.name} 掙脫精靈球逃出來了！還剩 ${battleState.wildBallsLeft} 顆精靈球！`, () => {
+                  battleState.isNarrating = false;
+                  battleState.currentTurn = 'p2';
+                  startTurn();
+                });
+              } else {
+                queueLog(`💨 5 顆精靈球都用光了，野生的 ${battleState.p2.pokeDetails.name} 逃走了！`, () => {
+                  wildImg.style.opacity = '0.3';
+                  endWildBattle(false);
+                });
+              }
             }
-          }
-        }, 350);
-      }, 350);
+          }, 400);
+        }, 400);
+      });
     }
 
-    function defeatWildPokemon() {
-      if (isWildActionBusy || !isWildInAdventure) return;
+    function runAwayWildInBattle() {
+      if (!battleState.active || !battleState.isWild || battleState.isNarrating) return;
+      battleState.isNarrating = true;
+      document.getElementById('battle-moves-grid').style.display = 'none';
+      const wildBar = document.getElementById('battle-wild-bar');
+      if (wildBar) wildBar.style.display = 'none';
 
-      isWildActionBusy = true;
-      wildHpCurrent = 0;
-      const student = students[currentStudentId];
-      const pokes = student.pokemons;
-      const activeIdx = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < pokes.length) ? student.activePokemonIndex : (pokes.length - 1);
-      const activePoke = pokes.length > 0 ? pokes[activeIdx] : null;
-      const activeName = activePoke ? getCurrentPokemon(activePoke).name : '寶可夢';
+      queueLog(`💨 成功逃離了與野生的 ${battleState.p2.pokeDetails.name} 的對戰！`, () => {
+        endWildBattle(false);
+      });
+    }
 
-      const wildImg = document.getElementById('wild-pokemon-img');
-      wildImg.style.transform = 'scale(0.8) translateY(-20px)';
-      wildImg.style.opacity = '0.4';
+    function endWildBattle(isCaught) {
+      battleState.active = false;
+      document.getElementById('battle-moves-grid').style.display = 'none';
+      const wildBar = document.getElementById('battle-wild-bar');
+      if (wildBar) wildBar.style.display = 'none';
+      document.getElementById('battle-auto-indicator').style.display = 'none';
 
-      document.getElementById('wild-action-log').innerHTML = `
-        💥 ${activeName} 發動強力一擊，將野生的 <span style="color:#fef08a;">${currentWildPoke.name}</span> 擊倒了！
-      `;
+      battleBGM.pause();
+      battleBGM.currentTime = 0;
 
-      isWildInAdventure = false;
-      updateWildUI();
+      if (isCaught) {
+        winSound.pause();
+        winSound.currentTime = 0;
+        winSound.play();
+      }
+
+      setTimeout(() => {
+        document.getElementById('battle-img-p1').style.transform = '';
+        document.getElementById('battle-img-p2').style.transform = '';
+        document.getElementById('battle-img-p1').style.opacity = '1';
+        document.getElementById('battle-img-p2').style.opacity = '1';
+        document.getElementById('battle-img-p2').style.filter = '';
+
+        document.getElementById('student-container').style.display = 'grid';
+        document.getElementById('battle-container').style.display = 'none';
+        document.getElementById('btn-goto-battle').style.display = 'flex';
+        renderTabs();
+        renderContent();
+      }, 1500);
     }
 
     // Storage Event Listener - Crucial for same-device tab sync
