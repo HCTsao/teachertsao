@@ -1027,6 +1027,10 @@
         });
       }
 
+      if (!newData['teacher']) {
+        newData['teacher'] = JSON.parse(JSON.stringify(teacherStudentData));
+      }
+
       const oldData = JSON.parse(JSON.stringify(students || {}));
       students = newData;
       
@@ -1103,9 +1107,13 @@
         if (!students || typeof students !== 'object' || !students["1"]) {
           students = JSON.parse(JSON.stringify(defaultStudents));
         }
+        if (!students['teacher']) {
+          students['teacher'] = JSON.parse(JSON.stringify(teacherStudentData));
+        }
       } catch (e) {
         console.error("載入本地資料時發生錯誤：", e);
         students = JSON.parse(JSON.stringify(defaultStudents));
+        students['teacher'] = JSON.parse(JSON.stringify(teacherStudentData));
       }
 
       // 2. Connect live real-time Firebase listener
@@ -1317,7 +1325,7 @@
       }
 
       const latestPoke = pokes.length > 0 ? pokes[pokes.length - 1] : null;
-      const needsNewSelection = !latestPoke || latestPoke.points >= 300;
+      const needsNewSelection = !student.isTeacher && (!latestPoke || latestPoke.points >= 300);
 
       if (needsNewSelection) {
         // Show Selection Screen
@@ -1999,7 +2007,9 @@
       p1Select.innerHTML = '';
       const opt1 = document.createElement('option');
       opt1.value = currentStudentId;
-      opt1.textContent = `${currentStudentId}號 ${students[currentStudentId].name}`;
+      const s1Obj = students[currentStudentId];
+      const p1Name = s1Obj ? s1Obj.name : '';
+      opt1.textContent = (currentStudentId === 'teacher' || (s1Obj && s1Obj.isTeacher)) ? p1Name : `${currentStudentId}號 ${p1Name}`;
       p1Select.appendChild(opt1);
       p1Select.disabled = true;
 
@@ -2009,10 +2019,11 @@
       let firstOtherId = null;
       for (let id in students) {
         if (id !== currentStudentId) {
+          if (id === 'teacher' && !showTeacherPage) continue;
           if (!firstOtherId) firstOtherId = id;
           const opt2 = document.createElement('option');
           opt2.value = id;
-          opt2.textContent = `${id}號 ${students[id].name}`;
+          opt2.textContent = (id === 'teacher' || students[id].isTeacher) ? students[id].name : `${id}號 ${students[id].name}`;
           p2Select.appendChild(opt2);
         }
       }
@@ -3549,10 +3560,12 @@
 
       let deductionMsg = "";
       if (winnerName !== battleState.p1.name) {
-        if (activePoke) {
+        if (activePoke && !student.isTeacher) {
           activePoke.points = Math.max(0, activePoke.points - 10);
           saveData();
           deductionMsg = "（對戰失敗，扣除 10 點經驗值）";
+        } else if (student.isTeacher) {
+          deductionMsg = "（曹老師對戰體驗，免扣除經驗值）";
         }
       } else {
         deductionMsg = "（對戰勝利，免予扣除經驗值！）";
@@ -3609,11 +3622,20 @@
       if (!student) return;
       
       const modal = document.getElementById('wildEncounterModal');
-      modal.style.display = 'flex';
       
       if (!isWildInAdventure) {
+        const pokes = student.pokemons || [];
+        const activeIdx = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < pokes.length) ? student.activePokemonIndex : (pokes.length - 1);
+        const activePoke = pokes.length > 0 ? pokes[activeIdx] : null;
+
+        if (!activePoke || (!student.isTeacher && activePoke.points < 5)) {
+          alert(`⚠️ 你的寶可夢經驗值不足 5 點（目前經驗值：${activePoke ? activePoke.points : 0} 點），無法申請進入野外冒險！\n\n請先完成作業/答題累積經驗值喔！`);
+          return;
+        }
+        modal.style.display = 'flex';
         startWildAdventure();
       } else {
+        modal.style.display = 'flex';
         updateWildUI();
       }
     }
@@ -3625,18 +3647,21 @@
 
     function startWildAdventure() {
       const student = students[currentStudentId];
-      const pokes = student.pokemons;
+      if (!student) return;
+      const pokes = student.pokemons || [];
       const activeIdx = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < pokes.length) ? student.activePokemonIndex : (pokes.length - 1);
       const activePoke = pokes.length > 0 ? pokes[activeIdx] : null;
 
-      if (!activePoke || activePoke.points < 5) {
+      if (!activePoke || (!student.isTeacher && activePoke.points < 5)) {
         alert(`⚠️ 你的寶可夢經驗值不足 5 點（目前經驗值：${activePoke ? activePoke.points : 0} 點），無法申請進入野外冒險！\n\n請先完成作業/答題累積經驗值喔！`);
         return;
       }
 
-      // 申請冒險直接扣除 5 點經驗值
-      activePoke.points -= 5;
-      saveData();
+      // 申請冒險扣除 5 點經驗值（曹老師免扣除）
+      if (!student.isTeacher) {
+        activePoke.points -= 5;
+        saveData();
+      }
 
       isWildActionBusy = false;
       isWildInAdventure = true;
@@ -3648,17 +3673,27 @@
       currentWildPoke = WILD_POKEMON_POOL[randomIdx];
 
       const img = document.getElementById('wild-pokemon-img');
-      img.src = currentWildPoke.url;
-      img.style.opacity = '1';
-      img.style.transform = 'scale(1)';
+      if (img) {
+        img.src = currentWildPoke.url;
+        img.style.opacity = '1';
+        img.style.transform = 'scale(1)';
+        img.style.filter = 'drop-shadow(0 10px 15px rgba(0,0,0,0.5))';
+      }
 
-      document.getElementById('wild-pokemon-title').innerHTML = `
-        野生的 ${currentWildPoke.name} (Lv. 1) ${getTypeLabel(currentWildPoke.type, "2px 6px", "0.8rem", "4px", "6px")}
-      `;
+      const titleEl = document.getElementById('wild-pokemon-title');
+      if (titleEl) {
+        titleEl.innerHTML = `
+          野生的 ${currentWildPoke.name} (Lv. 1) ${getTypeLabel(currentWildPoke.type, "2px 6px", "0.8rem", "4px", "6px")}
+        `;
+      }
 
-      document.getElementById('wild-action-log').innerHTML = `
-        🎯 已扣除 5 點經驗值！獲得 <span style="color:#fef08a; margin: 0 4px;">5 顆精靈球</span>！草叢中發現了野生的 <span style="color:#34d399; margin: 0 4px;">${currentWildPoke.name}</span>！
-      `;
+      const logEl = document.getElementById('wild-action-log');
+      if (logEl) {
+        const feeText = student.isTeacher ? "👑 曹老師免扣點！" : "🎯 已扣除 5 點經驗值！";
+        logEl.innerHTML = `
+          ${feeText}獲得 <span style="color:#fef08a; margin: 0 4px;">5 顆精靈球</span>！草叢中發現了野生的 <span style="color:#34d399; margin: 0 4px;">${currentWildPoke.name}</span>！
+        `;
+      }
 
       updateWildUI();
     }
