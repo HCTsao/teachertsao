@@ -3840,108 +3840,98 @@
       // Step 1: Initialize ball position at player side
       ball.style.display = 'block';
       ball.style.transition = 'none';
-      ball.style.left = '22%';
-      ball.style.bottom = '40%';
+      ball.style.left = '20%';
+      ball.style.bottom = '35%';
       ball.style.opacity = '1';
       ball.style.transform = 'scale(0.6) rotate(0deg)';
       ball.style.filter = 'drop-shadow(0 4px 10px rgba(0,0,0,0.6))';
 
-      // Step 2: Arc flight animation to wild pokemon
+      // Step 2: High arc flight animation landing directly inside the green turf circle (left: 76%, bottom: 74%)
       requestAnimationFrame(() => {
         setTimeout(() => {
-          ball.style.transition = 'left 0.65s cubic-bezier(0.25, 0.8, 0.25, 1), bottom 0.65s cubic-bezier(0, 0.85, 0.4, 1.2), transform 0.65s linear';
+          ball.style.transition = 'left 0.7s cubic-bezier(0.2, 0.8, 0.25, 1), bottom 0.7s cubic-bezier(0, 0.9, 0.35, 1.1), transform 0.7s linear';
           ball.style.left = '76%';
-          ball.style.bottom = '68%';
-          ball.style.transform = 'scale(1.1) rotate(720deg)';
+          ball.style.bottom = '74%';
+          ball.style.transform = 'scale(1) rotate(720deg)';
 
-          // Step 3: Ball hits wild pokemon & pokemon absorbs into ball
+          // Step 3: Ball hits wild pokemon & pokemon shrinks/absorbs into ball inside green circle
           setTimeout(() => {
             wildImg.style.transition = 'all 0.3s ease-in';
-            wildImg.style.transform = 'scale(0.1) rotate(180deg)';
+            wildImg.style.transform = 'scale(0.05) rotate(180deg)';
             wildImg.style.opacity = '0';
 
-            // Ball drops onto turf platform
+            // Step 4: Ball rests inside green circle & wiggles/shakes back and forth
             setTimeout(() => {
-              ball.style.transition = 'bottom 0.25s ease-in, transform 0.25s ease-out';
-              ball.style.bottom = '56%';
-              ball.style.transform = 'scale(1) rotate(720deg)';
+              let shakeCount = 0;
+              const shakeInterval = setInterval(() => {
+                shakeCount++;
+                ball.style.transition = 'transform 0.18s ease-in-out';
+                if (shakeCount === 1) {
+                  ball.style.transform = 'scale(0.95) rotate(-30deg)';
+                } else if (shakeCount === 2) {
+                  ball.style.transform = 'scale(0.95) rotate(30deg)';
+                } else if (shakeCount === 3) {
+                  ball.style.transform = 'scale(0.95) rotate(-15deg)';
+                } else if (shakeCount === 4) {
+                  ball.style.transform = 'scale(0.95) rotate(0deg)';
+                  clearInterval(shakeInterval);
 
-              // Step 4: Ball wiggles/shakes on the ground
-              setTimeout(() => {
-                let shakeCount = 0;
-                const shakeInterval = setInterval(() => {
-                  shakeCount++;
-                  if (shakeCount === 1) {
-                    ball.style.transition = 'transform 0.15s ease-in-out';
-                    ball.style.transform = 'scale(1) rotate(-22deg)';
-                  } else if (shakeCount === 2) {
-                    ball.style.transform = 'scale(1) rotate(22deg)';
-                  } else if (shakeCount === 3) {
-                    ball.style.transform = 'scale(1) rotate(-10deg)';
-                  } else if (shakeCount === 4) {
-                    ball.style.transform = 'scale(1) rotate(0deg)';
-                    clearInterval(shakeInterval);
+                  // Step 5: Determine Catch outcome
+                  setTimeout(() => {
+                    const isCaught = Math.random() < catchRate;
 
-                    // Step 5: Determine Catch outcome
-                    setTimeout(() => {
-                      const isCaught = Math.random() < catchRate;
+                    if (isCaught) {
+                      // Golden aura flare inside green circle
+                      ball.style.transition = 'filter 0.35s ease, transform 0.35s ease';
+                      ball.style.filter = 'drop-shadow(0 0 25px #f59e0b) brightness(1.3)';
+                      ball.style.transform = 'scale(1.2)';
 
-                      if (isCaught) {
-                        // Golden aura flare
-                        ball.style.transition = 'filter 0.3s ease, transform 0.3s ease';
-                        ball.style.filter = 'drop-shadow(0 0 25px #f59e0b) brightness(1.3)';
-                        ball.style.transform = 'scale(1.25)';
+                      const student = students[currentStudentId];
+                      const wildPokeData = battleState.wildPokeData;
+                      const defaultMoves = MOVES_POOL[wildPokeData.family]
+                        ? MOVES_POOL[wildPokeData.family].slice(0, 4).map(m => m.name)
+                        : ["撞擊"];
 
-                        const student = students[currentStudentId];
-                        const wildPokeData = battleState.wildPokeData;
-                        const defaultMoves = MOVES_POOL[wildPokeData.family]
-                          ? MOVES_POOL[wildPokeData.family].slice(0, 4).map(m => m.name)
-                          : ["撞擊"];
-
-                        if (student) {
-                          if (!student.pokemons) student.pokemons = [];
-                          student.pokemons.push({
-                            family: wildPokeData.family,
-                            points: 0,
-                            moves: defaultMoves,
-                            moveLibrary: defaultMoves
-                          });
-                          saveData();
-                        }
-
-                        queueLog(`🎉 太棒了！成功收服野生的 ${wildPokeData.name}！(Lv.0) 已加入你的寶可夢倉庫！`, () => {
-                          endWildBattle(true);
+                      if (student) {
+                        if (!student.pokemons) student.pokemons = [];
+                        student.pokemons.push({
+                          family: wildPokeData.family,
+                          points: 0,
+                          moves: defaultMoves,
+                          moveLibrary: defaultMoves
                         });
-                      } else {
-                        // Pokemon escapes!
-                        ball.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
-                        ball.style.opacity = '0';
-                        ball.style.transform = 'scale(1.4)';
-
-                        wildImg.style.transition = 'all 0.3s ease-out';
-                        wildImg.style.transform = 'scale(1)';
-                        wildImg.style.opacity = '1';
-
-                        setTimeout(() => {
-                          ball.style.display = 'none';
-                          if (battleState.wildBallsLeft > 0) {
-                            queueLog(`💨 哎呀！${battleState.p2.pokeDetails.name} 掙脫精靈球逃出來了！還剩 ${battleState.wildBallsLeft} 顆精靈球！`, () => {
-                              battleState.isNarrating = false;
-                              battleState.currentTurn = 'p2';
-                              startTurn();
-                            });
-                          } else {
-                            queueLog(`💨 5 顆精靈球都用光了，野生的 ${battleState.p2.pokeDetails.name} 逃走了！`, () => {
-                              wildImg.style.opacity = '0.35';
-                              endWildBattle(false);
-                            });
-                          }
-                        }, 300);
+                        saveData();
                       }
-                    }, 400);
-                  }
-                }, 350);
-              }, 300);
+
+                      queueLog(`🎉 太棒了！成功收服野生的 ${wildPokeData.name}！(Lv.0) 已加入你的寶可夢倉庫！`, () => {
+                        endWildBattle(true);
+                      });
+                    } else {
+                      // Pokemon escapes!
+                      ball.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+                      ball.style.opacity = '0';
+                      ball.style.transform = 'scale(1.4)';
+
+                      wildImg.style.transition = 'all 0.3s ease-out';
+                      wildImg.style.transform = 'scale(1)';
+                      wildImg.style.opacity = '1';
+
+                      setTimeout(() => {
+                        ball.style.display = 'none';
+                        const ballsMsg = battleState.wildBallsLeft > 0
+                          ? `還剩 ${battleState.wildBallsLeft} 顆精靈球！`
+                          : `精靈球已用完，請選擇招式繼續戰鬥將其打倒！`;
+
+                        queueLog(`💨 哎呀！${battleState.p2.pokeDetails.name} 掙脫精靈球逃出來了！${ballsMsg}`, () => {
+                          battleState.isNarrating = false;
+                          battleState.currentTurn = 'p2';
+                          startTurn();
+                        });
+                      }, 300);
+                    }
+                  }, 400);
+                }
+              }, 350);
             }, 300);
           }, 300);
         }, 30);
