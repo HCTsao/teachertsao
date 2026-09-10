@@ -477,11 +477,9 @@
         <div class="header-panel">
             <div class="stats-group">
                 <div class="stat-item">
-                    <span class="stat-label">生命值 LIVES</span>
-                    <span class="stat-value" id="livesDisplay">
-                        <span class="heart">❤️</span>
-                        <span class="heart">❤️</span>
-                        <span class="heart">❤️</span>
+                    <span class="stat-label">目前得分 SCORE</span>
+                    <span class="stat-value" id="scoreDisplay" style="color: #e67e22; font-size: 1.3rem;">
+                        0 分
                     </span>
                 </div>
             </div>
@@ -538,11 +536,10 @@
                     <h2 style="color: var(--text-color)">遊戲規則</h2>
                     <div class="rules-content" style="max-height: 240px; overflow-y: auto;">
                         <ul>
-                            <li><strong>目標：</strong>依序吃掉紅色數字飼料（依各關卡規則）。</li>
+                            <li><strong>目標：</strong>依序吃掉紅色數字飼料（依各關卡順序或倒數規則）。</li>
                             <li><strong>操作：</strong>電腦使用方向鍵；行動裝置則直接<strong>點擊遊戲畫面的上、下、左、右側邊緣</strong>進行轉向。</li>
+                            <li><strong>得分機制：</strong>吃對正確數字 <strong>+10 分</strong>；吃錯數字或咬到自己 <strong>扣 5 分</strong>。</li>
                             <li><strong>機制：</strong>畫面上會有 3 個紅色飼料，只有 1 個是正確順序的數字。</li>
-                            <li><strong>生命：</strong>共有 3 條命，吃到錯誤數字生命 -1。所有飼料位置會重新隨機生成。</li>
-                            <li><strong>死亡：</strong>生命歸零或是蛇頭咬到自己的身體，遊戲皆會立刻結束。</li>
                         </ul>
                     </div>
                     <button class="action-btn" id="closeRulesBtn">我知道了</button>
@@ -686,6 +683,7 @@
                 startNum: 0,
                 firstTarget: 1,
                 maxTarget: 18,
+                endTarget: 18,
                 step: 1,
                 growthPerEat: 1,
                 eatsPerGrowth: 1,
@@ -695,6 +693,7 @@
                 startNum: 17,
                 firstTarget: 18,
                 maxTarget: 30,
+                endTarget: 30,
                 step: 1,
                 growthPerEat: 1,
                 eatsPerGrowth: 1,
@@ -704,6 +703,7 @@
                 startNum: 29,
                 firstTarget: 30,
                 maxTarget: 50,
+                endTarget: 50,
                 step: 1,
                 growthPerEat: 1,
                 eatsPerGrowth: 1,
@@ -713,6 +713,7 @@
                 startNum: 0,
                 firstTarget: 2,
                 maxTarget: 50,
+                endTarget: 50,
                 step: 2,
                 growthPerEat: 1,
                 eatsPerGrowth: 1,
@@ -722,6 +723,7 @@
                 startNum: 0,
                 firstTarget: 5,
                 maxTarget: 50,
+                endTarget: 50,
                 step: 5,
                 growthPerEat: 2,
                 eatsPerGrowth: 1,
@@ -731,6 +733,7 @@
                 startNum: 49,
                 firstTarget: 50,
                 maxTarget: 100,
+                endTarget: 100,
                 step: 1,
                 growthPerEat: 1,
                 eatsPerGrowth: 3,
@@ -740,6 +743,7 @@
                 startNum: 0,
                 firstTarget: 10,
                 maxTarget: 100,
+                endTarget: 100,
                 step: 10,
                 growthPerEat: 2,
                 eatsPerGrowth: 1,
@@ -749,7 +753,28 @@
                 startNum: 99,
                 firstTarget: 100,
                 maxTarget: 200,
+                endTarget: 200,
                 step: 1,
+                growthPerEat: 1,
+                eatsPerGrowth: 4,
+            },
+            9: {
+                name: "100以內的數(倒數)",
+                startNum: 101,
+                firstTarget: 100,
+                maxTarget: 50,
+                endTarget: 50,
+                step: -1,
+                growthPerEat: 1,
+                eatsPerGrowth: 3,
+            },
+            10: {
+                name: "200以內的數(倒數)",
+                startNum: 201,
+                firstTarget: 200,
+                maxTarget: 100,
+                endTarget: 100,
+                step: -1,
                 growthPerEat: 1,
                 eatsPerGrowth: 4,
             }
@@ -769,7 +794,7 @@
         let direction = 'right';
         let nextDirection = 'right';
         let currentTarget = 1; // 根據關卡設定調整
-        let lives = 3;
+        let score = 0;
         let feeds = [];        // 包含三個飼料物件 {x, y, value}
         let particles = [];    // 備用
         let gameInterval = null;
@@ -868,7 +893,7 @@
         function generateFeeds() {
             feeds = [];
             const levelConfig = LEVELS[currentLevel];
-            const max = levelConfig.maxTarget;
+            const end = levelConfig.endTarget || levelConfig.maxTarget;
             const step = levelConfig.step;
 
             // 1. 生成正確的飼料
@@ -881,49 +906,37 @@
             });
 
             // 2. 如果是最後一個目標，只放一個飼料
-            if (currentTarget === max) return;
+            if (currentTarget === end) return;
 
             // 3. 生成 2 個錯誤飼料，確保總共 3 個
-            //    當正確答案為整十數（如 150, 160 等）時，誘答選項改為 +10, +20
             const usedVals = new Set([currentTarget]);
             let wrongVals = [];
-            const distractorStep = (currentTarget % 10 === 0) ? 10 : step;
 
-            // 先嘗試向後取
-            const next1 = currentTarget + distractorStep;
-            const next2 = currentTarget + 2 * distractorStep;
-            if (next1 <= max) { wrongVals.push(next1); usedVals.add(next1); }
-            if (next2 <= max && wrongVals.length < 2) { wrongVals.push(next2); usedVals.add(next2); }
+            const minBound = Math.min(levelConfig.firstTarget, end);
+            const maxBound = Math.max(levelConfig.firstTarget, end);
 
-            // 若還不足 2 個，往前按 distractorStep 取數字補充
-            if (wrongVals.length < 2) {
-                let candidate = currentTarget - distractorStep;
-                while (wrongVals.length < 2 && candidate >= levelConfig.firstTarget) {
-                    if (!usedVals.has(candidate)) {
-                        wrongVals.push(candidate);
-                        usedVals.add(candidate);
-                    }
-                    candidate -= distractorStep;
-                }
-            }
+            const absStep = Math.abs(step);
+            const distractorStep = (currentTarget % 10 === 0 && absStep === 1) ? 10 : absStep;
 
-            // 若仍然不足 2 個，按原 step 往後/往前補充
-            if (wrongVals.length < 2) {
-                let candidate = currentTarget + step;
-                while (wrongVals.length < 2 && candidate <= max) {
-                    if (!usedVals.has(candidate)) {
-                        wrongVals.push(candidate);
-                        usedVals.add(candidate);
-                    }
-                    candidate += step;
-                }
-                candidate = currentTarget - step;
-                while (wrongVals.length < 2 && candidate >= levelConfig.firstTarget) {
-                    if (!usedVals.has(candidate)) {
-                        wrongVals.push(candidate);
-                        usedVals.add(candidate);
-                    }
-                    candidate -= step;
+            const candidateOffsets = [
+                distractorStep,
+                -distractorStep,
+                2 * distractorStep,
+                -2 * distractorStep,
+                1,
+                -1,
+                2,
+                -2,
+                10,
+                -10
+            ];
+
+            for (const offset of candidateOffsets) {
+                if (wrongVals.length >= 2) break;
+                const candidate = currentTarget + offset;
+                if (candidate >= minBound && candidate <= maxBound && !usedVals.has(candidate)) {
+                    wrongVals.push(candidate);
+                    usedVals.add(candidate);
                 }
             }
 
@@ -1037,10 +1050,20 @@
             if (head.y >= GRID_COUNT) head.y = 0;
 
 
-            // 2. 碰撞檢測：咬到自己死亡
+            // 2. 碰撞檢測：咬到自己扣 5 分並重設蛇位置
             const bitSelf = snake.some((segment, idx) => idx > 0 && segment.x === head.x && segment.y === head.y);
             if (bitSelf) {
-                gameOver("你咬到了自己的身體！");
+                sounds.playWrong();
+                triggerScreenShake();
+                score -= 5;
+                updateScoreUI(-5);
+                snake = [
+                    { x: 10, y: 10 },
+                    { x: 9, y: 10 }
+                ];
+                direction = 'right';
+                nextDirection = 'right';
+                generateFeeds();
                 return;
             }
 
@@ -1050,25 +1073,30 @@
             // 3. 碰撞檢測：吃飼料
             let ateFeed = false;
             const levelConfig = LEVELS[currentLevel];
+            const end = levelConfig.endTarget || levelConfig.maxTarget;
+
             for (let i = 0; i < feeds.length; i++) {
                 const feed = feeds[i];
                 if (head.x === feed.x && head.y === feed.y) {
                     ateFeed = true;
                     if (feed.isCorrect) {
-                        // 吃對正確飼料
+                        // 吃對正確飼料 (+10分)
                         sounds.playCorrect();
                         triggerSuccessFlash();
                         speakNumber(currentTarget); // 語音播報
                         
+                        score += 10;
+                        updateScoreUI(10);
+                        
                         // 提示數字與進度條更新
                         document.getElementById('currentNumberPrompt').innerText = currentTarget;
-                        const totalSteps = Math.round((levelConfig.maxTarget - levelConfig.firstTarget) / levelConfig.step) + 1;
-                        const completed = Math.round((currentTarget - levelConfig.firstTarget) / levelConfig.step) + 1;
-                        const progressPercent = (completed / totalSteps) * 100;
+                        const totalSteps = Math.round(Math.abs(end - levelConfig.firstTarget) / Math.abs(levelConfig.step)) + 1;
+                        const completed = Math.round(Math.abs(currentTarget - levelConfig.firstTarget) / Math.abs(levelConfig.step)) + 1;
+                        const progressPercent = Math.min(100, (completed / totalSteps) * 100);
                         document.getElementById('progressBar').style.width = `${progressPercent}%`;
 
-                        // 判斷是否過關 (吃到 maxTarget 算過關)
-                        if (currentTarget === levelConfig.maxTarget) {
+                        // 判斷是否過關 (吃到 endTarget 算過關)
+                        if (currentTarget === end) {
                             victory();
                             return;
                         }
@@ -1090,20 +1118,15 @@
 
                         generateFeeds(); // 重新生成飼料
                     } else {
-                        // 吃錯錯誤飼料
+                        // 吃錯錯誤飼料 (-5分)
                         sounds.playWrong();
                         triggerScreenShake();
-                        lives--;
-                        updateLivesUI();
+                        score -= 5;
+                        updateScoreUI(-5);
 
-                        if (lives <= 0) {
-                            gameOver("吃錯 3 次飼料，生命值歸零！");
-                            return;
-                        } else {
-                            // 吃錯不增長，pop 掉尾巴，並重新生成飼料
-                            snake.pop();
-                            generateFeeds();
-                        }
+                        // 吃錯不增長，pop 掉尾巴，並重新生成飼料
+                        snake.pop();
+                        generateFeeds();
                     }
                     break;
                 }
@@ -1239,18 +1262,16 @@
         }
 
         // --- 狀態更新 UI ---
-        function updateLivesUI() {
-            const container = document.getElementById('livesDisplay');
-            container.innerHTML = '';
-            for (let i = 0; i < 3; i++) {
-                const heart = document.createElement('span');
-                heart.className = 'heart';
-                heart.innerText = i < lives ? '❤️' : '🖤';
-                // 如果是剛被扣掉的生命，加入縮放特效
-                if (i === lives) {
-                    heart.style.transform = 'scale(0.5)';
-                }
-                container.appendChild(heart);
+        function updateScoreUI(change = 0) {
+            const container = document.getElementById('scoreDisplay');
+            if (!container) return;
+            container.innerText = `${score} 分`;
+            if (change !== 0) {
+                container.style.transform = 'scale(1.25)';
+                container.style.transition = 'transform 0.15s ease';
+                setTimeout(() => {
+                    container.style.transform = 'scale(1.0)';
+                }, 150);
             }
         }
 
@@ -1381,13 +1402,14 @@
             currentTarget = levelConfig.firstTarget;
             correctEatsInLevel = 0;
             growthPending = 0;
-            lives = 3;
+            score = 0;
             particles = [];
             
-            updateLivesUI();
+            updateScoreUI();
             document.getElementById('currentNumberPrompt').innerText = levelConfig.startNum;
             document.getElementById('progressBar').style.width = '0%';
-            document.getElementById('progressLabel').innerText = `通關進度 (${levelConfig.maxTarget})`;
+            const end = levelConfig.endTarget || levelConfig.maxTarget;
+            document.getElementById('progressLabel').innerText = `通關進度 (${end})`;
             // 顯示左上角的回主選單按鈕
             document.getElementById('abandonBtn').style.display = 'block';
 
@@ -1416,9 +1438,7 @@
 
             document.getElementById('abandonBtn').style.display = 'none';
             document.getElementById('gameOverReason').innerText = reason;
-            const levelConfig = LEVELS[currentLevel];
-            let finalVal = currentTarget - levelConfig.step;
-            document.getElementById('finalScore').innerText = finalVal; 
+            document.getElementById('finalScore').innerText = `${score} 分`; 
             document.getElementById('gameOverOverlay').classList.add('active');
         }
 
@@ -1433,7 +1453,7 @@
 
             document.getElementById('abandonBtn').style.display = 'none';
             const levelConfig = LEVELS[currentLevel];
-            document.getElementById('victoryDesc').innerHTML = `你成功按順序完成了 <strong>${levelConfig.name}</strong> 的挑戰！`;
+            document.getElementById('victoryDesc').innerHTML = `你成功按順序完成了 <strong>${levelConfig.name}</strong> 的挑戰！<br><span style="font-size: 1.3rem; color: #e67e22; font-weight: bold; display: block; margin-top: 12px;">🏆 獲得總分：${score} 分</span>`;
             document.getElementById('victoryOverlay').classList.add('active');
         }
 
