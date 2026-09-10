@@ -369,7 +369,19 @@
             <button class="btn btn-primary" onclick="modifyPoints()"><i class="fa-solid fa-plus-minus"></i> 送出增減分</button>
           </div>
 
-          <div style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+          <div style="margin-top: 25px; border-top: 1px dashed var(--border-color); padding-top: 20px;">
+            <div style="font-weight: 800; font-size: 0.95rem; color: #0369a1; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-crown" style="color: #eab308;"></i> 老師的寶可夢頁面設定
+            </div>
+            <p style="font-size: 0.82rem; color: #64748b; margin-bottom: 12px; line-height: 1.4;">
+              預設曹老師 (水箭龜 Lv.30)。開啟後會在集點卡頁面顯示「👑 曹老師」，並可於對戰中選擇曹老師。
+            </p>
+            <button id="btn-toggle-teacher-page" onclick="toggleTeacherPageAdmin()" style="width: 100%; padding: 10px; border-radius: 12px; font-weight: 800; font-size: 0.9rem; border: none; cursor: pointer; font-family: inherit; transition: background 0.2s; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white;">
+              <i class="fa-solid fa-circle-check"></i> 老師頁面：已啟用 (點擊關閉)
+            </button>
+          </div>
+
+          <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
             <button class="btn btn-danger" onclick="resetStudent()"><i class="fa-solid fa-trash-can"></i> 重設該學生資料</button>
           </div>
         </div>
@@ -625,7 +637,13 @@
         students = JSON.parse(JSON.stringify(defaultStudents));
       }
 
-      // 2. Connect live real-time Firebase listener on 'studentData' node
+      // 2. Load teacher page toggle setting
+      const localTeacherVal = localStorage.getItem('pokemon_show_teacher_page');
+      if (localTeacherVal !== null) {
+        showTeacherPage = (localTeacherVal === 'true');
+      }
+
+      // 3. Connect live real-time Firebase listener on 'studentData' node
       if (database) {
         database.ref('studentData').on('value', (snapshot) => {
           const val = snapshot.val();
@@ -635,8 +653,44 @@
             renderOverview();
           }
         });
+
+        database.ref('showTeacherPage').on('value', (snapshot) => {
+          const val = snapshot.val();
+          if (val !== null) {
+            showTeacherPage = (val === true || val === 'true');
+            localStorage.setItem('pokemon_show_teacher_page', showTeacherPage ? 'true' : 'false');
+            updateTeacherToggleBtn();
+          }
+        });
       } else {
+        updateTeacherToggleBtn();
         renderOverview();
+      }
+    }
+
+    let showTeacherPage = true;
+
+    function toggleTeacherPageAdmin() {
+      showTeacherPage = !showTeacherPage;
+      localStorage.setItem('pokemon_show_teacher_page', showTeacherPage ? 'true' : 'false');
+      if (database) {
+        database.ref('showTeacherPage').set(showTeacherPage);
+      }
+      updateTeacherToggleBtn();
+      renderOverview();
+    }
+
+    function updateTeacherToggleBtn() {
+      const btn = document.getElementById('btn-toggle-teacher-page');
+      if (!btn) return;
+      if (showTeacherPage) {
+        btn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+        btn.style.color = 'white';
+        btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> 老師頁面：已啟用 (點擊關閉)';
+      } else {
+        btn.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+        btn.style.color = 'white';
+        btn.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> 老師頁面：已取消/關閉 (點擊開啟)';
       }
     }
 
