@@ -49,6 +49,47 @@
       padding: 20px;
     }
 
+    /* GBA Wild Encounter Arrow Wipe Animation */
+    #gba-wild-transition {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 999999;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .gba-wipe-bar {
+      position: absolute;
+      width: 140vw;
+      background: #050505;
+      will-change: transform;
+    }
+    .gba-wipe-bar.wipe-right {
+      left: -20vw;
+      clip-path: polygon(0% 0%, calc(100% - 45px) 0%, 100% 50%, calc(100% - 45px) 100%, 0% 100%);
+      transform: translateX(-130%);
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .gba-wipe-bar.wipe-left {
+      left: -20vw;
+      clip-path: polygon(45px 0%, 100% 0%, 100% 100%, 45px 100%, 0% 50%);
+      transform: translateX(130%);
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    #gba-wild-transition.active .wipe-right.wipe-in {
+      transform: translateX(0%);
+    }
+    #gba-wild-transition.active .wipe-left.wipe-in {
+      transform: translateX(0%);
+    }
+    #gba-wild-transition.active .wipe-right.wipe-out {
+      transform: translateX(130%);
+    }
+    #gba-wild-transition.active .wipe-left.wipe-out {
+      transform: translateX(-130%);
+    }
+
     .header-title {
       font-size: 2.5rem;
       font-weight: 900;
@@ -598,6 +639,18 @@
     </div>
   </div>
 
+  <!-- GBA Wild Encounter Transition Overlay -->
+  <div id="gba-wild-transition">
+    <div class="gba-wipe-bar wipe-right" style="top: 0vh; height: 12.5vh;"></div>
+    <div class="gba-wipe-bar wipe-left" style="top: 12.5vh; height: 12.5vh;"></div>
+    <div class="gba-wipe-bar wipe-right" style="top: 25vh; height: 12.5vh;"></div>
+    <div class="gba-wipe-bar wipe-left" style="top: 37.5vh; height: 12.5vh;"></div>
+    <div class="gba-wipe-bar wipe-right" style="top: 50vh; height: 12.5vh;"></div>
+    <div class="gba-wipe-bar wipe-left" style="top: 62.5vh; height: 12.5vh;"></div>
+    <div class="gba-wipe-bar wipe-right" style="top: 75vh; height: 12.5vh;"></div>
+    <div class="gba-wipe-bar wipe-left" style="top: 87.5vh; height: 12.5vh;"></div>
+  </div>
+
   <!-- GBA Move Learn / Replace Overlay -->
   <div id="move-learn-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; font-family: 'Fredoka', 'Noto Sans TC', monospace; color: white; padding: 20px; user-select: none;">
     <div style="width: 90%; max-width: 500px; background: #1e293b; border: 4px solid #f8fafc; border-radius: 8px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
@@ -653,7 +706,7 @@
     </button>
   </div>
 
-  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v2.6</span></h1>
+  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v2.7</span></h1>
 
   <!-- Student Card Container -->
   <div class="main-container" id="student-container">
@@ -800,10 +853,15 @@
   </div>
 
   <script>
-    // Global Battle BGM
+    // Global Battle BGM (Trainer Battle)
     const battleBGM = new Audio("Pokémon Legends： Z-A - Trainer Battle Music (HQ).mp3");
     battleBGM.loop = true;
     battleBGM.volume = 0.15; // Set volume to be quieter (15%)
+
+    // Wild Battle BGM
+    const wildBattleBGM = new Audio("Pokemon Wild Battle Music.mp3");
+    wildBattleBGM.loop = true;
+    wildBattleBGM.volume = 0.15;
 
     // Battle Victory Sound Effect
     const winSound = new Audio("Pokemon Battle Win - Sound Effect (HD).mp3");
@@ -1183,6 +1241,8 @@
         }
         if (!students['teacher']) {
           students['teacher'] = JSON.parse(JSON.stringify(teacherStudentData));
+        } else if (students['teacher'].name === "紅旗老師" || (students['teacher'].name && students['teacher'].name.includes("曹老師"))) {
+          students['teacher'].name = "泓棋老師";
         }
       } catch (e) {
         console.error("載入本地資料時發生錯誤：", e);
@@ -1196,6 +1256,9 @@
         database.ref('studentData').on('value', (snapshot) => {
           const val = snapshot.val();
           if (val && typeof val === 'object' && val["1"]) {
+            if (val['teacher'] && (val['teacher'].name === "紅旗老師" || (val['teacher'].name && val['teacher'].name.includes("曹老師")))) {
+              val['teacher'].name = "泓棋老師";
+            }
             localStorage.setItem('pokemon_trainer_data', JSON.stringify(val));
             students = val;
             handleDataSync(val);
@@ -1231,7 +1294,7 @@
     let showTeacherPage = true;
 
     const teacherStudentData = {
-      name: "紅旗老師",
+      name: "泓棋老師",
       isTeacher: true,
       pokemons: [
         {
@@ -1342,7 +1405,7 @@
         tBtn.style.background = currentStudentId === 'teacher' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'rgba(245, 158, 11, 0.35)';
         tBtn.style.color = currentStudentId === 'teacher' ? 'white' : '#78350f';
         tBtn.style.fontWeight = '900';
-        tBtn.innerHTML = `<i class="fa-solid fa-crown" style="color: #eab308; margin-right: 4px;"></i> 紅旗老師`;
+        tBtn.innerHTML = `<i class="fa-solid fa-crown" style="color: #eab308; margin-right: 4px;"></i> 泓棋老師`;
         tBtn.onclick = () => {
           currentStudentId = 'teacher';
           syncMovesAndCheckPending(currentStudentId);
@@ -2350,6 +2413,8 @@
       updateBattleUI();
 
       // Play Battle BGM
+      wildBattleBGM.pause();
+      wildBattleBGM.currentTime = 0;
       battleBGM.currentTime = 0;
       battleBGM.play().catch(err => console.log("音訊播放受瀏覽器政策限制：", err));
 
@@ -3771,7 +3836,7 @@
           saveData();
           deductionMsg = "（對戰失敗，扣除 10 點經驗值）";
         } else if (student.isTeacher) {
-          deductionMsg = "（紅旗老師對戰體驗，免扣除經驗值）";
+          deductionMsg = "（泓棋老師對戰體驗，免扣除經驗值）";
         }
       } else {
         deductionMsg = "（對戰勝利，免予扣除經驗值！）";
@@ -3823,6 +3888,62 @@
       return Math.min(0.90, Math.max(0.20, rate));
     }
 
+    function triggerWildEncounterTransition(onCovered) {
+      const overlay = document.getElementById('gba-wild-transition');
+      if (!overlay) {
+        if (onCovered) onCovered();
+        return;
+      }
+
+      const rightBars = overlay.querySelectorAll('.wipe-right');
+      const leftBars = overlay.querySelectorAll('.wipe-left');
+
+      // Reset initial positions
+      rightBars.forEach(b => {
+        b.style.transition = 'none';
+        b.classList.remove('wipe-in', 'wipe-out');
+        b.style.transform = 'translateX(-130%)';
+      });
+      leftBars.forEach(b => {
+        b.style.transition = 'none';
+        b.classList.remove('wipe-in', 'wipe-out');
+        b.style.transform = 'translateX(130%)';
+      });
+
+      overlay.style.display = 'block';
+      overlay.classList.add('active');
+
+      // Force layout reflow
+      void overlay.offsetHeight;
+
+      // Enable transition and sweep in
+      const transSpeed = 'transform 0.38s cubic-bezier(0.4, 0, 0.2, 1)';
+      rightBars.forEach(b => {
+        b.style.transition = transSpeed;
+        b.style.transform = 'translateX(0%)';
+      });
+      leftBars.forEach(b => {
+        b.style.transition = transSpeed;
+        b.style.transform = 'translateX(0%)';
+      });
+
+      // When bars meet and fully cover screen black (~400ms)
+      setTimeout(() => {
+        if (onCovered) onCovered();
+
+        // Hold full black briefly then sweep out
+        setTimeout(() => {
+          rightBars.forEach(b => b.style.transform = 'translateX(130%)');
+          leftBars.forEach(b => b.style.transform = 'translateX(-130%)');
+
+          setTimeout(() => {
+            overlay.style.display = 'none';
+            overlay.classList.remove('active');
+          }, 400);
+        }, 80);
+      }, 390);
+    }
+
     function openWildEncounterModal() {
       const student = students[currentStudentId];
       if (!student) return;
@@ -3836,13 +3957,15 @@
         return;
       }
 
-      // 申請冒險扣除 5 點經驗值（紅旗老師免扣點）
+      // 申請冒險扣除 5 點經驗值（泓棋老師免扣點）
       if (!student.isTeacher) {
         activePoke.points -= 5;
         saveData();
       }
 
-      startWildBattle();
+      triggerWildEncounterTransition(() => {
+        startWildBattle();
+      });
     }
 
     function startWildBattle() {
@@ -3956,10 +4079,12 @@
 
       updateBattleUI();
 
+      battleBGM.pause();
       battleBGM.currentTime = 0;
-      battleBGM.play().catch(err => console.log("音訊播放限制：", err));
+      wildBattleBGM.currentTime = 0;
+      wildBattleBGM.play().catch(err => console.log("野生對戰音訊播放限制：", err));
 
-      const feeText = student.isTeacher ? "👑 紅旗老師免扣點！" : "🎯 已扣除 5 點經驗值！";
+      const feeText = student.isTeacher ? "👑 泓棋老師免扣點！" : "🎯 已扣除 5 點經驗值！";
       queueLog(`${feeText}進入野外草叢... 遇見了野生的 ${wildPoke.name}！`, () => {
         const speed1 = battleState.p1.speed;
         const speed2 = battleState.p2.speed;
@@ -4130,11 +4255,11 @@
       if (wildBar) wildBar.style.display = 'none';
 
       queueLog(`💨 成功逃離了與野生的 ${battleState.p2.pokeDetails.name} 的對戰！`, () => {
-        endWildBattle(false);
+        endWildBattle(false, true);
       });
     }
 
-    function endWildBattle(isCaught) {
+    function endWildBattle(isCaught, isEscape = false) {
       battleState.active = false;
       document.getElementById('battle-moves-grid').style.display = 'none';
       const wildBar = document.getElementById('battle-wild-bar');
@@ -4146,6 +4271,8 @@
 
       battleBGM.pause();
       battleBGM.currentTime = 0;
+      wildBattleBGM.pause();
+      wildBattleBGM.currentTime = 0;
 
       if (isCaught) {
         winSound.pause();
@@ -4166,7 +4293,7 @@
         renderContent();
       };
 
-      if (isCaught) {
+      if (isCaught || isEscape) {
         finishReturn();
       } else {
         setTimeout(finishReturn, 1500);
