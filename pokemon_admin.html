@@ -763,28 +763,94 @@
         const displayName = isTeacher ? `👑 ${student.name}` : `${id}號 ${student.name}`;
         const badgeBg = isTeacher ? 'background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : (activePoke && activePoke.points >= 300 ? 'background: #10b981' : 'background: #0369a1');
 
+        let pokeListHTML = '';
+        if (pokes.length > 0) {
+          pokes.forEach((p, idx) => {
+            const pDetails = getCurrentPokemon(p);
+            const lvl = Math.floor(p.points / 10);
+            const isActive = idx === activeIndex;
+            pokeListHTML += `
+              <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px 12px; margin-top: 8px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <img src="${pDetails ? pDetails.url : imgUrl}" style="width: 38px; height: 38px; object-fit: contain;">
+                  <div>
+                    <span style="font-weight: 700; font-size: 0.95rem; color: #f8fafc;">${pDetails ? pDetails.name : '寶可夢'}</span>
+                    <span style="font-size: 0.8rem; color: #94a3b8; margin-left: 6px;">Lv.${lvl} (${p.points}分)</span>
+                    ${isActive ? '<span style="background: #22c55e; color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; font-weight: bold; margin-left: 6px;">出戰中</span>' : ''}
+                  </div>
+                </div>
+                <button onclick="releasePokemon('${id}', ${idx})" style="background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #fca5a5; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: inherit;" onmouseover="this.style.background='#ef4444'; this.style.color='white';" onmouseout="this.style.background='rgba(239, 68, 68, 0.2)'; this.style.color='#fca5a5';">
+                  <i class="fa-solid fa-leaf"></i> 放生
+                </button>
+              </div>
+            `;
+          });
+        } else {
+          pokeListHTML = `<div style="font-size: 0.85rem; color: #64748b; margin-top: 8px; font-style: italic;">目前無寶可夢夥伴</div>`;
+        }
+
         const item = document.createElement('div');
         item.className = 'student-item';
+        item.style.flexDirection = 'column';
+        item.style.alignItems = 'stretch';
+        item.style.gap = '10px';
+
         item.innerHTML = `
-          <div class="student-info">
-            <div class="avatar">
-              <img src="${imgUrl}" alt="${pName}">
-            </div>
-            <div>
-              <div class="student-name">${displayName}</div>
-              <div class="student-pokemon-desc">
-                寶可夢數量: ${pokes.length} 隻 | 目前夥伴: ${pName}
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div class="student-info">
+              <div class="avatar">
+                <img src="${imgUrl}" alt="${pName}">
+              </div>
+              <div>
+                <div class="student-name">${displayName}</div>
+                <div class="student-pokemon-desc">
+                  寶可夢數量: ${pokes.length} 隻 | 出戰夥伴: ${pName}
+                </div>
               </div>
             </div>
+            <div>
+              <span class="student-badge" style="${badgeBg}">
+                Lv. ${pLv} (${pPoints}分)
+              </span>
+            </div>
           </div>
-          <div>
-            <span class="student-badge" style="${badgeBg}">
-              Lv. ${pLv} (${pPoints}分)
-            </span>
+          <div style="border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px;">
+            <div style="font-size: 0.85rem; font-weight: 700; color: #38bdf8; display: flex; justify-content: space-between; align-items: center;">
+              <span>🎒 擁有寶可夢列表 (${pokes.length} 隻)</span>
+            </div>
+            ${pokeListHTML}
           </div>
         `;
         container.appendChild(item);
       }
+    }
+
+    function releasePokemon(studentId, pokeIndex) {
+      const student = students[studentId];
+      if (!student || !student.pokemons || !student.pokemons[pokeIndex]) return;
+
+      const poke = student.pokemons[pokeIndex];
+      const pokeData = getCurrentPokemon(poke);
+      const pokeName = pokeData ? pokeData.name : "寶可夢";
+      const level = Math.floor(poke.points / 10);
+
+      const confirmRelease = confirm(`⚠️ 【放生確認】\n\n您確定要幫「${student.name}」放生「${pokeName} (Lv.${level})」嗎？\n\n放生後該寶可夢將回歸大自然，無法復原！`);
+      
+      if (!confirmRelease) return;
+
+      student.pokemons.splice(pokeIndex, 1);
+
+      if (student.activePokemonIndex !== undefined) {
+        if (student.activePokemonIndex === pokeIndex) {
+          student.activePokemonIndex = student.pokemons.length > 0 ? (student.pokemons.length - 1) : 0;
+        } else if (student.activePokemonIndex > pokeIndex) {
+          student.activePokemonIndex--;
+        }
+      }
+
+      saveData();
+      renderOverview();
+      alert(`🍃 已成功為 ${student.name} 放生 ${pokeName}！`);
     }
 
     function modifyPoints() {
