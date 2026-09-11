@@ -49,45 +49,31 @@
       padding: 20px;
     }
 
-    /* GBA Wild Encounter Arrow Wipe Animation */
+    /* GBA Wild Encounter Arrow Wipe Animation (Scoped to Game Window) */
     #gba-wild-transition {
       display: none;
       position: fixed;
-      inset: 0;
       z-index: 999999;
       pointer-events: none;
       overflow: hidden;
+      border-radius: 24px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
     }
     .gba-wipe-bar {
       position: absolute;
-      width: 140vw;
+      width: 140%;
       background: #050505;
       will-change: transform;
     }
     .gba-wipe-bar.wipe-right {
-      left: -20vw;
-      clip-path: polygon(0% 0%, calc(100% - 45px) 0%, 100% 50%, calc(100% - 45px) 100%, 0% 100%);
+      left: -20%;
+      clip-path: polygon(0% 0%, calc(100% - 40px) 0%, 100% 50%, calc(100% - 40px) 100%, 0% 100%);
       transform: translateX(-130%);
-      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .gba-wipe-bar.wipe-left {
-      left: -20vw;
-      clip-path: polygon(45px 0%, 100% 0%, 100% 100%, 45px 100%, 0% 50%);
+      left: -20%;
+      clip-path: polygon(40px 0%, 100% 0%, 100% 100%, 40px 100%, 0% 50%);
       transform: translateX(130%);
-      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    #gba-wild-transition.active .wipe-right.wipe-in {
-      transform: translateX(0%);
-    }
-    #gba-wild-transition.active .wipe-left.wipe-in {
-      transform: translateX(0%);
-    }
-    #gba-wild-transition.active .wipe-right.wipe-out {
-      transform: translateX(130%);
-    }
-    #gba-wild-transition.active .wipe-left.wipe-out {
-      transform: translateX(-130%);
     }
 
     .header-title {
@@ -641,14 +627,14 @@
 
   <!-- GBA Wild Encounter Transition Overlay -->
   <div id="gba-wild-transition">
-    <div class="gba-wipe-bar wipe-right" style="top: 0vh; height: 12.5vh;"></div>
-    <div class="gba-wipe-bar wipe-left" style="top: 12.5vh; height: 12.5vh;"></div>
-    <div class="gba-wipe-bar wipe-right" style="top: 25vh; height: 12.5vh;"></div>
-    <div class="gba-wipe-bar wipe-left" style="top: 37.5vh; height: 12.5vh;"></div>
-    <div class="gba-wipe-bar wipe-right" style="top: 50vh; height: 12.5vh;"></div>
-    <div class="gba-wipe-bar wipe-left" style="top: 62.5vh; height: 12.5vh;"></div>
-    <div class="gba-wipe-bar wipe-right" style="top: 75vh; height: 12.5vh;"></div>
-    <div class="gba-wipe-bar wipe-left" style="top: 87.5vh; height: 12.5vh;"></div>
+    <div class="gba-wipe-bar wipe-right" style="top: 0%; height: 12.5%;"></div>
+    <div class="gba-wipe-bar wipe-left" style="top: 12.5%; height: 12.5%;"></div>
+    <div class="gba-wipe-bar wipe-right" style="top: 25%; height: 12.5%;"></div>
+    <div class="gba-wipe-bar wipe-left" style="top: 37.5%; height: 12.5%;"></div>
+    <div class="gba-wipe-bar wipe-right" style="top: 50%; height: 12.5%;"></div>
+    <div class="gba-wipe-bar wipe-left" style="top: 62.5%; height: 12.5%;"></div>
+    <div class="gba-wipe-bar wipe-right" style="top: 75%; height: 12.5%;"></div>
+    <div class="gba-wipe-bar wipe-left" style="top: 87.5%; height: 12.5%;"></div>
   </div>
 
   <!-- GBA Move Learn / Replace Overlay -->
@@ -3911,29 +3897,40 @@
         return;
       }
 
+      // Target active game card container
+      const studentContainer = document.getElementById('student-container');
+      const battleContainer = document.getElementById('battle-container');
+      let targetEl = (studentContainer && studentContainer.style.display !== 'none')
+        ? studentContainer
+        : (battleContainer || document.body);
+
+      let rect = targetEl.getBoundingClientRect();
+
+      overlay.style.position = 'fixed';
+      overlay.style.top = `${rect.top}px`;
+      overlay.style.left = `${rect.left}px`;
+      overlay.style.width = `${rect.width}px`;
+      overlay.style.height = `${rect.height}px`;
+      overlay.style.borderRadius = '24px';
+
       const rightBars = overlay.querySelectorAll('.wipe-right');
       const leftBars = overlay.querySelectorAll('.wipe-left');
 
-      // Reset initial positions
+      // Reset initial offscreen positions
       rightBars.forEach(b => {
         b.style.transition = 'none';
-        b.classList.remove('wipe-in', 'wipe-out');
         b.style.transform = 'translateX(-130%)';
       });
       leftBars.forEach(b => {
         b.style.transition = 'none';
-        b.classList.remove('wipe-in', 'wipe-out');
         b.style.transform = 'translateX(130%)';
       });
 
       overlay.style.display = 'block';
-      overlay.classList.add('active');
+      void overlay.offsetHeight; // force reflow
 
-      // Force layout reflow
-      void overlay.offsetHeight;
-
-      // Enable transition and sweep in
-      const transSpeed = 'transform 0.38s cubic-bezier(0.4, 0, 0.2, 1)';
+      // Slower, smoother 0.65s cubic-bezier sweep in
+      const transSpeed = 'transform 0.65s cubic-bezier(0.33, 1, 0.68, 1)';
       rightBars.forEach(b => {
         b.style.transition = transSpeed;
         b.style.transform = 'translateX(0%)';
@@ -3943,21 +3940,29 @@
         b.style.transform = 'translateX(0%)';
       });
 
-      // When bars meet and fully cover screen black (~400ms)
+      // Step 2: Fully covered black at ~660ms
       setTimeout(() => {
         if (onCovered) onCovered();
 
-        // Hold full black briefly then sweep out
+        // Hold full black curtain for 200ms
         setTimeout(() => {
+          // Adjust overlay bounds for battle-container after view switch
+          const newTarget = (battleContainer && battleContainer.style.display !== 'none') ? battleContainer : targetEl;
+          const newRect = newTarget.getBoundingClientRect();
+          overlay.style.top = `${newRect.top}px`;
+          overlay.style.left = `${newRect.left}px`;
+          overlay.style.width = `${newRect.width}px`;
+          overlay.style.height = `${newRect.height}px`;
+
+          // Sweep out to reveal battle screen
           rightBars.forEach(b => b.style.transform = 'translateX(130%)');
           leftBars.forEach(b => b.style.transform = 'translateX(-130%)');
 
           setTimeout(() => {
             overlay.style.display = 'none';
-            overlay.classList.remove('active');
-          }, 400);
-        }, 80);
-      }, 390);
+          }, 670);
+        }, 200);
+      }, 660);
     }
 
     function openWildEncounterModal() {
