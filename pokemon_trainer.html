@@ -505,6 +505,14 @@
       pointer-events: none;
       z-index: 40;
     }
+    @keyframes pulseGlow {
+      0% { transform: scale(0.9); opacity: 0.5; }
+      100% { transform: scale(1.15); opacity: 0.9; }
+    }
+    @keyframes bounceBall {
+      0% { transform: translateY(0) rotate(0deg); }
+      100% { transform: translateY(-8px) rotate(15deg); }
+    }
   </style>
 </head>
 <body>
@@ -535,6 +543,58 @@
       <div id="evo-btn-container" style="display: none; justify-content: flex-end; margin-top: 10px;">
         <button id="evo-ok-btn" style="background: #eab308; color: #0f172a; border: none; padding: 8px 24px; font-weight: 900; font-size: 1.1rem; border-radius: 4px; cursor: pointer; box-shadow: 0 4px 0 #ca8a04; transition: transform 0.1s;" onclick="closeEvolution()">確定</button>
       </div>
+    </div>
+  </div>
+
+  <!-- GBA Catch Celebration Overlay -->
+  <div id="catch-overlay" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); z-index: 99999; flex-direction: column; align-items: center; justify-content: center; font-family: 'Fredoka', 'Noto Sans TC', sans-serif; color: white; overflow: hidden; user-select: none; padding: 20px;">
+    <!-- Background Glow & Ray Animation -->
+    <div style="position: absolute; inset: 0; background: radial-gradient(circle at center, rgba(16, 185, 129, 0.3) 0%, rgba(15, 23, 42, 0.9) 70%); pointer-events: none;"></div>
+    
+    <!-- Sparkles/Confetti container -->
+    <div id="catch-particles" style="position: absolute; inset: 0; pointer-events: none; z-index: 12;"></div>
+
+    <!-- Main Card Box -->
+    <div style="position: relative; z-index: 20; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 4px solid #10b981; border-radius: 24px; padding: 30px 25px; width: 90%; max-width: 520px; box-shadow: 0 25px 50px -12px rgba(16, 185, 129, 0.4); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px;">
+      
+      <!-- Crown / Title Header -->
+      <div style="display: flex; align-items: center; gap: 10px; font-size: 1.8rem; font-weight: 900; color: #34d399; letter-spacing: 2px; text-shadow: 0 0 15px rgba(52, 211, 153, 0.5);">
+        <span>🎉</span>
+        <span>恭喜成功收服！</span>
+        <span>🎉</span>
+      </div>
+
+      <!-- Pokemon Display Badge with Pokeball -->
+      <div style="position: relative; width: 220px; height: 220px; display: flex; justify-content: center; align-items: center; margin: 10px 0;">
+        <div style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(52, 211, 153, 0.3) 0%, rgba(16, 185, 129, 0) 70%); animation: pulseGlow 2s infinite alternate;"></div>
+        <img id="catch-img-poke" src="" style="width: 190px; height: 190px; object-fit: contain; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5)); transform: scale(0.2); transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);" />
+        <img id="catch-img-ball" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" style="position: absolute; bottom: 5px; right: 15px; width: 45px; height: 45px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5)); animation: bounceBall 1s infinite alternate;" />
+      </div>
+
+      <!-- Subtitle Description -->
+      <div id="catch-text-name" style="font-size: 1.35rem; font-weight: 800; color: #f8fafc; line-height: 1.4;">
+        [學生] 成功收服了 野生的 [寶可夢]！
+      </div>
+
+      <!-- Status badges -->
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+        <span style="background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; color: #34d399; padding: 6px 14px; border-radius: 20px; font-weight: 800; font-size: 0.9rem;">
+          🌟 等級：Lv.0
+        </span>
+        <span style="background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b; color: #fbbf24; padding: 6px 14px; border-radius: 20px; font-weight: 800; font-size: 0.9rem;">
+          📦 已存入寶可夢倉庫
+        </span>
+      </div>
+
+      <!-- Moves Learned List -->
+      <div id="catch-text-moves" style="font-size: 0.9rem; color: #94a3b8; font-weight: 700; width: 100%; background: rgba(0,0,0,0.25); padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);">
+        ⚡ 初始解鎖招式：撞擊
+      </div>
+
+      <!-- OK Confirm Button -->
+      <button id="btn-confirm-catch" onclick="closeCatchCelebration()" style="margin-top: 10px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; padding: 12px 36px; font-size: 1.15rem; font-weight: 900; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); transition: transform 0.2s; font-family: inherit;" onmouseover="this.style.transform='scale(1.06)'" onmouseout="this.style.transform='scale(1)'">
+        <i class="fa-solid fa-circle-check"></i> 太棒了！放入倉庫
+      </button>
     </div>
   </div>
 
@@ -1671,6 +1731,102 @@
       if(evoCallback) {
         evoCallback();
         evoCallback = null;
+      }
+    }
+
+    // Catch Celebration Logic
+    let catchCallback = null;
+
+    function triggerCatchCelebration(studentName, wildPokeData, callback) {
+      catchCallback = callback;
+      const overlay = document.getElementById('catch-overlay');
+      const imgPoke = document.getElementById('catch-img-poke');
+      const textName = document.getElementById('catch-text-name');
+      const textMoves = document.getElementById('catch-text-moves');
+      const particles = document.getElementById('catch-particles');
+
+      const basePoke = POKEMON_DATA[wildPokeData.family][0];
+      const pokeName = wildPokeData.name;
+      const pokeUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${basePoke.id}.png`;
+
+      const defaultMoves = MOVES_POOL[wildPokeData.family]
+        ? MOVES_POOL[wildPokeData.family].slice(0, 4).map(m => m.name)
+        : ["撞擊"];
+
+      imgPoke.src = pokeUrl;
+      imgPoke.style.transform = 'scale(0.2)';
+      textName.innerHTML = `🎉 <span style="color: #f59e0b;">${studentName}</span> 成功收服了 野生的 <span style="color: #34d399;">${pokeName}</span>！`;
+      textMoves.innerHTML = `⚡ 初始解鎖招式：${defaultMoves.join('、')}`;
+      particles.innerHTML = '';
+
+      overlay.style.display = 'flex';
+
+      // Play victory audio
+      winSound.pause();
+      winSound.currentTime = 0;
+      winSound.play().catch(err => console.log("Audio play error:", err));
+
+      // Burst scale & Sparkles
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          imgPoke.style.transform = 'scale(1)';
+          createCatchSparkles();
+        }, 100);
+      });
+    }
+
+    function createCatchSparkles() {
+      const particles = document.getElementById('catch-particles');
+      if (!particles) return;
+      for (let i = 0; i < 60; i++) {
+        const p = document.createElement('div');
+        const size = Math.random() * 10 + 5;
+        p.style.position = 'absolute';
+        p.style.left = '50%';
+        p.style.top = '45%';
+        p.style.width = `${size}px`;
+        p.style.height = `${size}px`;
+        p.style.background = `hsl(${Math.random() * 360}, 100%, 70%)`;
+        p.style.borderRadius = '50%';
+        p.style.boxShadow = '0 0 12px white';
+        
+        const angle = Math.random() * Math.PI * 2;
+        const velocity = Math.random() * 350 + 150;
+        const vx = Math.cos(angle) * velocity;
+        const vy = Math.sin(angle) * velocity;
+        
+        particles.appendChild(p);
+
+        let posX = 0;
+        let opacity = 1;
+        let scale = 1;
+        let posY = 0;
+
+        function animateP() {
+          posX += vx * 0.016;
+          posY += vy * 0.016 + 1.2;
+          opacity -= 0.015;
+          scale -= 0.008;
+
+          p.style.transform = `translate(${posX}px, ${posY}px) scale(${Math.max(0, scale)})`;
+          p.style.opacity = opacity;
+
+          if (opacity > 0) {
+            requestAnimationFrame(animateP);
+          } else {
+            p.remove();
+          }
+        }
+        requestAnimationFrame(animateP);
+      }
+    }
+
+    function closeCatchCelebration() {
+      const overlay = document.getElementById('catch-overlay');
+      if (overlay) overlay.style.display = 'none';
+      if (catchCallback) {
+        catchCallback();
+        catchCallback = null;
       }
     }
 
@@ -3899,9 +4055,12 @@
                         saveData();
                       }
 
-                      queueLog(`🎉 太棒了！成功收服野生的 ${wildPokeData.name}！(Lv.0) 已加入你的寶可夢倉庫！`, () => {
-                        endWildBattle(true);
-                      });
+                      // Trigger Congratulation Catch Celebration Screen!
+                      setTimeout(() => {
+                        triggerCatchCelebration(student.name, wildPokeData, () => {
+                          endWildBattle(true);
+                        });
+                      }, 500);
                     } else {
                       // Pokemon escapes!
                       ball.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
