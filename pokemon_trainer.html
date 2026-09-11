@@ -1005,7 +1005,7 @@
       ],
       gastly: [
         { name: "舔", level: 0, power: 10, type: "ghost", status: "none" },
-        { name: "催眠術", level: 1, power: 0, type: "status", status: "atk-down" },
+        { name: "催眠術", level: 1, power: 0, type: "status", status: "sleep" },
         { name: "黑夜魔影", level: 2, power: 18, type: "ghost", status: "none" },
         { name: "奇異光線", level: 3, power: 0, type: "status", status: "atk-down" },
         { name: "陰影球", level: 10, power: 25, type: "ghost", status: "none" },
@@ -2369,6 +2369,8 @@
         speed: Math.floor(p1Details.speed * scale1),
         atkMod: 1,
         defMod: 1,
+        asleep: false,
+        sleepTurns: 0,
         poisoned: false,
         moves: p1Moves,
         movePP: p1MovePP
@@ -2390,6 +2392,8 @@
         speed: Math.floor(p2Details.speed * scale2),
         atkMod: 1,
         defMod: 1,
+        asleep: false,
+        sleepTurns: 0,
         poisoned: false,
         moves: p2Moves
       };
@@ -2464,6 +2468,36 @@
     function startTurn() {
       if (!battleState.active) return;
       
+      const activeFighter = battleState[battleState.currentTurn];
+      if (activeFighter && activeFighter.asleep) {
+        if (activeFighter.sleepTurns > 0) {
+          activeFighter.sleepTurns--;
+          updateBattleUI();
+          document.getElementById('battle-moves-grid').style.display = 'none';
+          const wildBar = document.getElementById('battle-wild-bar');
+          if (wildBar) wildBar.style.display = 'none';
+          document.getElementById('battle-auto-indicator').style.display = 'none';
+
+          if (activeFighter.sleepTurns <= 0) {
+            activeFighter.asleep = false;
+            updateBattleUI();
+            queueLog(`😴 ${activeFighter.name}的${activeFighter.pokeDetails.name} 正在沉睡中，無法行動...`, () => {
+              queueLog(`⏰ ${activeFighter.name}的${activeFighter.pokeDetails.name} 從沉睡中醒過來了！`, () => {
+                endTurn();
+              });
+            });
+          } else {
+            queueLog(`😴 ${activeFighter.name}的${activeFighter.pokeDetails.name} 正在沉睡中，無法行動！（還需沉睡 ${activeFighter.sleepTurns} 回合）`, () => {
+              endTurn();
+            });
+          }
+          return;
+        } else {
+          activeFighter.asleep = false;
+          updateBattleUI();
+        }
+      }
+
       if (battleState.currentTurn === 'p1') {
         // Player 1's turn (Manual Control)
         document.getElementById('battle-auto-indicator').style.display = 'none';
@@ -2643,7 +2677,16 @@
           playMoveEffect(move, attackerSide, defenderSide, () => {
             
             if (move.type === 'status') {
-              if (move.status === 'atk-down') {
+              if (move.status === 'sleep') {
+                if (defender.asleep) {
+                  queueLog(`${defender.name}的${defender.pokeDetails.name} 已經處於沉睡狀態了！`, () => endTurn());
+                } else {
+                  defender.asleep = true;
+                  defender.sleepTurns = 3;
+                  updateBattleUI();
+                  queueLog(`🌀 ${defender.name}的${defender.pokeDetails.name} 中了催眠術，陷入了沉睡狀態！（3 回合無法行動）`, () => endTurn());
+                }
+              } else if (move.status === 'atk-down') {
                 defender.atkMod *= 0.7;
                 queueLog(`${defender.name}的${defender.pokeDetails.name} 攻擊力降低了！`, () => endTurn());
               } else if (move.status === 'def-up') {
@@ -2969,7 +3012,26 @@
       const endX = defenderSide === 'p1' ? p1X : p2X;
       const endY = defenderSide === 'p1' ? p1Y : p2Y;
 
-      if (move.status === 'heal') {
+      if (move.status === 'sleep') {
+        const ringTargetX = endX;
+        const ringTargetY = endY;
+        for (let i = 0; i < 6; i++) {
+          setTimeout(() => {
+            createParticle({
+              x: ringTargetX + (Math.random() * 40 - 20),
+              y: ringTargetY + (Math.random() * 20 - 10),
+              vx: Math.random() * 1.5 - 0.75,
+              vy: -(Math.random() * 2 + 1),
+              color: '#818cf8',
+              size: Math.random() * 8 + 6,
+              gravity: -0.02,
+              duration: 900,
+              glow: true
+            });
+          }, i * 120);
+        }
+        setTimeout(callback, 900);
+      } else if (move.status === 'heal') {
         // Synthesis Green sparkles rising
         for (let i = 0; i < 25; i++) {
           createParticle({
@@ -3807,9 +3869,17 @@
       document.getElementById('battle-hp-text-p1').textContent = `${battleState.p1.hp} / ${battleState.p1.maxHp}`;
       document.getElementById('battle-hp-text-p2').textContent = `${battleState.p2.hp} / ${battleState.p2.maxHp}`;
 
-      // Show poison status badge next to name
-      document.getElementById('battle-name-p1').innerHTML = `${battleState.p1.name}的${battleState.p1.pokeDetails.name}${battleState.p1.poisoned ? ' <span style="background: #a855f7; color: white; font-size: 0.75rem; padding: 1px 4px; border-radius: 3px; font-weight: bold; margin-left: 5px;">☠️ 中毒</span>' : ''}`;
-      document.getElementById('battle-name-p2').innerHTML = `${battleState.p2.name}的${battleState.p2.pokeDetails.name}${battleState.p2.poisoned ? ' <span style="background: #a855f7; color: white; font-size: 0.75rem; padding: 1px 4px; border-radius: 3px; font-weight: bold; margin-left: 5px;">☠️ 中毒</span>' : ''}`;
+      // Show status badges next to name
+      let statusBadge1 = '';
+      if (battleState.p1.asleep) statusBadge1 += ' <span style="background: #6366f1; color: white; font-size: 0.75rem; padding: 1px 4px; border-radius: 3px; font-weight: bold; margin-left: 5px;">😴 睡</span>';
+      if (battleState.p1.poisoned) statusBadge1 += ' <span style="background: #a855f7; color: white; font-size: 0.75rem; padding: 1px 4px; border-radius: 3px; font-weight: bold; margin-left: 5px;">☠️ 中毒</span>';
+
+      let statusBadge2 = '';
+      if (battleState.p2.asleep) statusBadge2 += ' <span style="background: #6366f1; color: white; font-size: 0.75rem; padding: 1px 4px; border-radius: 3px; font-weight: bold; margin-left: 5px;">😴 睡</span>';
+      if (battleState.p2.poisoned) statusBadge2 += ' <span style="background: #a855f7; color: white; font-size: 0.75rem; padding: 1px 4px; border-radius: 3px; font-weight: bold; margin-left: 5px;">☠️ 中毒</span>';
+
+      document.getElementById('battle-name-p1').innerHTML = `${battleState.p1.name}的${battleState.p1.pokeDetails.name}${statusBadge1}`;
+      document.getElementById('battle-name-p2').innerHTML = `${battleState.p2.name}的${battleState.p2.pokeDetails.name}${statusBadge2}`;
     }
 
     function endBattle(winnerName) {
@@ -4075,6 +4145,8 @@
         speed: Math.floor(basePoke.speed * scale2),
         atkMod: 1,
         defMod: 1,
+        asleep: false,
+        sleepTurns: 0,
         poisoned: false,
         moves: wildMoves
       };
