@@ -361,6 +361,13 @@
             </select>
           </div>
 
+          <div class="form-group">
+            <label for="pokemon-select">選擇要加扣分的寶可夢</label>
+            <select id="pokemon-select">
+              <option value="-1">目前無寶可夢夥伴</option>
+            </select>
+          </div>
+
           <div class="form-group" id="points-group">
             <label for="points-input">給予分數 (可輸入負數扣分)</label>
             <input type="number" id="points-input" value="1" min="-200" max="200">
@@ -823,6 +830,7 @@
         `;
         container.appendChild(item);
       }
+      updateSelectedInfo();
     }
 
     function releasePokemon(studentId, pokeIndex) {
@@ -858,26 +866,36 @@
       const pointsToAdd = parseInt(document.getElementById('points-input').value) || 0;
       const student = students[selectedId];
 
-      if (!student.pokemons || student.pokemons.length === 0) {
+      if (!student || !student.pokemons || student.pokemons.length === 0) {
         alert("這位學生還沒有在學生端網頁上選擇初始寶可夢夥伴喔！無法進行加分。");
         return;
       }
 
-      const activeIndex = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < student.pokemons.length) ? student.activePokemonIndex : (student.pokemons.length - 1);
-      const activePoke = student.pokemons[activeIndex];
+      const pokeSelect = document.getElementById('pokemon-select');
+      let targetIndex = pokeSelect ? parseInt(pokeSelect.value) : -1;
 
-      if (activePoke.points >= 300 && pointsToAdd > 0) {
-        alert("該寶可夢已達滿級 (30等)！請請學生先到網頁端選擇下一隻寶可夢！");
+      if (isNaN(targetIndex) || targetIndex < 0 || targetIndex >= student.pokemons.length) {
+        targetIndex = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < student.pokemons.length)
+          ? student.activePokemonIndex
+          : (student.pokemons.length - 1);
+      }
+
+      const targetPoke = student.pokemons[targetIndex];
+      const targetPokeData = getCurrentPokemon(targetPoke);
+      const targetPokeName = targetPokeData ? targetPokeData.name : '寶可夢';
+
+      if (targetPoke.points >= 300 && pointsToAdd > 0) {
+        alert(`「${targetPokeName}」已達滿級 (30等)！請學生先到網頁端選擇下一隻寶可夢！`);
         return;
       }
 
-      activePoke.points += pointsToAdd;
-      if (activePoke.points > 300) activePoke.points = 300;
-      if (activePoke.points < 0) activePoke.points = 0;
+      targetPoke.points += pointsToAdd;
+      if (targetPoke.points > 300) targetPoke.points = 300;
+      if (targetPoke.points < 0) targetPoke.points = 0;
 
       saveData();
       renderOverview();
-      alert(`已成功為 ${student.name} 送出增減分！`);
+      alert(`已成功為 ${student.name} 的「${targetPokeName}」送出增減分！`);
     }
 
     function resetStudent() {
@@ -893,7 +911,44 @@
     }
 
     function updateSelectedInfo() {
-      // Custom sync if needed
+      const pokeSelect = document.getElementById('pokemon-select');
+      if (!pokeSelect) return;
+
+      const selectedId = document.getElementById('student-select').value;
+      const student = students ? students[selectedId] : null;
+
+      const previousIndex = parseInt(pokeSelect.value);
+      pokeSelect.innerHTML = '';
+
+      if (!student || !student.pokemons || student.pokemons.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = "-1";
+        opt.textContent = "目前無寶可夢夥伴";
+        pokeSelect.appendChild(opt);
+        return;
+      }
+
+      const activeIndex = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < student.pokemons.length)
+        ? student.activePokemonIndex
+        : (student.pokemons.length - 1);
+
+      student.pokemons.forEach((poke, idx) => {
+        const pokeData = getCurrentPokemon(poke);
+        const name = pokeData ? pokeData.name : '寶可夢';
+        const level = Math.floor(poke.points / 10);
+        const isActive = (idx === activeIndex);
+
+        const opt = document.createElement('option');
+        opt.value = idx;
+        opt.textContent = `${idx + 1}. ${name} (Lv.${level}, ${poke.points}分)${isActive ? ' [出戰中]' : ''}`;
+        pokeSelect.appendChild(opt);
+      });
+
+      if (!isNaN(previousIndex) && previousIndex >= 0 && previousIndex < student.pokemons.length) {
+        pokeSelect.value = previousIndex;
+      } else if (activeIndex >= 0 && activeIndex < student.pokemons.length) {
+        pokeSelect.value = activeIndex;
+      }
     }
 
     // 頁籤切換邏輯
