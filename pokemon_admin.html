@@ -520,6 +520,36 @@
         { id: 158, name: '小鋸鱷', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/158.png' },
         { id: 159, name: '藍鱷', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/159.png' },
         { id: 160, name: '大力鱷', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/160.png' }
+      ],
+      turtwig: [
+        { id: 387, name: '草苗龜', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/387.png' },
+        { id: 388, name: '樹林龜', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/388.png' },
+        { id: 389, name: '土台龜', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/389.png' }
+      ],
+      chimchar: [
+        { id: 390, name: '小火焰猴', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/390.png' },
+        { id: 391, name: '猛火猴', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/391.png' },
+        { id: 392, name: '烈焰猴', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/392.png' }
+      ],
+      piplup: [
+        { id: 393, name: '波加曼', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/393.png' },
+        { id: 394, name: '波皇子', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/394.png' },
+        { id: 395, name: '帝王拿波', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/395.png' }
+      ],
+      treecko: [
+        { id: 252, name: '木守宮', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/252.png' },
+        { id: 253, name: '森林蜥蜴', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/253.png' },
+        { id: 254, name: '蜥蜴王', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/254.png' }
+      ],
+      torchic: [
+        { id: 255, name: '火稚雞', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/255.png' },
+        { id: 256, name: '力壯雞', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/256.png' },
+        { id: 257, name: '火焰雞', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/257.png' }
+      ],
+      mudkip: [
+        { id: 258, name: '水躍魚', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/258.png' },
+        { id: 259, name: '沼躍魚', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/259.png' },
+        { id: 260, name: '巨沼怪', url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/260.png' }
       ]
     };
 
@@ -537,6 +567,11 @@
             points: 200,
             moves: ["水炮", "加農水炮", "縮入殼中", "水之波動"],
             moveLibrary: ["撞擊", "縮入殼中", "水槍", "搖尾巴", "水之波動", "咬住", "水炮", "濁流", "加農水炮"]
+          },
+          {
+            family: "piplup",
+            points: 0,
+            moves: ["撞擊", "水槍"]
           }
         ]
       }
@@ -726,7 +761,17 @@
       }
     }
 
-    function getStage(level) {
+    function getStage(pokeOrLevel) {
+      if (typeof pokeOrLevel === 'object' && pokeOrLevel !== null) {
+        const poke = pokeOrLevel;
+        const level = Math.floor((poke.points || 0) / 10);
+        if (poke.stage !== undefined) return poke.stage;
+        if (level < 10) return 0;
+        if (level < 20) return poke.cancelledLv10 ? 0 : 1;
+        if (poke.cancelledLv20) return poke.cancelledLv10 ? 0 : 1;
+        return 2;
+      }
+      const level = parseInt(pokeOrLevel) || 0;
       if (level < 10) return 0;
       if (level < 20) return 1;
       return 2;
@@ -735,9 +780,9 @@
     function getCurrentPokemon(poke) {
       if (!poke || !poke.family) return null;
       const familyArr = POKEMON_DATA[poke.family];
-      const level = Math.floor(poke.points / 10);
-      const stageIndex = getStage(level);
-      return familyArr[stageIndex];
+      if (!familyArr) return null;
+      const stageIndex = getStage(poke);
+      return familyArr[stageIndex] || familyArr[0];
     }
 
     function renderOverview() {
