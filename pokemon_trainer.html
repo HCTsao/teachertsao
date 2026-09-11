@@ -766,7 +766,7 @@
     </button>
   </div>
 
-  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v3.1</span></h1>
+  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v3.2</span></h1>
 
   <!-- Student Card Container -->
   <div class="main-container" id="student-container">
@@ -2581,6 +2581,22 @@
       }
     }
 
+    function adjustP1SpritePosition() {
+      const img1 = document.getElementById('battle-img-p1');
+      if (!img1 || !battleState.p1) return;
+      const fam = battleState.p1.family;
+      const idP1 = battleState.p1.pokeDetails ? battleState.p1.pokeDetails.id : null;
+      if (fam === 'piplup' || idP1 === 393) {
+        img1.style.bottom = '-35%';
+      } else if (fam === 'chikorita' || idP1 === 152) {
+        img1.style.bottom = '-32%';
+      } else if (fam === 'gastly' && idP1 === 94) {
+        img1.style.bottom = '-28%';
+      } else {
+        img1.style.bottom = '-18%';
+      }
+    }
+
     function startBattle() {
       const p1Id = document.getElementById('battle-p1-select').value;
       const p2Id = document.getElementById('battle-p2-select').value;
@@ -2668,11 +2684,12 @@
       document.getElementById('battle-img-p1').src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/${battleState.p1.pokeDetails.id}.png`;
       document.getElementById('battle-img-p2').src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${battleState.p2.pokeDetails.id}.png`;
       
-      // Reset image animations
+      // Reset image animations & apply custom Y-offset for P1
       document.getElementById('battle-img-p1').style.transform = 'scale(1)';
       document.getElementById('battle-img-p1').style.opacity = '1';
       document.getElementById('battle-img-p2').style.transform = 'scale(1)';
       document.getElementById('battle-img-p2').style.opacity = '1';
+      adjustP1SpritePosition();
 
       document.getElementById('battle-name-p1').textContent = `${battleState.p1.name}的${battleState.p1.pokeDetails.name}`;
       document.getElementById('battle-name-p2').textContent = `${battleState.p2.name}的${battleState.p2.pokeDetails.name}`;
@@ -4003,33 +4020,326 @@
         }
         setTimeout(() => flashDefender(defenderSide), 100);
         setTimeout(callback, delay + 750);
-      } else {
-        // Default physical attack hit spark
-        const star = document.createElement('div');
-        star.style.position = 'absolute';
-        star.style.left = `${endX}px`;
-        star.style.top = `${endY}px`;
-        star.style.width = '10px';
-        star.style.height = '10px';
-        star.style.background = '#fef08a';
-        star.style.border = '3px solid #eab308';
-        star.style.borderRadius = '50%';
-        star.style.transform = 'translate(-50%, -50%) scale(0)';
-        star.style.pointerEvents = 'none';
-        star.style.zIndex = '40';
-        star.style.transition = 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-        arena.appendChild(star);
+      } else if (move.name === '抓' || move.name === '劈開' || move.name === '二連踢' || move.name === '音速拳' || move.name === '拍擊' || move.name === '葉刃' || move.name === '龍爪') {
+        // Sharp metallic claw / slash animation!
+        const isDragonClaw = move.name === '龍爪';
+        const isLeafBlade = move.name === '葉刃';
+        const colorGrad = isDragonClaw 
+          ? 'linear-gradient(90deg, transparent, #c084fc, #a855f7, transparent)'
+          : (isLeafBlade 
+            ? 'linear-gradient(90deg, transparent, #86efac, #22c55e, transparent)'
+            : 'linear-gradient(90deg, transparent, #ffffff, #fef08a, transparent)');
+        const glowColor = isDragonClaw ? '#a855f7' : (isLeafBlade ? '#22c55e' : '#facc15');
 
-        requestAnimationFrame(() => {
-          star.style.transform = 'translate(-50%, -50%) scale(5)';
-        });
-        
+        for (let i = 0; i < 3; i++) {
+          setTimeout(() => {
+            const claw = document.createElement('div');
+            claw.style.position = 'absolute';
+            claw.style.left = `${endX + (i - 1) * 20}px`;
+            claw.style.top = `${endY + (i - 1) * 10}px`;
+            claw.style.width = isDragonClaw ? '150px' : '125px';
+            claw.style.height = '7px';
+            claw.style.background = colorGrad;
+            claw.style.boxShadow = `0 0 14px ${glowColor}, 0 0 24px white`;
+            claw.style.borderRadius = '3px';
+            claw.style.pointerEvents = 'none';
+            claw.style.zIndex = '45';
+            claw.style.transform = 'translate(-50%, -50%) rotate(-35deg) scaleX(0)';
+            claw.style.transition = 'transform 0.12s cubic-bezier(0.1, 0.9, 0.2, 1), opacity 0.12s';
+            arena.appendChild(claw);
+
+            requestAnimationFrame(() => {
+              claw.style.transform = 'translate(-50%, -50%) rotate(-35deg) scaleX(1)';
+            });
+
+            setTimeout(() => {
+              claw.style.opacity = '0';
+              setTimeout(() => claw.remove(), 100);
+            }, 140);
+          }, i * 55);
+        }
+
         setTimeout(() => {
           flashDefender(defenderSide);
-          star.style.opacity = '0';
-          setTimeout(() => star.remove(), 100);
+          for (let k = 0; k < 15; k++) {
+            createParticle({
+              x: endX + (Math.random() * 40 - 20),
+              y: endY + (Math.random() * 40 - 20),
+              vx: Math.random() * 6 - 3,
+              vy: Math.random() * 6 - 3,
+              color: glowColor,
+              size: Math.random() * 7 + 4,
+              duration: 350,
+              glow: true
+            });
+          }
           callback();
-        }, 250);
+        }, 320);
+      } else if (move.name === '十萬伏特' || move.name === '電擊' || move.name === '打雷' || move.name === '伏特攻擊' || move.type === 'electric') {
+        // High-voltage lightning bolt strike!
+        const flashOverlay = document.getElementById('battle-flash-overlay');
+        if (flashOverlay) {
+          flashOverlay.style.background = '#fef08a';
+          flashOverlay.style.opacity = '0.7';
+          setTimeout(() => flashOverlay.style.opacity = '0', 160);
+        }
+
+        for (let b = 0; b < 5; b++) {
+          setTimeout(() => {
+            const bolt = document.createElement('div');
+            bolt.style.position = 'absolute';
+            bolt.style.left = `${startX}px`;
+            bolt.style.top = `${startY}px`;
+            bolt.style.width = '0px';
+            bolt.style.height = '0px';
+            bolt.style.background = 'linear-gradient(90deg, #fef08a, #eab308, #38bdf8, white)';
+            bolt.style.boxShadow = '0 0 16px #facc15, 0 0 30px #38bdf8';
+            bolt.style.borderRadius = '4px';
+            bolt.style.pointerEvents = 'none';
+            bolt.style.zIndex = '46';
+            bolt.style.transform = 'translate(-50%, -50%)';
+            bolt.style.transition = 'all 0.14s ease-out';
+            arena.appendChild(bolt);
+
+            const dx = endX - startX + (Math.random() * 40 - 20);
+            const dy = endY - startY + (Math.random() * 40 - 20);
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+            requestAnimationFrame(() => {
+              bolt.style.left = `${startX + dx/2}px`;
+              bolt.style.top = `${startY + dy/2}px`;
+              bolt.style.width = `${dist}px`;
+              bolt.style.height = `${Math.random() * 18 + 10}px`;
+              bolt.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+            });
+
+            setTimeout(() => {
+              bolt.style.opacity = '0';
+              setTimeout(() => bolt.remove(), 100);
+            }, 150);
+          }, b * 50);
+        }
+
+        let delay = 0;
+        for (let i = 0; i < 22; i++) {
+          setTimeout(() => {
+            createParticle({
+              x: endX + (Math.random() * 50 - 25),
+              y: endY + (Math.random() * 50 - 25),
+              vx: Math.random() * 10 - 5,
+              vy: Math.random() * 10 - 5,
+              color: Math.random() < 0.6 ? '#fef08a' : '#38bdf8',
+              size: Math.random() * 10 + 5,
+              duration: 350,
+              glow: true
+            });
+          }, delay);
+          delay += 12;
+        }
+
+        setTimeout(() => {
+          flashDefender(defenderSide);
+          callback();
+        }, delay + 220);
+      } else if (move.name === '泡沫光線') {
+        const count = 22;
+        let delay = 0;
+        for (let i = 0; i < count; i++) {
+          setTimeout(() => {
+            createParticle({
+              x: startX + (Math.random() * 20 - 10),
+              y: startY + (Math.random() * 20 - 10),
+              vx: (endX - startX) / 14 + (Math.random() * 5 - 2.5),
+              vy: (endY - startY) / 14 + (Math.random() * 5 - 2.5),
+              color: 'rgba(147, 197, 253, 0.85)',
+              size: Math.random() * 16 + 8,
+              duration: 450,
+              isBubble: true
+            });
+          }, delay);
+          delay += 20;
+        }
+        setTimeout(() => flashDefender(defenderSide), delay + 150);
+        setTimeout(callback, delay + 500);
+      } else if (move.name === '地震' || move.name === '震級') {
+        const arenaCard = document.getElementById('battle-arena-card');
+        arenaCard.style.transition = 'transform 0.05s';
+        let shakeCount = 0;
+        const shakeInterval = setInterval(() => {
+          const offsetX = (Math.random() * 18 - 9);
+          const offsetY = (Math.random() * 18 - 9);
+          arenaCard.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+          shakeCount++;
+          if (shakeCount >= 10) {
+            clearInterval(shakeInterval);
+            arenaCard.style.transform = 'translate(0, 0)';
+            flashDefender(defenderSide);
+            callback();
+          }
+        }, 45);
+      } else if (move.name === '落石' || move.name === '岩石封鎖' || move.name === '岩崩' || move.name === '泥巴射擊') {
+        for (let r = 0; r < 4; r++) {
+          setTimeout(() => {
+            const rock = document.createElement('div');
+            rock.style.position = 'absolute';
+            rock.style.left = `${endX + (Math.random() * 40 - 20)}px`;
+            rock.style.top = `${endY - 120}px`;
+            rock.style.width = '35px';
+            rock.style.height = '35px';
+            rock.style.background = move.name === '泥巴射擊' ? '#78350f' : '#78716c';
+            rock.style.border = '3px solid #292524';
+            rock.style.borderRadius = '8px';
+            rock.style.transform = 'rotate(45deg)';
+            rock.style.transition = 'top 0.2s cubic-bezier(0.55, 0.085, 0.68, 0.53)';
+            rock.style.zIndex = '45';
+            arena.appendChild(rock);
+
+            requestAnimationFrame(() => {
+              rock.style.top = `${endY}px`;
+            });
+
+            setTimeout(() => {
+              rock.remove();
+              flashDefender(defenderSide);
+              for (let k = 0; k < 8; k++) {
+                createParticle({
+                  x: endX + (Math.random() * 30 - 15),
+                  y: endY + (Math.random() * 30 - 15),
+                  vx: Math.random() * 6 - 3,
+                  vy: Math.random() * 6 - 3,
+                  color: move.name === '泥巴射擊' ? '#92400e' : '#a8a29e',
+                  size: Math.random() * 8 + 4,
+                  duration: 350
+                });
+              }
+            }, 200);
+          }, r * 120);
+        }
+        setTimeout(callback, 750);
+      } else if (move.name === '吸取' || move.name === '樹汁吸收' || move.name === '寄生種子') {
+        let delay = 0;
+        for (let i = 0; i < 16; i++) {
+          setTimeout(() => {
+            createParticle({
+              x: endX + (Math.random() * 30 - 15),
+              y: endY + (Math.random() * 30 - 15),
+              vx: (startX - endX) / 16 + (Math.random() * 3 - 1.5),
+              vy: (startY - endY) / 16 + (Math.random() * 3 - 1.5),
+              color: '#4ade80',
+              size: Math.random() * 8 + 6,
+              duration: 400,
+              glow: true
+            });
+          }, delay);
+          delay += 25;
+        }
+        setTimeout(() => flashDefender(defenderSide), delay + 150);
+        setTimeout(callback, delay + 450);
+      } else if (move.name === '催眠術' || move.name === '奇異光線' || move.name === '念力' || move.name === '精神強念' || move.name === '幻象光線') {
+        for (let i = 0; i < 4; i++) {
+          setTimeout(() => {
+            const wave = document.createElement('div');
+            wave.style.position = 'absolute';
+            wave.style.left = `${endX}px`;
+            wave.style.top = `${endY}px`;
+            wave.style.width = '20px';
+            wave.style.height = '20px';
+            wave.style.border = '4px solid #c084fc';
+            wave.style.boxShadow = '0 0 20px #a855f7, 0 0 35px #e879f9';
+            wave.style.borderRadius = '50%';
+            wave.style.transform = 'translate(-50%, -50%)';
+            wave.style.transition = 'all 0.5s ease-out';
+            wave.style.pointerEvents = 'none';
+            wave.style.zIndex = '45';
+            arena.appendChild(wave);
+
+            requestAnimationFrame(() => {
+              wave.style.width = '160px';
+              wave.style.height = '160px';
+              wave.style.opacity = '0';
+            });
+
+            setTimeout(() => wave.remove(), 500);
+          }, i * 140);
+        }
+        setTimeout(() => flashDefender(defenderSide), 400);
+        setTimeout(callback, 800);
+      } else if (move.name === '陰影球' || move.name === '惡波動' || move.name === '黑夜魔影' || move.name === '禍不單行' || move.name === '舔') {
+        const shadowOrb = document.createElement('div');
+        shadowOrb.style.position = 'absolute';
+        shadowOrb.style.left = `${startX}px`;
+        shadowOrb.style.top = `${startY}px`;
+        shadowOrb.style.width = '32px';
+        shadowOrb.style.height = '32px';
+        shadowOrb.style.background = 'radial-gradient(circle, #a855f7 0%, #3b0764 80%)';
+        shadowOrb.style.boxShadow = '0 0 20px #7e22ce, 0 0 35px #581c87';
+        shadowOrb.style.borderRadius = '50%';
+        shadowOrb.style.transform = 'translate(-50%, -50%)';
+        shadowOrb.style.transition = 'all 0.3s ease-in-out';
+        shadowOrb.style.zIndex = '45';
+        arena.appendChild(shadowOrb);
+
+        requestAnimationFrame(() => {
+          shadowOrb.style.left = `${endX}px`;
+          shadowOrb.style.top = `${endY}px`;
+        });
+
+        setTimeout(() => {
+          shadowOrb.remove();
+          flashDefender(defenderSide);
+          for (let k = 0; k < 18; k++) {
+            createParticle({
+              x: endX + (Math.random() * 30 - 15),
+              y: endY + (Math.random() * 30 - 15),
+              vx: Math.random() * 6 - 3,
+              vy: Math.random() * 6 - 3,
+              color: '#a855f7',
+              size: Math.random() * 10 + 6,
+              duration: 400,
+              glow: true
+            });
+          }
+          callback();
+        }, 320);
+      } else {
+        // High speed physical dash & starburst ring impact
+        const img = document.getElementById(attackerSide === 'p1' ? 'battle-img-p1' : 'battle-img-p2');
+        const directionX = attackerSide === 'p1' ? 70 : -70;
+        const directionY = attackerSide === 'p1' ? -45 : 45;
+        
+        img.style.transition = 'transform 0.15s ease-in';
+        img.style.transform = `translate(${directionX}px, ${directionY}px) scale(1.15)`;
+        
+        setTimeout(() => {
+          img.style.transition = 'transform 0.15s ease-out';
+          img.style.transform = 'translate(0, 0) scale(1)';
+          flashDefender(defenderSide);
+
+          const star = document.createElement('div');
+          star.style.position = 'absolute';
+          star.style.left = `${endX}px`;
+          star.style.top = `${endY}px`;
+          star.style.width = '20px';
+          star.style.height = '20px';
+          star.style.background = '#ffffff';
+          star.style.boxShadow = '0 0 20px #fef08a, 0 0 35px #f59e0b';
+          star.style.borderRadius = '50%';
+          star.style.transform = 'translate(-50%, -50%) scale(0)';
+          star.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s';
+          star.style.zIndex = '45';
+          arena.appendChild(star);
+
+          requestAnimationFrame(() => {
+            star.style.transform = 'translate(-50%, -50%) scale(4)';
+          });
+
+          setTimeout(() => {
+            star.style.opacity = '0';
+            setTimeout(() => star.remove(), 150);
+            callback();
+          }, 220);
+        }, 160);
       }
     }
 
