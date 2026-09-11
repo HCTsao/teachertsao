@@ -3052,7 +3052,25 @@
                   animateFaint(defenderSide, () => {
                     if (battleState.isWild) {
                       if (defenderSide === 'p2') {
-                        queueLog(`💥 野生的 ${defender.pokeDetails.name} 倒下了！對戰獲勝！`, () => {
+                        const student = students[currentStudentId];
+                        let bonusMsg = "";
+                        if (student && student.pokemons) {
+                          const activeIdx = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < student.pokemons.length) ? student.activePokemonIndex : (student.pokemons.length - 1);
+                          const activePoke = student.pokemons[activeIdx];
+                          if (activePoke) {
+                            if (student.isTeacher) {
+                              const bonusPts = Math.floor(Math.random() * 3) + 3;
+                              activePoke.points += bonusPts;
+                              saveData();
+                              bonusMsg = `（泓棋老師獲得 ${bonusPts} 點經驗值！）`;
+                            } else {
+                              activePoke.points += 10;
+                              saveData();
+                              bonusMsg = "（加回 10 點經驗值！）";
+                            }
+                          }
+                        }
+                        queueLog(`💥 野生的 ${defender.pokeDetails.name} 倒下了！對戰獲勝！${bonusMsg}`, () => {
                           endWildBattle(false);
                         });
                       } else {
@@ -4531,7 +4549,23 @@
           deductionMsg = "（泓棋老師對戰體驗，免扣除經驗值）";
         }
       } else {
-        deductionMsg = "（對戰勝利，免予扣除經驗值！）";
+        if (student && student.isTeacher && activePoke) {
+          const p1Level = Math.floor((activePoke.points || 0) / 10);
+          const p2Points = (battleState.p2 && battleState.p2.activePoke) ? (battleState.p2.activePoke.points || 0) : 0;
+          const p2Level = Math.floor(p2Points / 10);
+
+          let addPts = 0;
+          if (p2Level > p1Level) {
+            addPts = (p2Level - p1Level) * 3;
+          } else {
+            addPts = Math.floor(Math.random() * 3) + 3; // 3~5 points
+          }
+          activePoke.points += addPts;
+          saveData();
+          deductionMsg = `（對戰勝利！泓棋老師獲得 ${addPts} 點經驗值！）`;
+        } else {
+          deductionMsg = "（對戰勝利，免予扣除經驗值！）";
+        }
       }
       
       queueLog(`對戰結束！恭喜 ${winnerName} 獲得了勝利！${deductionMsg}`, () => {
@@ -4923,6 +4957,15 @@
 
                     if (student) {
                       if (!student.pokemons) student.pokemons = [];
+                      const activeIdx = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < student.pokemons.length) ? student.activePokemonIndex : (student.pokemons.length - 1);
+                      const activePoke = student.pokemons[activeIdx];
+                      if (activePoke) {
+                        if (student.isTeacher) {
+                          activePoke.points += Math.floor(Math.random() * 3) + 3;
+                        } else {
+                          activePoke.points += 10;
+                        }
+                      }
                       student.pokemons.push({
                         family: wildPokeData.family,
                         points: 0,
