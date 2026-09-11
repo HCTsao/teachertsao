@@ -734,6 +734,18 @@
         { subject: '國語', type: '國語', text: '甲本p.11', content: '甲本p.11' },
         { subject: '國語', type: '國語', text: '乙本L2生字(全~司)寫5次', content: '乙本L2生字(全~司)寫5次' },
         { subject: '國語', type: '國語', text: '考國L1生字聽寫', content: '考國L1生字聽寫' }
+      ],
+      '2026-09-12': [
+        { subject: '數學', type: '數學', text: '數習p.11', content: '數習p.11' },
+        { subject: '國語', type: '國語', text: '甲本p.11', content: '甲本p.11' },
+        { subject: '國語', type: '國語', text: '乙本L2生字(全~司)寫5次', content: '乙本L2生字(全~司)寫5次' },
+        { subject: '國語', type: '國語', text: '考國L1生字聽寫', content: '考國L1生字聽寫' }
+      ],
+      '2026-09-13': [
+        { subject: '數學', type: '數學', text: '數習p.11', content: '數習p.11' },
+        { subject: '國語', type: '國語', text: '甲本p.11', content: '甲本p.11' },
+        { subject: '國語', type: '國語', text: '乙本L2生字(全~司)寫5次', content: '乙本L2生字(全~司)寫5次' },
+        { subject: '國語', type: '國語', text: '考國L1生字聽寫', content: '考國L1生字聽寫' }
       ]
     };
 
@@ -769,12 +781,53 @@
       '2026-09-11': []
     };
 
+    // 自動追蹤與沿用放假前最後一個上課日作業與通知單
+    function getHomeworkForDate(dateObj) {
+      const queryDateStr = formatDateKey(dateObj);
+      if (homeworkDatabase[queryDateStr] && Array.isArray(homeworkDatabase[queryDateStr]) && homeworkDatabase[queryDateStr].length > 0) {
+        return { list: homeworkDatabase[queryDateStr], dateKey: queryDateStr, isFallback: false };
+      }
+
+      // 往回推查 30 天內最近一次有作業紀錄的上課日
+      let curr = new Date(dateObj.getTime());
+      for (let i = 0; i < 30; i++) {
+        curr.setDate(curr.getDate() - 1);
+        const prevKey = formatDateKey(curr);
+        if (homeworkDatabase[prevKey] && Array.isArray(homeworkDatabase[prevKey]) && homeworkDatabase[prevKey].length > 0) {
+          return { list: homeworkDatabase[prevKey], dateKey: prevKey, isFallback: true };
+        }
+      }
+
+      return { list: [], dateKey: queryDateStr, isFallback: false };
+    }
+
+    function getNoticeForDate(dateObj) {
+      const queryDateStr = formatDateKey(dateObj);
+      const nData = noticeDatabase[queryDateStr];
+      if (nData && (Array.isArray(nData) ? nData.length > 0 : true)) {
+        return { data: nData, dateKey: queryDateStr, isFallback: false };
+      }
+
+      // 往回推查 30 天內最近一次有通知單紀錄的上課日
+      let curr = new Date(dateObj.getTime());
+      for (let i = 0; i < 30; i++) {
+        curr.setDate(curr.getDate() - 1);
+        const prevKey = formatDateKey(curr);
+        const pData = noticeDatabase[prevKey];
+        if (pData && (Array.isArray(pData) ? pData.length > 0 : true)) {
+          return { data: pData, dateKey: prevKey, isFallback: true };
+        }
+      }
+
+      return { data: null, dateKey: queryDateStr, isFallback: false };
+    }
+
     function renderHomeworkAndNotices() {
-      const queryDateStr = formatDateKey(today);
       const hwContainer = document.getElementById('homeworkContainer');
       const noticeContainer = document.getElementById('noticeContainer');
 
-      const todayHomework = homeworkDatabase[queryDateStr];
+      const hwResult = getHomeworkForDate(today);
+      const todayHomework = hwResult.list;
 
       if (!todayHomework || todayHomework.length === 0) {
         hwContainer.innerHTML = `
@@ -789,7 +842,20 @@
           </div>
         `;
       } else {
-        let listHtml = '<ul class="homework-list">';
+        let fallbackBanner = '';
+        if (hwResult.isFallback) {
+          const parts = hwResult.dateKey.split('-');
+          const m = parseInt(parts[1]);
+          const d = parseInt(parts[2]);
+          fallbackBanner = `
+            <div style="background-color: #fff7ed; color: #c2410c; padding: 8px 14px; border-radius: 12px; font-size: 0.9rem; font-weight: 600; margin-bottom: 12px; border: 1px solid #ffedd5; display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-calendar-day" style="color: #ea580c;"></i>
+              <span>（週末 / 連假期間，自動持續顯示 ${m} 月 ${d} 日最後上課日作業內容）</span>
+            </div>
+          `;
+        }
+
+        let listHtml = fallbackBanner + '<ul class="homework-list">';
         todayHomework.forEach(item => {
           const subj = item.subject || item.type || '備忘';
           const text = item.text || item.content || '';
@@ -811,7 +877,8 @@
         hwContainer.innerHTML = listHtml;
       }
 
-      const noticeData = noticeDatabase[queryDateStr];
+      const noticeResult = getNoticeForDate(today);
+      const noticeData = noticeResult.data;
       if (!noticeData || (Array.isArray(noticeData) && noticeData.length === 0)) {
         noticeContainer.innerHTML = `
           <div style="text-align: center; padding: 20px; color: #94a3b8; font-size: 0.95rem;">
