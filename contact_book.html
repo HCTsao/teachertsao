@@ -258,7 +258,13 @@
       return `${year}-${month}-${date}`;
     }
 
-    let homeworkDatabase = {};
+    let homeworkDatabase = {
+      '2026-09-14': [
+        { subject: '數學', type: '數學', text: '1. 數習p.12~13', content: '1. 數習p.12~13' },
+        { subject: '國語', type: '國語', text: '2. 乙本L2生字(夾~臉)寫5次(廷恩、岳泰、冠宏)', content: '2. 乙本L2生字(夾~臉)寫5次(廷恩、岳泰、冠宏)' },
+        { subject: '國語', type: '國語', text: '3. 乙本L2生字(全~司)寫5次(洪福)', content: '3. 乙本L2生字(全~司)寫5次(洪福)' }
+      ]
+    };
     let noticeDatabase = {};
 
     function parseHomeworkData(val) {
@@ -267,7 +273,7 @@
         return val.map(item => {
           if (typeof item === 'string') {
             let type = '作業';
-            if (item.includes('國')) type = '國語';
+            if (item.includes('國') || item.includes('甲') || item.includes('乙')) type = '國語';
             else if (item.includes('數')) type = '數學';
             else if (item.includes('英')) type = '英文';
             return { subject: type, type: type, text: item, content: item };
@@ -279,7 +285,7 @@
         const lines = val.split('\n').map(l => l.trim()).filter(l => l !== '');
         return lines.map(line => {
           let type = '作業';
-          if (line.includes('國')) type = '國語';
+          if (line.includes('國') || line.includes('甲') || line.includes('乙')) type = '國語';
           else if (line.includes('數')) type = '數學';
           else if (line.includes('英')) type = '英文';
           return { subject: type, type: type, text: line, content: line };
@@ -292,19 +298,7 @@
       const queryDateStr = formatDateKey(dateObj);
       const rawHw = homeworkDatabase[queryDateStr];
       const parsed = parseHomeworkData(rawHw);
-      if (parsed.length > 0) {
-        return { list: parsed, dateKey: queryDateStr };
-      }
-      let curr = new Date(dateObj.getTime());
-      for (let i = 0; i < 30; i++) {
-        curr.setDate(curr.getDate() - 1);
-        const prevKey = formatDateKey(curr);
-        const pParsed = parseHomeworkData(homeworkDatabase[prevKey]);
-        if (pParsed.length > 0) {
-          return { list: pParsed, dateKey: prevKey };
-        }
-      }
-      return { list: [], dateKey: queryDateStr };
+      return { list: parsed, dateKey: queryDateStr };
     }
 
     function renderHomeworkAndNotices() {
@@ -340,7 +334,7 @@
       const queryDateStr = formatDateKey(today);
       const noticeData = noticeDatabase[queryDateStr];
       if (noticeContainer) {
-        if (!noticeData) {
+        if (!noticeData || (Array.isArray(noticeData) && noticeData.length === 0)) {
           noticeContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: #94a3b8; font-size: 0.9rem;">今日無特殊聯絡事項或通知單</div>`;
         } else {
           const src = typeof noticeData === 'string' ? noticeData : (noticeData.src || noticeData.base64);
@@ -359,20 +353,16 @@
 
       if (database) {
         database.ref('homeworkDatabase').on('value', (snapshot) => {
-          const val = snapshot.val();
-          if (val) {
-            homeworkDatabase = val;
-            try { localStorage.setItem('homeworkDatabase', JSON.stringify(val)); } catch (e) {}
-            renderHomeworkAndNotices();
-          }
+          const val = snapshot.val() || {};
+          homeworkDatabase = val;
+          try { localStorage.setItem('homeworkDatabase', JSON.stringify(val)); } catch (e) {}
+          renderHomeworkAndNotices();
         });
         database.ref('noticeDatabase').on('value', (snapshot) => {
-          const val = snapshot.val();
-          if (val) {
-            noticeDatabase = val;
-            try { localStorage.setItem('noticeDatabase', JSON.stringify(val)); } catch (e) {}
-            renderHomeworkAndNotices();
-          }
+          const val = snapshot.val() || {};
+          noticeDatabase = val;
+          try { localStorage.setItem('noticeDatabase', JSON.stringify(val)); } catch (e) {}
+          renderHomeworkAndNotices();
         });
       } else {
         renderHomeworkAndNotices();
