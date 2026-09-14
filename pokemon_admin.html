@@ -693,11 +693,17 @@
         students = JSON.parse(JSON.stringify(defaultStudents));
       }
 
-      // 2. Load teacher page toggle setting
+      // 2. Load teacher page toggle setting & local homework/notice cache
       const localTeacherVal = localStorage.getItem('pokemon_show_teacher_page');
       if (localTeacherVal !== null) {
         showTeacherPage = (localTeacherVal === 'true');
       }
+      try {
+        const localHw = localStorage.getItem('homeworkDatabase');
+        if (localHw) adminHomeworkDb = JSON.parse(localHw);
+        const localNotice = localStorage.getItem('noticeDatabase');
+        if (localNotice) adminNoticeDb = JSON.parse(localNotice);
+      } catch (e) {}
 
       // 3. Connect live real-time Firebase listener on 'studentData' node
       if (database) {
@@ -1034,6 +1040,7 @@
         const val = snapshot.val();
         if (val) {
           adminHomeworkDb = val;
+          try { localStorage.setItem('homeworkDatabase', JSON.stringify(val)); } catch (e) {}
           // 若當前在作業分頁，刷新顯示
           if (document.getElementById('tab-content-homework').style.display === 'block') {
             loadHomeworkForDate();
@@ -1045,6 +1052,7 @@
         const val = snapshot.val();
         if (val) {
           adminNoticeDb = val;
+          try { localStorage.setItem('noticeDatabase', JSON.stringify(val)); } catch (e) {}
           if (document.getElementById('tab-content-homework').style.display === 'block') {
             loadHomeworkForDate();
           }
@@ -1135,6 +1143,11 @@
 
       // 更新本地跟 Firebase (直接存成純文字)
       adminHomeworkDb[targetDate] = content;
+      try {
+        localStorage.setItem('homeworkDatabase', JSON.stringify(adminHomeworkDb));
+        window.dispatchEvent(new Event('storage'));
+      } catch (e) {}
+
       if (database) {
         database.ref('homeworkDatabase').set(adminHomeworkDb)
           .then(() => alert(`${targetDate} 作業儲存並同步成功！`))
@@ -1155,6 +1168,10 @@
       if (confirm(`確定要清除 ${targetDate} 的作業內容嗎？`)) {
         // 從本機資料庫刪除
         delete adminHomeworkDb[targetDate];
+        try {
+          localStorage.setItem('homeworkDatabase', JSON.stringify(adminHomeworkDb));
+          window.dispatchEvent(new Event('storage'));
+        } catch (e) {}
 
         // 同步至 Firebase
         if (database) {
@@ -1182,6 +1199,10 @@
       if (confirm(`確定要清除 ${targetDate} 的通知單圖片嗎？`)) {
         // 從本機資料庫刪除
         delete adminNoticeDb[targetDate];
+        try {
+          localStorage.setItem('noticeDatabase', JSON.stringify(adminNoticeDb));
+          window.dispatchEvent(new Event('storage'));
+        } catch (e) {}
 
         // 同步至 Firebase
         if (database) {
@@ -1278,6 +1299,11 @@
       }
 
       adminNoticeDb[targetDate] = currentSelectedFileBase64;
+      try {
+        localStorage.setItem('noticeDatabase', JSON.stringify(adminNoticeDb));
+        window.dispatchEvent(new Event('storage'));
+      } catch (e) {}
+
       if (database) {
         database.ref('noticeDatabase').set(adminNoticeDb)
           .then(() => {

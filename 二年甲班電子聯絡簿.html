@@ -472,7 +472,7 @@
       <h1 class="class-title">
         <i class="fa-solid fa-star"></i> 二年甲班電子聯絡簿
       </h1>
-      <div class="teacher-badge">導師：曹泓棋</div>
+      <div class="teacher-badge">導師：紅旗老師</div>
       
       <!-- 日期顯示看板 (點擊選取月曆切換日期) -->
       <div class="date-badge-container" id="dateBadgeBtn" onclick="triggerDatePicker()" title="點擊開啟月曆選單調整日期">
@@ -773,11 +773,41 @@
       '2026-09-11': []
     };
 
+    // 解析各種多元作業格式 (陣列或分行字串)
+    function parseHomeworkData(val) {
+      if (!val) return [];
+      if (Array.isArray(val)) {
+        return val.map(item => {
+          if (typeof item === 'string') {
+            let type = '作業';
+            if (item.includes('國')) type = '國語';
+            else if (item.includes('數')) type = '數學';
+            else if (item.includes('英')) type = '英文';
+            return { subject: type, type: type, text: item, content: item };
+          }
+          return item;
+        });
+      }
+      if (typeof val === 'string' && val.trim() !== '') {
+        const lines = val.split('\n').map(l => l.trim()).filter(l => l !== '');
+        return lines.map(line => {
+          let type = '作業';
+          if (line.includes('國')) type = '國語';
+          else if (line.includes('數')) type = '數學';
+          else if (line.includes('英')) type = '英文';
+          return { subject: type, type: type, text: line, content: line };
+        });
+      }
+      return [];
+    }
+
     // 自動追蹤與沿用放假前最後一個上課日作業與通知單
     function getHomeworkForDate(dateObj) {
       const queryDateStr = formatDateKey(dateObj);
-      if (homeworkDatabase[queryDateStr] && Array.isArray(homeworkDatabase[queryDateStr]) && homeworkDatabase[queryDateStr].length > 0) {
-        return { list: homeworkDatabase[queryDateStr], dateKey: queryDateStr, isFallback: false };
+      const rawHw = homeworkDatabase[queryDateStr];
+      const parsed = parseHomeworkData(rawHw);
+      if (parsed.length > 0) {
+        return { list: parsed, dateKey: queryDateStr, isFallback: false };
       }
 
       // 往回推查 30 天內最近一次有作業紀錄的上課日
@@ -785,8 +815,9 @@
       for (let i = 0; i < 30; i++) {
         curr.setDate(curr.getDate() - 1);
         const prevKey = formatDateKey(curr);
-        if (homeworkDatabase[prevKey] && Array.isArray(homeworkDatabase[prevKey]) && homeworkDatabase[prevKey].length > 0) {
-          return { list: homeworkDatabase[prevKey], dateKey: prevKey, isFallback: true };
+        const pParsed = parseHomeworkData(homeworkDatabase[prevKey]);
+        if (pParsed.length > 0) {
+          return { list: pParsed, dateKey: prevKey, isFallback: true };
         }
       }
 
@@ -894,11 +925,21 @@
     }
 
     function initDataSync() {
+      // 1. 本地快取讀取
+      try {
+        const localHw = localStorage.getItem('homeworkDatabase');
+        if (localHw) homeworkDatabase = JSON.parse(localHw);
+        const localNotice = localStorage.getItem('noticeDatabase');
+        if (localNotice) noticeDatabase = JSON.parse(localNotice);
+      } catch (e) {}
+
+      // 2. Firebase 即時連線監聽
       if (database) {
         database.ref('homeworkDatabase').on('value', (snapshot) => {
           const val = snapshot.val();
           if (val) {
             homeworkDatabase = val;
+            try { localStorage.setItem('homeworkDatabase', JSON.stringify(val)); } catch (e) {}
             renderHomeworkAndNotices();
           }
         }, (error) => {
@@ -910,6 +951,7 @@
           const val = snapshot.val();
           if (val) {
             noticeDatabase = val;
+            try { localStorage.setItem('noticeDatabase', JSON.stringify(val)); } catch (e) {}
             renderHomeworkAndNotices();
           }
         }, (error) => {
@@ -920,6 +962,17 @@
         renderHomeworkAndNotices();
       }
     }
+
+    // 同步分頁跨分頁監聽
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'homeworkDatabase' || e.key === 'noticeDatabase') {
+        try {
+          if (e.key === 'homeworkDatabase' && e.newValue) homeworkDatabase = JSON.parse(e.newValue);
+          if (e.key === 'noticeDatabase' && e.newValue) noticeDatabase = JSON.parse(e.newValue);
+          renderHomeworkAndNotices();
+        } catch (e) {}
+      }
+    });
 
     document.addEventListener('DOMContentLoaded', initDataSync);
   </script>

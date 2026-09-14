@@ -10,8 +10,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
   
-  <!-- FontAwesome 圖標引入用於裝飾 -->
+  <!-- FontAwesome 圖標與 Firebase SDK -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
   <style>
     /* 全域 CSS 變數：精選馬卡龍配色系統 */
@@ -195,7 +197,7 @@
       <h1 class="class-title">
         <i class="fa-solid fa-star"></i> 二年甲班電子聯絡簿
       </h1>
-      <div class="teacher-badge">導師：曹泓棋</div>
+      <div class="teacher-badge">導師：紅旗老師</div>
       
       <div class="date-badge-container">
         <div class="date-roc" id="dateRoc">民國 115 年 7 月 2 日 (星期四)</div>
@@ -215,17 +217,179 @@
       </div>
     </div>
 
-    <!-- 今日作業區 -->
+    <!-- 今日通知單區域 -->
     <div class="glass-card">
-      <h2 class="section-title homework">
-        <i class="fa-solid fa-pencil"></i> 今日作業
+      <h2 class="section-title notice" style="color: #0284c7;">
+        <i class="fa-solid fa-bullhorn"></i> 重要通知與公告
       </h2>
-      <div id="homeworkContainer" class="homework-container">
+      <div id="noticeContainer" class="notice-container">
         <!-- 由 JS 生成 -->
       </div>
     </div>
 
   </div>
 
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCQK6Ex0zHb13uAKwhvHAH6OFGVBiyodts",
+      authDomain: "pokemon-7bd40.firebaseapp.com",
+      projectId: "pokemon-7bd40",
+      storageBucket: "pokemon-7bd40.firebasestorage.app",
+      messagingSenderId: "641379923525",
+      appId: "1:641379923525:web:fda369e1f7c84d6218552c",
+      databaseURL: "https://pokemon-7bd40-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+
+    let database = null;
+    try {
+      if (typeof firebase !== 'undefined') {
+        firebase.initializeApp(firebaseConfig);
+        database = firebase.database();
+      }
+    } catch (err) {
+      console.warn("Firebase 初始化失敗：", err);
+    }
+
+    const today = new Date();
+    function formatDateKey(d) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const date = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${date}`;
+    }
+
+    let homeworkDatabase = {};
+    let noticeDatabase = {};
+
+    function parseHomeworkData(val) {
+      if (!val) return [];
+      if (Array.isArray(val)) {
+        return val.map(item => {
+          if (typeof item === 'string') {
+            let type = '作業';
+            if (item.includes('國')) type = '國語';
+            else if (item.includes('數')) type = '數學';
+            else if (item.includes('英')) type = '英文';
+            return { subject: type, type: type, text: item, content: item };
+          }
+          return item;
+        });
+      }
+      if (typeof val === 'string' && val.trim() !== '') {
+        const lines = val.split('\n').map(l => l.trim()).filter(l => l !== '');
+        return lines.map(line => {
+          let type = '作業';
+          if (line.includes('國')) type = '國語';
+          else if (line.includes('數')) type = '數學';
+          else if (line.includes('英')) type = '英文';
+          return { subject: type, type: type, text: line, content: line };
+        });
+      }
+      return [];
+    }
+
+    function getHomeworkForDate(dateObj) {
+      const queryDateStr = formatDateKey(dateObj);
+      const rawHw = homeworkDatabase[queryDateStr];
+      const parsed = parseHomeworkData(rawHw);
+      if (parsed.length > 0) {
+        return { list: parsed, dateKey: queryDateStr };
+      }
+      let curr = new Date(dateObj.getTime());
+      for (let i = 0; i < 30; i++) {
+        curr.setDate(curr.getDate() - 1);
+        const prevKey = formatDateKey(curr);
+        const pParsed = parseHomeworkData(homeworkDatabase[prevKey]);
+        if (pParsed.length > 0) {
+          return { list: pParsed, dateKey: prevKey };
+        }
+      }
+      return { list: [], dateKey: queryDateStr };
+    }
+
+    function renderHomeworkAndNotices() {
+      const hwContainer = document.getElementById('homeworkContainer');
+      const noticeContainer = document.getElementById('noticeContainer');
+
+      const hwResult = getHomeworkForDate(today);
+      const todayHomework = hwResult.list;
+
+      if (!todayHomework || todayHomework.length === 0) {
+        hwContainer.innerHTML = `
+          <div style="text-align:center; padding: 20px; color: #94a3b8;">
+            <i class="fa-solid fa-umbrella-beach" style="font-size:2rem; margin-bottom:8px; display:block; color:#f59e0b;"></i>
+            今日無作業
+          </div>
+        `;
+      } else {
+        let listHtml = '<ul style="list-style: none; display: flex; flex-direction: column; gap: 10px;">';
+        todayHomework.forEach(item => {
+          const subj = item.subject || item.type || '作業';
+          const text = item.text || item.content || '';
+          listHtml += `
+            <li style="background: #ffffff; padding: 12px 16px; border-radius: 12px; border: 1px solid #e2e8f0; font-weight: 700; display: flex; align-items: center; gap: 10px;">
+              <span style="background: #0284c7; color: white; padding: 2px 8px; border-radius: 6px; font-size: 0.85rem;">${subj}</span>
+              <span>${text}</span>
+            </li>
+          `;
+        });
+        listHtml += '</ul>';
+        hwContainer.innerHTML = listHtml;
+      }
+
+      const queryDateStr = formatDateKey(today);
+      const noticeData = noticeDatabase[queryDateStr];
+      if (noticeContainer) {
+        if (!noticeData) {
+          noticeContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: #94a3b8; font-size: 0.9rem;">今日無特殊聯絡事項或通知單</div>`;
+        } else {
+          const src = typeof noticeData === 'string' ? noticeData : (noticeData.src || noticeData.base64);
+          noticeContainer.innerHTML = `<img src="${src}" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" />`;
+        }
+      }
+    }
+
+    function initDataSync() {
+      try {
+        const localHw = localStorage.getItem('homeworkDatabase');
+        if (localHw) homeworkDatabase = JSON.parse(localHw);
+        const localNotice = localStorage.getItem('noticeDatabase');
+        if (localNotice) noticeDatabase = JSON.parse(localNotice);
+      } catch (e) {}
+
+      if (database) {
+        database.ref('homeworkDatabase').on('value', (snapshot) => {
+          const val = snapshot.val();
+          if (val) {
+            homeworkDatabase = val;
+            try { localStorage.setItem('homeworkDatabase', JSON.stringify(val)); } catch (e) {}
+            renderHomeworkAndNotices();
+          }
+        });
+        database.ref('noticeDatabase').on('value', (snapshot) => {
+          const val = snapshot.val();
+          if (val) {
+            noticeDatabase = val;
+            try { localStorage.setItem('noticeDatabase', JSON.stringify(val)); } catch (e) {}
+            renderHomeworkAndNotices();
+          }
+        });
+      } else {
+        renderHomeworkAndNotices();
+      }
+    }
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'homeworkDatabase' || e.key === 'noticeDatabase') {
+        try {
+          if (e.key === 'homeworkDatabase' && e.newValue) homeworkDatabase = JSON.parse(e.newValue);
+          if (e.key === 'noticeDatabase' && e.newValue) noticeDatabase = JSON.parse(e.newValue);
+          renderHomeworkAndNotices();
+        } catch (e) {}
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', initDataSync);
+  </script>
 </body>
 </html>
