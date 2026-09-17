@@ -815,7 +815,7 @@
     </button>
   </div>
 
-  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v3.9</span></h1>
+  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v4.0</span></h1>
 
   <!-- Student Card Container -->
   <div class="main-container" id="student-container">
@@ -1522,7 +1522,39 @@
       }
     }
 
-    // Sync moves dynamically based on level to prevent offline sync bugs
+    // Get level-scaled stats (HP, Atk, Def, SpAtk, SpDef, Speed) dynamically for level 0~30
+    function getPokemonScaledStats(poke) {
+      const base = getCurrentPokemon(poke);
+      if (!base) return null;
+      const level = Math.floor((poke.points || 0) / 10);
+      const scale = 1 + (level / 30);
+      return {
+        hp: Math.floor(base.hp * scale),
+        atk: Math.floor(base.atk * scale),
+        def: Math.floor(base.def * scale),
+        spatk: Math.floor(base.spatk * scale),
+        spdef: Math.floor(base.spdef * scale),
+        speed: Math.floor(base.speed * scale),
+        level: level,
+        name: base.name,
+        url: base.url,
+        id: base.id
+      };
+    }
+
+    // Move status effect description helper
+    function getMoveEffectDesc(move) {
+      if (!move) return '';
+      if (move.name === '煙幕') return '<span style="font-size: 0.72rem; color: #fbbf24; background: rgba(251,191,36,0.15); padding: 2px 6px; border-radius: 4px; font-weight: 700;">🎯 降低對手命中率</span>';
+      if (move.status === 'atk-down') return '<span style="font-size: 0.72rem; color: #f87171; background: rgba(248,113,113,0.15); padding: 2px 6px; border-radius: 4px; font-weight: 700;">⚔️ 降低對手攻擊力</span>';
+      if (move.status === 'def-up') return '<span style="font-size: 0.72rem; color: #60a5fa; background: rgba(96,165,250,0.15); padding: 2px 6px; border-radius: 4px; font-weight: 700;">🛡️ 提升我方防禦力</span>';
+      if (move.status === 'heal') return '<span style="font-size: 0.72rem; color: #4ade80; background: rgba(74,222,128,0.15); padding: 2px 6px; border-radius: 4px; font-weight: 700;">❤️ 恢復 45% 生命值</span>';
+      if (move.status === 'sleep') return '<span style="font-size: 0.72rem; color: #c084fc; background: rgba(192,132,252,0.15); padding: 2px 6px; border-radius: 4px; font-weight: 700;">😴 使對手沉睡(3回合)</span>';
+      if (move.type === 'poison') return '<span style="font-size: 0.72rem; color: #e879f9; background: rgba(232,121,249,0.15); padding: 2px 6px; border-radius: 4px; font-weight: 700;">☠️ 35%機率致中毒</span>';
+      return '';
+    }
+
+    // Sync moves & stats dynamically based on level to prune locked moves upon de-leveling
     function syncMovesAndCheckPending(studentId) {
       const student = students[studentId];
       if (!student || !student.pokemons || student.pokemons.length === 0) return;
@@ -1534,29 +1566,19 @@
       const pool = MOVES_POOL[poke.family];
       if (!pool) return;
       
-      if (!poke.moveLibrary) {
-        poke.moveLibrary = [];
-      }
+      const unlockedMoves = pool.filter(m => m.level <= level).map(m => m.name);
+      poke.moveLibrary = unlockedMoves;
 
       let changed = false;
-      const unlocked = pool.filter(m => m.level <= level);
-      for (let m of unlocked) {
-        if (!poke.moveLibrary.includes(m.name)) {
-          poke.moveLibrary.push(m.name);
-          changed = true;
-        }
+      const validMoves = (poke.moves || []).filter(mName => unlockedMoves.includes(mName));
+      if (validMoves.length !== (poke.moves || []).length) {
+        poke.moves = validMoves;
+        changed = true;
       }
 
       if (!poke.moves || poke.moves.length === 0) {
-        poke.moves = poke.moveLibrary.slice(0, 4);
+        poke.moves = unlockedMoves.slice(-4);
         changed = true;
-      } else {
-        for (let m of unlocked) {
-          if (poke.moves.length < 4 && !poke.moves.includes(m.name)) {
-            poke.moves.push(m.name);
-            changed = true;
-          }
-        }
       }
 
       if (changed) {
@@ -1707,6 +1729,7 @@
         const level = Math.floor(activePoke.points / 10);
         const currentStagePoints = activePoke.points % 10;
         const progressPercent = (currentStagePoints / 10) * 100;
+        const scaledStats = getPokemonScaledStats(activePoke);
         
         let nextEvolutionText = '';
         if (level < 10) {
@@ -1780,18 +1803,18 @@
               ${nextEvolutionText}
             </div>
 
-            <!-- Base Stats Panel (7 大能力值：攻擊、防禦、特攻、特防、速度、命中、閃避) -->
+            <!-- Base Stats Panel (6 大能力值：生命、攻擊、防禦、特攻、特防、速度) -->
             <div style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(8px); border-radius: 16px; border: 1px solid rgba(0,0,0,0.08); padding: 14px 18px; margin-bottom: 20px; width: 100%; max-width: 420px; box-shadow: var(--shadow-sm);">
               <div style="font-size: 0.88rem; font-weight: 800; color: #1e293b; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
-                <span><i class="fa-solid fa-chart-simple" style="color: #3b82f6;"></i> ${pokemon.name} 基礎能力值 (7大屬性)</span>
-                <span style="font-size: 0.72rem; color: #64748b; font-weight: 700;">種族值: ${pokemon.hp + pokemon.atk + pokemon.def + pokemon.spatk + pokemon.spdef + pokemon.speed}</span>
+                <span><i class="fa-solid fa-chart-simple" style="color: #3b82f6;"></i> ${scaledStats.name} 目前能力值 (Lv. ${scaledStats.level})</span>
+                <span style="font-size: 0.72rem; color: #64748b; font-weight: 700;">總數值: ${scaledStats.hp + scaledStats.atk + scaledStats.def + scaledStats.spatk + scaledStats.spdef + scaledStats.speed}</span>
               </div>
               <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 0.8rem; font-weight: 700;">
                 <div style="display:flex; align-items:center; justify-content:space-between; background:#fff1f2; padding:6px 10px; border-radius:8px; border:1px solid #fecdd3; color:#be123c;">
-                  <span>❤️ 生命 (HP)</span><span>${pokemon.hp}</span>
+                  <span>❤️ 生命 (HP)</span><span>${scaledStats.hp}</span>
                 </div>
                 <div style="display:flex; align-items:center; justify-content:space-between; background:#fff7ed; padding:6px 10px; border-radius:8px; border:1px solid #ffedd5; color:#c2410c;">
-                  <span>⚔️ 攻擊 (Atk)</span><span>${pokemon.atk}</span>
+                  <span>⚔️ 攻擊 (Atk)</span><span>${scaledStats.atk}</span>
                 </div>
                 <div style="display:flex; align-items:center; justify-content:space-between; background:#fefce8; padding:6px 10px; border-radius:8px; border:1px solid #fef08a; color:#a16207;">
                   <span>🛡️ 防禦 (Def)</span><span>${pokemon.def}</span>
@@ -2306,10 +2329,11 @@
         row.style.transition = 'all 0.2s';
         
         row.innerHTML = `
-          <div style="display: flex; align-items: center; gap: 8px; font-weight: 700;">
+          <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; flex-wrap: wrap;">
             <span>${name}</span>
             ${getTypeLabel(move.type)}
             <span style="font-size: 0.75rem; color: #94a3b8;">(威力: ${move.power || '-'} | PP: ${getMoveMaxPp(move)})</span>
+            ${getMoveEffectDesc(move)}
           </div>
           <input type="checkbox" style="width: 18px; height: 18px; cursor: pointer;" ${isChecked ? 'checked' : ''}>
         `;
