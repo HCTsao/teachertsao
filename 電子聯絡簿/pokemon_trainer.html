@@ -1423,6 +1423,22 @@
         newData['teacher'] = JSON.parse(JSON.stringify(teacherStudentData));
       }
 
+      // Preserve confirmedStage if local memory has higher confirmedStage than incoming Firebase snapshot
+      if (students) {
+        for (let id in newData) {
+          if (students[id] && students[id].pokemons && newData[id].pokemons) {
+            newData[id].pokemons.forEach((newP, idx) => {
+              const oldP = students[id].pokemons[idx];
+              if (oldP && oldP.family === newP.family && oldP.confirmedStage !== undefined) {
+                if (newP.confirmedStage === undefined || oldP.confirmedStage > newP.confirmedStage) {
+                  newP.confirmedStage = oldP.confirmedStage;
+                }
+              }
+            });
+          }
+        }
+      }
+
       const oldData = JSON.parse(JSON.stringify(students || {}));
       students = newData;
       
@@ -2040,6 +2056,9 @@
 
       const oldPoke = familyArr[confirmedStage];
       const newPoke = familyArr[targetStage];
+
+      activePoke.confirmedStage = targetStage;
+      saveData();
 
       triggerEvolution(student.name, activePoke, targetStage, oldPoke, newPoke, () => {
         renderTabs();
