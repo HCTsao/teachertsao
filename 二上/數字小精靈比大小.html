@@ -1001,21 +1001,46 @@
                         rightSpeechText: rightDisp
                     };
                 } else if (mode === 'challenge') {
-                    let leftSum = randRange(20, 198);
-                    let rightVal = randRange(10, 200);
-                    while (leftSum === rightVal) {
-                        rightVal = randRange(10, 200);
-                    }
+                    // Challenge mode:
+                    // 1. Mostly 3-digit values (100 ~ 200, 80% chance), occasionally 2-digit (70 ~ 99, 20% chance).
+                    // 2. The difference between leftSum and rightVal is small (1 ~ 15 apart), so comparison is subtle.
+                    const isThreeDigit = Math.random() < 0.8;
+                    const diff = randRange(1, 15);
 
-                    const isGreater = leftSum > rightVal;
-                    if ((targetOp === '>' && !isGreater) || (targetOp === '<' && isGreater)) {
+                    let leftSum, rightVal;
+                    if (isThreeDigit) {
+                        // Base around 100 ~ 185
+                        const baseNum = randRange(100, Math.max(100, 195 - diff));
                         if (targetOp === '>') {
-                            rightVal = randRange(10, Math.max(10, leftSum - 1));
+                            leftSum = baseNum + diff;
+                            rightVal = baseNum;
                         } else {
-                            rightVal = randRange(Math.min(200, leftSum + 1), 200);
+                            leftSum = baseNum;
+                            rightVal = baseNum + diff;
+                        }
+                    } else {
+                        // Base around 70 ~ 95
+                        const baseNum = randRange(70, Math.max(70, 98 - diff));
+                        if (targetOp === '>') {
+                            leftSum = baseNum + diff;
+                            rightVal = baseNum;
+                        } else {
+                            leftSum = baseNum;
+                            rightVal = baseNum + diff;
                         }
                     }
 
+                    // Clamp values strictly within 200 max
+                    leftSum = Math.min(198, Math.max(20, leftSum));
+                    rightVal = Math.min(200, Math.max(10, rightVal));
+
+                    // If after clamping they become equal, adjust rightVal
+                    if (leftSum === rightVal) {
+                        if (targetOp === '>') rightVal = leftSum - randRange(1, 10);
+                        else rightVal = leftSum + randRange(1, 10);
+                    }
+
+                    // Split leftSum into two 2-digit addends a, b (10 <= a,b <= 99)
                     const aMin = Math.max(10, leftSum - 99);
                     const aMax = Math.min(99, leftSum - 10);
                     const a = randRange(aMin, aMax);
