@@ -827,7 +827,7 @@
     </button>
   </div>
 
-  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v4.9</span></h1>
+  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v4.10</span></h1>
 
   <!-- Student Card Container -->
   <div class="main-container" id="student-container">
@@ -1678,13 +1678,20 @@
       if (!students['teacher']) {
         students['teacher'] = JSON.parse(JSON.stringify(teacherStudentData));
       } else if (students['teacher'].pokemons) {
-        const hasPiplup = students['teacher'].pokemons.some(p => p.family === 'piplup');
-        if (!hasPiplup) {
-          students['teacher'].pokemons.push({
+        let piplupPoke = students['teacher'].pokemons.find(p => p.family === 'piplup');
+        if (!piplupPoke) {
+          piplupPoke = {
             family: "piplup",
             points: 0,
             moves: ["撞擊", "水槍"]
-          });
+          };
+          students['teacher'].pokemons.push(piplupPoke);
+        }
+        // 還原泓棋老師的波加曼（波皇子曾阻止進化，還原為 Stage 0 波加曼）
+        if (piplupPoke && piplupPoke.confirmedStage !== 0) {
+          piplupPoke.confirmedStage = 0;
+          piplupPoke.lastEvoPromptedLevel = Math.floor((piplupPoke.points || 0) / 10);
+          saveData();
         }
       }
 
@@ -1721,28 +1728,20 @@
       }
     }
 
-    // Get current Pokemon stage index based on points and cancellation flags (used for stats)
+    // Get current Pokemon stage index based on points and confirmedStage (used for stats)
     function getStage(level, poke) {
+      const confirmed = (poke && poke.confirmedStage !== undefined) ? poke.confirmedStage : 0;
       if (level < 10) return 0;
       if (level < 20) {
-        return (poke && poke.cancelledLv10) ? 0 : 1;
+        return Math.min(1, confirmed);
       }
-      if (poke && poke.cancelledLv20) {
-        return (poke.cancelledLv10) ? 0 : 1;
-      }
-      if (poke && poke.cancelledLv10) {
-        return 1;
-      }
-      return 2;
+      return Math.min(2, confirmed);
     }
 
     // Get display stage index for appearance (外觀不會退化，維持已完成進化的最高階段)
     function getDisplayStage(poke) {
       if (!poke) return 0;
-      const level = Math.floor((poke.points || 0) / 10);
-      const naturalStage = getStage(level, poke);
-      const confirmed = poke.confirmedStage || 0;
-      return Math.max(confirmed, naturalStage);
+      return poke.confirmedStage || 0;
     }
 
     function getCurrentPokemon(poke) {
@@ -1781,28 +1780,29 @@
       const activeIndex = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < pokes.length) ? student.activePokemonIndex : (pokes.length - 1);
       const activePoke = pokes.length > 0 ? pokes[activeIndex] : null;
 
-      // Check for evolution animation trigger (repeats on page open until user confirms or cancels)
+      // Check for evolution animation trigger (repeats on level up if unconfirmed)
       if (activePoke) {
         const level = Math.floor((activePoke.points || 0) / 10);
-        let targetStage = 0;
-        if (level >= 20) {
-          if (!activePoke.cancelledLv20) targetStage = 2;
-          else if (level >= 10 && !activePoke.cancelledLv10) targetStage = 1;
-        } else if (level >= 10) {
-          if (!activePoke.cancelledLv10) targetStage = 1;
-        }
-
         const confirmedStage = activePoke.confirmedStage || 0;
+        const targetStage = confirmedStage + 1; // next stage to evolve into
 
-        if (targetStage > confirmedStage) {
-          const oldStage = confirmedStage;
-          const newStage = targetStage;
-          const oldPoke = POKEMON_DATA[activePoke.family][oldStage];
-          const newPoke = POKEMON_DATA[activePoke.family][newStage];
-          
-          triggerEvolution(student.name, activePoke, targetStage, oldPoke, newPoke, () => {
-            renderContent();
-          });
+        if (targetStage <= 2) {
+          const minReqLevel = targetStage === 1 ? 10 : 20;
+          const lastPromptedLevel = activePoke.lastEvoPromptedLevel || 0;
+
+          if (level >= minReqLevel && level > lastPromptedLevel) {
+            const oldStage = confirmedStage;
+            const newStage = targetStage;
+            const oldPoke = POKEMON_DATA[activePoke.family][oldStage];
+            const newPoke = POKEMON_DATA[activePoke.family][newStage];
+            
+            activePoke.lastEvoPromptedLevel = level;
+            saveData();
+
+            triggerEvolution(student.name, activePoke, targetStage, oldPoke, newPoke, () => {
+              renderContent();
+            });
+          }
         }
       }
 
