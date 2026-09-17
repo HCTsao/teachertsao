@@ -540,6 +540,10 @@
       0% { transform: translateY(0) rotate(0deg); }
       100% { transform: translateY(-8px) rotate(15deg); }
     }
+    @keyframes pulseEvoBtn {
+      0% { transform: scale(1); box-shadow: 0 4px 15px rgba(245, 158, 11, 0.45); }
+      100% { transform: scale(1.05); box-shadow: 0 6px 25px rgba(239, 68, 68, 0.75); }
+    }
 
     /* Mobile Responsive Optimizations */
     @media (max-width: 768px) {
@@ -1441,27 +1445,6 @@
           const newLevel = Math.floor(newActive.points / 10);
           const newStage = getStage(newLevel);
           
-          // 1. Check for evolution overlays
-          if (newStage > oldStage) {
-            const familyArr = POKEMON_DATA[newActive.family];
-            const oldPoke = familyArr[oldStage];
-            const newPoke = familyArr[newStage];
-            
-            const targetPoints = newStage === 1 ? 100 : 200;
-            const sessionKey = `has_seen_evolution_${newActive.family}_${targetPoints}`;
-            sessionStorage.setItem(sessionKey, 'true');
-
-            if (document.getElementById('evolution-overlay').style.display !== 'flex') {
-              triggerEvolution(newStudent.name, newActive, newStage, oldPoke, newPoke, () => {
-                syncMovesAndCheckPending(currentStudentId);
-                renderTabs();
-                renderContent();
-              });
-            }
-            return;
-          }
-          
-          // 2. Check for move learning overlays (no evolution, e.g. Lv.1, 2, 3, 15)
           if (newLevel > oldLevel) {
             syncMovesAndCheckPending(currentStudentId);
             renderTabs();
@@ -1678,6 +1661,18 @@
       if (!students['teacher']) {
         students['teacher'] = JSON.parse(JSON.stringify(teacherStudentData));
       } else if (students['teacher'].pokemons) {
+        let waterPoke = students['teacher'].pokemons.find(p => p.family === 'water');
+        if (waterPoke) {
+          waterPoke.confirmedStage = 2; // 進化為水箭龜
+          if ((waterPoke.points || 0) < 200) waterPoke.points = 200;
+        }
+
+        let gastlyPoke = students['teacher'].pokemons.find(p => p.family === 'gastly');
+        if (gastlyPoke) {
+          gastlyPoke.confirmedStage = 2; // 進化為耿鬼
+          if ((gastlyPoke.points || 0) < 200) gastlyPoke.points = 201;
+        }
+
         let pichuPoke = students['teacher'].pokemons.find(p => p.family === 'pichu');
         if (!pichuPoke) {
           pichuPoke = {
@@ -1778,28 +1773,19 @@
       const activeIndex = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < pokes.length) ? student.activePokemonIndex : (pokes.length - 1);
       const activePoke = pokes.length > 0 ? pokes[activeIndex] : null;
 
-      // Check for evolution animation trigger (repeats on level up if unconfirmed)
+      let canEvolve = false;
+      let targetStageName = '';
       if (activePoke) {
         const level = Math.floor((activePoke.points || 0) / 10);
         const confirmedStage = activePoke.confirmedStage || 0;
-        const targetStage = confirmedStage + 1; // next stage to evolve into
+        const targetStage = confirmedStage + 1;
+        const familyArr = POKEMON_DATA[activePoke.family];
 
-        if (targetStage <= 2) {
-          const minReqLevel = targetStage === 1 ? 10 : 20;
-          const lastPromptedLevel = activePoke.lastEvoPromptedLevel || 0;
-
-          if (level >= minReqLevel && level > lastPromptedLevel) {
-            const oldStage = confirmedStage;
-            const newStage = targetStage;
-            const oldPoke = POKEMON_DATA[activePoke.family][oldStage];
-            const newPoke = POKEMON_DATA[activePoke.family][newStage];
-            
-            activePoke.lastEvoPromptedLevel = level;
-            saveData();
-
-            triggerEvolution(student.name, activePoke, targetStage, oldPoke, newPoke, () => {
-              renderContent();
-            });
+        if (familyArr && targetStage < familyArr.length) {
+          const reqLevel = targetStage === 1 ? 10 : 20;
+          if (level >= reqLevel) {
+            canEvolve = true;
+            targetStageName = familyArr[targetStage].name;
           }
         }
       }
@@ -1908,6 +1894,22 @@
             
             <div class="pokemon-name">${pokemon.name}</div>
             <div class="points-info">目前分數：${activePoke.points} / 300 分 (Lv. ${level})</div>
+
+            ${canEvolve ? `
+              <div style="margin: 10px 0 15px 0; text-align: center;">
+                <button onclick="triggerManualEvolution()" style="
+                  background: linear-gradient(135deg, #f59e0b 0%, #ef4444 50%, #ec4899 100%);
+                  color: white; font-weight: 800; font-size: 1.05rem;
+                  padding: 10px 24px; border-radius: 30px; border: 2px solid #ffffff;
+                  box-shadow: 0 4px 18px rgba(245, 158, 11, 0.45);
+                  cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+                  transition: all 0.25s ease; font-family: inherit;
+                  animation: pulseEvoBtn 1.5s infinite alternate;
+                ">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i> 點我進化為 ${targetStageName}！
+                </button>
+              </div>
+            ` : ''}
             
             <div class="progress-container">
               <div class="progress-bar" style="width: ${progressPercent}%;"></div>
@@ -2022,6 +2024,27 @@
       saveData();
       syncMovesAndCheckPending(currentStudentId);
       renderContent();
+    }
+
+    function triggerManualEvolution() {
+      const student = students[currentStudentId];
+      if (!student || !student.pokemons) return;
+      const activeIndex = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < student.pokemons.length) ? student.activePokemonIndex : (student.pokemons.length - 1);
+      const activePoke = student.pokemons[activeIndex];
+      if (!activePoke) return;
+
+      const confirmedStage = activePoke.confirmedStage || 0;
+      const targetStage = confirmedStage + 1;
+      const familyArr = POKEMON_DATA[activePoke.family];
+      if (!familyArr || targetStage >= familyArr.length) return;
+
+      const oldPoke = familyArr[confirmedStage];
+      const newPoke = familyArr[targetStage];
+
+      triggerEvolution(student.name, activePoke, targetStage, oldPoke, newPoke, () => {
+        renderTabs();
+        renderContent();
+      });
     }
 
     // GBA Evolution logic
