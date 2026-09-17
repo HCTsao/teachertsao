@@ -827,7 +827,7 @@
     </button>
   </div>
 
-  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v4.2</span></h1>
+  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v4.3</span></h1>
 
   <!-- Student Card Container -->
   <div class="main-container" id="student-container">
@@ -945,10 +945,15 @@
           <div id="battle-log" style="font-size: 0.95rem; line-height: 1.35; font-weight: 700; flex: 1; letter-spacing: 0.5px; word-break: break-all;">
             載入對戰中...
           </div>
-          <!-- Wild Action Bar inside Left Black Box -->
-          <div id="battle-wild-bar" style="display: none; flex-direction: column; gap: 4px; margin-left: 8px; flex-shrink: 0; align-items: center;">
-            <button id="btn-wild-ball" onclick="throwPokeballInBattle()" style="background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: white; border: 1px solid #fca5a5; padding: 6px 10px; border-radius: 8px; font-weight: 800; font-size: 0.78rem; cursor: pointer; font-family: inherit; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap;">
-              <span class="ball-icon">🔴 </span><span class="ball-text-desktop">投擲精靈球 (剩5顆)</span><span class="ball-text-mobile">投擲精靈球(5)</span>
+          <!-- Left Action Bar (Pokeball Button & Teacher Auto Battle Button) -->
+          <div id="battle-action-bar-left" style="display: flex; flex-direction: column; gap: 4px; margin-left: 8px; flex-shrink: 0; align-items: center;">
+            <div id="battle-wild-bar" style="display: none; flex-direction: column; gap: 4px;">
+              <button id="btn-wild-ball" onclick="throwPokeballInBattle()" style="background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: white; border: 1px solid #fca5a5; padding: 6px 10px; border-radius: 8px; font-weight: 800; font-size: 0.78rem; cursor: pointer; font-family: inherit; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap;">
+                <span class="ball-icon">🔴 </span><span class="ball-text-desktop">投擲精靈球 (剩5顆)</span><span class="ball-text-mobile">投擲精靈球(5)</span>
+              </button>
+            </div>
+            <button id="btn-teacher-auto" onclick="toggleTeacherAutoBattle()" style="display: none; background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%); color: #0f172a; border: 1px solid #fef08a; padding: 6px 10px; border-radius: 8px; font-weight: 900; font-size: 0.78rem; cursor: pointer; font-family: inherit; box-shadow: 0 2px 4px rgba(0,0,0,0.3); align-items: center; justify-content: center; gap: 4px; white-space: nowrap;">
+              <i class="fa-solid fa-robot"></i> <span id="txt-teacher-auto">自動戰鬥：關閉</span>
             </button>
           </div>
         </div>
@@ -2465,6 +2470,7 @@
     let battleState = {
       active: false,
       mode: 'auto',
+      autoBattle: false,
       p1: { name: "", activePoke: null, hp: 100, maxHp: 100, level: 1, family: "fire", atkMod: 1, defMod: 1, moves: [] },
       p2: { name: "", activePoke: null, hp: 100, maxHp: 100, level: 1, family: "water", atkMod: 1, defMod: 1, moves: [] },
       currentTurn: "p1",
@@ -2814,8 +2820,10 @@
       });
 
       battleState.active = true;
+      battleState.autoBattle = false;
       battleState.logQueue = [];
       battleState.isNarrating = false;
+      updateTeacherAutoButton();
       
       const p1Details = getCurrentPokemon(active1);
       const p2Details = getCurrentPokemon(active2);
@@ -2970,6 +2978,25 @@
       }
 
       if (battleState.currentTurn === 'p1') {
+        const student = students[currentStudentId];
+        const isTeacher = student && (student.isTeacher || currentStudentId === 'teacher');
+        updateTeacherAutoButton();
+
+        if (isTeacher && battleState.autoBattle) {
+          document.getElementById('battle-auto-indicator').style.display = 'block';
+          document.getElementById('battle-auto-indicator').innerHTML = `<i class="fa-solid fa-bolt" style="animation: flash 1s infinite;"></i> 老師自動對戰中...`;
+          document.getElementById('battle-moves-grid').style.display = 'none';
+          const wildBar = document.getElementById('battle-wild-bar');
+          if (wildBar) wildBar.style.display = 'none';
+
+          setTimeout(() => {
+            if (battleState.active && battleState.autoBattle && battleState.currentTurn === 'p1' && !battleState.isNarrating) {
+              autoExecuteTeacherMove();
+            }
+          }, 600);
+          return;
+        }
+
         // Player 1's turn (Manual Control)
         document.getElementById('battle-auto-indicator').style.display = 'none';
         document.getElementById('battle-moves-grid').style.display = 'grid';
@@ -3075,6 +3102,79 @@
 
     function getUnlockedMoves(fighter) {
       return fighter.moves.map(name => MOVES_DETAILS_MAP[name]);
+    }
+
+    function toggleTeacherAutoBattle() {
+      battleState.autoBattle = !battleState.autoBattle;
+      updateTeacherAutoButton();
+      if (battleState.autoBattle && battleState.active && battleState.currentTurn === 'p1' && !battleState.isNarrating) {
+        document.getElementById('battle-auto-indicator').style.display = 'block';
+        document.getElementById('battle-auto-indicator').innerHTML = `<i class="fa-solid fa-bolt" style="animation: flash 1s infinite;"></i> 老師自動對戰中...`;
+        document.getElementById('battle-moves-grid').style.display = 'none';
+        const wildBar = document.getElementById('battle-wild-bar');
+        if (wildBar) wildBar.style.display = 'none';
+        setTimeout(() => {
+          autoExecuteTeacherMove();
+        }, 400);
+      } else if (!battleState.autoBattle && battleState.active && battleState.currentTurn === 'p1' && !battleState.isNarrating) {
+        document.getElementById('battle-auto-indicator').style.display = 'none';
+        document.getElementById('battle-moves-grid').style.display = 'grid';
+        const wildBar = document.getElementById('battle-wild-bar');
+        if (battleState.isWild && wildBar) wildBar.style.display = 'flex';
+      }
+    }
+
+    function updateTeacherAutoButton() {
+      const btn = document.getElementById('btn-teacher-auto');
+      const txt = document.getElementById('txt-teacher-auto');
+      if (!btn || !txt) return;
+
+      const student = students[currentStudentId];
+      const isTeacher = student && (student.isTeacher || currentStudentId === 'teacher');
+
+      if (isTeacher && battleState.active) {
+        btn.style.display = 'flex';
+        if (battleState.autoBattle) {
+          btn.style.background = 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)';
+          btn.style.borderColor = '#86efac';
+          btn.style.color = '#ffffff';
+          txt.textContent = '自動戰鬥：開啟';
+        } else {
+          btn.style.background = 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)';
+          btn.style.borderColor = '#fef08a';
+          btn.style.color = '#0f172a';
+          txt.textContent = '自動戰鬥：關閉';
+        }
+      } else {
+        btn.style.display = 'none';
+      }
+    }
+
+    function autoExecuteTeacherMove() {
+      if (!battleState.active || battleState.currentTurn !== 'p1' || battleState.isNarrating) return;
+      const fighter = battleState.p1;
+      if (!fighter || !fighter.moves) return;
+
+      let validChoices = [];
+      fighter.moves.forEach((mName, idx) => {
+        const move = MOVES_DETAILS_MAP[mName];
+        if (move) {
+          const maxPp = getMoveMaxPp(move);
+          const currentPp = (fighter.movePP && fighter.movePP[mName] !== undefined)
+            ? fighter.movePP[mName]
+            : maxPp;
+          if (currentPp > 0) {
+            validChoices.push({ index: idx, move: move, pp: currentPp });
+          }
+        }
+      });
+
+      if (validChoices.length === 0) {
+        playerSelectMove(0);
+      } else {
+        validChoices.sort((a, b) => (b.move.power || 0) - (a.move.power || 0));
+        playerSelectMove(validChoices[0].index);
+      }
     }
 
     function playerSelectMove(index) {
@@ -4699,6 +4799,8 @@
 
     function endBattle(winnerName) {
       battleState.active = false;
+      battleState.autoBattle = false;
+      updateTeacherAutoButton();
       document.getElementById('battle-moves-grid').style.display = 'none';
       document.getElementById('battle-auto-indicator').style.display = 'none';
 
@@ -4933,12 +5035,14 @@
       });
 
       battleState.active = true;
+      battleState.autoBattle = false;
       battleState.isWild = true;
       battleState.wildCaught = false;
       battleState.wildBallsLeft = 5;
       battleState.wildPokeData = wildPoke;
       battleState.logQueue = [];
       battleState.isNarrating = false;
+      updateTeacherAutoButton();
 
       battleState.p1 = {
         id: currentStudentId,
@@ -5240,6 +5344,8 @@
 
     function endWildBattle(isCaught, isEscape = false) {
       battleState.active = false;
+      battleState.autoBattle = false;
+      updateTeacherAutoButton();
       document.getElementById('battle-moves-grid').style.display = 'none';
       const wildBar = document.getElementById('battle-wild-bar');
       if (wildBar) wildBar.style.display = 'none';
