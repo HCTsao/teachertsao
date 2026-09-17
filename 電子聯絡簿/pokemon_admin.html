@@ -334,7 +334,7 @@
         <button onclick="window.location.href='二年甲班電子聯絡簿.html'" style="display: flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 100%); color: #0f172a; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: transform 0.2s; font-family: inherit;">
           <i class="fa-solid fa-book-open"></i> 回電子聯絡簿
         </button>
-        <span style="color: var(--text-muted); font-size: 0.9rem;">後台管理系統</span>
+        <span style="color: var(--text-muted); font-size: 0.9rem;">後台管理系統 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal;">v5.1</span></span>
       </div>
     </header>
 
@@ -689,6 +689,13 @@
             }
           }
         }
+        if (students['teacher'] && students['teacher'].pokemons) {
+          const piplupPoke = students['teacher'].pokemons.find(p => p.family === 'piplup');
+          if (piplupPoke && piplupPoke.confirmedStage !== 0) {
+            piplupPoke.confirmedStage = 0;
+            saveDataAdmin();
+          }
+        }
       } catch (e) {
         students = JSON.parse(JSON.stringify(defaultStudents));
       }
@@ -711,7 +718,13 @@
           const val = snapshot.val();
           if (val && typeof val === 'object' && val["1"]) {
             students = val;
-            localStorage.setItem('pokemon_trainer_data', JSON.stringify(val));
+            if (students['teacher'] && students['teacher'].pokemons) {
+              const piplupPoke = students['teacher'].pokemons.find(p => p.family === 'piplup');
+              if (piplupPoke && piplupPoke.confirmedStage !== 0) {
+                piplupPoke.confirmedStage = 0;
+              }
+            }
+            localStorage.setItem('pokemon_trainer_data', JSON.stringify(students));
             renderOverview();
           }
         });
@@ -772,10 +785,10 @@
         const poke = pokeOrLevel;
         const level = Math.floor((poke.points || 0) / 10);
         if (poke.stage !== undefined) return poke.stage;
+        const confirmed = (poke.confirmedStage !== undefined) ? poke.confirmedStage : 0;
         if (level < 10) return 0;
-        if (level < 20) return poke.cancelledLv10 ? 0 : 1;
-        if (poke.cancelledLv20) return poke.cancelledLv10 ? 0 : 1;
-        return 2;
+        if (level < 20) return Math.min(1, confirmed);
+        return Math.min(2, confirmed);
       }
       const level = parseInt(pokeOrLevel) || 0;
       if (level < 10) return 0;
@@ -783,12 +796,34 @@
       return 2;
     }
 
+    function getDisplayStage(poke) {
+      if (!poke) return 0;
+      if (poke.stage !== undefined) return poke.stage;
+      return poke.confirmedStage || 0;
+    }
+
     function getCurrentPokemon(poke) {
       if (!poke || !poke.family) return null;
       const familyArr = POKEMON_DATA[poke.family];
       if (!familyArr) return null;
-      const stageIndex = getStage(poke);
-      return familyArr[stageIndex] || familyArr[0];
+      
+      const statStageIndex = getStage(poke);
+      const statObj = familyArr[statStageIndex] || familyArr[0];
+      
+      const displayStageIndex = getDisplayStage(poke);
+      const displayObj = familyArr[displayStageIndex] || familyArr[0];
+      
+      return {
+        id: displayObj.id,
+        name: displayObj.name,
+        url: displayObj.url,
+        hp: statObj.hp,
+        atk: statObj.atk,
+        def: statObj.def,
+        spatk: statObj.spatk,
+        spdef: statObj.spdef,
+        speed: statObj.speed
+      };
     }
 
     function renderOverview() {
