@@ -827,7 +827,7 @@
     </button>
   </div>
 
-  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v5.1</span></h1>
+  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v5.2</span></h1>
 
   <!-- Student Card Container -->
   <div class="main-container" id="student-container">
@@ -1678,21 +1678,20 @@
       if (!students['teacher']) {
         students['teacher'] = JSON.parse(JSON.stringify(teacherStudentData));
       } else if (students['teacher'].pokemons) {
-        let piplupPoke = students['teacher'].pokemons.find(p => p.family === 'piplup');
-        if (!piplupPoke) {
-          piplupPoke = {
-            family: "piplup",
-            points: 0,
-            moves: ["撞擊", "水槍"]
+        let pichuPoke = students['teacher'].pokemons.find(p => p.family === 'pichu');
+        if (!pichuPoke) {
+          pichuPoke = {
+            family: "pichu",
+            points: 101,
+            confirmedStage: 1,
+            moves: ["撞擊", "電擊", "電光一閃", "十萬伏特"]
           };
-          students['teacher'].pokemons.push(piplupPoke);
+          students['teacher'].pokemons.push(pichuPoke);
+        } else {
+          pichuPoke.confirmedStage = 1; // 進化為皮卡丘
+          if ((pichuPoke.points || 0) < 100) pichuPoke.points = 101;
         }
-        // 還原泓棋老師的波加曼（波皇子曾阻止進化，還原為 Stage 0 波加曼）
-        if (piplupPoke && piplupPoke.confirmedStage !== 0) {
-          piplupPoke.confirmedStage = 0;
-          piplupPoke.lastEvoPromptedLevel = Math.floor((piplupPoke.points || 0) / 10);
-          saveData();
-        }
+        saveData();
       }
 
       for (let id in students) {
@@ -2029,11 +2028,8 @@
     // GBA Evolution logic
     let evoCallback = null;
     let currentEvoSound = null;
-    let activeEvoKeyHandler = null;
-    let activeEvoClickHandler = null;
     let activeEvoPoke = null;
     let currentTargetStage = 0;
-    let isEvoCancelled = false;
 
     function triggerEvolution(studentName, activePokeObj, targetStage, oldPoke, newPoke, callback) {
       if (typeof activePokeObj === 'number') {
@@ -2043,7 +2039,6 @@
       }
       activeEvoPoke = activePokeObj;
       evoCallback = callback;
-      isEvoCancelled = false;
       
       // Pause battle BGM if playing
       battleBGM.pause();
@@ -2070,80 +2065,7 @@
       flash.style.transform = 'scale(0)';
       particles.innerHTML = '';
       
-      let evoKeyCount = 0;
-
-      const updateEvoPromptText = () => {
-        if (isEvoCancelled) {
-          txt.textContent = `▶ 咦？${oldPoke.name} 停止進化了！`;
-        } else if (evoKeyCount > 0) {
-          txt.textContent = `咦？${studentName}的 ${oldPoke.name} 樣子怪怪的...！ (連按 3 次阻止進化: ${evoKeyCount}/3)`;
-        } else {
-          txt.textContent = `咦？${studentName}的 ${oldPoke.name} 樣子怪怪的...！ (連按 3 次任意鍵或點擊螢幕可阻止進化)`;
-        }
-      };
-
-      updateEvoPromptText();
-
-      const cancelEvolutionAction = () => {
-        if (isEvoCancelled) return;
-        isEvoCancelled = true;
-
-        if (activeEvoKeyHandler) {
-          window.removeEventListener('keydown', activeEvoKeyHandler);
-          activeEvoKeyHandler = null;
-        }
-        if (activeEvoClickHandler) {
-          overlay.removeEventListener('click', activeEvoClickHandler);
-          activeEvoClickHandler = null;
-        }
-        if (currentEvoSound) {
-          currentEvoSound.pause();
-          currentEvoSound = null;
-        }
-
-        if (activeEvoPoke && typeof activeEvoPoke === 'object') {
-          const level = Math.floor((activeEvoPoke.points || 0) / 10);
-          if (currentTargetStage === 1 || (level >= 10 && level < 20)) {
-            activeEvoPoke.cancelledLv10 = true;
-          } else if (currentTargetStage === 2 || level >= 20) {
-            activeEvoPoke.cancelledLv20 = true;
-          }
-          saveData();
-        }
-
-        updateEvoPromptText();
-        imgOld.style.opacity = '1';
-        imgOld.style.filter = 'drop-shadow(0 0 20px rgba(255,255,255,0.4))';
-        imgOld.style.transform = 'scale(1)';
-        imgNew.style.opacity = '0';
-        flash.style.opacity = '0';
-        btnGroup.style.display = 'flex';
-      };
-
-      const handleUserPress = (e) => {
-        if (isEvoCancelled) return;
-        if (e && e.target && (e.target.tagName === 'BUTTON' || e.target.closest('#evo-btn-container'))) {
-          return;
-        }
-        evoKeyCount++;
-        updateEvoPromptText();
-        if (evoKeyCount >= 3) {
-          cancelEvolutionAction();
-        }
-      };
-
-      if (activeEvoKeyHandler) {
-        window.removeEventListener('keydown', activeEvoKeyHandler);
-      }
-      if (activeEvoClickHandler) {
-        overlay.removeEventListener('click', activeEvoClickHandler);
-      }
-
-      activeEvoKeyHandler = handleUserPress;
-      activeEvoClickHandler = handleUserPress;
-
-      window.addEventListener('keydown', activeEvoKeyHandler);
-      overlay.addEventListener('click', activeEvoClickHandler);
+      txt.textContent = `咦？${studentName}的 ${oldPoke.name} 樣子怪怪的...！`;
 
       // Load and play custom evolution MP3 starting from the 3rd second
       currentEvoSound = new Audio("Pokemon Evolution Template (Open to Download and Public Use).mp3");
@@ -2156,11 +2078,9 @@
       let flashCount = 0;
       
       function runFlash() {
-        if (isEvoCancelled) return;
         let elapsed = Date.now() - startTime;
         if (elapsed < flashDuration) {
           let ratio = elapsed / flashDuration;
-          // Delays speed up from 450ms down to 45ms
           let currentDelay = 450 - (405 * Math.pow(ratio, 1.4));
           
           const showNew = flashCount % 2 === 1;
@@ -2185,15 +2105,6 @@
       runFlash();
 
       function triggerBurst() {
-        if (isEvoCancelled) return;
-        if (activeEvoKeyHandler) {
-          window.removeEventListener('keydown', activeEvoKeyHandler);
-          activeEvoKeyHandler = null;
-        }
-        if (activeEvoClickHandler) {
-          overlay.removeEventListener('click', activeEvoClickHandler);
-          activeEvoClickHandler = null;
-        }
         imgOld.style.opacity = '0';
         imgNew.style.opacity = '1';
         imgNew.style.filter = 'brightness(0) invert(1) drop-shadow(0 0 30px white)';
@@ -2203,7 +2114,6 @@
         flash.style.opacity = '1';
         
         setTimeout(() => {
-          if (isEvoCancelled) return;
           imgNew.style.transform = 'scale(1)';
           imgNew.style.filter = 'drop-shadow(0 10px 20px rgba(0,0,0,0.5))';
           flash.style.opacity = '0';
@@ -2258,20 +2168,12 @@
     function closeEvolution() {
       const overlay = document.getElementById('evolution-overlay');
       overlay.style.display = 'none';
-      if (activeEvoKeyHandler) {
-        window.removeEventListener('keydown', activeEvoKeyHandler);
-        activeEvoKeyHandler = null;
-      }
-      if (activeEvoClickHandler) {
-        if (overlay) overlay.removeEventListener('click', activeEvoClickHandler);
-        activeEvoClickHandler = null;
-      }
       if (currentEvoSound) {
         currentEvoSound.pause();
         currentEvoSound = null;
       }
 
-      if (activeEvoPoke && typeof activeEvoPoke === 'object' && currentTargetStage && !isEvoCancelled) {
+      if (activeEvoPoke && typeof activeEvoPoke === 'object' && currentTargetStage) {
         activeEvoPoke.confirmedStage = currentTargetStage;
         saveData();
       }
