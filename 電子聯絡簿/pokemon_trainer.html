@@ -3225,15 +3225,21 @@
                           const activeIdx = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < student.pokemons.length) ? student.activePokemonIndex : (student.pokemons.length - 1);
                           const activePoke = student.pokemons[activeIdx];
                           if (activePoke) {
+                            const isStronger = battleState.p2 && (battleState.p2.level > battleState.p1.level);
                             if (student.isTeacher) {
-                              const bonusPts = Math.floor(Math.random() * 3) + 3;
+                              const bonusPts = isStronger ? (Math.floor(Math.random() * 6) + 10) : (Math.floor(Math.random() * 3) + 3);
                               activePoke.points += bonusPts;
                               saveData();
-                              bonusMsg = `（泓棋老師獲得 ${bonusPts} 點經驗值！）`;
+                              bonusMsg = isStronger
+                                ? `（⚔️ 越級挑戰強敵成功！泓棋老師獲得大量 ${bonusPts} 點經驗值！）`
+                                : `（泓棋老師獲得 ${bonusPts} 點經驗值！）`;
                             } else {
-                              activePoke.points += 10;
+                              const bonusPts = isStronger ? 15 : 10;
+                              activePoke.points += bonusPts;
                               saveData();
-                              bonusMsg = "（加回 10 點經驗值！）";
+                              bonusMsg = isStronger
+                                ? `（⚔️ 越級挑戰強敵成功！獲得加倍 ${bonusPts} 點經驗值！）`
+                                : `（加回 10 點經驗值！）`;
                             }
                           }
                         }
@@ -4956,7 +4962,14 @@
       };
 
       const basePoke = POKEMON_DATA[wildPoke.family][0];
-      const wildLevel = Math.max(0, lv1 - 1);
+      // 野生寶可夢等級產生：有 35% 機率遭遇高 1 等強敵 (lv1 + 1)，35% 同等級 (lv1)，30% 低 1 等 (lv1 - 1)
+      const randLevel = Math.random();
+      let wildLevel = Math.max(0, lv1 - 1);
+      if (randLevel < 0.35) {
+        wildLevel = Math.min(30, lv1 + 1);
+      } else if (randLevel < 0.70) {
+        wildLevel = lv1;
+      }
       const scale2 = 1.5 + wildLevel / 10;
       const wildHp = Math.floor(basePoke.hp * scale2 * 0.8);
 
@@ -5023,7 +5036,10 @@
       wildBattleBGM.currentTime = 0;
       wildBattleBGM.play().catch(err => console.log("野生對戰音訊播放限制：", err));
 
-      queueLog(`進入野外草叢... 遇見了野生的 ${wildPoke.name}！`, () => {
+      const encounterMsg = wildLevel > lv1
+        ? `🔥 注意！遭遇高 1 等強敵！遇見了 Lv.${wildLevel} 野生的 ${wildPoke.name}！`
+        : `進入野外草叢... 遇見了 Lv.${wildLevel} 野生的 ${wildPoke.name}！`;
+      queueLog(encounterMsg, () => {
         const speed1 = battleState.p1.speed;
         const speed2 = battleState.p2.speed;
         battleState.currentTurn = speed1 >= speed2 ? 'p1' : 'p2';
