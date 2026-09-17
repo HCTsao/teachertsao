@@ -1674,20 +1674,21 @@
       const activeIndex = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < pokes.length) ? student.activePokemonIndex : (pokes.length - 1);
       const activePoke = pokes.length > 0 ? pokes[activeIndex] : null;
 
-      // Check for first-time evolution animation trigger based on level 10 or 20 (points exactly 100 or 200)
+      // Check for evolution animation trigger (repeats on page open until user clicks '確定')
       if (activePoke) {
-        if (activePoke.points === 100 || activePoke.points === 200) {
-          const sessionKey = `has_seen_evolution_${activePoke.family}_${activePoke.points}`;
-          if (!sessionStorage.getItem(sessionKey)) {
-            sessionStorage.setItem(sessionKey, 'true');
-            const oldStage = activePoke.points === 100 ? 0 : 1;
-            const newStage = activePoke.points === 100 ? 1 : 2;
-            const oldPoke = POKEMON_DATA[activePoke.family][oldStage];
-            const newPoke = POKEMON_DATA[activePoke.family][newStage];
-            triggerEvolution(student.name, oldPoke, newPoke, () => {
-              renderContent();
-            });
-          }
+        const level = Math.floor((activePoke.points || 0) / 10);
+        const targetStage = level >= 20 ? 2 : (level >= 10 ? 1 : 0);
+        const confirmedStage = activePoke.confirmedStage || 0;
+
+        if (targetStage > confirmedStage) {
+          const oldStage = targetStage === 2 ? 1 : 0;
+          const newStage = targetStage;
+          const oldPoke = POKEMON_DATA[activePoke.family][oldStage];
+          const newPoke = POKEMON_DATA[activePoke.family][newStage];
+          
+          triggerEvolution(student.name, activePoke, targetStage, oldPoke, newPoke, () => {
+            renderContent();
+          });
         }
       }
 
@@ -1819,22 +1820,16 @@
                   <span>⚔️ 攻擊 (Atk)</span><span>${scaledStats.atk}</span>
                 </div>
                 <div style="display:flex; align-items:center; justify-content:space-between; background:#fefce8; padding:6px 10px; border-radius:8px; border:1px solid #fef08a; color:#a16207;">
-                  <span>🛡️ 防禦 (Def)</span><span>${pokemon.def}</span>
+                  <span>🛡️ 防禦 (Def)</span><span>${scaledStats.def}</span>
                 </div>
                 <div style="display:flex; align-items:center; justify-content:space-between; background:#f0fdf4; padding:6px 10px; border-radius:8px; border:1px solid #dcfce7; color:#15803d;">
-                  <span>🔮 特攻 (SpAtk)</span><span>${pokemon.spatk}</span>
+                  <span>🔮 特攻 (SpAtk)</span><span>${scaledStats.spatk}</span>
                 </div>
                 <div style="display:flex; align-items:center; justify-content:space-between; background:#f0f9ff; padding:6px 10px; border-radius:8px; border:1px solid #e0f2fe; color:#0369a1;">
-                  <span>🔰 特防 (SpDef)</span><span>${pokemon.spdef}</span>
+                  <span>🔰 特防 (SpDef)</span><span>${scaledStats.spdef}</span>
                 </div>
                 <div style="display:flex; align-items:center; justify-content:space-between; background:#faf5ff; padding:6px 10px; border-radius:8px; border:1px solid #f3e8ff; color:#6b21a8;">
-                  <span>⚡ 速度 (Speed)</span><span>${pokemon.speed}</span>
-                </div>
-                <div style="display:flex; align-items:center; justify-content:space-between; background:#f1f5f9; padding:6px 10px; border-radius:8px; border:1px solid #e2e8f0; color:#334155;">
-                  <span>🎯 命中 (Acc)</span><span>${pokemon.accuracy || 100}%</span>
-                </div>
-                <div style="display:flex; align-items:center; justify-content:space-between; background:#f1f5f9; padding:6px 10px; border-radius:8px; border:1px solid #e2e8f0; color:#334155;">
-                  <span>🌀 閃避 (Eva)</span><span>${pokemon.evasion || 100}%</span>
+                  <span>⚡ 速度 (Speed)</span><span>${scaledStats.speed}</span>
                 </div>
               </div>
             </div>
@@ -1921,15 +1916,16 @@
     let evoCallback = null;
     let currentEvoSound = null;
     let activeEvoKeyHandler = null;
+    let activeEvoPoke = null;
+    let currentTargetStage = 0;
 
-    function triggerEvolution(studentName, targetPokeObj, oldPoke, newPoke, callback) {
-      let activePoke = targetPokeObj;
-      if (typeof targetPokeObj === 'object' && targetPokeObj.name && !targetPokeObj.points) {
-        activePoke = null;
-        callback = newPoke;
-        newPoke = oldPoke;
-        oldPoke = targetPokeObj;
+    function triggerEvolution(studentName, activePokeObj, targetStage, oldPoke, newPoke, callback) {
+      if (typeof activePokeObj === 'number') {
+        currentTargetStage = targetStage;
+      } else {
+        currentTargetStage = targetStage;
       }
+      activeEvoPoke = activePokeObj;
 
       evoCallback = callback;
       
@@ -2102,6 +2098,10 @@
 
     function closeEvolution() {
       document.getElementById('evolution-overlay').style.display = 'none';
+      if (activeEvoPoke && currentTargetStage) {
+        activeEvoPoke.confirmedStage = currentTargetStage;
+        saveData();
+      }
       if (activeEvoKeyHandler) {
         window.removeEventListener('keydown', activeEvoKeyHandler);
         activeEvoKeyHandler = null;
