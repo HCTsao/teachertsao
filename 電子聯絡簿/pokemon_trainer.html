@@ -1624,6 +1624,9 @@
       if (move.status === 'def-up') return '<span style="font-size: 0.72rem; color: #60a5fa; background: rgba(96,165,250,0.15); padding: 2px 6px; border-radius: 4px; font-weight: 700;">🛡️ 提升我方防禦力</span>';
       if (move.status === 'heal') return '<span style="font-size: 0.72rem; color: #4ade80; background: rgba(74,222,128,0.15); padding: 2px 6px; border-radius: 4px; font-weight: 700;">❤️ 恢復 45% 生命值</span>';
       if (move.status === 'sleep') return '<span style="font-size: 0.72rem; color: #c084fc; background: rgba(192,132,252,0.15); padding: 2px 6px; border-radius: 4px; font-weight: 700;">😴 使對手沉睡(3回合)</span>';
+      if (move.status === 'paralyze') return '<span style="font-size: 0.72rem; color: #eab308; background: rgba(234,179,8,0.15); padding: 2px 6px; border-radius: 4px; font-weight: 700;">⚡ 使對手陷入麻痺</span>';
+      if (move.name === '蹭蹭臉頰') return '<span style="font-size: 0.72rem; color: #eab308; background: rgba(234,179,8,0.15); padding: 2px 6px; border-radius: 4px; font-weight: 700;">⚡ 100%機率致麻痺</span>';
+      if (move.type === 'electric' || move.name === '泰山壓頂' || move.name === '龍之氣息') return '<span style="font-size: 0.72rem; color: #eab308; background: rgba(234,179,8,0.15); padding: 2px 6px; border-radius: 4px; font-weight: 700;">⚡ 30%機率致麻痺</span>';
       if (move.type === 'poison') return '<span style="font-size: 0.72rem; color: #e879f9; background: rgba(232,121,249,0.15); padding: 2px 6px; border-radius: 4px; font-weight: 700;">☠️ 35%機率致中毒</span>';
       return '';
     }
@@ -2890,6 +2893,7 @@
         asleep: false,
         sleepTurns: 0,
         poisoned: false,
+        paralyzed: false,
         moves: p1Moves,
         movePP: p1MovePP
       };
@@ -2913,6 +2917,7 @@
         asleep: false,
         sleepTurns: 0,
         poisoned: false,
+        paralyzed: false,
         moves: p2Moves
       };
 
@@ -2944,11 +2949,20 @@
       battleBGM.play().catch(err => console.log("音訊播放受瀏覽器政策限制：", err));
 
       queueLog(`對戰開始！由 ${battleState.p1.name}的${battleState.p1.pokeDetails.name} 對決 ${battleState.p2.name}的${battleState.p2.pokeDetails.name}！`, () => {
-        const speed1 = battleState.p1.speed;
-        const speed2 = battleState.p2.speed;
+        const speed1 = getFighterSpeed(battleState.p1);
+        const speed2 = getFighterSpeed(battleState.p2);
         battleState.currentTurn = speed1 >= speed2 ? 'p1' : 'p2';
         startTurn();
       });
+    }
+
+    function getFighterSpeed(fighter) {
+      if (!fighter) return 0;
+      let spd = fighter.speed || 0;
+      if (fighter.paralyzed) {
+        spd = Math.floor(spd * 0.5);
+      }
+      return spd;
     }
 
     // Coordinates mapping updated to center Pokemon body exactly on 3D platform shadows
@@ -3014,6 +3028,21 @@
         } else {
           activeFighter.asleep = false;
           updateBattleUI();
+        }
+      }
+
+      if (activeFighter && activeFighter.paralyzed) {
+        if (Math.random() < 0.25) {
+          updateBattleUI();
+          document.getElementById('battle-moves-grid').style.display = 'none';
+          const wildBar = document.getElementById('battle-wild-bar');
+          if (wildBar) wildBar.style.display = 'none';
+          document.getElementById('battle-auto-indicator').style.display = 'none';
+
+          queueLog(`⚡ ${activeFighter.name}的${activeFighter.pokeDetails.name} 身體麻痺，無法行動！`, () => {
+            endTurn();
+          });
+          return;
         }
       }
 
@@ -3313,6 +3342,14 @@
                 attacker.hp = Math.min(attacker.maxHp, attacker.hp + healAmt);
                 updateBattleUI();
                 queueLog(`${attacker.name}的${attacker.pokeDetails.name} 恢復了生命值！`, () => endTurn());
+              } else if (move.status === 'paralyze') {
+                if (defender.paralyzed) {
+                  queueLog(`${defender.name}的${defender.pokeDetails.name} 已經處於麻痺狀態了！`, () => endTurn());
+                } else {
+                  defender.paralyzed = true;
+                  updateBattleUI();
+                  queueLog(`⚡ ${defender.name}的${defender.pokeDetails.name} 陷入了麻痺狀態！`, () => endTurn());
+                }
               }
             } else {
               // Check Evasion & Accuracy before damage
@@ -3350,6 +3387,14 @@
               if (move.type === 'poison' && !defender.poisoned && defender.hp > 0 && Math.random() < 0.35) {
                 defender.poisoned = true;
                 poisonedThisTurn = true;
+              }
+
+              let paralyzedThisTurn = false;
+              const isParalyzeAttack = move.name === '蹭蹭臉頰' || move.type === 'electric' || move.name === '泰山壓頂' || move.name === '龍之氣息';
+              const paralyzeChance = move.name === '蹭蹭臉頰' ? 1.0 : 0.30;
+              if (isParalyzeAttack && !defender.paralyzed && defender.hp > 0 && Math.random() < paralyzeChance) {
+                defender.paralyzed = true;
+                paralyzedThisTurn = true;
               }
 
               updateBattleUI();
@@ -3411,6 +3456,9 @@
               }
               if (poisonedThisTurn) {
                 resultText += ` ${defender.name}的${defender.pokeDetails.name}中毒了！☠️`;
+              }
+              if (paralyzedThisTurn) {
+                resultText += ` ${defender.name}的${defender.pokeDetails.name}麻痺了！⚡`;
               }
 
               if (eff.text) {
@@ -5102,7 +5150,10 @@
         speed: Math.floor(p1Details.speed * scale1),
         atkMod: 1,
         defMod: 1,
+        asleep: false,
+        sleepTurns: 0,
         poisoned: false,
+        paralyzed: false,
         moves: p1Moves,
         movePP: p1MovePP
       };
@@ -5152,6 +5203,7 @@
         asleep: false,
         sleepTurns: 0,
         poisoned: false,
+        paralyzed: false,
         moves: wildMoves
       };
 
@@ -5190,8 +5242,8 @@
         encounterMsg += ` (⚠️ 寶可夢已達 6 隻上限，精靈球數設為 0 顆，打倒可正常獲取經驗值！)`;
       }
       queueLog(encounterMsg, () => {
-        const speed1 = battleState.p1.speed;
-        const speed2 = battleState.p2.speed;
+        const speed1 = getFighterSpeed(battleState.p1);
+        const speed2 = getFighterSpeed(battleState.p2);
         battleState.currentTurn = speed1 >= speed2 ? 'p1' : 'p2';
         startTurn();
       });
