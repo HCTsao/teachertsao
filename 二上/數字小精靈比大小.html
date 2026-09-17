@@ -259,9 +259,42 @@
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         ];
 
+        // Helper: Convert integer (1 ~ 200) to Traditional Chinese text for elementary school
+        const numberToChinese = (num) => {
+            const chars = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+            if (num === 200) return '二百';
+            if (num === 100) return '一百';
+            if (num < 10) return chars[num];
+            if (num < 20) return '十' + (num % 10 === 0 ? '' : chars[num % 10]);
+            if (num < 100) {
+                const ten = Math.floor(num / 10);
+                const one = num % 10;
+                return chars[ten] + '十' + (one === 0 ? '' : chars[one]);
+            }
+            const tens = Math.floor((num % 100) / 10);
+            const ones = num % 10;
+            if (tens === 0) {
+                return '一百零' + chars[ones];
+            } else if (tens === 1) {
+                return '一百一十' + (ones === 0 ? '' : chars[ones]);
+            } else {
+                return '一百' + chars[tens] + '十' + (ones === 0 ? '' : chars[ones]);
+            }
+        };
+
+        // Helper: Get responsive text size for circle container
+        const getTextSizeClass = (str) => {
+            const len = String(str).length;
+            if (len <= 3) return 'text-3xl font-black';
+            if (len === 4) return 'text-xl font-black';
+            if (len === 5) return 'text-lg font-black leading-tight text-center px-1';
+            return 'text-base font-bold leading-tight text-center px-1';
+        };
+
         // Main App
         const App = () => {
             const [gameState, setGameState] = useState('menu'); // menu, playing, reward_ready, playing_reward, reward_gameover
+            const [gameMode, setGameMode] = useState('basic'); // basic, advanced, challenge
             const [isMuted, setIsMuted] = useState(false);
 
             // Correct answers in math stage → become mini-game lives (max 5)
@@ -273,9 +306,14 @@
             // Sequence of operators to guarantee a mix of > and <
             const [questionSequence, setQuestionSequence] = useState([]);
 
-            // Left / Right values
+            // Left / Right values & display texts
             const [leftValue, setLeftValue] = useState(100);
             const [rightValue, setRightValue] = useState(100);
+            const [leftDisplayText, setLeftDisplayText] = useState('100');
+            const [rightDisplayText, setRightDisplayText] = useState('100');
+            const [leftSpeechText, setLeftSpeechText] = useState('100');
+            const [rightSpeechText, setRightSpeechText] = useState('100');
+
             const [correctChoice, setCorrectChoice] = useState('');
             const [isShaking, setIsShaking] = useState(false);
             const [canAnswer, setCanAnswer] = useState(true);
@@ -310,7 +348,7 @@
             const touchStartRef = useRef(null);
             const rewardIntervalRef = useRef(null);
             const gameTickRef       = useRef(null);
-            const lastQuestionRef   = useRef({ left: 0, right: 0 });
+            const lastQuestionRef   = useRef({ leftDisp: '', rightDisp: '' });
 
             // --- Firebase Leaderboard Logic ---
             const fetchLeaderboard = () => {
@@ -941,7 +979,73 @@
                 return { left, right };
             };
 
-            const startQuestion = (attemptIndex, seq, repeatLast = false) => {
+            // Generate question item depending on mode
+            const generateQuestion = (targetOp, mode) => {
+                if (mode === 'advanced') {
+                    let res = generateNumbers(targetOp);
+                    const isLeftChinese = Math.random() > 0.5;
+                    const leftVal = res.left;
+                    const rightVal = res.right;
+                    const leftZh = numberToChinese(leftVal);
+                    const rightZh = numberToChinese(rightVal);
+
+                    const leftDisp = isLeftChinese ? leftZh : String(leftVal);
+                    const rightDisp = isLeftChinese ? String(rightVal) : rightZh;
+
+                    return {
+                        leftValue: leftVal,
+                        rightValue: rightVal,
+                        leftDisplayText: leftDisp,
+                        rightDisplayText: rightDisp,
+                        leftSpeechText: leftDisp,
+                        rightSpeechText: rightDisp
+                    };
+                } else if (mode === 'challenge') {
+                    let leftSum = randRange(20, 198);
+                    let rightVal = randRange(10, 200);
+                    while (leftSum === rightVal) {
+                        rightVal = randRange(10, 200);
+                    }
+
+                    const isGreater = leftSum > rightVal;
+                    if ((targetOp === '>' && !isGreater) || (targetOp === '<' && isGreater)) {
+                        if (targetOp === '>') {
+                            rightVal = randRange(10, Math.max(10, leftSum - 1));
+                        } else {
+                            rightVal = randRange(Math.min(200, leftSum + 1), 200);
+                        }
+                    }
+
+                    const aMin = Math.max(10, leftSum - 99);
+                    const aMax = Math.min(99, leftSum - 10);
+                    const a = randRange(aMin, aMax);
+                    const b = leftSum - a;
+
+                    const leftDisp = `${a} + ${b}`;
+                    const rightDisp = String(rightVal);
+
+                    return {
+                        leftValue: leftSum,
+                        rightValue: rightVal,
+                        leftDisplayText: leftDisp,
+                        rightDisplayText: rightDisp,
+                        leftSpeechText: `${a}加${b}`,
+                        rightSpeechText: String(rightVal)
+                    };
+                } else {
+                    let res = generateNumbers(targetOp);
+                    return {
+                        leftValue: res.left,
+                        rightValue: res.right,
+                        leftDisplayText: String(res.left),
+                        rightDisplayText: String(res.right),
+                        leftSpeechText: String(res.left),
+                        rightSpeechText: String(res.right)
+                    };
+                }
+            };
+
+            const startQuestion = (attemptIndex, seq, repeatLast = false, currentMode = gameMode) => {
                 setCanAnswer(true);
                 setPacmanMouthOpen(false);
                 setSpinAngle(0);
@@ -958,16 +1062,22 @@
                 const index = attemptIndex !== undefined ? attemptIndex : totalAttempts;
                 const targetOp = (activeSeq && activeSeq[index]) ? activeSeq[index] : (Math.random() > 0.5 ? '>' : '<');
 
-                let res = generateNumbers(targetOp);
+                let q = generateQuestion(targetOp, currentMode);
                 // Prevent identical consecutive questions
-                while (res.left === lastQuestionRef.current.left && res.right === lastQuestionRef.current.right) {
-                    res = generateNumbers(targetOp);
+                while (q.leftDisplayText === lastQuestionRef.current.leftDisp && q.rightDisplayText === lastQuestionRef.current.rightDisp) {
+                    q = generateQuestion(targetOp, currentMode);
                 }
-                lastQuestionRef.current = { left: res.left, right: res.right };
+                lastQuestionRef.current = { leftDisp: q.leftDisplayText, rightDisp: q.rightDisplayText };
 
-                setLeftValue(res.left);
-                setRightValue(res.right);
-                setCorrectChoice(targetOp);
+                setLeftValue(q.leftValue);
+                setRightValue(q.rightValue);
+                setLeftDisplayText(q.leftDisplayText);
+                setRightDisplayText(q.rightDisplayText);
+                setLeftSpeechText(q.leftSpeechText);
+                setRightSpeechText(q.rightSpeechText);
+
+                const correctSymbol = q.leftValue > q.rightValue ? '>' : '<';
+                setCorrectChoice(correctSymbol);
             };
 
             // Choice verification
@@ -1015,7 +1125,7 @@
                         try {
                             window.speechSynthesis.cancel();
                             const sign = correctChoice === '>' ? '大於' : '小於';
-                            const text = `${leftValue} ${sign} ${rightValue}`;
+                            const text = `${leftSpeechText} ${sign} ${rightSpeechText}`;
                             const utter = new SpeechSynthesisUtterance(text);
                             utter.lang = 'zh-TW';
                             utter.rate = 0.95;
@@ -1071,14 +1181,16 @@
                 if (gRef.current && dirMap[dir]) gRef.current.pac.next = dirMap[dir];
             };
 
-            const initGame = () => {
+            const initGame = (selectedMode) => {
+                const activeMode = selectedMode || gameMode;
+                setGameMode(activeMode);
                 setCorrectCount(0);
                 setTotalAttempts(0);
                 setSlotResults([null, null, null, null, null]);
                 setPacmanFacing('right');
                 
                 // Clear duplicate check ref
-                lastQuestionRef.current = { left: 0, right: 0 };
+                lastQuestionRef.current = { leftDisp: '', rightDisp: '' };
                 
                 // Pre-generate a list containing exactly at least two '>' and two '<' symbols
                 const seq = ['>', '>', '<', '<', Math.random() > 0.5 ? '>' : '<'];
@@ -1090,7 +1202,7 @@
                 setQuestionSequence(seq);
 
                 setGameState('playing');
-                setTimeout(() => startQuestion(0, seq), 50);
+                setTimeout(() => startQuestion(0, seq, false, activeMode), 50);
             };
 
             return (
@@ -1122,23 +1234,81 @@
 
                     {/* MENU SCREEN */}
                     {gameState === 'menu' && (
-                        <main className="flex-1 w-full max-w-4xl flex flex-col items-center justify-center gap-8 py-8 z-10">
-                            <div className="text-center space-y-4">
-                                <h1 className="text-5xl md:text-6xl font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-b from-yellow-300 via-amber-400 to-orange-500 drop-shadow-[0_4px_12px_rgba(245,158,11,0.3)] animate-pulse">
+                        <main className="flex-1 w-full max-w-4xl flex flex-col items-center justify-center gap-6 py-4 z-10">
+                            <div className="text-center space-y-2">
+                                <h1 className="text-4xl md:text-5xl font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-b from-yellow-300 via-amber-400 to-orange-500 drop-shadow-[0_4px_12px_rgba(245,158,11,0.3)] animate-pulse">
                                     數字小精靈比大小
                                 </h1>
+                                <p className="text-slate-400 font-bold text-sm">請選擇挑戰難度模式</p>
+                            </div>
+
+                            {/* Mode Selection Cards */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full px-4 max-w-3xl">
+                                {/* Basic Mode Card */}
+                                <div 
+                                    onClick={() => setGameMode('basic')}
+                                    className={`cursor-pointer rounded-2xl p-4 border-2 transition-all duration-200 flex flex-col items-center justify-between text-center ${
+                                        gameMode === 'basic' 
+                                            ? 'bg-slate-900/90 border-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.4)] scale-105' 
+                                            : 'bg-slate-900/40 border-slate-800 hover:border-slate-700 hover:bg-slate-900/60'
+                                    }`}
+                                >
+                                    <div className="text-3xl mb-1">🟢</div>
+                                    <h3 className="text-xl font-black text-amber-300 mb-1">基礎版</h3>
+                                    <p className="text-xs text-slate-300 font-bold mb-3">雙邊阿拉伯數字 (1~200)</p>
+                                    <div className="w-full py-2 bg-slate-950/60 rounded-xl border border-slate-800 text-sky-300 font-mono text-xs font-bold">
+                                        105 vs 150
+                                    </div>
+                                </div>
+
+                                {/* Advanced Mode Card */}
+                                <div 
+                                    onClick={() => setGameMode('advanced')}
+                                    className={`cursor-pointer rounded-2xl p-4 border-2 transition-all duration-200 flex flex-col items-center justify-between text-center ${
+                                        gameMode === 'advanced' 
+                                            ? 'bg-slate-900/90 border-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.4)] scale-105' 
+                                            : 'bg-slate-900/40 border-slate-800 hover:border-slate-700 hover:bg-slate-900/60'
+                                    }`}
+                                >
+                                    <div className="text-3xl mb-1">🟡</div>
+                                    <h3 className="text-xl font-black text-amber-300 mb-1">進階版</h3>
+                                    <p className="text-xs text-slate-300 font-bold mb-3">中文國字與數字對照</p>
+                                    <div className="w-full py-2 bg-slate-950/60 rounded-xl border border-slate-800 text-yellow-300 font-bold text-xs">
+                                        一百零五 vs 150
+                                    </div>
+                                </div>
+
+                                {/* Challenge Mode Card */}
+                                <div 
+                                    onClick={() => setGameMode('challenge')}
+                                    className={`cursor-pointer rounded-2xl p-4 border-2 transition-all duration-200 flex flex-col items-center justify-between text-center ${
+                                        gameMode === 'challenge' 
+                                            ? 'bg-slate-900/90 border-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.4)] scale-105' 
+                                            : 'bg-slate-900/40 border-slate-800 hover:border-slate-700 hover:bg-slate-900/60'
+                                    }`}
+                                >
+                                    <div className="text-3xl mb-1">🔴</div>
+                                    <h3 className="text-xl font-black text-amber-300 mb-1">挑戰版</h3>
+                                    <p className="text-xs text-slate-300 font-bold mb-3">二位數加法算式與數字</p>
+                                    <div className="w-full py-2 bg-slate-950/60 rounded-xl border border-slate-800 text-emerald-300 font-bold text-xs">
+                                        78 + 65 vs 140
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Retro Pac-man Demo Animation */}
-                            <div className="w-80 h-32 flex items-center justify-between relative px-8 bg-slate-900/40 border border-slate-900 rounded-3xl">
-                                <div className="w-12 h-12 rounded-full bg-sky-500/20 border border-sky-400 flex items-center justify-center font-bold text-sky-300">105</div>
-                                <div className="animate-bounce"><PacmanChar direction="idle" size={60} /></div>
-                                <div className="w-12 h-12 rounded-full bg-rose-500/20 border border-rose-400 flex items-center justify-center font-bold text-rose-300">150</div>
+                            <div className="w-80 h-24 flex items-center justify-between relative px-8 bg-slate-900/40 border border-slate-900 rounded-3xl my-1">
+                                <div className="w-12 h-12 rounded-full bg-sky-500/20 border border-sky-400 flex items-center justify-center font-bold text-sky-300 text-xs text-center">
+                                    {gameMode === 'advanced' ? '一百' : gameMode === 'challenge' ? '60+45' : '105'}
+                                </div>
+                                <div className="animate-bounce"><PacmanChar direction="idle" size={50} /></div>
+                                <div className="w-12 h-12 rounded-full bg-rose-500/20 border border-rose-400 flex items-center justify-center font-bold text-rose-300 text-xs text-center">
+                                    150
+                                </div>
                             </div>
 
-                            <div className="text-center space-y-6">
-
-                                <button onClick={initGame} className="w-64 py-4 px-8 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black text-2xl shadow-lg shadow-orange-500/20 hover:scale-105 active:scale-95 transition-all text-center">
+                            <div className="text-center">
+                                <button onClick={() => initGame(gameMode)} className="w-64 py-4 px-8 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black text-2xl shadow-lg shadow-orange-500/20 hover:scale-105 active:scale-95 transition-all text-center cursor-pointer">
                                     開始挑戰
                                 </button>
                             </div>
@@ -1175,7 +1345,7 @@
                                     
                                     {/* Left Food Circle */}
                                     <div 
-                                        className="absolute top-1/2 w-28 h-28 rounded-full border-4 border-sky-400 bg-sky-950/40 flex items-center justify-center text-3xl font-black text-sky-300 glow-blue transition-all duration-500 ease-in-out"
+                                        className={`absolute top-1/2 w-28 h-28 rounded-full border-4 border-sky-400 bg-sky-950/40 flex items-center justify-center text-sky-300 glow-blue transition-all duration-500 ease-in-out ${getTextSizeClass(leftDisplayText)}`}
                                         style={{ 
                                             left: '50%',
                                             marginLeft: leftFoodEaten ? '-57.5px' : '-220px',
@@ -1183,7 +1353,7 @@
                                             opacity: leftFoodEaten ? 0 : 1
                                         }}
                                     >
-                                        {leftValue}
+                                        {leftDisplayText}
                                     </div>
 
                                     {/* Center Pacman Area */}
@@ -1200,7 +1370,7 @@
 
                                     {/* Right Food Circle */}
                                     <div 
-                                        className="absolute top-1/2 w-28 h-28 rounded-full border-4 border-rose-500 bg-rose-950/40 flex items-center justify-center text-3xl font-black text-rose-300 glow-rose transition-all duration-500 ease-in-out"
+                                        className={`absolute top-1/2 w-28 h-28 rounded-full border-4 border-rose-500 bg-rose-950/40 flex items-center justify-center text-rose-300 glow-rose transition-all duration-500 ease-in-out ${getTextSizeClass(rightDisplayText)}`}
                                         style={{ 
                                             left: '50%',
                                             marginLeft: rightFoodEaten ? '-57.5px' : '105px',
@@ -1208,7 +1378,7 @@
                                             opacity: rightFoodEaten ? 0 : 1
                                         }}
                                     >
-                                        {rightValue}
+                                        {rightDisplayText}
                                     </div>
 
                                 </div>
