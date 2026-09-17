@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>二年甲班電子聯絡簿</title>
+  
+  <!-- 引入 Google 字型 (思源黑體與可愛的圓體字 Quicksand/Fredoka) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome 圖標與 Firebase SDK -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <style>
+    /* 全域 CSS 變數：精選馬卡龍配色系統 */
+    :root {
+      --primary-color: #7dd3fc; /* 天空藍 */
+      --secondary-color: #a7f3d0; /* 薄荷綠 */
+      --accent-color: #fef08a; /* 鵝黃色 */
+      --text-dark: #334155;
+      --text-light: #64748b;
+      --card-bg: rgba(255, 255, 255, 0.85);
+      --card-border: rgba(255, 255, 255, 0.5);
+      --shadow-sm: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+      --shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.08);
+      --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+      
+      --color-chinese: #f97316; /* 國語 */
+      --color-math: #3b82f6; /* 數學 */
+      --color-english: #10b981; /* 英文 */
+      --color-memo: #ec4899; /* 備忘 */
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Fredoka', 'Noto Sans TC', sans-serif;
+      color: var(--text-dark);
+      background: linear-gradient(135deg, #f0f9ff 0%, #fffbeb 50%, #f0fdf4 100%);
+      background-attachment: fixed;
+      line-height: 1.6;
+      padding-bottom: 30px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    .hero-banner {
+      width: 100%;
+      height: 160px;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: var(--shadow-md);
+      position: relative;
+      margin-bottom: 20px;
+    }
+
+    .hero-banner img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.5s ease;
+    }
+
+    .hero-banner:hover img {
+      transform: scale(1.03);
+    }
+
+    .glass-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .header-section {
+      text-align: center;
+      padding: 12px 10px;
+    }
+
+    .class-title {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #0369a1;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .class-title i {
+      color: #f59e0b;
+      animation: spin 8s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .teacher-badge {
+      display: inline-block;
+      background-color: #e0f2fe;
+      color: #0369a1;
+      padding: 4px 14px;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      margin-bottom: 12px;
+      border: 1px solid rgba(3, 105, 161, 0.15);
+    }
+
+    .date-badge-container {
+      background: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 100%);
+      color: white;
+      border-radius: 16px;
+      padding: 12px;
+      box-shadow: var(--shadow-md);
+      margin-bottom: 8px;
+    }
+
+    .date-roc {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    .section-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .contact-nav-tabs {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 15px;
+    }
+
+    .contact-tab-btn {
+      padding: 10px 18px;
+      border-radius: 20px;
+      border: none;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      background: #e2e8f0;
+      color: #475569;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+    }
+
+    .contact-tab-btn:hover {
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <div class="hero-banner">
+      <img src="classroom_banner.jpg" alt="二年甲班班級橫幅" onerror="this.src='https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=600&q=80'">
+    </div>
+
+    <div class="glass-card header-section">
+      <h1 class="class-title">
+        <i class="fa-solid fa-star"></i> 二年甲班電子聯絡簿
+      </h1>
+      <div class="teacher-badge">導師：紅旗老師</div>
+      
+      <div class="date-badge-container">
+        <div class="date-roc" id="dateRoc">民國 115 年 7 月 2 日 (星期四)</div>
+      </div>
+      
+      <!-- 要求: 按下一字千金頁籤直接開啟獨立網頁 -->
+      <div class="contact-nav-tabs">
+        <a href="生字挑戰/生字大冒險.html" target="_blank" class="contact-tab-btn" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.3);">
+          <i class="fa-solid fa-trophy"></i> 一字千金
+        </a>
+        <a href="pokemon_trainer.html" class="contact-tab-btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white;">
+          <i class="fa-solid fa-gamepad"></i> 寶可夢集點卡
+        </a>
+        <button onclick="window.location.href='pokemon_admin.html'" class="contact-tab-btn" style="background: linear-gradient(135deg, #64748b 0%, #475569 100%); color: white;">
+          <i class="fa-solid fa-shield-halved"></i> 教師後台
+        </button>
+      </div>
+    </div>
+
+    <!-- 今日通知單區域 -->
+    <div class="glass-card">
+      <h2 class="section-title notice" style="color: #0284c7;">
+        <i class="fa-solid fa-bullhorn"></i> 重要通知與公告
+      </h2>
+      <div id="noticeContainer" class="notice-container">
+        <!-- 由 JS 生成 -->
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCQK6Ex0zHb13uAKwhvHAH6OFGVBiyodts",
+      authDomain: "pokemon-7bd40.firebaseapp.com",
+      projectId: "pokemon-7bd40",
+      storageBucket: "pokemon-7bd40.firebasestorage.app",
+      messagingSenderId: "641379923525",
+      appId: "1:641379923525:web:fda369e1f7c84d6218552c",
+      databaseURL: "https://pokemon-7bd40-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+
+    let database = null;
+    try {
+      if (typeof firebase !== 'undefined') {
+        firebase.initializeApp(firebaseConfig);
+        database = firebase.database();
+      }
+    } catch (err) {
+      console.warn("Firebase 初始化失敗：", err);
+    }
+
+    const today = new Date();
+    function formatDateKey(d) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const date = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${date}`;
+    }
+
+    let homeworkDatabase = {
+      '2026-09-14': [
+        { subject: '數學', type: '數學', text: '1. 數習p.12~13', content: '1. 數習p.12~13' },
+        { subject: '國語', type: '國語', text: '2. 乙本L2生字(夾~臉)寫5次(廷恩、岳泰、冠宏)', content: '2. 乙本L2生字(夾~臉)寫5次(廷恩、岳泰、冠宏)' },
+        { subject: '國語', type: '國語', text: '3. 乙本L2生字(全~司)寫5次(洪福)', content: '3. 乙本L2生字(全~司)寫5次(洪福)' }
+      ]
+    };
+    let noticeDatabase = {};
+
+    function parseHomeworkData(val) {
+      if (!val) return [];
+      if (Array.isArray(val)) {
+        return val.map(item => {
+          if (typeof item === 'string') {
+            let type = '作業';
+            if (item.includes('國') || item.includes('甲') || item.includes('乙')) type = '國語';
+            else if (item.includes('數')) type = '數學';
+            else if (item.includes('英')) type = '英文';
+            return { subject: type, type: type, text: item, content: item };
+          }
+          return item;
+        });
+      }
+      if (typeof val === 'string' && val.trim() !== '') {
+        const lines = val.split('\n').map(l => l.trim()).filter(l => l !== '');
+        return lines.map(line => {
+          let type = '作業';
+          if (line.includes('國') || line.includes('甲') || line.includes('乙')) type = '國語';
+          else if (line.includes('數')) type = '數學';
+          else if (line.includes('英')) type = '英文';
+          return { subject: type, type: type, text: line, content: line };
+        });
+      }
+      return [];
+    }
+
+    function getHomeworkForDate(dateObj) {
+      const queryDateStr = formatDateKey(dateObj);
+      const rawHw = homeworkDatabase[queryDateStr];
+      const parsed = parseHomeworkData(rawHw);
+      return { list: parsed, dateKey: queryDateStr };
+    }
+
+    function renderHomeworkAndNotices() {
+      const hwContainer = document.getElementById('homeworkContainer');
+      const noticeContainer = document.getElementById('noticeContainer');
+
+      const hwResult = getHomeworkForDate(today);
+      const todayHomework = hwResult.list;
+
+      if (!todayHomework || todayHomework.length === 0) {
+        hwContainer.innerHTML = `
+          <div style="text-align:center; padding: 20px; color: #94a3b8;">
+            <i class="fa-solid fa-umbrella-beach" style="font-size:2rem; margin-bottom:8px; display:block; color:#f59e0b;"></i>
+            今日無作業
+          </div>
+        `;
+      } else {
+        let listHtml = '<ul style="list-style: none; display: flex; flex-direction: column; gap: 10px;">';
+        todayHomework.forEach(item => {
+          const subj = item.subject || item.type || '作業';
+          const text = item.text || item.content || '';
+          listHtml += `
+            <li style="background: #ffffff; padding: 12px 16px; border-radius: 12px; border: 1px solid #e2e8f0; font-weight: 700; display: flex; align-items: center; gap: 10px;">
+              <span style="background: #0284c7; color: white; padding: 2px 8px; border-radius: 6px; font-size: 0.85rem;">${subj}</span>
+              <span>${text}</span>
+            </li>
+          `;
+        });
+        listHtml += '</ul>';
+        hwContainer.innerHTML = listHtml;
+      }
+
+      const queryDateStr = formatDateKey(today);
+      const noticeData = noticeDatabase[queryDateStr];
+      if (noticeContainer) {
+        if (!noticeData || (Array.isArray(noticeData) && noticeData.length === 0)) {
+          noticeContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: #94a3b8; font-size: 0.9rem;">今日無特殊聯絡事項或通知單</div>`;
+        } else {
+          const src = typeof noticeData === 'string' ? noticeData : (noticeData.src || noticeData.base64);
+          noticeContainer.innerHTML = `<img src="${src}" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" />`;
+        }
+      }
+    }
+
+    function initDataSync() {
+      try {
+        const localHw = localStorage.getItem('homeworkDatabase');
+        if (localHw) homeworkDatabase = JSON.parse(localHw);
+        const localNotice = localStorage.getItem('noticeDatabase');
+        if (localNotice) noticeDatabase = JSON.parse(localNotice);
+      } catch (e) {}
+
+      if (database) {
+        database.ref('homeworkDatabase').on('value', (snapshot) => {
+          const val = snapshot.val() || {};
+          homeworkDatabase = val;
+          try { localStorage.setItem('homeworkDatabase', JSON.stringify(val)); } catch (e) {}
+          renderHomeworkAndNotices();
+        });
+        database.ref('noticeDatabase').on('value', (snapshot) => {
+          const val = snapshot.val() || {};
+          noticeDatabase = val;
+          try { localStorage.setItem('noticeDatabase', JSON.stringify(val)); } catch (e) {}
+          renderHomeworkAndNotices();
+        });
+      } else {
+        renderHomeworkAndNotices();
+      }
+    }
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'homeworkDatabase' || e.key === 'noticeDatabase') {
+        try {
+          if (e.key === 'homeworkDatabase' && e.newValue) homeworkDatabase = JSON.parse(e.newValue);
+          if (e.key === 'noticeDatabase' && e.newValue) noticeDatabase = JSON.parse(e.newValue);
+          renderHomeworkAndNotices();
+        } catch (e) {}
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', initDataSync);
+  </script>
+</body>
+</html>

@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>二年甲班電子聯絡簿</title>
+  
+  <!-- 引入 Google 字型 (思源黑體與可愛的圓體字 Quicksand/Fredoka) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome 圖標引入用於裝飾 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Firebase Compatibility SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+  <style>
+    /* 全域 CSS 變數：精選馬卡龍配色系統 */
+    :root {
+      --primary-color: #7dd3fc; /* 天空藍 */
+      --secondary-color: #a7f3d0; /* 薄荷綠 */
+      --accent-color: #fef08a; /* 鵝黃色 */
+      --text-dark: #334155;
+      --text-light: #64748b;
+      --card-bg: rgba(255, 255, 255, 0.85);
+      --card-border: rgba(255, 255, 255, 0.5);
+      --shadow-sm: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+      --shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.08);
+      --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+      
+      --color-chinese: #f97316; /* 國語 */
+      --color-math: #3b82f6; /* 數學 */
+      --color-english: #10b981; /* 英文 */
+      --color-memo: #ec4899; /* 備忘 */
+    }
+
+    /* 基本樣式重設與字型設定 */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent; /* 移除行動裝置觸控藍影 */
+    }
+
+    body {
+      font-family: 'Fredoka', 'Noto Sans TC', sans-serif;
+      color: var(--text-dark);
+      /* 溫和好入眼的漸層背景 */
+      background: linear-gradient(135deg, #f0f9ff 0%, #fffbeb 50%, #f0fdf4 100%);
+      background-attachment: fixed;
+      line-height: 1.6;
+      padding-bottom: 30px; /* 留白 */
+    }
+
+    /* 容器設定 */
+    .container {
+      width: 100%;
+      max-width: 600px; /* 行動裝置黃金寬度限制 */
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    /* 頂部精美橫幅封面圖 */
+    .hero-banner {
+      width: 100%;
+      height: 240px;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: var(--shadow-md);
+      position: relative;
+      margin-bottom: 20px;
+    }
+
+    .hero-banner img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 35%;
+      transition: transform 0.5s ease;
+    }
+
+    .hero-banner:hover img {
+      transform: scale(1.03);
+    }
+
+    /* 磨砂玻璃卡片共通樣式 */
+    .glass-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .glass-card:active {
+      transform: scale(0.99);
+    }
+
+    /* 班級標題區 */
+    .header-section {
+      text-align: center;
+      padding: 12px 10px;
+    }
+
+    .class-title {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #0369a1;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .class-title i {
+      color: #f59e0b;
+      animation: spin 8s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .teacher-badge {
+      display: inline-block;
+      background-color: #e0f2fe;
+      color: #0369a1;
+      padding: 4px 14px;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      margin-bottom: 12px;
+      border: 1px solid rgba(3, 105, 161, 0.15);
+    }
+
+    /* 日期顯示區 (點擊月曆選單) */
+    .date-badge-container {
+      background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%);
+      color: white;
+      border-radius: 16px;
+      padding: 14px 16px;
+      box-shadow: var(--shadow-md);
+      margin-bottom: 8px;
+      position: relative;
+      cursor: pointer;
+      overflow: hidden;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .date-badge-container:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px -3px rgba(2, 132, 199, 0.4);
+    }
+
+    .date-badge-container input[type="date"] {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+      z-index: 5;
+      pointer-events: auto;
+    }
+
+    .date-roc {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+    }
+
+    .date-picker-hint {
+      font-size: 0.82rem;
+      opacity: 0.95;
+      margin-top: 4px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      color: #f0f9ff;
+    }
+
+    @media (max-width: 480px) {
+      .hero-banner {
+        height: 180px;
+      }
+      .date-badge-container {
+        padding: 10px 8px;
+      }
+      .date-roc {
+        font-size: 0.95rem;
+        letter-spacing: 0px;
+        white-space: nowrap;
+      }
+      .date-roc i {
+        font-size: 0.85em;
+        margin-left: 4px !important;
+        margin-right: 4px !important;
+      }
+      .date-picker-hint {
+        font-size: 0.75rem;
+      }
+      .class-title {
+        font-size: 1.4rem;
+      }
+    }
+
+    .section-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-title.homework i {
+      color: #3b82f6;
+    }
+
+    .section-title.notices i {
+      color: #ec4899;
+    }
+
+    /* 今日作業區域 */
+    .homework-container {
+      min-height: 80px;
+    }
+
+    /* 暑假無作業狀態卡片 */
+    .no-homework-card {
+      text-align: center;
+      padding: 24px 12px;
+      background: radial-gradient(circle at top right, #fffdf5 0%, #fffbeb 100%);
+      border-radius: 16px;
+      border: 1px solid #fef3c7;
+    }
+
+    .no-homework-icon {
+      font-size: 3.5rem;
+      color: #f59e0b;
+      margin-bottom: 12px;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0% { transform: translateY(0px); }
+      50% { transform: translateY(-8px); }
+      100% { transform: translateY(0px); }
+    }
+
+    .no-homework-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #b45309;
+    }
+
+    /* 正常作業清單 */
+    .homework-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .homework-item {
+      display: flex;
+      align-items: center;
+      background-color: white;
+      border-radius: 14px;
+      padding: 12px 14px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+      border: 1px solid #f1f5f9;
+      transition: transform 0.2s ease;
+    }
+
+    .homework-item:hover {
+      transform: translateX(4px);
+    }
+
+    /* 科目彩色小標籤 */
+    .subject-tag {
+      flex-shrink: 0;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: white;
+      text-align: center;
+      min-width: 55px;
+      margin-right: 12px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .tag-chinese { background-color: var(--color-chinese); }
+    .tag-math { background-color: var(--color-math); }
+    .tag-english { background-color: var(--color-english); }
+    .tag-memo { background-color: var(--color-memo); }
+    .tag-notice { background-color: #8b5cf6; }
+
+    .homework-text {
+      font-size: 24px;
+      color: var(--text-dark);
+      font-weight: 500;
+      word-break: break-all;
+    }
+
+    /* 聯絡事項與通知單照片區域 */
+    .notice-card {
+      margin-top: 10px;
+    }
+
+    .notice-gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-top: 10px;
+    }
+
+    .notice-image-container {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid #e2e8f0;
+      aspect-ratio: 3 / 4;
+      cursor: pointer;
+      background-color: #f8fafc;
+    }
+
+    .notice-image-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.4s ease;
+    }
+
+    .notice-image-container:hover img {
+      transform: scale(1.05);
+    }
+
+    /* 懸浮放大提示蓋板 */
+    .image-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      font-size: 1.1rem;
+      font-weight: 500;
+    }
+
+    .notice-image-container:hover .image-overlay {
+      opacity: 1;
+    }
+
+    /* 行動裝置最佳化之圖片放大燈箱 (Lightbox Modal) */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      inset: 0;
+      background-color: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .modal.show {
+      display: flex;
+      opacity: 1;
+    }
+
+    .modal-content {
+      max-width: 100%;
+      max-height: 85vh;
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      transform: scale(0.9);
+      transition: transform 0.3s ease;
+      object-fit: contain;
+    }
+
+    .modal.show .modal-content {
+      transform: scale(1);
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      color: white;
+      font-size: 2rem;
+      cursor: pointer;
+      background: rgba(255,255,255,0.1);
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    /* 頁籤導覽列 (Tab Navigation Bar) */
+    .contact-nav-tabs {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 15px;
+    }
+
+    .contact-tab-btn {
+      padding: 10px 18px;
+      border-radius: 20px;
+      border: none;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      background: #e2e8f0;
+      color: #475569;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+    }
+
+    .contact-tab-btn:hover {
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- 頂部精美橫幅圖 -->
+    <div class="hero-banner">
+      <img src="classroom_banner.jpg" alt="二年甲班班級橫幅" onerror="this.src='https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=600&q=80'">
+    </div>
+
+    <!-- 標題與日期看板 -->
+    <div class="glass-card header-section">
+      <h1 class="class-title">
+        <i class="fa-solid fa-star"></i> 二年甲班電子聯絡簿
+      </h1>
+      <div class="teacher-badge">導師：紅旗老師</div>
+      
+      <!-- 日期顯示看板 (點擊選取月曆切換日期) -->
+      <div class="date-badge-container" id="dateBadgeBtn" onclick="triggerDatePicker()" title="點擊開啟月曆選單調整日期">
+        <input type="date" id="hiddenDatePicker" onchange="onDateInputChange(this.value)">
+        <div class="date-roc">
+          <i class="fa-regular fa-calendar-days" style="margin-right: 8px;"></i>
+          <span id="dateRoc"></span>
+          <i class="fa-solid fa-calendar-check" style="font-size: 0.9em; margin-left: 8px; color: #fef08a;"></i>
+        </div>
+        <div class="date-picker-hint">
+          <i class="fa-solid fa-hand-pointer"></i> 點擊選取月曆切換日期
+        </div>
+      </div>
+      
+      <!-- 頁籤導覽 (一字千金已暫時隱藏) -->
+      <div class="contact-nav-tabs">
+        <!-- 暫時隱藏一字千金按鈕
+        <a href="生字挑戰/生字大冒險.html" target="_blank" class="contact-tab-btn" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.3);">
+          <i class="fa-solid fa-trophy"></i> 一字千金
+        </a>
+        -->
+        <a href="pokemon_trainer.html" class="contact-tab-btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white;">
+          <i class="fa-solid fa-gamepad"></i> 寶可夢集點卡
+        </a>
+        <button onclick="showAdminPasswordModal()" class="contact-tab-btn" style="background: linear-gradient(135deg, #64748b 0%, #475569 100%); color: white;">
+          <i class="fa-solid fa-shield-halved"></i> 教師後台
+        </button>
+      </div>
+    </div>
+
+    <!-- 今日作業區 -->
+    <div class="glass-card">
+      <h2 class="section-title homework">
+        <i class="fa-solid fa-pencil"></i> 今日作業
+      </h2>
+      <div id="homeworkContainer" class="homework-container">
+        <!-- 由 JS 動態生成作業項目或暑假無作業卡片 -->
+      </div>
+    </div>
+
+    <!-- 聯絡事項與通知單照片區 -->
+    <div class="glass-card notice-card">
+      <h2 class="section-title notices">
+        <i class="fa-solid fa-bell"></i> 聯絡事項 / 重要通知單
+      </h2>
+      <div id="noticeContainer">
+        <!-- 由 JS 動態生成通知單圖片或提示訊息 -->
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 圖片放大燈箱 (Lightbox Modal) -->
+  <div id="imageModal" class="modal" onclick="closeImageModal()">
+    <div class="modal-close" onclick="closeImageModal()">&times;</div>
+    <img id="modalImage" class="modal-content" src="" alt="放大通知單圖片" onclick="event.stopPropagation()">
+  </div>
+
+  <!-- 教師後台密碼驗證 Modal -->
+  <div id="adminPasswordModal" class="modal" onclick="closeAdminPasswordModal()">
+    <div class="glass-card" style="max-width: 360px; width: 90%; text-align: center; margin: 0 auto; background: rgba(255, 255, 255, 0.95);" onclick="event.stopPropagation()">
+      <div style="font-size: 2.5rem; color: #475569; margin-bottom: 8px;">
+        <i class="fa-solid fa-lock"></i>
+      </div>
+      <h3 style="font-size: 1.3rem; color: #1e293b; margin-bottom: 6px;">教師後台安全驗證</h3>
+      <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 16px;">請輸入管理員密碼進入維護後台</p>
+      
+      <input type="password" id="adminPasswordInput" placeholder="請輸入後台密碼" style="width: 100%; padding: 10px 14px; border-radius: 12px; border: 1px solid #cbd5e1; font-size: 1rem; margin-bottom: 16px; text-align: center; font-family: inherit; outline: none;">
+      
+      <div style="display: flex; gap: 10px; justify-content: center;">
+        <button onclick="closeAdminPasswordModal()" style="flex: 1; padding: 8px 16px; border-radius: 10px; border: 1px solid #cbd5e1; background: white; color: #64748b; font-weight: 700; cursor: pointer; font-family: inherit;">取消</button>
+        <button onclick="verifyAdminPassword()" style="flex: 1; padding: 8px 16px; border-radius: 10px; border: none; background: #0284c7; color: white; font-weight: 700; cursor: pointer; font-family: inherit;">確定進入</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 民國年份與星期轉換字典
+    const weekNames = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+
+    // 格式化日期字串為 民國 XXX 年 X 月 X 日 (星期X)
+    function formatRocDate(dateObj) {
+      const yearRoc = dateObj.getFullYear() - 1911;
+      const month = dateObj.getMonth() + 1;
+      const day = dateObj.getDate();
+      const weekDay = weekNames[dateObj.getDay()];
+      return `民國 ${yearRoc} 年 ${month} 月 ${day} 日 (${weekDay})`;
+    }
+
+    // 格式化西元 Date 為 YYYY-MM-DD key 用於存取資料庫
+    function formatDateKey(dateObj) {
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // 初始化顯示今日日期 (若有 URL ?date=YYYY-MM-DD 優先使用，否則預設為當前真實西元日期)
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramDate = urlParams.get('date');
+    let today = new Date();
+
+    if (paramDate) {
+      const parts = paramDate.split('-');
+      if (parts.length === 3) {
+        today = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      }
+    }
+
+    // 主動觸發月曆選單
+    function triggerDatePicker() {
+      const picker = document.getElementById('hiddenDatePicker');
+      if (picker) {
+        try {
+          if (typeof picker.showPicker === 'function') {
+            picker.showPicker();
+          } else {
+            picker.focus();
+            picker.click();
+          }
+        } catch (err) {
+          picker.focus();
+          picker.click();
+        }
+      }
+    }
+
+    // 當月曆選擇日期改變時觸發
+    function onDateInputChange(val) {
+      if (!val) return;
+      const parts = val.split('-');
+      if (parts.length === 3) {
+        today = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        document.getElementById('dateRoc').innerText = formatRocDate(today);
+        renderHomeworkAndNotices();
+      }
+    }
+
+    // 初始化設定看板日期與隱藏 datepicker 之 value
+    document.getElementById('dateRoc').innerText = formatRocDate(today);
+    const initialPicker = document.getElementById('hiddenDatePicker');
+    if (initialPicker) {
+      initialPicker.value = formatDateKey(today);
+    }
+
+    // 圖片燈箱操作機制
+    function openImageModal(imgSrc) {
+      const modal = document.getElementById('imageModal');
+      const modalImg = document.getElementById('modalImage');
+      modalImg.src = imgSrc;
+      modal.classList.add('show');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeImageModal() {
+      const modal = document.getElementById('imageModal');
+      modal.classList.remove('show');
+      document.body.style.overflow = 'auto';
+    }
+
+    // 教師後台密碼彈窗機制
+    function showAdminPasswordModal() {
+      const modal = document.getElementById('adminPasswordModal');
+      const input = document.getElementById('adminPasswordInput');
+      input.value = '';
+      modal.classList.add('show');
+      setTimeout(() => input.focus(), 100);
+    }
+
+    function closeAdminPasswordModal() {
+      const modal = document.getElementById('adminPasswordModal');
+      modal.classList.remove('show');
+    }
+
+    function verifyAdminPassword() {
+      const pwd = document.getElementById('adminPasswordInput').value;
+      if (pwd === '964007') {
+        window.location.href = 'pokemon_admin.html?tab=homework';
+      } else {
+        alert('密碼錯誤！請輸入正確的後台管理員密碼。');
+      }
+    }
+
+    document.getElementById('adminPasswordInput').addEventListener('keyup', function(e) {
+      if (e.key === 'Enter') {
+        verifyAdminPassword();
+      }
+    });
+
+    // ----------------------------------------------------
+    // Firebase Realtime Database 初始化與資料監聽
+    // ----------------------------------------------------
+    const firebaseConfig = {
+      databaseURL: "https://pokemon-7bd40-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+
+    let database = null;
+    try {
+      firebase.initializeApp(firebaseConfig);
+      database = firebase.database();
+    } catch (e) {
+      console.warn("Firebase 初始化失敗，改用離線或 LocalStorage 模式:", e);
+    }
+
+    let homeworkDatabase = {
+      '2026-08-31': [
+        { subject: '國語', type: '國語', text: '第一冊L1~L6造詞x2 (自選8個生字)', content: '第一冊L1~L6造詞x2 (自選8個生字)' },
+        { subject: '數學', type: '數學', text: '8題', content: '8題' }
+      ],
+      '2026-09-01': [
+        { subject: '國語', type: '國語', text: '國第二冊L1~L6造詞x2 (自選8個生字)', content: '國第二冊L1~L6造詞x2 (自選8個生字)' },
+        { subject: '數學', type: '數學', text: '數學複習卷', content: '數學複習卷' }
+      ],
+      '2026-09-02': [
+        { subject: '國語', type: '國語', text: '國第二冊L7~L12造詞x2 (自選8個生字)', content: '國第二冊L7~L12造詞x2 (自選8個生字)' },
+        { subject: '數學', type: '數學', text: '數習p.4~6', content: '數習p.4~6' }
+      ],
+      '2026-09-03': [
+        { subject: '國語', type: '國語', text: '甲本L1(年~老)寫5次', content: '甲本L1(年~老)寫5次' },
+        { subject: '數學', type: '數學', text: '從99數到200練習3次', content: '從99數到200練習3次' }
+      ],
+      '2026-09-04': [
+        { subject: '國語', type: '國語', text: '甲本L1(師~還)寫5次', content: '甲本L1(師~還)寫5次' },
+        { subject: '國語', type: '國語', text: '國L1課文唸3次', content: '國L1課文唸3次' },
+        { subject: '數學', type: '數學', text: '數習P.7', content: '數習P.7' }
+      ],
+      '2026-09-05': [
+        { subject: '國語', type: '國語', text: '甲本L1(師~還)寫5次', content: '甲本L1(師~還)寫5次' },
+        { subject: '國語', type: '國語', text: '國L1課文唸3次', content: '國L1課文唸3次' },
+        { subject: '數學', type: '數學', text: '數習P.7', content: '數習P.7' }
+      ],
+      '2026-09-06': [
+        { subject: '國語', type: '國語', text: '甲本L1(師~還)寫5次', content: '甲本L1(師~還)寫5次' },
+        { subject: '國語', type: '國語', text: '國L1課文唸3次', content: '國L1課文唸3次' },
+        { subject: '數學', type: '數學', text: '數習P.7', content: '數習P.7' }
+      ],
+      '2026-09-07': [
+        { subject: '數學', type: '數學', text: '數習P.7~8', content: '數習P.7~8' },
+        { subject: '國語', type: '國語', text: '國L1造詞', content: '國L1造詞' }
+      ],
+      '2026-09-08': [
+        { subject: '國語', type: '國語', text: '甲本P.9~10語詞X2', content: '甲本P.9~10語詞X2' },
+        { subject: '數學', type: '數學', text: '數單一張', content: '數單一張' }
+      ],
+      '2026-09-09': [
+        { subject: '數學', type: '數學', text: '數習P.9~10', content: '數習P.9~10' },
+        { subject: '國語', type: '國語', text: '國L1圈詞(岳泰)', content: '國L1圈詞(岳泰)' },
+        { subject: '國語', type: '國語', text: '甲本P.9~10語詞X2(廷恩、冠宏)', content: '甲本P.9~10語詞X2(廷恩、冠宏)' }
+      ],
+      '2026-09-10': [
+        { subject: '國語', type: '國語', text: '國習P.6~9', content: '國習P.6~9' },
+        { subject: '國語', type: '國語', text: '國L1造句', content: '國L1造句' },
+        { subject: '數學', type: '數學', text: '數單一張', content: '數單一張' }
+      ],
+      '2026-09-11': [
+        { subject: '數學', type: '數學', text: '數習p.11', content: '數習p.11' },
+        { subject: '國語', type: '國語', text: '甲本p.11', content: '甲本p.11' },
+        { subject: '國語', type: '國語', text: '乙本L2生字(全~司)寫5次', content: '乙本L2生字(全~司)寫5次' },
+        { subject: '國語', type: '國語', text: '考國L1生字聽寫', content: '考國L1生字聽寫' }
+      ],
+      '2026-09-14': [
+        { subject: '數學', type: '數學', text: '1. 數習p.12~13', content: '1. 數習p.12~13' },
+        { subject: '國語', type: '國語', text: '2. 乙本L2生字(夾~臉)寫5次(廷恩、岳泰、冠宏)', content: '2. 乙本L2生字(夾~臉)寫5次(廷恩、岳泰、冠宏)' },
+        { subject: '國語', type: '國語', text: '3. 乙本L2生字(全~司)寫5次(洪福)', content: '3. 乙本L2生字(全~司)寫5次(洪福)' }
+      ]
+    };
+
+    let noticeDatabase = {};
+
+    // 解析各種多元作業格式 (陣列或分行字串)
+    function parseHomeworkData(val) {
+      if (!val) return [];
+      if (Array.isArray(val)) {
+        return val.map(item => {
+          if (typeof item === 'string') {
+            let type = '作業';
+            if (item.includes('國') || item.includes('甲') || item.includes('乙')) type = '國語';
+            else if (item.includes('數')) type = '數學';
+            else if (item.includes('英')) type = '英文';
+            return { subject: type, type: type, text: item, content: item };
+          }
+          return item;
+        });
+      }
+      if (typeof val === 'string' && val.trim() !== '') {
+        const lines = val.split('\n').map(l => l.trim()).filter(l => l !== '');
+        return lines.map(line => {
+          let type = '作業';
+          if (line.includes('國') || line.includes('甲') || line.includes('乙')) type = '國語';
+          else if (line.includes('數')) type = '數學';
+          else if (line.includes('英')) type = '英文';
+          return { subject: type, type: type, text: line, content: line };
+        });
+      }
+      return [];
+    }
+
+    function getHomeworkForDate(dateObj) {
+      const queryDateStr = formatDateKey(dateObj);
+      const rawHw = homeworkDatabase[queryDateStr];
+      const parsed = parseHomeworkData(rawHw);
+      return { list: parsed, dateKey: queryDateStr, isFallback: false };
+    }
+
+    function getNoticeForDate(dateObj) {
+      const queryDateStr = formatDateKey(dateObj);
+      const nData = noticeDatabase[queryDateStr];
+      if (nData && (Array.isArray(nData) ? nData.length > 0 : true)) {
+        return { data: nData, dateKey: queryDateStr, isFallback: false };
+      }
+      return { data: null, dateKey: queryDateStr, isFallback: false };
+    }
+
+    function renderHomeworkAndNotices() {
+      const hwContainer = document.getElementById('homeworkContainer');
+      const noticeContainer = document.getElementById('noticeContainer');
+
+      const hwResult = getHomeworkForDate(today);
+      const todayHomework = hwResult.list;
+
+      if (!todayHomework || todayHomework.length === 0) {
+        hwContainer.innerHTML = `
+          <div class="no-homework-card">
+            <div class="no-homework-icon">
+              <i class="fa-solid fa-umbrella-beach"></i>
+            </div>
+            <div class="no-homework-title">今日無作業</div>
+            <div style="font-size: 0.95rem; color: #d97706; margin-top: 6px; font-weight: 500;">
+              好好享受學習與放鬆的時光喔！
+            </div>
+          </div>
+        `;
+      } else {
+        let listHtml = '<ul class="homework-list">';
+        todayHomework.forEach(item => {
+          const subj = item.subject || item.type || '備忘';
+          const text = item.text || item.content || '';
+
+          let tagClass = 'tag-memo';
+          if (subj.includes('國')) tagClass = 'tag-chinese';
+          else if (subj.includes('數')) tagClass = 'tag-math';
+          else if (subj.includes('英')) tagClass = 'tag-english';
+          else if (subj.includes('通')) tagClass = 'tag-notice';
+
+          listHtml += `
+            <li class="homework-item">
+              <span class="subject-tag ${tagClass}">${subj}</span>
+              <span class="homework-text">${text}</span>
+            </li>
+          `;
+        });
+        listHtml += '</ul>';
+        hwContainer.innerHTML = listHtml;
+      }
+
+      const noticeResult = getNoticeForDate(today);
+      const noticeData = noticeResult.data;
+      if (!noticeData || (Array.isArray(noticeData) && noticeData.length === 0)) {
+        noticeContainer.innerHTML = `
+          <div style="text-align: center; padding: 20px; color: #94a3b8; font-size: 0.95rem;">
+            <i class="fa-solid fa-folder-open" style="font-size: 2rem; margin-bottom: 8px; color: #cbd5e1; display: block;"></i>
+            今日無特殊聯絡事項或通知單
+          </div>
+        `;
+      } else {
+        const items = Array.isArray(noticeData) ? noticeData : [noticeData];
+        let galleryHtml = '<div class="notice-gallery">';
+        
+        items.forEach(item => {
+          const src = typeof item === 'string' ? item : (item.src || item.base64);
+          const title = (typeof item === 'object' && item.title) ? item.title : '';
+          const note = (typeof item === 'object' && item.note) ? item.note : '';
+          
+          galleryHtml += `
+            <div class="notice-card-item" style="background: #ffffff; border-radius: 16px; padding: 14px; box-shadow: var(--shadow-sm); border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 10px;">
+              ${title ? `<div style="font-weight: 700; color: #0369a1; font-size: 1.05rem; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-file-signature" style="color: #0284c7;"></i> ${title}</div>` : ''}
+              <div class="notice-image-container" onclick="openImageModal('${src}')">
+                <img src="${src}" alt="${title || '重要通知單'}">
+                <div class="image-overlay">
+                  <i class="fa-solid fa-magnifying-glass-plus" style="margin-right: 6px;"></i> 點擊放大查看通知單
+                </div>
+              </div>
+              ${note ? `<div style="background-color: #fff7ed; color: #c2410c; padding: 8px 12px; border-radius: 10px; font-size: 0.9rem; font-weight: 600; border: 1px solid #ffedd5; display: flex; align-items: flex-start; gap: 6px;"><i class="fa-solid fa-circle-info" style="margin-top: 3px; color: #ea580c; flex-shrink: 0;"></i> <span>${note}</span></div>` : ''}
+            </div>
+          `;
+        });
+        
+        galleryHtml += '</div>';
+        noticeContainer.innerHTML = galleryHtml;
+      }
+    }
+
+    function initDataSync() {
+      // 1. 本地快取讀取
+      try {
+        const localHw = localStorage.getItem('homeworkDatabase');
+        if (localHw) homeworkDatabase = JSON.parse(localHw);
+        const localNotice = localStorage.getItem('noticeDatabase');
+        if (localNotice) noticeDatabase = JSON.parse(localNotice);
+      } catch (e) {}
+
+      // 2. Firebase 即時連線監聽
+      if (database) {
+        database.ref('homeworkDatabase').on('value', (snapshot) => {
+          const val = snapshot.val() || {};
+          homeworkDatabase = val;
+          try { localStorage.setItem('homeworkDatabase', JSON.stringify(val)); } catch (e) {}
+          renderHomeworkAndNotices();
+        }, (error) => {
+          console.warn("無法自 Realtime Database 讀取作業:", error);
+          renderHomeworkAndNotices();
+        });
+
+        database.ref('noticeDatabase').on('value', (snapshot) => {
+          const val = snapshot.val() || {};
+          noticeDatabase = val;
+          try { localStorage.setItem('noticeDatabase', JSON.stringify(val)); } catch (e) {}
+          renderHomeworkAndNotices();
+        }, (error) => {
+          console.warn("無法自 Realtime Database 讀取通知單:", error);
+          renderHomeworkAndNotices();
+        });
+      } else {
+        renderHomeworkAndNotices();
+      }
+    }
+
+    // 同步分頁跨分頁監聽
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'homeworkDatabase' || e.key === 'noticeDatabase') {
+        try {
+          if (e.key === 'homeworkDatabase' && e.newValue) homeworkDatabase = JSON.parse(e.newValue);
+          if (e.key === 'noticeDatabase' && e.newValue) noticeDatabase = JSON.parse(e.newValue);
+          renderHomeworkAndNotices();
+        } catch (e) {}
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', initDataSync);
+  </script>
+</body>
+</html>
