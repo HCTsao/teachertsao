@@ -3647,13 +3647,35 @@
           osc.frequency.exponentialRampToValueAtTime(80, now + 0.18);
           
           gainNode.gain.setValueAtTime(0.15, now);
-          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
-          
           osc.connect(gainNode);
           gainNode.connect(ctx.destination);
           
           osc.start(now);
           osc.stop(now + 0.18);
+        }
+        else if (move.type === 'electric') {
+          // GBA-style high-voltage crackle sound
+          const osc = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+          osc.type = 'sawtooth';
+          
+          if (move.name === '打雷' || move.name === '伏特攻擊') {
+            osc.frequency.setValueAtTime(1200, now);
+            osc.frequency.linearRampToValueAtTime(100, now + 0.4);
+            gainNode.gain.setValueAtTime(0.28, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+          } else {
+            osc.frequency.setValueAtTime(800, now);
+            osc.frequency.linearRampToValueAtTime(300, now + 0.25);
+            gainNode.gain.setValueAtTime(0.2, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+          }
+          
+          osc.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          
+          osc.start(now);
+          osc.stop(now + (move.name === '打雷' || move.name === '伏特攻擊' ? 0.4 : 0.25));
         }
         else {
           // Default normal/physical attack (Tackle, Bite): dull impact thump
@@ -3697,6 +3719,94 @@
       } catch (err) {
         console.error("Synthesizer sound error: ", err);
       }
+    }
+
+    // Helper: Dynamic SVG Lightning Generator for authentic electric bolt effects
+    function drawLightningSVG(startX, startY, endX, endY, options = {}) {
+      const arena = document.getElementById('battle-arena-card');
+      if (!arena) return null;
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.style.position = 'absolute';
+      svg.style.top = '0';
+      svg.style.left = '0';
+      svg.style.width = '100%';
+      svg.style.height = '100%';
+      svg.style.pointerEvents = 'none';
+      svg.style.zIndex = options.zIndex || '46';
+      svg.style.overflow = 'visible';
+
+      const color = options.color || '#ffffff';
+      const glowColor = options.glowColor || '#fde047';
+      const secondaryGlow = options.secondaryGlow || '#38bdf8';
+      const strokeWidth = options.strokeWidth || 4;
+      const segments = options.segments || 8;
+      const displace = options.displace || 25;
+
+      const dx = endX - startX;
+      const dy = endY - startY;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const nx = -dy / len;
+      const ny = dx / len;
+
+      let points = [{ x: startX, y: startY }];
+      for (let i = 1; i < segments; i++) {
+        const t = i / segments;
+        const px = startX + dx * t;
+        const py = startY + dy * t;
+        const offset = (Math.random() - 0.5) * displace * 2;
+        points.push({
+          x: px + nx * offset,
+          y: py + ny * offset
+        });
+      }
+      points.push({ x: endX, y: endY });
+
+      const pathD = points.map((p, idx) => (idx === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ');
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', pathD);
+      path.setAttribute('stroke', color);
+      path.setAttribute('stroke-width', strokeWidth);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+      path.style.filter = `drop-shadow(0 0 ${strokeWidth * 2}px ${glowColor}) drop-shadow(0 0 ${strokeWidth * 4}px ${secondaryGlow})`;
+
+      svg.appendChild(path);
+
+      if (options.branches) {
+        const numBranches = Math.floor(Math.random() * options.branches) + 1;
+        for (let b = 0; b < numBranches; b++) {
+          const idx = Math.floor(Math.random() * (points.length - 2)) + 1;
+          const bStart = points[idx];
+          const branchAngle = (Math.random() - 0.5) * 1.4;
+          const bLen = (Math.random() * 35 + 20);
+          const bEndX = bStart.x + Math.cos(branchAngle) * bLen + (dx / segments);
+          const bEndY = bStart.y + Math.sin(branchAngle) * bLen + (dy / segments);
+
+          const bPathD = `M ${bStart.x} ${bStart.y} L ${bStart.x + (bEndX - bStart.x)*0.5 + (Math.random()-0.5)*12} ${bStart.y + (bEndY - bStart.y)*0.5 + (Math.random()-0.5)*12} L ${bEndX} ${bEndY}`;
+          const bPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          bPath.setAttribute('d', bPathD);
+          bPath.setAttribute('stroke', color);
+          bPath.setAttribute('stroke-width', Math.max(1.5, strokeWidth * 0.55));
+          bPath.setAttribute('fill', 'none');
+          bPath.setAttribute('stroke-linecap', 'round');
+          bPath.style.filter = `drop-shadow(0 0 6px ${glowColor})`;
+          svg.appendChild(bPath);
+        }
+      }
+
+      arena.appendChild(svg);
+
+      if (options.duration) {
+        setTimeout(() => {
+          svg.style.transition = 'opacity 0.1s ease-out';
+          svg.style.opacity = '0';
+          setTimeout(() => svg.remove(), 100);
+        }, options.duration);
+      }
+
+      return svg;
     }
 
     // Spawn custom visual effects based on move (coords updated to align with P1/P2 center)
@@ -4500,73 +4610,342 @@
           }
           callback();
         }, 320);
-      } else if (move.name === '十萬伏特' || move.name === '電擊' || move.name === '打雷' || move.name === '伏特攻擊' || move.type === 'electric') {
-        // High-voltage lightning bolt strike!
-        const flashOverlay = document.getElementById('battle-flash-overlay');
-        if (flashOverlay) {
-          flashOverlay.style.background = '#fef08a';
-          flashOverlay.style.opacity = '0.7';
-          setTimeout(() => flashOverlay.style.opacity = '0', 160);
-        }
-
-        for (let b = 0; b < 5; b++) {
+      } else if (move.name === '電擊') {
+        // Sharp single lightning bolt striking down from the sky onto defender
+        for (let b = 0; b < 3; b++) {
           setTimeout(() => {
-            const bolt = document.createElement('div');
-            bolt.style.position = 'absolute';
-            bolt.style.left = `${startX}px`;
-            bolt.style.top = `${startY}px`;
-            bolt.style.width = '0px';
-            bolt.style.height = '0px';
-            bolt.style.background = 'linear-gradient(90deg, #fef08a, #eab308, #38bdf8, white)';
-            bolt.style.boxShadow = '0 0 16px #facc15, 0 0 30px #38bdf8';
-            bolt.style.borderRadius = '4px';
-            bolt.style.pointerEvents = 'none';
-            bolt.style.zIndex = '46';
-            bolt.style.transform = 'translate(-50%, -50%)';
-            bolt.style.transition = 'all 0.14s ease-out';
-            arena.appendChild(bolt);
-
-            const dx = endX - startX + (Math.random() * 40 - 20);
-            const dy = endY - startY + (Math.random() * 40 - 20);
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-
-            requestAnimationFrame(() => {
-              bolt.style.left = `${startX + dx/2}px`;
-              bolt.style.top = `${startY + dy/2}px`;
-              bolt.style.width = `${dist}px`;
-              bolt.style.height = `${Math.random() * 18 + 10}px`;
-              bolt.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+            const skyX = endX + (Math.random() * 40 - 20);
+            const skyY = Math.max(10, endY - 180);
+            drawLightningSVG(skyX, skyY, endX + (Math.random() * 20 - 10), endY, {
+              strokeWidth: 4.5,
+              displace: 22,
+              branches: 2,
+              glowColor: '#fde047',
+              duration: 120
             });
-
-            setTimeout(() => {
-              bolt.style.opacity = '0';
-              setTimeout(() => bolt.remove(), 100);
-            }, 150);
-          }, b * 50);
+          }, b * 70);
         }
-
-        let delay = 0;
-        for (let i = 0; i < 22; i++) {
-          setTimeout(() => {
-            createParticle({
-              x: endX + (Math.random() * 50 - 25),
-              y: endY + (Math.random() * 50 - 25),
-              vx: Math.random() * 10 - 5,
-              vy: Math.random() * 10 - 5,
-              color: Math.random() < 0.6 ? '#fef08a' : '#38bdf8',
-              size: Math.random() * 10 + 5,
-              duration: 350,
-              glow: true
-            });
-          }, delay);
-          delay += 12;
+        
+        for (let i = 0; i < 15; i++) {
+          createParticle({
+            x: endX + (Math.random() * 30 - 15),
+            y: endY + (Math.random() * 30 - 15),
+            vx: Math.random() * 8 - 4,
+            vy: Math.random() * 8 - 4,
+            color: Math.random() < 0.5 ? '#fef08a' : '#38bdf8',
+            size: Math.random() * 8 + 4,
+            duration: 350,
+            glow: true
+          });
         }
 
         setTimeout(() => {
           flashDefender(defenderSide);
           callback();
-        }, delay + 220);
+        }, 300);
+      } else if (move.name === '蹭蹭臉頰') {
+        const imgAttacker = document.getElementById(attackerSide === 'p1' ? 'battle-img-p1' : 'battle-img-p2');
+        const shiftX = attackerSide === 'p1' ? 35 : -35;
+        imgAttacker.style.transform = `translate(${shiftX}px, 0)`;
+
+        for (let i = 0; i < 6; i++) {
+          setTimeout(() => {
+            const cX = endX + (Math.random() * 40 - 20);
+            const cY = endY + (Math.random() * 40 - 20);
+            drawLightningSVG(cX, cY, cX + (Math.random() * 30 - 15), cY + (Math.random() * 30 - 15), {
+              strokeWidth: 2.5,
+              displace: 10,
+              branches: 1,
+              glowColor: '#fef08a',
+              secondaryGlow: '#f59e0b',
+              duration: 100
+            });
+
+            createParticle({
+              x: cX,
+              y: cY,
+              vx: Math.random() * 4 - 2,
+              vy: Math.random() * 4 - 2,
+              color: '#fde047',
+              size: Math.random() * 10 + 6,
+              duration: 400,
+              glow: true
+            });
+          }, i * 70);
+        }
+
+        setTimeout(() => {
+          imgAttacker.style.transform = 'translate(0, 0)';
+          flashDefender(defenderSide);
+          callback();
+        }, 500);
+      } else if (move.name === '十萬伏特') {
+        const flashOverlay = document.getElementById('battle-flash-overlay');
+        if (flashOverlay) {
+          flashOverlay.style.background = '#fde047';
+          flashOverlay.style.opacity = '0.6';
+          setTimeout(() => flashOverlay.style.opacity = '0', 200);
+        }
+
+        let delay = 0;
+        for (let b = 0; b < 7; b++) {
+          setTimeout(() => {
+            drawLightningSVG(startX, startY, endX, endY, {
+              strokeWidth: 6,
+              displace: 30,
+              branches: 3,
+              glowColor: '#fde047',
+              secondaryGlow: '#06b6d4',
+              duration: 140
+            });
+
+            createParticle({
+              x: startX + (endX - startX) * (b / 7) + (Math.random() * 30 - 15),
+              y: startY + (endY - startY) * (b / 7) + (Math.random() * 30 - 15),
+              vx: Math.random() * 10 - 5,
+              vy: Math.random() * 10 - 5,
+              color: '#ffffff',
+              size: Math.random() * 12 + 6,
+              duration: 350,
+              glow: true
+            });
+          }, delay);
+          delay += 40;
+        }
+
+        setTimeout(() => {
+          flashDefender(defenderSide);
+          for (let i = 0; i < 25; i++) {
+            createParticle({
+              x: endX + (Math.random() * 50 - 25),
+              y: endY + (Math.random() * 50 - 25),
+              vx: Math.random() * 12 - 6,
+              vy: Math.random() * 12 - 6,
+              color: Math.random() < 0.6 ? '#fde047' : '#38bdf8',
+              size: Math.random() * 10 + 5,
+              duration: 450,
+              glow: true
+            });
+          }
+          callback();
+        }, delay + 250);
+      } else if (move.name === '打雷') {
+        const arenaCard = document.getElementById('battle-arena-card');
+        const flashOverlay = document.getElementById('battle-flash-overlay');
+
+        if (flashOverlay) {
+          flashOverlay.style.background = '#0f172a';
+          flashOverlay.style.opacity = '0.75';
+        }
+
+        setTimeout(() => {
+          if (flashOverlay) {
+            flashOverlay.style.background = '#ffffff';
+            flashOverlay.style.opacity = '0.95';
+            setTimeout(() => flashOverlay.style.opacity = '0', 250);
+          }
+
+          drawLightningSVG(endX, 0, endX, endY, {
+            strokeWidth: 12,
+            displace: 40,
+            branches: 4,
+            glowColor: '#fde047',
+            secondaryGlow: '#0284c7',
+            duration: 350
+          });
+
+          drawLightningSVG(endX - 45, 0, endX - 15, endY, {
+            strokeWidth: 6,
+            displace: 30,
+            branches: 2,
+            glowColor: '#38bdf8',
+            duration: 300
+          });
+          drawLightningSVG(endX + 45, 0, endX + 15, endY, {
+            strokeWidth: 6,
+            displace: 30,
+            branches: 2,
+            glowColor: '#38bdf8',
+            duration: 300
+          });
+
+          let shakeCount = 0;
+          const interval = setInterval(() => {
+            arenaCard.style.transform = `translate(${(Math.random() * 24 - 12)}px, ${(Math.random() * 24 - 12)}px)`;
+            shakeCount++;
+            if (shakeCount >= 12) {
+              clearInterval(interval);
+              arenaCard.style.transform = 'translate(0, 0)';
+            }
+          }, 35);
+
+          const shockwave = document.createElement('div');
+          shockwave.style.position = 'absolute';
+          shockwave.style.left = `${endX}px`;
+          shockwave.style.top = `${endY + 20}px`;
+          shockwave.style.width = '20px';
+          shockwave.style.height = '10px';
+          shockwave.style.border = '5px solid #fde047';
+          shockwave.style.boxShadow = '0 0 25px #fde047, 0 0 50px #38bdf8';
+          shockwave.style.borderRadius = '50%';
+          shockwave.style.transform = 'translate(-50%, -50%)';
+          shockwave.style.transition = 'all 0.4s ease-out';
+          shockwave.style.pointerEvents = 'none';
+          shockwave.style.zIndex = '45';
+          arenaCard.appendChild(shockwave);
+
+          requestAnimationFrame(() => {
+            shockwave.style.width = '220px';
+            shockwave.style.height = '110px';
+            shockwave.style.opacity = '0';
+          });
+          setTimeout(() => shockwave.remove(), 450);
+
+          flashDefender(defenderSide);
+          callback();
+        }, 300);
+      } else if (move.name === '野性電擊') {
+        const img = document.getElementById(attackerSide === 'p1' ? 'battle-img-p1' : 'battle-img-p2');
+        img.style.filter = 'drop-shadow(0 0 20px #fde047) drop-shadow(0 0 30px #06b6d4) brightness(1.3)';
+
+        for (let i = 0; i < 4; i++) {
+          const aX = startX + (Math.random() * 40 - 20);
+          const aY = startY + (Math.random() * 40 - 20);
+          drawLightningSVG(aX, aY, aX + (Math.random() * 30 - 15), aY + (Math.random() * 30 - 15), {
+            strokeWidth: 3,
+            displace: 12,
+            branches: 1,
+            glowColor: '#fde047',
+            duration: 200
+          });
+        }
+
+        const directionX = attackerSide === 'p1' ? 70 : -70;
+        const directionY = attackerSide === 'p1' ? -45 : 45;
+        img.style.transform = `translate(${directionX}px, ${directionY}px) scale(1.15)`;
+
+        drawLightningSVG(startX, startY, startX + directionX, startY + directionY, {
+          strokeWidth: 7,
+          displace: 25,
+          branches: 3,
+          glowColor: '#fde047',
+          duration: 250
+        });
+
+        setTimeout(() => {
+          img.style.transform = 'translate(0, 0) scale(1)';
+          img.style.filter = '';
+          flashDefender(defenderSide);
+
+          for (let k = 0; k < 25; k++) {
+            createParticle({
+              x: endX + (Math.random() * 60 - 30),
+              y: endY + (Math.random() * 60 - 30),
+              vx: Math.random() * 10 - 5,
+              vy: Math.random() * 10 - 5,
+              color: Math.random() < 0.5 ? '#fde047' : '#06b6d4',
+              size: Math.random() * 12 + 6,
+              duration: 450,
+              glow: true
+            });
+          }
+          callback();
+        }, 300);
+      } else if (move.name === '伏特攻擊') {
+        const arenaCard = document.getElementById('battle-arena-card');
+        const flashOverlay = document.getElementById('battle-flash-overlay');
+
+        const plasmaOrb = document.createElement('div');
+        plasmaOrb.style.position = 'absolute';
+        plasmaOrb.style.left = `${startX}px`;
+        plasmaOrb.style.top = `${startY}px`;
+        plasmaOrb.style.width = '10px';
+        plasmaOrb.style.height = '10px';
+        plasmaOrb.style.background = 'radial-gradient(circle, #ffffff 0%, #fde047 50%, #0284c7 100%)';
+        plasmaOrb.style.boxShadow = '0 0 25px #fde047, 0 0 50px #38bdf8, 0 0 80px white';
+        plasmaOrb.style.borderRadius = '50%';
+        plasmaOrb.style.transform = 'translate(-50%, -50%)';
+        plasmaOrb.style.transition = 'all 0.35s ease-in';
+        plasmaOrb.style.zIndex = '47';
+        arenaCard.appendChild(plasmaOrb);
+
+        requestAnimationFrame(() => {
+          plasmaOrb.style.width = '80px';
+          plasmaOrb.style.height = '80px';
+        });
+
+        for (let i = 0; i < 6; i++) {
+          setTimeout(() => {
+            const rx1 = Math.random() * arenaCard.clientWidth;
+            const ry1 = Math.random() * arenaCard.clientHeight;
+            const rx2 = Math.random() * arenaCard.clientWidth;
+            const ry2 = Math.random() * arenaCard.clientHeight;
+            drawLightningSVG(rx1, ry1, rx2, ry2, {
+              strokeWidth: 5,
+              displace: 35,
+              branches: 3,
+              glowColor: '#fde047',
+              secondaryGlow: '#38bdf8',
+              duration: 150
+            });
+          }, i * 60);
+        }
+
+        setTimeout(() => {
+          plasmaOrb.style.transition = 'all 0.2s cubic-bezier(0.1, 0.9, 0.2, 1)';
+          plasmaOrb.style.left = `${endX}px`;
+          plasmaOrb.style.top = `${endY}px`;
+
+          drawLightningSVG(startX, startY, endX, endY, {
+            strokeWidth: 10,
+            displace: 30,
+            branches: 5,
+            glowColor: '#ffffff',
+            secondaryGlow: '#fde047',
+            duration: 250
+          });
+
+          setTimeout(() => {
+            plasmaOrb.remove();
+            if (flashOverlay) {
+              flashOverlay.style.background = '#fef08a';
+              flashOverlay.style.opacity = '0.9';
+              setTimeout(() => flashOverlay.style.opacity = '0', 250);
+            }
+
+            flashDefender(defenderSide);
+
+            for (let k = 0; k < 35; k++) {
+              createParticle({
+                x: endX + (Math.random() * 70 - 35),
+                y: endY + (Math.random() * 70 - 35),
+                vx: Math.random() * 14 - 7,
+                vy: Math.random() * 14 - 7,
+                color: Math.random() < 0.4 ? '#ffffff' : (Math.random() < 0.7 ? '#fde047' : '#0284c7'),
+                size: Math.random() * 14 + 6,
+                duration: 550,
+                glow: true
+              });
+            }
+            callback();
+          }, 200);
+        }, 400);
+      } else if (move.type === 'electric') {
+        for (let b = 0; b < 4; b++) {
+          setTimeout(() => {
+            drawLightningSVG(startX, startY, endX + (Math.random() * 30 - 15), endY + (Math.random() * 30 - 15), {
+              strokeWidth: 5,
+              displace: 25,
+              branches: 2,
+              glowColor: '#fde047',
+              duration: 150
+            });
+          }, b * 60);
+        }
+        setTimeout(() => {
+          flashDefender(defenderSide);
+          callback();
+        }, 300);
       } else if (move.name === '泡沫光線') {
         const count = 22;
         let delay = 0;
