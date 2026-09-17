@@ -827,7 +827,7 @@
     </button>
   </div>
 
-  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v4.7</span></h1>
+  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v4.8</span></h1>
 
   <!-- Student Card Container -->
   <div class="main-container" id="student-container">
@@ -1721,7 +1721,7 @@
       }
     }
 
-    // Get current Pokemon stage index based on points and cancellation flags
+    // Get current Pokemon stage index based on points and cancellation flags (used for stats)
     function getStage(level, poke) {
       if (level < 10) return 0;
       if (level < 20) {
@@ -1736,12 +1736,38 @@
       return 2;
     }
 
+    // Get display stage index for appearance (外觀不會退化，維持已完成進化的最高階段)
+    function getDisplayStage(poke) {
+      if (!poke) return 0;
+      const level = Math.floor((poke.points || 0) / 10);
+      const naturalStage = getStage(level, poke);
+      const confirmed = poke.confirmedStage || 0;
+      return Math.max(confirmed, naturalStage);
+    }
+
     function getCurrentPokemon(poke) {
       if (!poke || !poke.family) return null;
       const familyArr = POKEMON_DATA[poke.family];
-      const level = Math.floor(poke.points / 10);
-      const stageIndex = getStage(level, poke);
-      return familyArr[stageIndex];
+      const level = Math.floor((poke.points || 0) / 10);
+      
+      const statStageIndex = getStage(level, poke);
+      const statObj = familyArr[statStageIndex];
+      
+      const displayStageIndex = getDisplayStage(poke);
+      const displayObj = familyArr[displayStageIndex];
+      
+      return {
+        id: displayObj.id,
+        name: displayObj.name,
+        url: displayObj.url,
+        // Base stats follow current level's stage stats (數值與招式跟著等級走)
+        hp: statObj.hp,
+        atk: statObj.atk,
+        def: statObj.def,
+        spatk: statObj.spatk,
+        spdef: statObj.spdef,
+        speed: statObj.speed
+      };
     }
 
 
