@@ -41,9 +41,9 @@ function init() {
         });
         // 更新標題文字
         if (currentCategory === 'all') {
-            currentCategoryTitleText.textContent = '所有教具';
+            currentCategoryTitleText.textContent = '全部';
         } else {
-            currentCategoryTitleText.textContent = `${currentCategory} 教具`;
+            currentCategoryTitleText.textContent = `${currentCategory}`;
         }
     }
 
@@ -154,7 +154,7 @@ function renderTools() {
             toolsGrid.innerHTML = `
                 <div class="no-results" style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
                     <i class="fa-solid fa-magnifying-glass-blur" style="font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.6;"></i>
-                    <p style="font-size: 1.1rem; font-weight: 500;">找不到與「${searchQuery}」相關的教具</p>
+                    <p style="font-size: 1.1rem; font-weight: 500;">找不到與「${searchQuery}」相關的內容</p>
                     <p style="font-size: 0.9rem; margin-top: 0.3rem;">請嘗試換個關鍵字搜尋看看！</p>
                 </div>
             `;
@@ -207,8 +207,8 @@ function createComingSoonCard(category) {
     card.className = 'tool-card coming-soon';
     card.innerHTML = `
         <i class="fa-solid fa-hourglass-start coming-soon-icon"></i>
-        <h4 class="coming-soon-title">${category} 教具設計中</h4>
-        <p class="card-desc" style="margin-top: 0.5rem;">紅旗老師正在持續開發本學期的 AI 互動教具，敬請期待！</p>
+        <h4 class="coming-soon-title">${category} 設計中</h4>
+        <p class="card-desc" style="margin-top: 0.5rem;">紅旗老師正在持續開發本學期的 AI 互動內容，敬請期待！</p>
     `;
     return card;
 }
@@ -263,9 +263,9 @@ function setupEventListeners() {
         
         // 更新標題文字
         if (currentCategory === 'all') {
-            currentCategoryTitleText.textContent = '所有教具';
+            currentCategoryTitleText.textContent = '全部';
         } else {
-            currentCategoryTitleText.textContent = `${currentCategory} 教具`;
+            currentCategoryTitleText.textContent = `${currentCategory}`;
         }
 
         renderTools();
