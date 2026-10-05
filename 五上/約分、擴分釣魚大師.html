@@ -194,8 +194,13 @@
                         </div>
                     </div>
 
-                    <!-- 右側暫停 -->
+                    <!-- 右側暫停與倒數 -->
                     <div class="flex flex-col items-end gap-2">
+                        <div class="glass-panel-light px-4 py-1.5 rounded-xl flex items-center gap-2 border border-slate-700/50">
+                            <i class="fa-solid fa-clock text-amber-400 text-xs"></i>
+                            <span class="text-xs text-slate-400 font-semibold">時間</span>
+                            <span id="hud-timer" class="text-base font-black text-amber-400 font-mono text-glow">60s</span>
+                        </div>
                         <div class="glass-panel-light px-4 py-1.5 rounded-xl flex items-center gap-2 border border-slate-700/50">
                             <span class="text-xs text-slate-400 font-semibold">難度</span>
                             <span id="hud-difficulty" class="text-sm font-black text-emerald-400 text-glow">Lv.1</span>
@@ -332,9 +337,10 @@
                 <div>
                     <h4 class="font-bold text-rose-300 text-base mb-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i> 鯊魚干擾與生命值</h4>
                     <ul class="list-disc pl-5 space-y-1.5">
+                        <li>每一關<b>限時 60 秒</b>，每完成一題舊魚群會自動游離畫面，並載入全新題目！</li>
                         <li>深海中會游動著<b>「紅字分數鯊魚」</b>。若魚鉤不小心碰到鯊魚，鯊魚會咬著線不放，讓魚鉤上升速度極慢，並扣減生命值。</li>
                         <li>釣起不符合題目要求的「錯誤分數魚」也會扣除生命值。</li>
-                        <li>初始擁有 <b>3 顆心</b>，全部扣完遊戲即會進行結算。</li>
+                        <li>初始擁有 <b>3 顆心</b>，生命值扣完或 60 秒時間倒數完畢即會進行結算。</li>
                         <li>得分每大 100 分，魚群游速會加快，干擾小魚數量也會增加！</li>
                     </ul>
                 </div>
@@ -1045,8 +1051,13 @@
         let score = 0;
         let lives = 3;
         let timeElapsed = 0;
+        let timeLeft = 60; // 每一關限時 60 秒
+        let timerAccumulator = 0;
+        let isTransitioningQuestion = false; // 是否處於一題結束後魚群向兩側游開的轉場階段
         let gameTimer = null;
         let lastTime = 0;
+        let studentName = "訪客";
+        let isFirebaseActive = false;
         let stemProgress = 0; // 題幹答對次數進度，達到 3 次時換新題幹
         let currentBaseFraction = null; // 當前底數題幹 (例如 3/5)
         let currentMultiplier = 6; // 當前底數的擴分/約分乘數倍數 (例如 6)
@@ -1197,27 +1208,28 @@
 
         // 魚隻類別
         class Fish {
-            constructor(fraction, isCorrect, x = null, isL3Denominator = false, yBand = null) {
+            constructor(fraction, isCorrect, x = null, isL3Denominator = false, yBand = null, forcedDir = null) {
                 this.fraction = fraction; // 約分/擴分用分數對象 {n, d}
                 this.isL3Denominator = isL3Denominator; // 是否為第三關第1階段分母數字
                 this.isCorrect = isCorrect;
                 this.width = isL3Denominator ? 70 : 90;
                 this.height = isL3Denominator ? 50 : 60;
                 
-                // 決定游動方向
-                this.dir = Math.random() < 0.5 ? 1 : -1;
-                
-                // 散落生成：防止一開始擠在兩側邊界，70% 隨機散落在畫面上，30% 從兩側游入
-                if (x === 'side') {
-                    this.x = this.dir === 1 ? -100 : canvas.width + 100;
-                } else if (x !== null) {
-                    this.x = x;
+                // 決定游動方向：若指定 forcedDir 則採用，否則 50% 由左至右、50% 由右至左
+                if (forcedDir !== null) {
+                    this.dir = forcedDir;
                 } else {
-                    if (Math.random() < 0.7) {
-                        this.x = Math.random() * (canvas.width - 240) + 120;
-                    } else {
-                        this.x = this.dir === 1 ? -100 : canvas.width + 100;
-                    }
+                    this.dir = Math.random() < 0.5 ? 1 : -1;
+                }
+                
+                // 新題目登場：從畫面左右兩側邊界外 (錯開 80~280px) 登場，使進場更有時間與空間錯開層次
+                if (x === 'side' || x === null) {
+                    const offset = Math.random() * 200 + 80;
+                    this.x = this.dir === 1 ? -offset : canvas.width + offset;
+                    this.isEntering = true;
+                } else {
+                    this.x = x;
+                    this.isEntering = false;
                 }
                 
                 // 隨機分佈水深 Y，若指定 yBand 則劃分車道以防重疊
@@ -1227,23 +1239,30 @@
                     this.y = Math.random() * 380 + 270;
                 }
                 
-                // 速度設定 (基礎速度 + 每 100 分加快一次)
-                const difficultyBonus = Math.floor(score / 100) * 0.15;
-                if (currentLevel === 1) {
-                    this.speed = Math.random() * 0.4 + 0.4 + difficultyBonus;
-                } else if (currentLevel === 2) {
-                    this.speed = Math.random() * 0.5 + 0.5 + difficultyBonus;
+                // 豐富層次的速度設定 (包含慢速魚、中速魚、快速魚，讓魚群有快有慢方便瞄準)
+                // 35% 慢速魚 (特別好釣 0.35~0.5 px/frame), 45% 中速魚 (0.55~0.75 px/frame), 20% 快速魚 (0.85~1.15 px/frame)
+                const speedTier = Math.random();
+                let baseSpeed = 0.6;
+                if (speedTier < 0.35) {
+                    baseSpeed = Math.random() * 0.15 + 0.35; // 慢速魚 (容易命中)
+                } else if (speedTier < 0.8) {
+                    baseSpeed = Math.random() * 0.2 + 0.55;  // 中速魚
                 } else {
-                    this.speed = Math.random() * 0.6 + 0.6 + difficultyBonus;
+                    baseSpeed = Math.random() * 0.3 + 0.85;  // 快速魚
                 }
+
+                const difficultyBonus = Math.floor(score / 100) * 0.1;
+                this.cruiseSpeed = baseSpeed + difficultyBonus;
+
+                // 剛從畫面外登場時的「進場滑行」速度 (適中速 3.5 ~ 4.5 px/frame)
+                this.entranceSpeed = Math.max(3.5, this.cruiseSpeed * 2.2);
+                this.speed = this.isEntering ? this.entranceSpeed : this.cruiseSpeed;
 
                 // 隨機色彩 (HSL 確保亮麗且色調統一)
                 if (this.isCorrect) {
-                    // 正確答案：金黃色、亮橘色、粉紅色
                     const hue = [35, 15, 340][MathGenerator.randomInt(0, 2)];
                     this.color = `hsl(${hue}, 95%, 60%)`;
                 } else {
-                    // 錯誤答案：紫色、綠色、青藍色
                     const hue = [270, 150, 195][MathGenerator.randomInt(0, 2)];
                     this.color = `hsl(${hue}, 80%, 55%)`;
                 }
@@ -1261,6 +1280,19 @@
                     this.x = hook.x;
                     this.y = hook.y + 15;
                     return;
+                }
+
+                // 若處於剛從畫面外進場階段，使用進場滑行速度
+                if (this.isEntering) {
+                    this.speed = this.entranceSpeed;
+                    // 當魚體游入主畫面邊界內 (x >= 60 或 x <= canvas.width - 60) 後，切換回該魚特有的巡航速度
+                    if (this.dir === 1 && this.x >= 60) {
+                        this.isEntering = false;
+                        this.speed = this.cruiseSpeed;
+                    } else if (this.dir === -1 && this.x <= canvas.width - 60) {
+                        this.isEntering = false;
+                        this.speed = this.cruiseSpeed;
+                    }
                 }
 
                 // 橫向移動
@@ -1287,10 +1319,10 @@
 
             resetPosition() {
                 this.dir = Math.random() < 0.5 ? 1 : -1;
-                this.x = this.dir === 1 ? -100 : canvas.width + 100;
-                this.y = Math.random() * 400 + 270;
-                
-                // 如果是關卡3的題目轉換，會直接由重新整理來分配分數
+                this.x = this.dir === 1 ? -120 : canvas.width + 120;
+                this.y = Math.random() * 380 + 270;
+                this.isEntering = false;
+                this.speed = this.cruiseSpeed;
             }
 
             draw() {
@@ -1614,14 +1646,21 @@
         function buildEquivFish(baseF, lcm, group, spawnX) {
             const list = [];
             const maxK = Math.floor(lcm / baseF.d);
-            const yBands = [0, 1, 2, 3].sort(() => 0.5 - Math.random());
+            const totalFishCount = maxK * 2;
+            const yBands = Array.from({length: Math.max(6, totalFishCount)}, (_, i) => i % 6).sort(() => 0.5 - Math.random());
             let bandIdx = 0;
             for (let k = 1; k <= maxK; k++) {
                 const equiv = { n: baseF.n * k, d: baseF.d * k };
                 const isCorrect = (equiv.d === lcm);
-                const fish = new Fish(equiv, isCorrect, spawnX, false, yBands[bandIdx % 4]);
-                fish.fractionGroup = group;
-                list.push(fish);
+                // 每個選項皆生成兩隻魚：一隻由左邊 (dir=1) 登場，一隻由右邊 (dir=-1) 登場
+                const fishLeft = new Fish(equiv, isCorrect, spawnX, false, yBands[bandIdx % yBands.length], 1);
+                fishLeft.fractionGroup = group;
+                list.push(fishLeft);
+                bandIdx++;
+
+                const fishRight = new Fish(equiv, isCorrect, spawnX, false, yBands[bandIdx % yBands.length], -1);
+                fishRight.fractionGroup = group;
+                list.push(fishRight);
                 bandIdx++;
             }
             return list;
@@ -1689,7 +1728,7 @@
             hook.caughtFish = null;
             hook.state = 'idle';
 
-            const spawnX = initialSpawn ? null : 'side';
+            const spawnX = 'side';
 
             if (currentLevel === 1) {
                 if (changeStem || !mathData) {
@@ -1702,9 +1741,11 @@
                 const correctVal = mathData.correctFraction.n / mathData.correctFraction.d;
                 updateRemainingFishesCorrectness(correctVal, false);
 
-                const yBands = [0, 1, 2, 3].sort(() => 0.5 - Math.random());
-                fishes.push(new Fish(correctItem, true, spawnX, false, yBands[0]));
-                fishes.push(new Fish(correctItem, true, spawnX, false, yBands[1]));
+                const yBands = [0, 1, 2, 3, 4, 5].sort(() => 0.5 - Math.random());
+                // 正確答案選項：生成 2 隻魚 (一隻由左 dir=1，一隻由右 dir=-1)
+                fishes.push(new Fish(correctItem, true, spawnX, false, yBands[0], 1));
+                fishes.push(new Fish(correctItem, true, spawnX, false, yBands[1], -1));
+
                 const selectedIncorrect = incorrectList.sort(() => 0.5 - Math.random()).slice(0, 2);
                 while (selectedIncorrect.length < 2) {
                     const fallbackFrac = { ...correctItem };
@@ -1717,8 +1758,13 @@
                     fallbackFrac.val = fallbackFrac.n / fallbackFrac.d;
                     selectedIncorrect.push(fallbackFrac);
                 }
-                fishes.push(new Fish(selectedIncorrect[0], false, spawnX, false, yBands[2]));
-                fishes.push(new Fish(selectedIncorrect[1], false, spawnX, false, yBands[3]));
+                // 誘答選項 1：生成 2 隻魚 (一隻由左 dir=1，一隻由右 dir=-1)
+                fishes.push(new Fish(selectedIncorrect[0], false, spawnX, false, yBands[2], 1));
+                fishes.push(new Fish(selectedIncorrect[0], false, spawnX, false, yBands[3], -1));
+
+                // 誘答選項 2：生成 2 隻魚 (一隻由左 dir=1，一隻由右 dir=-1)
+                fishes.push(new Fish(selectedIncorrect[1], false, spawnX, false, yBands[4], 1));
+                fishes.push(new Fish(selectedIncorrect[1], false, spawnX, false, yBands[5], -1));
 
             } else if (currentLevel === 2) {
                 if (changeStem || !mathData) {
@@ -1731,9 +1777,11 @@
                 const correctVal = mathData.correctFraction.n / mathData.correctFraction.d;
                 updateRemainingFishesCorrectness(correctVal, false);
 
-                const yBands = [0, 1, 2, 3].sort(() => 0.5 - Math.random());
-                fishes.push(new Fish(correctItem, true, spawnX, false, yBands[0]));
-                fishes.push(new Fish(correctItem, true, spawnX, false, yBands[1]));
+                const yBands = [0, 1, 2, 3, 4, 5].sort(() => 0.5 - Math.random());
+                // 正確答案選項：生成 2 隻魚 (一隻由左 dir=1，一隻由右 dir=-1)
+                fishes.push(new Fish(correctItem, true, spawnX, false, yBands[0], 1));
+                fishes.push(new Fish(correctItem, true, spawnX, false, yBands[1], -1));
+
                 const selectedIncorrect = incorrectList.sort(() => 0.5 - Math.random()).slice(0, 2);
                 while (selectedIncorrect.length < 2) {
                     const fallbackFrac = { ...correctItem };
@@ -1746,8 +1794,13 @@
                     fallbackFrac.val = fallbackFrac.n / fallbackFrac.d;
                     selectedIncorrect.push(fallbackFrac);
                 }
-                fishes.push(new Fish(selectedIncorrect[0], false, spawnX, false, yBands[2]));
-                fishes.push(new Fish(selectedIncorrect[1], false, spawnX, false, yBands[3]));
+                // 誘答選項 1：生成 2 隻魚 (一隻由左 dir=1，一隻由右 dir=-1)
+                fishes.push(new Fish(selectedIncorrect[0], false, spawnX, false, yBands[2], 1));
+                fishes.push(new Fish(selectedIncorrect[0], false, spawnX, false, yBands[3], -1));
+
+                // 誘答選項 2：生成 2 隻魚 (一隻由左 dir=1，一隻由右 dir=-1)
+                fishes.push(new Fish(selectedIncorrect[1], false, spawnX, false, yBands[4], 1));
+                fishes.push(new Fish(selectedIncorrect[1], false, spawnX, false, yBands[5], -1));
 
             } else if (currentLevel === 3) {
                 if (changeStem || !mathData) {
@@ -1795,10 +1848,12 @@
                 } else if (level3Stage === 3) {
                     renderStemForStage();
                     const yBands = [0, 1, 2, 3].sort(() => 0.5 - Math.random());
-                    const fish1 = new Fish(mathData.tf1, mathData.tf1 === mathData.correctFraction, spawnX, false, yBands[0]);
-                    const fish2 = new Fish(mathData.tf2, mathData.tf2 === mathData.correctFraction, spawnX, false, yBands[1]);
-                    fishes.push(fish1);
-                    fishes.push(fish2);
+                    // 比較分數選項 1：生成 2 隻魚 (左、右)
+                    fishes.push(new Fish(mathData.tf1, mathData.tf1 === mathData.correctFraction, spawnX, false, yBands[0], 1));
+                    fishes.push(new Fish(mathData.tf1, mathData.tf1 === mathData.correctFraction, spawnX, false, yBands[1], -1));
+                    // 比較分數選項 2：生成 2 隻魚 (左、右)
+                    fishes.push(new Fish(mathData.tf2, mathData.tf2 === mathData.correctFraction, spawnX, false, yBands[2], 1));
+                    fishes.push(new Fish(mathData.tf2, mathData.tf2 === mathData.correctFraction, spawnX, false, yBands[3], -1));
                 }
             }
         }
@@ -1935,7 +1990,7 @@
 
         function triggerHookDrop() {
             if (gameState !== STATE_PLAYING) return;
-            if (level3Delaying) return; // 處於停留看題看板階段時禁止下鉤
+            if (level3Delaying || isTransitioningQuestion) return; // 處於轉場/游開階段時禁止下鉤
             if (hook.state === 'idle') {
                 hook.state = 'dropping';
                 
@@ -2101,7 +2156,7 @@
                             
                             // 檢測是否遊戲結束
                             if (lives <= 0) {
-                                endGame(false);
+                                endGame('lives');
                             }
                             break;
                         }
@@ -2142,6 +2197,28 @@
             }
         }
 
+        // 轉場函數：一題結束後讓前一題所有的魚朝兩側游開，再載入下一題
+        function transitionToNextQuestion(changeStem = true, delayMs = 700) {
+            isTransitioningQuestion = true;
+
+            // 讓畫面上所有尚未被釣起且未退場的舊魚，迅速朝左右兩側游走離開
+            fishes.forEach(fish => {
+                if (!fish.isCaught) {
+                    fish.isLeaving = true;
+                    // 若魚在畫面的左半邊，朝左游開；若在右半邊，朝右游開
+                    fish.dir = (fish.x < canvas.width / 2) ? -1 : 1;
+                    fish.speed = Math.max(8.5, fish.speed * 4);
+                }
+            });
+
+            // 延遲 delayMs 後清空舊魚殘留並進入下一題/階段
+            setTimeout(() => {
+                fishes = [];
+                nextQuestion(changeStem);
+                isTransitioningQuestion = false;
+            }, delayMs);
+        }
+
         // 結算釣起的分數魚
         function resolveCaughtFraction(caughtFish) {
             const fx = caughtFish.x;
@@ -2160,37 +2237,26 @@
                         
                         addFloatingText('✓ 第一個通分! +10', fx, fy, '#10b981', 20);
                         score += 10;
-                        nextQuestion(false);
+                        transitionToNextQuestion(false, 700);
                     } else if (level3Stage === 2) {
                         level3Stage = 3;
                         level3ConvertedGroup = 3;
                         addFloatingText('✓ 通分完成! 請比大小 +10', fx, fy, '#10b981', 20);
                         score += 10;
-                        nextQuestion(false);
+                        transitionToNextQuestion(false, 700);
                     } else {
                         addFloatingText('✓ 通分完成! +20', fx, fy, '#10b981', 20);
                         score += 20;
 
                         level3ConvertedGroup = 3; 
-                        level3Delaying = true;
-                        fishes.forEach(fish => {
-                            if (!fish.isNext) {
-                                fish.isLeaving = true;
-                                fish.speed = Math.max(4.5, fish.speed * 4);
-                            }
-                        });
                         renderStemForStage();
-
-                        setTimeout(() => {
-                            level3Delaying = false;
-                            nextQuestion();
-                        }, 3000);
+                        transitionToNextQuestion(true, 1000);
                     }
                 } else {
                     addFloatingText(`✓ 答對! 得分 +${points}`, fx, fy, '#10b981', 20);
                     score += points;
                     
-                    nextQuestion();
+                    transitionToNextQuestion(true, 700);
                 }
                 
                 // 更新難度顯示
@@ -2250,7 +2316,7 @@
                 hook.state = 'idle';
 
                 if (lives <= 0) {
-                    endGame(false);
+                    endGame('lives');
                 }
             }
         }
@@ -2540,11 +2606,41 @@
         // 10. 遊戲主循環與關卡切換
         // ==========================================
         
+        function updateTimerDisplay() {
+            const timerElem = document.getElementById('hud-timer');
+            if (timerElem) {
+                timerElem.innerText = `${timeLeft}s`;
+                if (timeLeft <= 10) {
+                    timerElem.className = "text-base font-black text-rose-500 font-mono text-glow animate-pulse";
+                } else if (timeLeft <= 20) {
+                    timerElem.className = "text-base font-black text-orange-400 font-mono text-glow";
+                } else {
+                    timerElem.className = "text-base font-black text-amber-400 font-mono text-glow";
+                }
+            }
+        }
+
         function gameLoop(timestamp) {
             if (gameState === STATE_PLAYING) {
                 // 計算 DeltaTime / 更新物理與狀態
                 const dt = timestamp - lastTime;
                 
+                // 時間倒數計時 (60 秒限時)
+                if (dt > 0 && dt < 1000) {
+                    timerAccumulator += dt;
+                    if (timerAccumulator >= 1000) {
+                        timerAccumulator -= 1000;
+                        if (timeLeft > 0) {
+                            timeLeft--;
+                            updateTimerDisplay();
+                            if (timeLeft <= 0) {
+                                endGame('timeup');
+                                return;
+                            }
+                        }
+                    }
+                }
+
                 // 清屏
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -2587,6 +2683,9 @@
             currentLevel = level;
             score = 0;
             lives = 3;
+            timeLeft = 60;
+            timerAccumulator = 0;
+            isTransitioningQuestion = false;
             level3Delaying = false;
             fishes = [];
             sharks = [];
@@ -2602,6 +2701,7 @@
             // 介面初始化
             hudScore.innerText = '000';
             updateLivesDisplay();
+            updateTimerDisplay();
 
             // 音效與聲音暖機
             soundManager.init();
@@ -2638,9 +2738,9 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // 結束遊戲並結算 (生命值耗盡才會觸發)
+        // 結束遊戲並結算 (生命值耗盡或 60 秒時間到觸發)
         // 顯示結算畫面排行榜
-        function endGame() {
+        function endGame(reason = 'lives') {
             gameState = STATE_GAMEOVER;
             
             // 播放結算音效
@@ -2659,15 +2759,22 @@
             resultScore.innerText = score.toString();
             resultBest.innerText = currentBest.toString();
 
-            // 根據得分與生命狀態給予不同評價
+            // 根據得分與狀態給予不同評價
             const btnAction = document.getElementById('btn-result-action');
 
-            // 生命值耗盡，捕魚船沉沒
-            resultIconContainer.className = "w-20 h-20 rounded-full mx-auto flex items-center justify-center text-4xl mb-4 border-rose-500 bg-rose-500/20 text-rose-400";
-            resultIconContainer.innerHTML = '<i class="fa-solid fa-heart-crack animate-bounce"></i>';
-            resultTitle.innerText = "捕魚船沉沒啦！";
-            resultTitle.className = "text-3xl font-black text-rose-400 font-['ZCOOL_KuaiLe'] tracking-wide";
-            resultDesc.innerText = `生命值耗盡囉，不小心釣起太多錯誤的分數，或受到鯊魚太多次撞擊。最終得分：${score} 分！再接再厲！`;
+            if (reason === 'timeup') {
+                resultIconContainer.className = "w-20 h-20 rounded-full mx-auto flex items-center justify-center text-4xl mb-4 border-amber-500 bg-amber-500/20 text-amber-400";
+                resultIconContainer.innerHTML = '<i class="fa-solid fa-hourglass-end animate-bounce"></i>';
+                resultTitle.innerText = "時間到！";
+                resultTitle.className = "text-3xl font-black text-amber-400 font-['ZCOOL_KuaiLe'] tracking-wide";
+                resultDesc.innerText = `60 秒限時挑戰結束！你在本關一共獲得了 ${score} 分！再接再厲！`;
+            } else {
+                resultIconContainer.className = "w-20 h-20 rounded-full mx-auto flex items-center justify-center text-4xl mb-4 border-rose-500 bg-rose-500/20 text-rose-400";
+                resultIconContainer.innerHTML = '<i class="fa-solid fa-heart-crack animate-bounce"></i>';
+                resultTitle.innerText = "捕魚船沉沒啦！";
+                resultTitle.className = "text-3xl font-black text-rose-400 font-['ZCOOL_KuaiLe'] tracking-wide";
+                resultDesc.innerText = `生命值耗盡囉，不小心釣起太多錯誤的分數，或受到鯊魚太多次撞擊。最終得分：${score} 分！再接再厲！`;
+            }
             btnAction.innerText = "重新挑戰";
 
             // 顯示結算畫面，隱藏題目版

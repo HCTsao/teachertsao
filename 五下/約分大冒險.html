@@ -50,9 +50,8 @@
             box-shadow: 0 0 10px rgba(250, 204, 21, 0.4);
         }
 
-        /* 卡牌基礎與3D旋轉 */
+        /* 卡牌基礎 (固定不翻轉) */
         .card-container {
-            perspective: 1000px;
             width: 160px;
             height: 160px;
         }
@@ -61,20 +60,13 @@
             width: 100%;
             height: 100%;
             position: relative;
-            transform-style: preserve-3d;
-            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
         }
 
-        .number-box-3d.flipped {
-            transform: rotateY(180deg);
-        }
-
-        .card-front, .card-back {
+        .card-front {
             position: absolute;
             width: 100%;
             height: 100%;
-            backface-visibility: hidden;
             border-radius: 24px;
             display: flex;
             flex-direction: row;
@@ -82,31 +74,20 @@
             align-items: center;
             justify-content: center;
             padding: 10px;
-            transition: all 0.3s ease;
+            transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
             border: 2px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .card-front {
             background: rgba(30, 41, 59, 0.7);
             color: white;
         }
 
-        .card-back {
-            background: rgba(30, 41, 59, 0.7);
-            color: white;
-            transform: rotateY(180deg);
-        }
-
-        /* 霓虹發光狀態 */
-        .card-container:hover .card-front:not(.locked),
-        .card-container:hover .card-back:not(.locked) {
+        /* 霓虹發光與選取狀態 */
+        .card-container:hover .card-front:not(.locked) {
             background: rgba(255, 255, 255, 0.15);
             border-color: rgba(255, 255, 255, 0.3);
             transform: scale(1.03);
         }
 
-        .selected .card-front,
-        .selected .card-back {
+        .selected .card-front {
             background: linear-gradient(135deg, #facc15 0%, #eab308 100%) !important;
             border-color: #fef08a !important;
             color: #0f172a !important;
@@ -447,7 +428,7 @@
             <div class="flex-1 max-w-md w-full px-4">
                 <div class="flex justify-between text-xs font-bold text-slate-400 mb-1.5">
                     <span>剩餘時間</span>
-                    <span id="timerText" class="text-white">60 秒</span>
+                    <span id="timerText" class="text-white">3 分 00 秒</span>
                 </div>
                 <div class="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-white/5">
                     <div id="timerBar" class="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full transition-all duration-1000"></div>
@@ -519,9 +500,6 @@
                                 <div class="card-front">
                                     <span class="current-num">0</span>
                                 </div>
-                                <div class="card-back">
-                                    <span class="current-num">0</span>
-                                </div>
                             </div>
                         </div>
                         <div class="fraction-line"></div>
@@ -529,9 +507,6 @@
                         <div id="den2" class="card-container" onclick="handleSelect('den2')">
                             <div class="number-box-3d" id="den2_box">
                                 <div class="card-front">
-                                    <span class="current-num">0</span>
-                                </div>
-                                <div class="card-back">
                                     <span class="current-num">0</span>
                                 </div>
                             </div>
@@ -792,7 +767,7 @@
             score: 0,
             round: 1,
             maxRounds: 3,
-            timeLeft: 60,
+            timeLeft: 180,
             timerId: null,
             hintTimerId: null,
             simStepCount: 0,
@@ -810,6 +785,14 @@
             if (n <= 3) return false;
             for (let i = 2; i <= Math.sqrt(n); i++) if (n % i === 0) return true;
             return false;
+        }
+        function formatTime(sec) {
+            const m = Math.floor(sec / 60);
+            const s = sec % 60;
+            if (m > 0) {
+                return `${m} 分 ${s < 10 ? '0' : ''}${s} 秒`;
+            }
+            return `${s} 秒`;
         }
 
         // ==========================================================================
@@ -870,12 +853,12 @@
                 const timerEl = document.getElementById('timerText');
                 const timerBar = document.getElementById('timerBar');
                 
-                timerEl.innerText = `${gameState.timeLeft} 秒`;
+                timerEl.innerText = formatTime(gameState.timeLeft);
                 
-                const percent = (gameState.timeLeft / (60 - (gameState.round - 1) * 10)) * 100;
+                const percent = (gameState.timeLeft / 180) * 100;
                 timerBar.style.width = `${percent}%`;
                 
-                if (gameState.timeLeft <= 10) {
+                if (gameState.timeLeft <= 15) {
                     timerEl.classList.add('timer-low');
                     timerBar.className = "bg-gradient-to-r from-red-500 to-pink-500 h-full rounded-full transition-all duration-1000";
                 } else {
@@ -915,10 +898,10 @@
         function initLevel() {
             document.getElementById('successOverlay').classList.add('hidden');
             document.getElementById('roundDisplay').innerText = gameState.round;
-            gameState.timeLeft = 60 - (gameState.round - 1) * 10;
+            gameState.timeLeft = 180;
             
             const timerEl = document.getElementById('timerText');
-            timerEl.innerText = `${gameState.timeLeft} 秒`;
+            timerEl.innerText = formatTime(gameState.timeLeft);
             timerEl.classList.remove('timer-low');
             
             const timerBar = document.getElementById('timerBar');
@@ -1038,12 +1021,11 @@
                 
                 if (!el || !cardBox) return;
 
-                // 移除選取與顛倒樣式
+                // 移除選取樣式
                 el.classList.remove('selected');
                 
                 // 處理除法篇一開始尚未轉為乘法的情況 (隱藏後面的數)
                 if (gameState.mode === 'div' && !gameState.isMultiplication && (id === 'num2' || id === 'den2')) {
-                    cardBox.classList.remove('flipped');
                     const val = id === 'num2' ? gameState.initialDivisor.num : gameState.initialDivisor.den;
                     
                     cardBox.innerHTML = `
@@ -1056,7 +1038,6 @@
 
                 // 處理除法篇轉為乘法但尚未填入顛倒值的情況 (顯示虛線與問號)
                 if (gameState.mode === 'div' && gameState.isMultiplication && (id === 'num2' || id === 'den2') && !gameState.flipped[id]) {
-                    cardBox.classList.remove('flipped');
                     cardBox.innerHTML = `
                         <div class="card-front waiting-flip-card">
                             <span class="text-3xl font-extrabold"><i class="fa-solid fa-arrows-rotate animate-spin mr-1"></i> 顛倒?</span>
@@ -1065,11 +1046,11 @@
                     return;
                 }
 
-                // 正常渲染卡牌內容 (有約分紀錄與目前值)
+                // 正常渲染卡牌內容 (有約分紀錄與目前值，固定不旋轉)
                 const buildCardContent = () => {
                     let html = '';
                     // 約分歷史
-                    info.history.forEach((h, index) => {
+                    info.history.forEach((h) => {
                         html += `
                             <span class="history-item" style="color: ${h.color};">
                                 ${h.val}
@@ -1083,26 +1064,11 @@
                     return html;
                 };
 
-                // 在除法篇，如果是除數且剛被翻轉成功，我們會展示 3D 翻轉效果
-                if (gameState.mode === 'div' && (id === 'num2' || id === 'den2')) {
-                    cardBox.innerHTML = `
-                        <div class="card-front waiting-flip-card">
-                            <span class="text-3xl font-extrabold"><i class="fa-solid fa-arrows-rotate animate-spin mr-1"></i> 顛倒?</span>
-                        </div>
-                        <div class="card-back">
-                            ${buildCardContent()}
-                        </div>
-                    `;
-                    // 設定 flipped 類別以啟動 Y 軸旋轉
-                    cardBox.classList.add('flipped');
-                } else {
-                    cardBox.classList.remove('flipped');
-                    cardBox.innerHTML = `
-                        <div class="card-front">
-                            ${buildCardContent()}
-                        </div>
-                    `;
-                }
+                cardBox.innerHTML = `
+                    <div class="card-front">
+                        ${buildCardContent()}
+                    </div>
+                `;
             });
             updateAnswerAreaLayout();
         }
