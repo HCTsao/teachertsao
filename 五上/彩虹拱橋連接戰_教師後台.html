@@ -256,7 +256,7 @@
     <!-- Top Left Nav -->
     <div class="top-left-nav">
       <a href="../index.html">🏠 回首頁</a>
-      <a href="彩虹拱橋連接戰.html">🎮 進入遊戲</a>
+      <a href="鵲橋相會：配對法找因數.html">🎮 進入遊戲</a>
     </div>
 
     <!-- DB Offline Banner -->
@@ -268,6 +268,25 @@
       <h1>👨‍🏫 彩虹拱橋連接戰 - 管理後台</h1>
       <button class="btn btn-danger" id="btn-clear-db">🧹 清除所有紀錄</button>
     </header>
+
+    <!-- Filter Panel -->
+    <div class="card" style="margin-bottom: 25px; padding: 18px 24px;">
+      <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label for="filter-class" style="font-weight: 800; font-size: 0.95rem; color: var(--color-primary);">🏫 班級篩選：</label>
+          <select id="filter-class" style="padding: 8px 14px; border-radius: 8px; border: 1px solid var(--color-border); font-size: 0.95rem; font-weight: bold; background: #fff; cursor: pointer;">
+            <option value="">全部班級</option>
+          </select>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 220px;">
+          <label for="filter-keyword" style="font-weight: 800; font-size: 0.95rem; color: var(--color-primary);">🔍 關鍵字搜尋：</label>
+          <input type="text" id="filter-keyword" placeholder="請輸入學生姓名、班級或座號..." style="width: 100%; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--color-border); font-size: 0.95rem;">
+        </div>
+
+        <button class="btn" id="btn-reset-filter" style="background: #e2e8f0; color: #334155; padding: 8px 16px;">↺ 重置篩選</button>
+      </div>
+    </div>
 
     <!-- Stats Cards -->
     <div class="stats-grid">
@@ -303,16 +322,17 @@
             <thead>
               <tr>
                 <th>時間</th>
+                <th>班級</th>
+                <th>座號</th>
                 <th>學生姓名</th>
                 <th>關卡類型</th>
                 <th>目標數字</th>
                 <th>錯誤原因</th>
-                <th>預期正確值</th>
-                <th>學生輸入的內容</th>
+                <th>學生選/填的因數</th>
               </tr>
             </thead>
             <tbody id="mistakes-table-body">
-              <tr><td colspan="7" style="text-align: center;">載入資料中...</td></tr>
+              <tr><td colspan="8" style="text-align: center;">載入資料中...</td></tr>
             </tbody>
           </table>
         </div>
@@ -329,12 +349,14 @@
               <tr>
                 <th>排名</th>
                 <th>時間</th>
+                <th>班級</th>
+                <th>座號</th>
                 <th>學生姓名</th>
                 <th>總積分</th>
               </tr>
             </thead>
             <tbody id="leaderboard-table-body">
-              <tr><td colspan="4" style="text-align: center;">載入資料中...</td></tr>
+              <tr><td colspan="6" style="text-align: center;">載入資料中...</td></tr>
             </tbody>
           </table>
         </div>
@@ -430,26 +452,111 @@
       updateStatistics(mistakesList, leaderboardList);
     }
 
+    // --- Helper to parse class, seat, name ---
+    function getStudentInfo(item) {
+      let cls = item.studentClass || '';
+      let seat = item.studentSeat || '';
+      let name = item.studentOnlyName || '';
+
+      if (!cls && !seat && item.name) {
+        let raw = item.name.trim();
+        let parts = raw.split(/\s+/);
+        if (parts.length >= 3) {
+          cls = parts[0];
+          seat = parts[1];
+          name = parts.slice(2).join(' ');
+        } else if (parts.length === 2) {
+          if (/^\d+/.test(parts[0])) {
+            cls = parts[0];
+            name = parts[1];
+          } else {
+            name = raw;
+          }
+        } else {
+          name = raw;
+        }
+      }
+
+      return {
+        classStr: cls || '-',
+        seatStr: seat || '-',
+        nameStr: name || item.name || '-'
+      };
+    }
+
+    function populateClassOptions() {
+      const classSelect = document.getElementById('filter-class');
+      let currentVal = classSelect.value;
+
+      let classes = new Set();
+      cacheMistakes.concat(cacheLeaderboard).forEach(item => {
+        let info = getStudentInfo(item);
+        if (info.classStr && info.classStr !== '-') {
+          classes.add(info.classStr);
+        }
+      });
+
+      let sortedClasses = Array.from(classes).sort();
+      classSelect.innerHTML = '<option value="">全部班級</option>';
+      sortedClasses.forEach(cls => {
+        let opt = document.createElement('option');
+        opt.value = cls;
+        opt.innerText = cls + ' 班';
+        if (cls === currentVal) opt.selected = true;
+        classSelect.appendChild(opt);
+      });
+    }
+
+    function applyFilters() {
+      populateClassOptions();
+      
+      const filterClass = document.getElementById('filter-class').value.trim().toLowerCase();
+      const filterKeyword = document.getElementById('filter-keyword').value.trim().toLowerCase();
+
+      function matchesFilter(item) {
+        let info = getStudentInfo(item);
+        if (filterClass && info.classStr.toLowerCase() !== filterClass) {
+          return false;
+        }
+        if (filterKeyword) {
+          let fullSearch = `${info.classStr} ${info.seatStr} ${info.nameStr} ${item.name || ''}`.toLowerCase();
+          if (!fullSearch.includes(filterKeyword)) {
+            return false;
+          }
+        }
+        return true;
+      }
+
+      let filteredMistakes = cacheMistakes.filter(matchesFilter);
+      let filteredLeaderboard = cacheLeaderboard.filter(matchesFilter);
+
+      renderMistakes(filteredMistakes);
+      renderLeaderboard(filteredLeaderboard);
+      updateStatisticsDisplay(filteredMistakes, filteredLeaderboard);
+    }
+
     // --- Rendering Functions ---
     function renderMistakes(list) {
       const tbody = document.getElementById('mistakes-table-body');
       tbody.innerHTML = '';
 
       if (list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--color-text-muted);">目前無任何答錯紀錄。</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--color-text-muted);">目前無任何答錯紀錄。</td></tr>';
         return;
       }
 
       list.forEach(item => {
+        let info = getStudentInfo(item);
         let tr = document.createElement('tr');
         let dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString() : '-';
         tr.innerHTML = `
           <td style="font-size: 0.85rem; color: var(--color-text-muted);">${dateStr}</td>
-          <td style="font-weight: bold; color: var(--color-primary);">${item.name}</td>
+          <td style="font-weight: bold; color: var(--color-accent);">${info.classStr}</td>
+          <td style="font-weight: bold;">${info.seatStr}</td>
+          <td style="font-weight: bold; color: var(--color-primary);">${info.nameStr}</td>
           <td><span class="badge ${item.type === '公因數挑戰' ? 'badge-success' : 'badge-error'}">${item.type}</span></td>
           <td style="font-family: monospace; font-weight: bold;">${item.base}</td>
           <td>${item.errorType}</td>
-          <td style="color: var(--color-success); font-weight: bold; font-family: monospace;">${item.expectedVal}</td>
           <td style="color: var(--color-danger); font-weight: bold; font-family: monospace;">${item.userInputVal}</td>
         `;
         tbody.appendChild(tr);
@@ -461,17 +568,20 @@
       tbody.innerHTML = '';
 
       if (list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--color-text-muted);">目前無任何積分成績。</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--color-text-muted);">目前無任何積分成績。</td></tr>';
         return;
       }
 
       list.forEach((item, idx) => {
+        let info = getStudentInfo(item);
         let tr = document.createElement('tr');
         let dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString() : '-';
         tr.innerHTML = `
           <td style="font-weight: 800; color: var(--color-accent);">${idx + 1}</td>
           <td style="font-size: 0.85rem; color: var(--color-text-muted);">${dateStr}</td>
-          <td style="font-weight: bold;">${item.name}</td>
+          <td style="font-weight: bold; color: var(--color-accent);">${info.classStr}</td>
+          <td style="font-weight: bold;">${info.seatStr}</td>
+          <td style="font-weight: bold;">${info.nameStr}</td>
           <td style="font-weight: bold; color: var(--color-success);">${item.score}</td>
         `;
         tbody.appendChild(tr);
@@ -486,22 +596,26 @@
       if (mistakes) cacheMistakes = mistakes;
       if (leaderboard) cacheLeaderboard = leaderboard;
 
+      applyFilters();
+    }
+
+    function updateStatisticsDisplay(filteredMistakes, filteredLeaderboard) {
       // 1. Total players
-      document.getElementById('stats-total-players').innerText = cacheLeaderboard.length;
+      document.getElementById('stats-total-players').innerText = filteredLeaderboard.length;
 
       // 2. Average score
-      if (cacheLeaderboard.length > 0) {
-        let sum = cacheLeaderboard.reduce((acc, curr) => acc + (curr.score || 0), 0);
-        let avg = Math.round(sum / cacheLeaderboard.length);
+      if (filteredLeaderboard.length > 0) {
+        let sum = filteredLeaderboard.reduce((acc, curr) => acc + (curr.score || 0), 0);
+        let avg = Math.round(sum / filteredLeaderboard.length);
         document.getElementById('stats-avg-score').innerText = avg;
       } else {
         document.getElementById('stats-avg-score').innerText = '0';
       }
 
       // 3. Most failed base number
-      if (cacheMistakes.length > 0) {
+      if (filteredMistakes.length > 0) {
         let freq = {};
-        cacheMistakes.forEach(m => {
+        filteredMistakes.forEach(m => {
           let b = m.base;
           if (b) {
             freq[b] = (freq[b] || 0) + 1;
@@ -522,6 +636,14 @@
         document.getElementById('stats-most-failed-base').innerText = '-';
       }
     }
+
+    document.getElementById('filter-class').addEventListener('change', applyFilters);
+    document.getElementById('filter-keyword').addEventListener('input', applyFilters);
+    document.getElementById('btn-reset-filter').addEventListener('click', () => {
+      document.getElementById('filter-class').value = '';
+      document.getElementById('filter-keyword').value = '';
+      applyFilters();
+    });
 
     // --- Clean DB Action ---
     document.getElementById('btn-clear-db').addEventListener('click', () => {
