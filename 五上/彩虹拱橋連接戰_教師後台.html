@@ -535,6 +535,21 @@
       updateStatisticsDisplay(filteredMistakes, filteredLeaderboard);
     }
 
+    function formatStudentFactors(val) {
+      if (!val || val === '無') return '無';
+      let str = String(val);
+      // Remove product results if present (e.g. "= 24")
+      if (str.includes('=')) {
+        str = str.split('=')[0];
+      }
+      let matches = str.match(/\d+/g);
+      if (matches && matches.length > 0) {
+        let nums = Array.from(new Set(matches.map(n => parseInt(n)))).sort((a, b) => a - b);
+        return nums.join('、');
+      }
+      return str;
+    }
+
     // --- Rendering Functions ---
     function renderMistakes(list) {
       const tbody = document.getElementById('mistakes-table-body');
@@ -549,6 +564,12 @@
         let info = getStudentInfo(item);
         let tr = document.createElement('tr');
         let dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString() : '-';
+        let errorTypeStr = item.errorType || '-';
+        if (errorTypeStr.includes('我找完了') || errorTypeStr.includes('漏找或找錯')) {
+          errorTypeStr = '漏找或找錯';
+        }
+        let factorsStr = formatStudentFactors(item.userInputVal);
+
         tr.innerHTML = `
           <td style="font-size: 0.85rem; color: var(--color-text-muted);">${dateStr}</td>
           <td style="font-weight: bold; color: var(--color-accent);">${info.classStr}</td>
@@ -556,8 +577,8 @@
           <td style="font-weight: bold; color: var(--color-primary);">${info.nameStr}</td>
           <td><span class="badge ${item.type === '公因數挑戰' ? 'badge-success' : 'badge-error'}">${item.type}</span></td>
           <td style="font-family: monospace; font-weight: bold;">${item.base}</td>
-          <td>${item.errorType}</td>
-          <td style="color: var(--color-danger); font-weight: bold; font-family: monospace;">${item.userInputVal}</td>
+          <td>${errorTypeStr}</td>
+          <td style="color: var(--color-danger); font-weight: bold; font-family: monospace;">${factorsStr}</td>
         `;
         tbody.appendChild(tr);
       });
