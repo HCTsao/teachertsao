@@ -1091,8 +1091,8 @@
     let correctOnFirstTryCount = 0; // Number of questions solved without mistakes
     let thisQuestionHadErrors = false;
     let studentName = "訪客";
-    let studentClass = "五年甲班";
-    let studentSeat = 1;
+    let studentClass = "訪客";
+    let studentSeat = 0;
     let questionsList = [];
     let state = 'setup'; // 'setup', 'playing', 'crossing', 'finished'
     
@@ -1320,7 +1320,7 @@
 
       // Read student name, class, seat
       let inputClass = document.getElementById('student-class').value.trim();
-      studentClass = inputClass || "小學";
+      studentClass = inputClass || "訪客";
 
       let inputSeat = parseInt(document.getElementById('student-seat').value);
       studentSeat = isNaN(inputSeat) ? 0 : inputSeat;
@@ -1701,7 +1701,10 @@
               sessionTotalScore = Math.max(0, sessionTotalScore - 20);
               hudScoreTxt.innerText = sessionTotalScore;
             }
-            logMistakeToFirebase(userInputMultiples[firstWrongIdx], expectedVal, firstWrongIdx);
+            let questionText = inLCMPhase
+              ? `依序找出 ${lcmNumA} 和 ${lcmNumB} 的前 ${multiplesCount} 個公倍數`
+              : `請依序輸入 ${baseNumber} 的前 ${multiplesCount} 個倍數`;
+            logMistakeToFirebase(userInputMultiples[firstWrongIdx], expectedVal, firstWrongIdx, questionText, [...userInputMultiples]);
 
             setTimeout(() => showFailureScreen(firstWrongIdx, expectedVal), 1400);
           }, 300);
@@ -1710,15 +1713,27 @@
       }
     }
 
-    function logMistakeToFirebase(userInputVal, expectedVal, stepIdx) {
+    function logMistakeToFirebase(userInputVal, expectedVal, stepIdx, questionText, studentInputList) {
       let expectedSequence = [];
       if (inLCMPhase) {
-        expectedSequence = lcmCorrectMultiples;
+        if (stepIdx === 99) {
+          expectedSequence = [expectedVal];
+        } else {
+          expectedSequence = lcmCorrectMultiples;
+        }
       } else {
         for (let i = 0; i < multiplesCount; i++) {
           expectedSequence.push(baseNumber * (i + 1));
         }
       }
+
+      if (!questionText) {
+        questionText = inLCMPhase
+          ? `依序找出 ${lcmNumA} 和 ${lcmNumB} 的前 ${multiplesCount} 個公倍數`
+          : `請依序輸入 ${baseNumber} 的前 ${multiplesCount} 個倍數`;
+      }
+
+      let recordedUserInput = studentInputList ? studentInputList : [...userInputMultiples];
 
       if (!isFirebaseActive) {
         // Fallback local storage mistakes
@@ -1727,12 +1742,13 @@
           name: studentName,
           className: studentClass,
           seatNumber: studentSeat,
-          type: inLCMPhase ? "公倍數挑戰" : "找倍數挑戰",
+          type: inLCMPhase ? (stepIdx === 99 ? "延伸公倍數挑戰" : "公倍數挑戰") : "找倍數挑戰",
           base: inLCMPhase ? `${lcmNumA}, ${lcmNumB}` : baseNumber,
+          question: questionText,
           stepIndex: stepIdx + 1,
           userInputVal: userInputVal,
           expectedVal: expectedVal,
-          userInput: userInputMultiples,
+          userInput: recordedUserInput,
           expected: expectedSequence,
           timestamp: Date.now()
         });
@@ -1745,12 +1761,13 @@
           name: studentName,
           className: studentClass,
           seatNumber: studentSeat,
-          type: inLCMPhase ? "公倍數挑戰" : "找倍數挑戰",
+          type: inLCMPhase ? (stepIdx === 99 ? "延伸公倍數挑戰" : "公倍數挑戰") : "找倍數挑戰",
           base: inLCMPhase ? `${lcmNumA}, ${lcmNumB}` : baseNumber,
+          question: questionText,
           stepIndex: stepIdx + 1,
           userInputVal: userInputVal,
           expectedVal: expectedVal,
-          userInput: userInputMultiples,
+          userInput: recordedUserInput,
           expected: expectedSequence,
           timestamp: firebase.database.ServerValue.TIMESTAMP
         });
@@ -2505,7 +2522,9 @@
           createSplash(particleX, 480);
 
           // Log mistake
-          logMistakeToFirebase(val, expectedVal, 99); // custom step index for extra multiples
+          let extraQuestionText = `依序找出 ${lcmNumA} 和 ${lcmNumB} 的第 ${lcmExtraStep + 2} 個公倍數`;
+          let extraAnswers = [correctLCM, ...lcmExtraAnswered, val];
+          logMistakeToFirebase(val, expectedVal, 99, extraQuestionText, extraAnswers);
 
           setTimeout(() => showFailureScreen(lcmExtraStep, expectedVal, val), 1400);
         }, 1200);
