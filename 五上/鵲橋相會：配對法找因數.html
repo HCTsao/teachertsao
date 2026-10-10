@@ -357,6 +357,25 @@
       box-shadow: 0 0 15px rgba(220, 38, 38, 0.8), inset 0 0 10px rgba(255,180,180,0.4);
     }
 
+    .slot.slot-editing {
+      border: 3px solid #fbbf24 !important;
+      background: #d97706 !important;
+      box-shadow: 0 0 22px #fbbf24, inset 0 0 10px rgba(255, 255, 255, 0.8) !important;
+      animation: pulseEdit 0.8s ease-in-out infinite alternate !important;
+      z-index: 20 !important;
+    }
+    @keyframes pulseEdit {
+      from { transform: translate(-50%, -50%) scale(1.02); }
+      to { transform: translate(-50%, -50%) scale(1.18); }
+    }
+    #hell-matched-row .slot.slot-editing {
+      animation: pulseEditHell 0.8s ease-in-out infinite alternate !important;
+    }
+    @keyframes pulseEditHell {
+      from { transform: scale(1.02); }
+      to { transform: scale(1.18); }
+    }
+
     #hell-matched-row .slot {
       position: relative;
       transform: none;
@@ -921,11 +940,12 @@
       </div>
 
       <div class="input-panel" id="advanced-input-panel" style="display: none;">
-        <div class="pool-title">✍️ 請用兩兩配對的方法找出因數 ✍️</div>
+        <div class="pool-title" id="adv-pool-title">✍️ 請用兩兩配對的方法找出因數 ✍️</div>
         <div class="input-row" id="adv-input-row">
           <input type="text" id="input-factor-1" inputmode="none" readonly>
           <input type="text" id="input-factor-2" inputmode="none" readonly>
           <button class="btn-primary" id="btn-submit-pair" style="padding: 6px 18px; font-size: 1rem;">確認配對 ➔</button>
+          <button class="btn-primary" id="btn-cancel-edit" style="display: none; padding: 6px 14px; font-size: 1rem; background: #64748b; border-color: #94a3b8;">取消</button>
           <button class="btn-primary" id="btn-finish-hell" style="display: none; padding: 6px 18px; font-size: 1rem; background: #dc2626; border-color: #ef4444;">我找完了 ➔</button>
         </div>
         <div class="virtual-keypad">
@@ -1176,6 +1196,92 @@
     const btnNextLevel = document.getElementById('btn-next-level');
     const centerStone = document.getElementById('center-stone');
     const slotCenter = document.getElementById('slot-center');
+    const btnCancelEdit = document.getElementById('btn-cancel-edit');
+    const advPoolTitle = document.getElementById('adv-pool-title');
+
+    let isSingleEditMode = false;
+    let editingSlotData = null;
+    let isEditPendingReplacement = false;
+    let walkAnimId = null;
+    let fallAnimId = null;
+    let magpieCheckInterval = null;
+    let gameTimeouts = [];
+
+    function setGameTimeout(fn, delay) {
+      let id = setTimeout(() => {
+        gameTimeouts = gameTimeouts.filter(t => t !== id);
+        fn();
+      }, delay);
+      gameTimeouts.push(id);
+      return id;
+    }
+
+    function clearAllGameTimeouts() {
+      gameTimeouts.forEach(id => clearTimeout(id));
+      gameTimeouts = [];
+    }
+
+    function cancelOngoingAnimations() {
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
+      if (questionTimerInterval) {
+        clearInterval(questionTimerInterval);
+        questionTimerInterval = null;
+      }
+      if (magpieCheckInterval) {
+        clearInterval(magpieCheckInterval);
+        magpieCheckInterval = null;
+      }
+      if (walkAnimId) {
+        cancelAnimationFrame(walkAnimId);
+        walkAnimId = null;
+      }
+      if (fallAnimId) {
+        cancelAnimationFrame(fallAnimId);
+        fallAnimId = null;
+      }
+
+      clearAllGameTimeouts();
+
+      // Remove flying bubbles & score indicators
+      document.querySelectorAll('.flying-bubble, .score-indicator').forEach(el => el.remove());
+
+      // Reset particles & magpies
+      particles = [];
+      magpies = [];
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Reset characters
+      cowherdBox.style.left = '12%';
+      cowherdBox.style.bottom = '30%';
+      cowherdBox.style.transform = '';
+      cowherdBox.innerHTML = getCowherdSVG('idle');
+
+      weaverBox.style.left = '88%';
+      weaverBox.style.bottom = '30%';
+      weaverBox.style.transform = '';
+      weaverBox.innerHTML = getWeaverGirlSVG('idle');
+
+      // Reset bridge deck & pool message
+      let deck = document.getElementById("magpie-bridge-deck");
+      if (deck) deck.style.display = "none";
+      let poolMsg = document.getElementById('pool-msg-overlay');
+      if (poolMsg) poolMsg.style.display = 'none';
+
+      // Exit single edit mode if active
+      exitSingleEditMode();
+
+      // Reset bubble selection
+      if (selectedBubble) {
+        selectedBubble.element.classList.remove('selected');
+        selectedBubble = null;
+      }
+
+      gameState = 'menu';
+      isMatchingAnimationActive = false;
+    }
 
     function shuffle(array) {
       for (let i = array.length - 1; i > 0; i--) {
@@ -1239,12 +1345,14 @@
     }
 
     function startNewGame() {
+      cancelOngoingAnimations();
       gameState = 'playing';
       selectedBubble = null;
       matchedPairs = [];
       isMatchingAnimationActive = false;
       magpies = []; // Reset magpies array
       questionStudentFactors.clear();
+      exitSingleEditMode();
 
       questionHadMistake = false;
       secondsElapsed = 0;
@@ -1565,7 +1673,7 @@
           animateFlyingBubble(el2, targetEl2, val2);
           selectedBubble = null;
           
-          setTimeout(() => {
+          setGameTimeout(() => {
             updateBridgeSlots();
             
             if (targetEl1) createExplosion(targetEl1.getBoundingClientRect());
@@ -1632,7 +1740,7 @@
         inputFactor1.value = '';
         inputFactor2.value = '';
         
-        setTimeout(() => {
+        setGameTimeout(() => {
           updateBridgeSlots();
           
           if (targetEl1) createExplosion(targetEl1.getBoundingClientRect());
@@ -1648,7 +1756,7 @@
     function shakeInputRow() {
       advInputRow.classList.add('error-shake');
       sound.playError();
-      setTimeout(() => advInputRow.classList.remove('error-shake'), 400);
+      setGameTimeout(() => advInputRow.classList.remove('error-shake'), 400);
     }
 
     function triggerMatchSuccess(match, v1, v2, originEl1, originEl2) {
@@ -1701,7 +1809,7 @@
           targetEl = s2;
         }
 
-        setTimeout(() => {
+        setGameTimeout(() => {
           createExplosion(s1.getBoundingClientRect());
           if (!match.isSquare) {
             createExplosion(targetEl.getBoundingClientRect());
@@ -1722,7 +1830,7 @@
         let centerSlot = document.getElementById(`slot-${targetIdx1}`);
         animateFlyingBubble(originEl1, centerSlot, val1);
         
-        setTimeout(() => {
+        setGameTimeout(() => {
           updateBridgeSlots();
           if (centerSlot) createExplosion(centerSlot.getBoundingClientRect());
           isMatchingAnimationActive = false;
@@ -1740,7 +1848,7 @@
         animateFlyingBubble(originEl1, leftSlot, val1);
         animateFlyingBubble(originEl2, rightSlot, val2);
         
-        setTimeout(() => {
+        setGameTimeout(() => {
           updateBridgeSlots();
           if (leftSlot) createExplosion(leftSlot.getBoundingClientRect());
           if (rightSlot) createExplosion(rightSlot.getBoundingClientRect());
@@ -1764,13 +1872,13 @@
       
       document.querySelector('.game-container').appendChild(flyer);
 
-      setTimeout(() => {
+      setGameTimeout(() => {
         flyer.style.left = `${(toRect.left - containerRect.left) / (window.currentScale || 1)}px`;
         flyer.style.top = `${(toRect.top - containerRect.top) / (window.currentScale || 1)}px`;
         flyer.style.transform = 'scale(0.8)';
       }, 50);
 
-      setTimeout(() => flyer.remove(), 850);
+      setGameTimeout(() => flyer.remove(), 850);
     }
 
     function createScoreIndicator(el) {
@@ -1785,7 +1893,7 @@
       ind.style.top = `${(rect.top - containerRect.top) / (window.currentScale || 1)}px`;
       
       document.querySelector('.game-container').appendChild(ind);
-      setTimeout(() => ind.remove(), 1500);
+      setGameTimeout(() => ind.remove(), 1500);
     }
 
     let magpies = [];
@@ -1921,13 +2029,13 @@
           hellMatchedRow.style.display = 'none';
           slotsOverlay.style.display = 'block';
 
-          setTimeout(() => {
+          setGameTimeout(() => {
             gameState = 'falling';
             triggerFallingAnimation(false);
           }, 600);
         } else {
           // 全對 → 正常召喚喜鵲
-          setTimeout(buildMagpieBridgeAnimation, 600);
+          setGameTimeout(buildMagpieBridgeAnimation, 600);
         }
       }
     }
@@ -1956,16 +2064,24 @@
       }
 
       sound.playTone(800, 'sine', 0.15);
-      let checkInterval = setInterval(() => {
+      if (magpieCheckInterval) clearInterval(magpieCheckInterval);
+      magpieCheckInterval = setInterval(() => {
+        if (gameState !== 'building_bridge') {
+          clearInterval(magpieCheckInterval);
+          magpieCheckInterval = null;
+          return;
+        }
         let allSettled = magpies.every(m => m.settled);
         if (allSettled) {
-          clearInterval(checkInterval);
+          clearInterval(magpieCheckInterval);
+          magpieCheckInterval = null;
           
           let deck = document.getElementById("magpie-bridge-deck");
           if (deck) deck.style.display = "block";
           sound.playSuccess();
           
-          setTimeout(() => {
+          setGameTimeout(() => {
+            if (gameState !== 'building_bridge') return;
             gameState = 'walking';
             triggerMeetingAnimation();
           }, 600);
@@ -1983,6 +2099,10 @@
       let totalSteps = 120; // 2 seconds walking animation
 
       function walkFrame() {
+        if (gameState !== 'walking') {
+          walkAnimId = null;
+          return;
+        }
         if (step <= totalSteps) {
           let t = step / totalSteps;
           
@@ -2004,8 +2124,9 @@
           }
 
           step++;
-          requestAnimationFrame(walkFrame);
+          walkAnimId = requestAnimationFrame(walkFrame);
         } else {
+          walkAnimId = null;
           cowherdBox.innerHTML = getCowherdSVG('idle');
           weaverBox.innerHTML = getWeaverGirlSVG('idle');
           
@@ -2026,7 +2147,8 @@
           createHearts(meetX, meetY, 3);
           
           for(let i=0; i<10; i++) {
-            setTimeout(() => {
+            setGameTimeout(() => {
+              if (gameState !== 'walking') return;
               createExplosion({
                 left: centerRect.left + (Math.random()*80 - 40),
                 top: centerRect.top + (Math.random()*40 - 20),
@@ -2035,13 +2157,14 @@
             }, i * 150);
           }
 
-          setTimeout(showClearScreen, 1200);
+          setGameTimeout(showClearScreen, 1200);
         }
       }
-      walkFrame();
+      walkAnimId = requestAnimationFrame(walkFrame);
     }
 
     function showClearScreen() {
+      if (gameState === 'menu') return;
       isFailMode = false;
       if (countdownInterval) clearInterval(countdownInterval);
       if (questionTimerInterval) clearInterval(questionTimerInterval);
@@ -2249,6 +2372,7 @@
     }
 
     function showFailureScreen() {
+      if (gameState === 'menu') return;
       isFailMode = true;
       if (inCommonFactorPhase) {
         clearMsg.style.textAlign = 'center';
@@ -2291,6 +2415,10 @@
       let totalSteps = walkSteps + fallSteps;
 
       function fallFrame() {
+        if (gameState !== 'falling') {
+          fallAnimId = null;
+          return;
+        }
         if (step <= totalSteps) {
           if (step <= walkSteps) {
             let t = step / walkSteps;
@@ -2322,8 +2450,9 @@
             }
           }
           step++;
-          requestAnimationFrame(fallFrame);
+          fallAnimId = requestAnimationFrame(fallFrame);
         } else {
+          fallAnimId = null;
           cowherdBox.innerHTML = getCowherdSVG('idle');
           weaverBox.innerHTML = getWeaverGirlSVG('idle');
           cowherdBox.style.transform = '';
@@ -2333,7 +2462,7 @@
           showFailureScreen();
         }
       }
-      fallFrame();
+      fallAnimId = requestAnimationFrame(fallFrame);
     }
 
     /* --- Canvas Stars & Explosions Particle System --- */
@@ -2633,6 +2762,7 @@
           } else {
             inCommonFactorPhase = false;
             commonFactorQuestionIndex = 0;
+            cancelOngoingAnimations();
             menuOverlay.classList.add('active');
             hudScoreContainer.style.display = 'none';
             hudTimerContainer.style.display = 'none';
@@ -2650,6 +2780,7 @@
             } else {
               inCommonFactorPhase = false;
               commonFactorQuestionIndex = 0;
+              cancelOngoingAnimations();
               menuOverlay.classList.add('active');
               hudScoreContainer.style.display = 'none';
               hudTimerContainer.style.display = 'none';
@@ -2672,12 +2803,17 @@
       inputFactor1.addEventListener('click', (e) => {
         e.preventDefault();
         setActiveInput(inputFactor1);
+        if (isSingleEditMode) {
+          isEditPendingReplacement = false;
+        }
       });
     }
     if (inputFactor2) {
       inputFactor2.addEventListener('click', (e) => {
         e.preventDefault();
-        setActiveInput(inputFactor2);
+        if (!isSingleEditMode) {
+          setActiveInput(inputFactor2);
+        }
       });
     }
 
@@ -2687,20 +2823,29 @@
 
       if (key >= '0' && key <= '9') {
         sound.playClick();
-        if (activeInput.value.length < 3) {
-          activeInput.value += key;
+        if (isSingleEditMode && isEditPendingReplacement) {
+          activeInput.value = key;
+          isEditPendingReplacement = false;
+        } else {
+          if (activeInput.value.length < 3) {
+            activeInput.value += key;
+          }
         }
       } else if (key === 'backspace') {
         sound.playClick();
+        isEditPendingReplacement = false;
         if (activeInput.value.length > 0) {
           activeInput.value = activeInput.value.slice(0, -1);
-        } else if (activeInput === inputFactor2) {
+        } else if (activeInput === inputFactor2 && !isSingleEditMode) {
           setActiveInput(inputFactor1);
         }
       } else if (key === 'clear') {
         sound.playClick();
+        isEditPendingReplacement = false;
         inputFactor1.value = '';
-        inputFactor2.value = '';
+        if (!isSingleEditMode) {
+          inputFactor2.value = '';
+        }
         setActiveInput(inputFactor1);
       }
     }
@@ -2721,71 +2866,198 @@
           handleVirtualKeyPress('backspace');
         } else if (e.key === 'Tab') {
           e.preventDefault();
-          setActiveInput(activeInput === inputFactor1 ? inputFactor2 : inputFactor1);
+          if (!isSingleEditMode) {
+            setActiveInput(activeInput === inputFactor1 ? inputFactor2 : inputFactor1);
+          }
         } else if (e.key === 'Enter') {
           e.preventDefault();
-          submitAdvancedPair();
-        } else if (e.key === 'Escape' || e.key === 'Delete') {
+          if (isSingleEditMode) {
+            submitFactorCorrection();
+          } else {
+            submitAdvancedPair();
+          }
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          if (isSingleEditMode) {
+            sound.playClick();
+            exitSingleEditMode();
+          } else {
+            handleVirtualKeyPress('clear');
+          }
+        } else if (e.key === 'Delete') {
           handleVirtualKeyPress('clear');
         }
       }
     });
 
-    // Allow clicking submitted factor slots on the bridge (Advanced mode) or matched row (Hell mode) to edit/modify them
+    function enterSingleEditMode(val, slotEl, isHell) {
+      if (gameState !== 'playing' || isMatchingAnimationActive) return;
+
+      // 若點擊正在修正的同一個插槽，則取消修正並退出
+      if (isSingleEditMode && editingSlotData && editingSlotData.element === slotEl) {
+        sound.playClick();
+        exitSingleEditMode();
+        return;
+      }
+
+      isSingleEditMode = true;
+      isEditPendingReplacement = true;
+      editingSlotData = {
+        originalVal: val,
+        element: slotEl,
+        isHell: isHell
+      };
+
+      document.querySelectorAll('.slot.slot-editing').forEach(el => el.classList.remove('slot-editing'));
+      slotEl.classList.add('slot-editing');
+
+      if (advPoolTitle) advPoolTitle.innerText = `✍️ 正在修正因數：${val} (請輸入新數值) ✍️`;
+      inputFactor1.value = val;
+      inputFactor2.value = '';
+      inputFactor2.style.display = 'none';
+
+      btnSubmitPair.innerText = '確認修正 ➔';
+      if (btnCancelEdit) btnCancelEdit.style.display = 'inline-block';
+      if (btnFinishHell) btnFinishHell.style.display = 'none';
+
+      setActiveInput(inputFactor1);
+    }
+
+    function exitSingleEditMode() {
+      isSingleEditMode = false;
+      editingSlotData = null;
+      isEditPendingReplacement = false;
+
+      document.querySelectorAll('.slot.slot-editing').forEach(el => el.classList.remove('slot-editing'));
+
+      if (advPoolTitle) advPoolTitle.innerText = '✍️ 請用兩兩配對的方法找出因數 ✍️';
+      inputFactor1.style.display = '';
+      inputFactor2.style.display = '';
+      inputFactor1.value = '';
+      inputFactor2.value = '';
+
+      btnSubmitPair.innerText = '確認配對 ➔';
+      if (btnCancelEdit) btnCancelEdit.style.display = 'none';
+      if (gameMode === 'hell') {
+        if (btnFinishHell) btnFinishHell.style.display = 'inline-block';
+      } else {
+        if (btnFinishHell) btnFinishHell.style.display = 'none';
+      }
+
+      setActiveInput(inputFactor1);
+    }
+
+    function submitFactorCorrection() {
+      if (!isSingleEditMode || !editingSlotData) return;
+      let newVal = parseInt(inputFactor1.value);
+
+      if (isNaN(newVal) || newVal <= 0) {
+        shakeInputRow();
+        return;
+      }
+
+      let oldVal = editingSlotData.originalVal;
+
+      if (newVal === oldVal) {
+        sound.playClick();
+        exitSingleEditMode();
+        return;
+      }
+
+      if (placedValues.includes(newVal) && newVal !== oldVal) {
+        shakeInputRow();
+        return;
+      }
+
+      sound.playSuccess();
+
+      let idx = placedValues.indexOf(oldVal);
+      if (idx !== -1) {
+        placedValues[idx] = newVal;
+      } else {
+        placedValues.push(newVal);
+      }
+      questionStudentFactors.add(newVal);
+
+      let pair = matchedPairs.find(p => p.f1 === oldVal || p.f2 === oldVal);
+      if (pair) {
+        if (pair.f1 === oldVal) {
+          pair.f1 = newVal;
+        } else {
+          pair.f2 = newVal;
+        }
+        let match = factorPairs.find(p => 
+          (p.f1 === pair.f1 && p.f2 === pair.f2) || (p.f1 === pair.f2 && p.f2 === pair.f1)
+        );
+        if (match) {
+          pair.id = match.id;
+          pair.isDummy = false;
+          pair.isSquare = match.isSquare;
+        } else {
+          pair.id = 'dummy-' + Date.now();
+          pair.isDummy = true;
+        }
+      }
+
+      if (editingSlotData.isHell) {
+        editingSlotData.element.innerText = newVal;
+        createExplosion(editingSlotData.element.getBoundingClientRect());
+      } else {
+        updateBridgeSlots();
+        let targetSlot = document.querySelectorAll('#slots-overlay .slot.filled');
+        targetSlot.forEach(s => {
+          if (parseInt(s.innerText) === newVal) {
+            createExplosion(s.getBoundingClientRect());
+          }
+        });
+      }
+
+      exitSingleEditMode();
+
+      if (gameMode === 'advanced' && matchedPairs.length === factorPairs.length) {
+        checkGameProgress();
+      }
+    }
+
+    // 點擊已填入插槽（進階版）或石階（困難版）時，僅針對該數字進入單數修正模式
     slotsOverlay.addEventListener('click', (e) => {
       let slot = e.target.closest('.slot.filled');
       if (!slot || gameState !== 'playing' || isMatchingAnimationActive) return;
-      if (gameMode !== 'advanced' && gameMode !== 'hell') return;
+      if (gameMode !== 'advanced') return;
 
       let val = parseInt(slot.innerText);
       if (isNaN(val)) return;
 
       sound.playClick();
-      
-      let idx = placedValues.indexOf(val);
-      if (idx !== -1) placedValues.splice(idx, 1);
-
-      let pairIdx = matchedPairs.findIndex(p => p.f1 === val || p.f2 === val);
-      if (pairIdx !== -1) matchedPairs.splice(pairIdx, 1);
-
-      updateBridgeSlots();
-
-      if (!inputFactor1.value) {
-        inputFactor1.value = val;
-        setActiveInput(inputFactor1);
-      } else {
-        inputFactor2.value = val;
-        setActiveInput(inputFactor2);
-      }
+      enterSingleEditMode(val, slot, false);
     });
 
     hellMatchedRow.addEventListener('click', (e) => {
       let slot = e.target.closest('.slot.filled');
       if (!slot || gameState !== 'playing' || isMatchingAnimationActive) return;
+      if (gameMode !== 'hell') return;
 
       let val = parseInt(slot.innerText);
       if (isNaN(val)) return;
 
       sound.playClick();
+      enterSingleEditMode(val, slot, true);
+    });
 
-      let idx = placedValues.indexOf(val);
-      if (idx !== -1) placedValues.splice(idx, 1);
-
-      let pairIdx = matchedPairs.findIndex(p => p.f1 === val || p.f2 === val);
-      if (pairIdx !== -1) matchedPairs.splice(pairIdx, 1);
-
-      slot.remove();
-
-      if (!inputFactor1.value) {
-        inputFactor1.value = val;
-        setActiveInput(inputFactor1);
+    btnSubmitPair.addEventListener('click', () => {
+      if (isSingleEditMode) {
+        submitFactorCorrection();
       } else {
-        inputFactor2.value = val;
-        setActiveInput(inputFactor2);
+        submitAdvancedPair();
       }
     });
 
-    btnSubmitPair.addEventListener('click', submitAdvancedPair);
+    if (btnCancelEdit) {
+      btnCancelEdit.addEventListener('click', () => {
+        sound.playClick();
+        exitSingleEditMode();
+      });
+    }
 
     btnFinishHell.addEventListener('click', () => {
       if (gameState !== 'playing' || isMatchingAnimationActive) return;
@@ -2806,6 +3078,7 @@
         hudScoreTxt.innerText = `${sessionTotalScore}分`;
 
         gameState = 'building_bridge';
+        updateBridgeSlots();
         buildMagpieBridgeAnimation();
       } else {
         questionHadMistake = true;
@@ -2819,9 +3092,10 @@
         poolMsg.style.display = 'flex';
         poolMsg.innerHTML = '😔 因數配對有誤...';
         hellMatchedRow.style.display = 'none';
+        updateBridgeSlots();
         slotsOverlay.style.display = 'block';
 
-        setTimeout(() => {
+        setGameTimeout(() => {
           gameState = 'falling';
           triggerFallingAnimation(false);
         }, 600);
@@ -2830,8 +3104,7 @@
 
     document.getElementById('btn-top-menu').addEventListener('click', () => {
       sound.playClick();
-      if (countdownInterval) clearInterval(countdownInterval);
-      if (questionTimerInterval) clearInterval(questionTimerInterval);
+      cancelOngoingAnimations();
       menuOverlay.classList.add('active');
       clearOverlay.classList.remove('active');
       document.getElementById('common-factor-overlay').classList.remove('active');
