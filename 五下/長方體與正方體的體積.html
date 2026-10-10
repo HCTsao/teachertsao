@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
@@ -85,7 +85,7 @@
     <!-- 中間 3D 顯示區 -->
     <div id="canvas-container" class="relative flex-1">
         
-        <!-- 右側紀錄面板與回到原位按鈕 -->
+        <!-- 右側紀錄面板與重新播放按鈕 -->
         <div class="absolute right-4 top-4 flex flex-col gap-3 w-64 md:w-80 pointer-events-none">
             <!-- 紀錄面板 -->
             <div id="formula-panel" class="bg-white/90 backdrop-blur p-4 rounded-xl shadow-lg border border-indigo-100">
@@ -106,9 +106,9 @@
                 </div>
             </div>
             
-            <!-- 回到原位按鈕 (橫向) -->
-            <button id="btn-reset-view" class="pointer-events-auto w-full bg-blue-600 text-white font-bold py-3 rounded-lg shadow-lg hover:bg-blue-700 transition stop-3d-prop">
-                回到原位
+            <!-- 重新播放按鈕 (橫向) -->
+            <button id="btn-replay" class="pointer-events-auto w-full bg-blue-600 text-white font-bold py-3 rounded-lg shadow-lg hover:bg-blue-700 transition stop-3d-prop">
+                重新播放
             </button>
         </div>
 
@@ -164,6 +164,8 @@
         let cubes = []; 
         let isAnimating = false;
         let currentStep = 0; 
+        let currentSubStep = 1;
+        let isFinished = false;
 
         function init() {
             scene = new THREE.Scene();
@@ -223,6 +225,8 @@
         function updateModel() {
             if (isAnimating) return;
             currentStep = 0;
+            currentSubStep = 1;
+            isFinished = false;
             resetUI();
             updateStartButtonState();
             
@@ -283,16 +287,31 @@
 
         function updateStartButtonState() {
             const btn = document.getElementById('btn-start');
+            const btnReplay = document.getElementById('btn-replay');
             if (isAnimating) {
-                btn.classList.add('btn-disabled');
-                btn.disabled = true;
+                if (btn) {
+                    btn.classList.add('btn-disabled');
+                    btn.disabled = true;
+                }
+                if (btnReplay) {
+                    btnReplay.classList.add('btn-disabled');
+                    btnReplay.disabled = true;
+                }
             } else {
-                btn.classList.remove('btn-disabled');
-                btn.disabled = false;
+                if (btn) {
+                    btn.classList.remove('btn-disabled');
+                    btn.disabled = false;
+                }
+                if (btnReplay) {
+                    btnReplay.classList.remove('btn-disabled');
+                    btnReplay.disabled = false;
+                }
             }
         }
 
         function showQuiz(step, subStep = 1) {
+            currentStep = step;
+            currentSubStep = subStep;
             const l = parseInt(document.getElementById('input-l').value);
             const w = parseInt(document.getElementById('input-w').value);
             const h = parseInt(document.getElementById('input-h').value);
@@ -369,17 +388,26 @@
         function showError() { document.getElementById('quiz-error').classList.remove('hidden'); }
 
         async function handleSuccess(step) {
+            isAnimating = true;
+            updateStartButtonState();
             document.getElementById('quiz-modal').style.display = 'none';
             const el = document.getElementById(`step-${step}-ui`);
             el.classList.remove('step-hidden');
             el.classList.add('step-visible', 'bg-white/80', 'border-l-4', step === 1 ? 'border-indigo-500' : (step === 2 ? 'border-pink-500' : 'border-green-500'));
-            currentStep = step;
-            updateStartButtonState(); 
             
             await sleep(800);
-            if (step === 1) playAnimation2();
-            else if (step === 2) playAnimation3();
-            else {
+            if (step === 1) {
+                currentStep = 2;
+                currentSubStep = 1;
+                await playAnimation2();
+            } else if (step === 2) {
+                currentStep = 3;
+                currentSubStep = 1;
+                await playAnimation3();
+            } else {
+                currentStep = 3;
+                isFinished = true;
+                isAnimating = false;
                 updateStartButtonState();
             }
         }
@@ -390,16 +418,40 @@
             if (isAnimating) return;
             
             // 重啟前清空狀態
-            currentStep = 0; 
             resetUI();
-            
-            // 修正：必須在 isAnimating 設為 true 之前重設積木顯示，否則 updateModel 會被跳過
             updateModel(); 
             
+            currentStep = 1;
+            currentSubStep = 1;
+            isFinished = false;
+
+            await replayStep1();
+        }
+
+        async function replayStep1() {
             isAnimating = true; 
             updateStartButtonState();
+            document.getElementById('quiz-modal').style.display = 'none';
+            document.getElementById('quiz-error').classList.add('hidden');
 
             const l = parseInt(document.getElementById('input-l').value);
+            const w = parseInt(document.getElementById('input-w').value);
+            const h = parseInt(document.getElementById('input-h').value);
+
+            // 隱藏全部積木
+            for (let y = 0; y < h; y++) {
+                for (let z = 0; z < w; z++) {
+                    for (let x = 0; x < l; x++) {
+                        if (cubes[y] && cubes[y][z] && cubes[y][z][x]) {
+                            cubes[y][z][x].visible = false;
+                        }
+                    }
+                }
+            }
+
+            await sleep(200);
+
+            // 第一步動畫：一排積木由左至右出現
             for (let x = 0; x < l; x++) { 
                 if (cubes[0] && cubes[0][0] && cubes[0][0][x]) {
                     cubes[0][0][x].visible = true; 
@@ -412,48 +464,122 @@
         }
 
         async function playAnimation2() {
-            isAnimating = true;
-            updateStartButtonState();
-            const l = parseInt(document.getElementById('input-l').value);
-            const w = parseInt(document.getElementById('input-w').value);
-            for (let z = 1; z < w; z++) {
-                for (let x = 0; x < l; x++) {
-                    if (cubes[0] && cubes[0][z] && cubes[0][z][x]) {
-                        cubes[0][z][x].visible = true;
-                    }
-                }
-                await sleep(500);
-            }
-            isAnimating = false; 
-            updateStartButtonState();
-            showQuiz(2, 1);
+            await replayStep2();
         }
 
-        async function playAnimation3() {
+        async function replayStep2() {
             isAnimating = true;
             updateStartButtonState();
+            document.getElementById('quiz-modal').style.display = 'none';
+            document.getElementById('quiz-error').classList.add('hidden');
+
             const l = parseInt(document.getElementById('input-l').value);
             const w = parseInt(document.getElementById('input-w').value);
             const h = parseInt(document.getElementById('input-h').value);
-            for (let y = 1; y < h; y++) {
+
+            // 保留第一步(y=0, z=0)積木為顯示，其餘隱藏
+            for (let y = 0; y < h; y++) {
                 for (let z = 0; z < w; z++) {
                     for (let x = 0; x < l; x++) {
                         if (cubes[y] && cubes[y][z] && cubes[y][z][x]) {
-                            cubes[y][z][x].visible = true;
+                            cubes[y][z][x].visible = (y === 0 && z === 0);
                         }
                     }
                 }
-                await sleep(700);
             }
+
+            await sleep(200);
+
+            // 第二步動畫：第一層排數由前至後依排出現
+            if (w === 1) {
+                await sleep(300);
+            } else {
+                for (let z = 1; z < w; z++) {
+                    for (let x = 0; x < l; x++) {
+                        if (cubes[0] && cubes[0][z] && cubes[0][z][x]) {
+                            cubes[0][z][x].visible = true;
+                        }
+                    }
+                    await sleep(500);
+                }
+            }
+
             isAnimating = false; 
             updateStartButtonState();
-            showQuiz(3, 1);
+            showQuiz(2, currentSubStep || 1);
+        }
+
+        async function playAnimation3() {
+            await replayStep3();
+        }
+
+        async function replayStep3() {
+            isAnimating = true;
+            updateStartButtonState();
+            document.getElementById('quiz-modal').style.display = 'none';
+            document.getElementById('quiz-error').classList.add('hidden');
+
+            const l = parseInt(document.getElementById('input-l').value);
+            const w = parseInt(document.getElementById('input-w').value);
+            const h = parseInt(document.getElementById('input-h').value);
+
+            // 保留第一層(y=0)積木為顯示，其餘上層隱藏
+            for (let y = 0; y < h; y++) {
+                for (let z = 0; z < w; z++) {
+                    for (let x = 0; x < l; x++) {
+                        if (cubes[y] && cubes[y][z] && cubes[y][z][x]) {
+                            cubes[y][z][x].visible = (y === 0);
+                        }
+                    }
+                }
+            }
+
+            await sleep(200);
+
+            // 第三步動畫：由下至上一層一層堆疊出現
+            if (h === 1) {
+                await sleep(300);
+            } else {
+                for (let y = 1; y < h; y++) {
+                    for (let z = 0; z < w; z++) {
+                        for (let x = 0; x < l; x++) {
+                            if (cubes[y] && cubes[y][z] && cubes[y][z][x]) {
+                                cubes[y][z][x].visible = true;
+                            }
+                        }
+                    }
+                    await sleep(700);
+                }
+            }
+
+            isAnimating = false; 
+            updateStartButtonState();
+            if (!isFinished) {
+                showQuiz(3, currentSubStep || 1);
+            }
+        }
+
+        async function replayCurrentStep() {
+            if (isAnimating) return;
+            if (currentStep === 0) {
+                await playAnimation1();
+            } else if (currentStep === 1) {
+                await replayStep1();
+            } else if (currentStep === 2) {
+                await replayStep2();
+            } else if (currentStep === 3) {
+                await replayStep3();
+            }
         }
 
         function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
 
         let isMouseDown = false, mouseX = 0, mouseY = 0;
-        container.addEventListener('mousedown', () => isMouseDown = true);
+        container.addEventListener('mousedown', (e) => {
+            isMouseDown = true;
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
         window.addEventListener('mouseup', () => isMouseDown = false);
         window.addEventListener('mousemove', (e) => {
             if (!isMouseDown) return;
@@ -462,17 +588,19 @@
             mouseX = e.clientX; mouseY = e.clientY;
         });
 
-        document.getElementById('input-l').addEventListener('input', updateModel);
-        document.getElementById('input-w').addEventListener('input', updateModel);
-        document.getElementById('input-h').addEventListener('input', updateModel);
-        document.getElementById('btn-start').addEventListener('click', playAnimation1);
-        
-        document.getElementById('btn-reset-view').addEventListener('click', () => {
+        // 雙擊畫面可重設視角至初始角度
+        container.addEventListener('dblclick', () => {
             scene.rotation.x = 0;
             scene.rotation.y = 0;
             camera.position.set(12, 10, 15);
             camera.lookAt(0, 0, 0);
         });
+
+        document.getElementById('input-l').addEventListener('input', updateModel);
+        document.getElementById('input-w').addEventListener('input', updateModel);
+        document.getElementById('input-h').addEventListener('input', updateModel);
+        document.getElementById('btn-start').addEventListener('click', playAnimation1);
+        document.getElementById('btn-replay').addEventListener('click', replayCurrentStep);
 
         window.onload = init;
         window.onresize = () => {
