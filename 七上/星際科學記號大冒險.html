@@ -1052,7 +1052,7 @@
 
             <div class="versus-panel" id="versusPanel" style="display:none;">
                 <div class="versus-title">⚔️ 雙人對戰</div>
-                <p class="versus-rule">雙方各 5 滴血，答對 1 題打掉對手 1 滴血，先讓對方歸零就贏！<br>有人答對時，對方還有最後 3 秒作答機會！</p>
+                <p class="versus-rule">雙方各 5 滴血，答對 1 題打掉對手 1 滴血，先讓對方歸零就贏！<br>有人答對時，對方畫面會直接公布正確答案並跳下一題！</p>
                 <div id="versusLobby">
                     <button class="btn btn-primary" onclick="vsCreate()">🆕 開新房間</button>
                     <div class="versus-join">
@@ -1780,6 +1780,8 @@
         let vsOppName = '';
         let vsMyAnswered = false;
         let vsOppAnswered = false;
+        let vsRevealed = false;
+        let vsCorrectIndex = -1;
         let vsRoundTimer = null;
         let vsAdvancing = false;
         let vsAdvanceTimer = null;
@@ -1855,7 +1857,6 @@
             vsChannel.on('broadcast', { event: 'start' }, ({ payload }) => vsOnStart(payload));
             vsChannel.on('broadcast', { event: 'q' }, ({ payload }) => vsOnQ(payload));
             vsChannel.on('broadcast', { event: 'ans' }, ({ payload }) => vsOnAns(payload));
-            vsChannel.on('broadcast', { event: 'hurry' }, ({ payload }) => vsOnHurry(payload));
             vsChannel.on('broadcast', { event: 'over' }, () => vsOnOver());
             vsChannel.on('presence', { event: 'sync' }, vsOnPresence);
             vsChannel.on('presence', { event: 'leave' }, ({ key }) => vsOnLeave(key));
@@ -1979,6 +1980,7 @@
             clearTimeout(vsAdvanceTimer);
             vsMyAnswered = false;
             vsOppAnswered = false;
+            vsRevealed = false;
             const p = vsMakePayload();
             p.n = vsRound;
             vsRender(p);
@@ -1992,10 +1994,12 @@
             if (p.n <= vsRound) return;
             vsRound = p.n;
             vsMyAnswered = false;
+            vsRevealed = false;
             vsRender(p);
         }
 
         function vsRender(p) {
+            vsCorrectIndex = p.correct;
             // 記錄本題資訊（錯題上傳教師後台用）
             gameState.currentQ = {
                 type: p.type,
@@ -2020,7 +2024,7 @@
         }
 
         function vsAnswer(si, ci, btn) {
-            if (vsOver || vsMyAnswered) return;
+            if (vsOver || vsMyAnswered || vsRevealed) return;
             vsMyAnswered = true;
             document.querySelectorAll('.answer-btn').forEach(b => b.style.pointerEvents = 'none');
             const feedback = document.getElementById('feedback');
@@ -2048,10 +2052,7 @@
             updateGameUI();
             if (vsChannel) vsChannel.send({ type: 'broadcast', event: 'ans', payload: { n: vsRound, ok: ok } });
             if (vsIsHost) {
-                if (ok) {
-                    vsScheduleAdvance(3000);
-                    if (!vsOppAnswered && vsChannel) vsChannel.send({ type: 'broadcast', event: 'hurry', payload: { n: vsRound } });
-                }
+                if (ok) vsScheduleAdvance(3000);
                 vsHostCheckAdvance();
             }
             vsCheckEnd();
@@ -2062,10 +2063,8 @@
             if (payload.n !== vsRound) return;
             if (payload.ok) {
                 vsDamageMe();
-                if (vsIsHost) {
-                    vsScheduleAdvance(3000);
-                    if (!vsMyAnswered) vsShowHurry();
-                }
+                if (!vsMyAnswered) vsRevealAnswer();
+                if (vsIsHost) vsScheduleAdvance(3000);
             }
             if (vsIsHost) {
                 vsOppAnswered = true;
@@ -2091,18 +2090,16 @@
             vsAdvanceTimer = setTimeout(() => { if (!vsOver) vsNextRound(); }, delay);
         }
 
-        // 對手已答對，提醒還沒作答的自己把握最後 3 秒
-        function vsShowHurry() {
-            if (vsOver || vsMyAnswered) return;
+        // 對方答對了：在還沒作答的自己畫面上公布正確答案並鎖定
+        function vsRevealAnswer() {
+            if (vsOver || vsMyAnswered || vsRevealed) return;
+            vsRevealed = true;
+            const buttons = document.querySelectorAll('.answer-btn');
+            buttons.forEach(b => b.style.pointerEvents = 'none');
+            if (buttons[vsCorrectIndex]) buttons[vsCorrectIndex].classList.add('correct');
             const feedback = document.getElementById('feedback');
-            feedback.textContent = '⚡ 對手已答對！最後 3 秒作答！';
+            feedback.textContent = '💡 對方答對了！正確答案如上，準備跳下一題…';
             feedback.className = 'feedback correct';
-        }
-
-        function vsOnHurry(payload) {
-            if (!payload || vsOver || !vsStarted) return;
-            if (payload.n !== vsRound) return;
-            vsShowHurry();
         }
 
         function vsHostCheckAdvance() {
