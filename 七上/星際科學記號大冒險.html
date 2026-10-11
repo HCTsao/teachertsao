@@ -866,6 +866,102 @@
             margin-top: 8px;
         }
 
+        /* 單機 / 對戰模式切換 */
+        .mode-select {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .mode-btn {
+            padding: 12px 28px;
+            font-size: 1.1em;
+            font-family: inherit;
+            font-weight: bold;
+            border-radius: 30px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .mode-btn.active {
+            border-color: #00ffff;
+            background: linear-gradient(135deg, #00c6ff, #0072ff);
+            box-shadow: 0 0 18px rgba(0, 255, 255, 0.5);
+        }
+
+        /* 雙人對戰面板 */
+        .versus-panel {
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px solid rgba(255, 100, 100, 0.4);
+            border-radius: 20px;
+            padding: 25px;
+            text-align: center;
+        }
+
+        .versus-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #ff8888;
+            margin-bottom: 10px;
+        }
+
+        .versus-rule {
+            color: #aaccff;
+            margin-bottom: 18px;
+        }
+
+        .versus-join {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            align-items: center;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .versus-join input {
+            padding: 12px;
+            font-size: 1.1em;
+            font-family: inherit;
+            text-align: center;
+            letter-spacing: 4px;
+            width: 170px;
+            border-radius: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            outline: none;
+        }
+
+        .versus-join input:focus {
+            border-color: #ff8888;
+        }
+
+        .versus-hint {
+            color: #88aacc;
+            font-size: 0.9em;
+            margin-top: 14px;
+        }
+
+        .room-code {
+            font-size: 2.2em;
+            font-weight: bold;
+            color: #ffdd00;
+            letter-spacing: 6px;
+            margin: 10px 0 15px;
+            text-shadow: 0 0 15px #ff8800;
+        }
+
+        .waiting-text {
+            color: #aaccff;
+            margin-bottom: 18px;
+            animation: vsPulse 1.2s ease-in-out infinite;
+        }
+
         @media (max-width: 600px) {
             .identity-inputs {
                 grid-template-columns: 1fr;
@@ -875,6 +971,7 @@
 </head>
 <body>
     <div class="stars" id="stars"></div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <audio id="bgm" src="bgm.mp3" loop preload="auto"></audio>
     <button class="bgm-toggle" id="bgmToggle" onclick="toggleBgm()" title="背景音樂開/關">🎵</button>
     <a class="home-btn" href="../index.html" title="回到網站首頁">🏠 回到首頁</a>
@@ -896,6 +993,11 @@
         <div class="screen active" id="startScreen">
             <h1 class="title">🚀 星際科學記號大冒險</h1>
             <p class="subtitle">踏上宇宙之旅，成為科學記號大師！</p>
+
+            <div class="mode-select">
+                <button class="mode-btn active" id="modeSingle" onclick="setMode('single')">🎮 單機冒險</button>
+                <button class="mode-btn" id="modeVersus" onclick="setMode('versus')">⚔️ 雙人對戰</button>
+            </div>
             
             
             <div class="game-header">
@@ -913,7 +1015,7 @@
                 </div>
             </div>
 
-            <div class="level-grid">
+            <div class="level-grid" id="levelGrid">
                 <div class="level-card" onclick="startGame(1)">
                     <div class="level-icon">🌍</div>
                     <div class="level-name">地球出發</div>
@@ -953,6 +1055,24 @@
                     <div class="level-icon">🏆</div>
                     <div class="level-name">排行榜</div>
                     <div class="level-desc">各關卡英雄榜</div>
+                </div>
+            </div>
+
+            <div class="versus-panel" id="versusPanel" style="display:none;">
+                <div class="versus-title">⚔️ 雙人對戰</div>
+                <p class="versus-rule">雙方各 5 滴血，答對 1 題打掉對手 1 滴血，先讓對方歸零就贏！<br>對戰成績不列入排行榜。</p>
+                <div id="versusLobby">
+                    <button class="btn btn-primary" onclick="vsCreate()">🆕 開新房間</button>
+                    <div class="versus-join">
+                        <input id="roomCodeInput" placeholder="輸入4位房號" maxlength="4" inputmode="numeric">
+                        <button class="btn btn-secondary" onclick="vsJoin()">🚪 加入房間</button>
+                    </div>
+                    <p class="versus-hint">開房者把房號告訴對手，兩人在不同裝置同時加入即可開戰！<br>出戰名號預設使用上方填寫的姓名。</p>
+                </div>
+                <div id="versusWaiting" style="display:none;">
+                    <div class="room-code" id="roomCodeDisplay">房號：----</div>
+                    <div class="waiting-text" id="waitingText">等待對手加入…</div>
+                    <button class="btn btn-secondary" onclick="vsCancel()">取消</button>
                 </div>
             </div>
         </div>
@@ -1073,6 +1193,7 @@
             questionIndex: 0,
             totalQuestions: 5,
             correctAnswers: 0,
+            mode: 'single',
             player: { className: '', seat: '', name: '' },
             answersLog: [],
             currentQ: null,
@@ -1157,6 +1278,11 @@
             if (screenId === 'startScreen' || screenId === 'resultScreen') {
                 stopBgm();
             }
+
+            // 離開遊戲畫面時清理對戰連線
+            if (screenId !== 'gameScreen') {
+                vsCleanup();
+            }
         }
 
         // 開始遊戲
@@ -1192,6 +1318,8 @@
             gameState.questionIndex = 0;
             gameState.correctAnswers = 0;
             gameState.answersLog = [];
+            gameState.mode = 'single';
+            setMode('single');
             gameState.monstersDefeated = 0;
             gameState.startTime = Date.now();
             updateGameUI();
@@ -1212,19 +1340,24 @@
 
         // 更新遊戲 UI
         function updateGameUI() {
-            document.getElementById('score').textContent = gameState.score;
-            document.getElementById('levelDisplay').textContent = gameState.challengeMode ? '挑戰' : gameState.currentLevel;
-            document.getElementById('progress').textContent = 
-                gameState.challengeMode ? gameState.challengeTime + 's' : 
+            const isVs = gameState.mode === 'versus';
+            const maxLives = isVs ? 5 : 3;
+            document.getElementById('score').textContent = isVs ? vsHits : gameState.score;
+            document.getElementById('levelDisplay').textContent = isVs ? '對戰' : (gameState.challengeMode ? '挑戰' : gameState.currentLevel);
+            document.getElementById('progress').textContent =
+                isVs ? `第 ${vsRound} 輪` :
+                gameState.challengeMode ? gameState.challengeTime + 's' :
                 `${gameState.questionIndex}/${gameState.totalQuestions}`;
-            
-            const progressPercent = gameState.challengeMode ? 
-                ((60 - gameState.challengeTime) / 60 * 100) : 
+
+            const progressPercent = isVs ? Math.min(100, vsRound * 10) :
+                gameState.challengeMode ?
+                ((60 - gameState.challengeTime) / 60 * 100) :
                 (gameState.questionIndex / gameState.totalQuestions * 100);
             document.getElementById('progressFill').style.width = progressPercent + '%';
-            
-            document.getElementById('hearts').textContent = '❤️'.repeat(gameState.lives) + '🖤'.repeat(3 - gameState.lives);
-            document.getElementById('shipHpFill').style.width = (gameState.lives / 3 * 100) + '%';
+
+            const lives = Math.max(gameState.lives, 0);
+            document.getElementById('hearts').textContent = '❤️'.repeat(lives) + '🖤'.repeat(Math.max(maxLives - lives, 0));
+            document.getElementById('shipHpFill').style.width = (lives / maxLives * 100) + '%';
         }
 
         // 生成題目
@@ -1633,6 +1766,381 @@
             
             oscillator.start(audioContext.currentTime);
             oscillator.stop(audioContext.currentTime + 0.3);
+        }
+
+        // ===== 雙人對戰模式（Supabase Realtime 連線，不記入排行榜）=====
+        let sbVs = null;
+        let vsChannel = null;
+        let vsClientId = '';
+        let vsRoom = '';
+        let vsIsHost = false;
+        let vsStarted = false;
+        let vsOver = false;
+        let vsRound = 0;
+        let vsMyHp = 5;
+        let vsOppHp = 5;
+        let vsHits = 0;
+        let vsTaken = 0;
+        let vsCorrect = 0;
+        let vsTotal = 0;
+        let vsMyName = '';
+        let vsOppName = '';
+        let vsMyAnswered = false;
+        let vsOppAnswered = false;
+        let vsRoundTimer = null;
+
+        function vsGetClient() {
+            if (sbVs) return sbVs;
+            if (typeof supabase === 'undefined' || !SUPABASE_URL.startsWith('http')) return null;
+            sbVs = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            return sbVs;
+        }
+
+        function setMode(mode) {
+            gameState.mode = mode;
+            document.getElementById('modeSingle').classList.toggle('active', mode === 'single');
+            document.getElementById('modeVersus').classList.toggle('active', mode === 'versus');
+            document.getElementById('levelGrid').style.display = mode === 'single' ? '' : 'none';
+            document.getElementById('versusPanel').style.display = mode === 'versus' ? '' : 'none';
+            if (mode === 'single') {
+                vsCleanup();
+                document.getElementById('versusLobby').style.display = '';
+                document.getElementById('versusWaiting').style.display = 'none';
+            }
+        }
+
+        function vsFighterName() {
+            const n = (document.getElementById('inputName').value || '').trim();
+            if (n) return n;
+            return '訪客' + Math.floor(Math.random() * 90 + 10);
+        }
+
+        function vsMakeCode() {
+            return String(Math.floor(Math.random() * 9000 + 1000));
+        }
+
+        function vsCreate() {
+            if (!vsGetClient()) { alert('⚔️ 對戰需要連上網路，請確認網路後再試！'); return; }
+            vsMyName = vsFighterName();
+            vsRoom = vsMakeCode();
+            vsIsHost = true;
+            vsJoinChannel();
+            document.getElementById('versusLobby').style.display = 'none';
+            document.getElementById('versusWaiting').style.display = '';
+            document.getElementById('roomCodeDisplay').textContent = '房號：' + vsRoom;
+            document.getElementById('waitingText').textContent = '等待對手加入…（請告訴對手房號）';
+        }
+
+        function vsJoin() {
+            if (!vsGetClient()) { alert('⚔️ 對戰需要連上網路，請確認網路後再試！'); return; }
+            const code = document.getElementById('roomCodeInput').value.trim();
+            if (!/^\d{4}$/.test(code)) { alert('請輸入 4 位數字房號！'); return; }
+            vsMyName = vsFighterName();
+            vsRoom = code;
+            vsIsHost = false;
+            vsJoinChannel();
+            document.getElementById('versusLobby').style.display = 'none';
+            document.getElementById('versusWaiting').style.display = '';
+            document.getElementById('roomCodeDisplay').textContent = '房號：' + vsRoom;
+            document.getElementById('waitingText').textContent = '已送出加入請求，等待房主開始…';
+        }
+
+        function vsCancel() {
+            vsCleanup();
+            document.getElementById('versusLobby').style.display = '';
+            document.getElementById('versusWaiting').style.display = 'none';
+        }
+
+        function vsJoinChannel() {
+            const sb = vsGetClient();
+            vsClientId = 'c' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+            vsStarted = false;
+            vsOver = false;
+            vsChannel = sb.channel('sci-battle-' + vsRoom, { config: { presence: { key: vsClientId } } });
+            vsChannel.on('broadcast', { event: 'start' }, ({ payload }) => vsOnStart(payload));
+            vsChannel.on('broadcast', { event: 'q' }, ({ payload }) => vsOnQ(payload));
+            vsChannel.on('broadcast', { event: 'ans' }, ({ payload }) => vsOnAns(payload));
+            vsChannel.on('broadcast', { event: 'over' }, () => vsOnOver());
+            vsChannel.on('presence', { event: 'sync' }, vsOnPresence);
+            vsChannel.on('presence', { event: 'leave' }, ({ key }) => vsOnLeave(key));
+            vsChannel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') vsChannel.track({ name: vsMyName });
+            });
+        }
+
+        function vsPresenceMembers() {
+            if (!vsChannel) return [];
+            const state = vsChannel.presenceState();
+            return Object.entries(state).map(([key, metas]) => ({ key, name: (metas[0] && metas[0].name) || '?' }));
+        }
+
+        function vsOnPresence() {
+            if (!vsIsHost || vsStarted || !vsChannel) return;
+            const members = vsPresenceMembers();
+            if (members.length >= 2) {
+                const guest = members.find(m => m.key !== vsClientId);
+                vsOppName = guest ? guest.name : '對手';
+                vsBegin();
+            }
+        }
+
+        function vsOnLeave(key) {
+            if (vsStarted && !vsOver && key !== vsClientId) {
+                vsEnd('leave-win');
+            }
+        }
+
+        function vsBegin() {
+            vsStarted = true;
+            vsRound = 0;
+            vsMyHp = 5;
+            vsOppHp = 5;
+            vsHits = 0;
+            vsTaken = 0;
+            vsCorrect = 0;
+            vsTotal = 0;
+            gameState.mode = 'versus';
+            gameState.lives = 5;
+            gameState.challengeMode = false;
+            showScreen('gameScreen');
+            vsSetupArena();
+            updateGameUI();
+            startBgm();
+            vsChannel.send({ type: 'broadcast', event: 'start', payload: { host: vsMyName, guest: vsOppName } });
+            setTimeout(() => { if (!vsOver) vsNextRound(); }, 1000);
+        }
+
+        function vsOnStart(payload) {
+            if (vsIsHost || vsStarted) return;
+            vsOppName = (payload && payload.host) || '對手';
+            vsStarted = true;
+            vsRound = 0;
+            vsMyHp = 5;
+            vsOppHp = 5;
+            vsHits = 0;
+            vsTaken = 0;
+            vsCorrect = 0;
+            vsTotal = 0;
+            gameState.mode = 'versus';
+            gameState.lives = 5;
+            gameState.challengeMode = false;
+            showScreen('gameScreen');
+            vsSetupArena();
+            updateGameUI();
+            startBgm();
+        }
+
+        function vsSetupArena() {
+            document.getElementById('monsterSprite').textContent = '🛸';
+            document.getElementById('monsterName').textContent = '🛸 ' + vsOppName;
+            document.getElementById('monsterHpFill').style.width = '100%';
+            document.getElementById('shipHpFill').style.width = '100%';
+            document.getElementById('battleFx').innerHTML = '';
+            document.getElementById('battleLabel').textContent = `⚔️ 房間 ${vsRoom} · ${vsMyName} VS ${vsOppName}`;
+        }
+
+        function vsMakePayload() {
+            const level = Math.floor(Math.random() * 6) + 1;
+            const types = getQuestionTypes(level);
+            const type = types[Math.floor(Math.random() * types.length)];
+            let question, answers, correctAnswer, hint;
+            switch (type) {
+                case 'toScientificLarge': ({ question, answers, correctAnswer, hint } = generateToScientific('large')); break;
+                case 'toScientificDecimal': ({ question, answers, correctAnswer, hint } = generateToScientific('decimal')); break;
+                case 'toScientificSmall': ({ question, answers, correctAnswer, hint } = generateToScientific('small')); break;
+                case 'toScientificFraction': ({ question, answers, correctAnswer, hint } = generateToScientificFraction()); break;
+                case 'digitCount': ({ question, answers, correctAnswer, hint } = generateDigitCount()); break;
+                case 'decimalPosition': ({ question, answers, correctAnswer, hint } = generateDecimalPosition()); break;
+                default: ({ question, answers, correctAnswer, hint } = generateCompareScientific()); break;
+            }
+            const shuffled = shuffleArray(answers.map((a, i) => ({ value: a, isCorrect: i === correctAnswer })));
+            return {
+                n: vsRound,
+                type: getQuestionTypeName(type),
+                question: question,
+                hint: hint,
+                answers: shuffled.map(a => a.value),
+                correct: shuffled.findIndex(a => a.isCorrect)
+            };
+        }
+
+        function vsNextRound() {
+            if (vsOver) return;
+            vsRound++;
+            vsMyAnswered = false;
+            vsOppAnswered = false;
+            const p = vsMakePayload();
+            p.n = vsRound;
+            vsRender(p);
+            vsChannel.send({ type: 'broadcast', event: 'q', payload: p });
+            clearTimeout(vsRoundTimer);
+            vsRoundTimer = setTimeout(() => { if (!vsOver) vsNextRound(); }, 30000);
+        }
+
+        function vsOnQ(p) {
+            if (!p || vsOver || !vsStarted) return;
+            if (p.n <= vsRound) return;
+            vsRound = p.n;
+            vsMyAnswered = false;
+            vsRender(p);
+        }
+
+        function vsRender(p) {
+            document.getElementById('questionType').textContent = p.type;
+            document.getElementById('questionText').innerHTML = p.question;
+            document.getElementById('hintText').innerHTML = p.hint;
+            document.getElementById('feedback').textContent = '';
+            document.getElementById('feedback').className = 'feedback';
+            const box = document.getElementById('answers');
+            box.innerHTML = '';
+            p.answers.forEach((a, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'answer-btn';
+                btn.innerHTML = a;
+                btn.onclick = () => vsAnswer(i, p.correct, btn);
+                box.appendChild(btn);
+            });
+            updateGameUI();
+        }
+
+        function vsAnswer(si, ci, btn) {
+            if (vsOver || vsMyAnswered) return;
+            vsMyAnswered = true;
+            document.querySelectorAll('.answer-btn').forEach(b => b.style.pointerEvents = 'none');
+            const feedback = document.getElementById('feedback');
+            const ok = si === ci;
+            vsTotal++;
+            if (ok) {
+                playCorrectSound();
+                btn.classList.add('correct');
+                vsCorrect++;
+                vsHits++;
+                vsOppHp = Math.max(vsOppHp - 1, 0);
+                vsHitOpponentFx();
+                feedback.textContent = '✅ 命中！對手受到 1 點傷害！';
+                feedback.className = 'feedback correct';
+            } else {
+                playWrongSound();
+                btn.classList.add('wrong');
+                document.querySelectorAll('.answer-btn')[ci].classList.add('correct');
+                feedback.textContent = '❌ 沒打中…等待對手出招！';
+                feedback.className = 'feedback wrong';
+            }
+            updateGameUI();
+            if (vsChannel) vsChannel.send({ type: 'broadcast', event: 'ans', payload: { n: vsRound, ok: ok } });
+            if (vsIsHost) vsHostCheckAdvance();
+            vsCheckEnd();
+        }
+
+        function vsOnAns(payload) {
+            if (!payload || vsOver || !vsStarted) return;
+            if (payload.n !== vsRound) return;
+            if (payload.ok) vsDamageMe();
+            if (vsIsHost) {
+                vsOppAnswered = true;
+                vsHostCheckAdvance();
+            }
+        }
+
+        function vsDamageMe() {
+            vsMyHp = Math.max(vsMyHp - 1, 0);
+            vsTaken++;
+            vsTakeHitFx();
+            updateGameUI();
+            vsCheckEnd();
+        }
+
+        function vsHostCheckAdvance() {
+            if (vsOver || !vsIsHost) return;
+            if (vsMyAnswered && vsOppAnswered) {
+                clearTimeout(vsRoundTimer);
+                setTimeout(() => { if (!vsOver) vsNextRound(); }, 1400);
+            }
+        }
+
+        function vsCheckEnd() {
+            if (vsOver) return;
+            if (vsMyHp <= 0 && vsOppHp <= 0) vsEnd('draw');
+            else if (vsOppHp <= 0) vsEnd('win');
+            else if (vsMyHp <= 0) vsEnd('lose');
+        }
+
+        function vsOnOver() {
+            if (vsOver) return;
+            vsCheckEnd();
+        }
+
+        function vsEnd(result) {
+            if (vsOver) return;
+            vsOver = true;
+            clearTimeout(vsRoundTimer);
+            if (vsChannel) vsChannel.send({ type: 'broadcast', event: 'over', payload: {} });
+            const titles = { win: '🏆 勝利！', lose: '😵 落敗…', draw: '🤝 平手！', 'leave-win': '🏆 對方離線，你獲勝！' };
+            document.getElementById('resultTitle').textContent = titles[result] || '🏁 對戰結束';
+            document.getElementById('starsEarned').style.display = 'none';
+            document.getElementById('newAchievement').style.display = 'none';
+            document.getElementById('finalScore').textContent = `${vsMyName} ❤${vsMyHp}：❤${vsOppHp} ${vsOppName}`;
+            document.getElementById('correctCount').textContent = vsCorrect;
+            document.getElementById('maxCombo').textContent = vsHits;
+            document.getElementById('accuracy').textContent = (vsTotal ? Math.round(vsCorrect / vsTotal * 100) : 0) + '%';
+            document.getElementById('defeatedCount').textContent = vsTaken;
+            const labels = document.querySelectorAll('#resultScreen .result-stat-label');
+            if (labels[1]) labels[1].textContent = '命中對手';
+            if (labels[3]) labels[3].textContent = '受到傷害';
+            showScreen('resultScreen');
+        }
+
+        function vsHitOpponentFx() {
+            const fx = document.getElementById('battleFx');
+            playLaserSound();
+            const laser = document.createElement('div');
+            laser.className = 'laser';
+            fx.appendChild(laser);
+            setTimeout(() => {
+                laser.remove();
+                const boom = document.createElement('div');
+                boom.className = 'boom';
+                boom.textContent = '💥';
+                boom.style.right = '6%';
+                fx.appendChild(boom);
+                playExplosionSound();
+                document.getElementById('monsterHpFill').style.width = (vsOppHp / 5 * 100) + '%';
+                setTimeout(() => { fx.innerHTML = ''; }, 800);
+            }, 380);
+        }
+
+        function vsTakeHitFx() {
+            const fx = document.getElementById('battleFx');
+            playPlasmaSound();
+            const plasma = document.createElement('div');
+            plasma.className = 'plasma';
+            plasma.textContent = '🔥';
+            fx.appendChild(plasma);
+            setTimeout(() => {
+                plasma.remove();
+                const boom = document.createElement('div');
+                boom.className = 'boom';
+                boom.textContent = '💥';
+                boom.style.left = '6%';
+                fx.appendChild(boom);
+                playExplosionSound();
+                const ship = document.getElementById('shipSprite');
+                ship.classList.add('ship-hit');
+                setTimeout(() => ship.classList.remove('ship-hit'), 650);
+                const container = document.querySelector('.container');
+                container.classList.add('shake');
+                setTimeout(() => container.classList.remove('shake'), 500);
+                setTimeout(() => { fx.innerHTML = ''; }, 700);
+            }, 550);
+        }
+
+        function vsCleanup() {
+            clearTimeout(vsRoundTimer);
+            if (vsChannel) {
+                try { vsChannel.unsubscribe(); } catch (e) {}
+                vsChannel = null;
+            }
+            vsStarted = false;
         }
 
         // ===== Supabase 成績上傳 + 教師後台 =====
@@ -2153,6 +2661,14 @@
             document.getElementById('maxCombo').textContent = gameState.maxCombo;
             document.getElementById('accuracy').textContent = accuracy + '%';
             document.getElementById('defeatedCount').textContent = gameState.monstersDefeated || 0;
+
+            // 恢復單機結算版面（對戰模式會改動這些）
+            document.getElementById('starsEarned').style.display = '';
+            const statLabels = document.querySelectorAll('#resultScreen .result-stat-label');
+            if (statLabels[0]) statLabels[0].textContent = '答對題數';
+            if (statLabels[1]) statLabels[1].textContent = '最大 Combo';
+            if (statLabels[2]) statLabels[2].textContent = '正確率';
+            if (statLabels[3]) statLabels[3].textContent = '擊破怪獸';
 
             // 顯示新成就
             const newAchievementDiv = document.getElementById('newAchievement');
