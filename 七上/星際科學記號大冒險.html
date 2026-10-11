@@ -1485,9 +1485,9 @@
             };
             
             const correctAnswer = `${formatCoefficient(coefficient)} × 10<sup>${exponent}</sup>`;
-            // 誘答選項：a 不在 1 到 10 之間的錯誤答案
+            // 誘答選項：位數差一位、係數未化簡、指數正負號錯
             const wrongAnswers = [
-                `${formatCoefficient(coefficient / 10)} × 10<sup>${exponent + 1}</sup>`,
+                `${formatCoefficient(coefficient)} × 10<sup>${exponent + 1}</sup>`,
                 `${formatCoefficient(coefficient * 10)} × 10<sup>${exponent - 1}</sup>`,
                 `${formatCoefficient(coefficient)} × 10<sup>${-exponent}</sup>`
             ];
@@ -1532,9 +1532,9 @@
             const fracHTML = `<span style="display:inline-block;vertical-align:middle;text-align:center;"><span style="display:block;padding:0 8px;line-height:1.4;">${numerator}</span><span style="display:block;border-top:2px solid #00ffff;padding:0 8px;line-height:1.4;">${denominator}</span></span>`;
             
             const correctAnswer = `${formatCoeff(coefficient)} × 10<sup>${exponent}</sup>`;
-            // 誘答選項：a 不在 1 到 10 之間的錯誤答案
+            // 誘答選項：位數差一位、係數未化簡、指數正負號錯
             const wrongAnswers = [
-                `${formatCoeff(coefficient / 10)} × 10<sup>${exponent + 1}</sup>`,
+                `${formatCoeff(coefficient)} × 10<sup>${exponent + 1}</sup>`,
                 `${formatCoeff(coefficient * 10)} × 10<sup>${exponent - 1}</sup>`,
                 `${formatCoeff(coefficient)} × 10<sup>${-exponent}</sup>`
             ];
@@ -1794,6 +1794,7 @@
         }
 
         function setMode(mode) {
+            unlockAudio();
             gameState.mode = mode;
             document.getElementById('modeSingle').classList.toggle('active', mode === 'single');
             document.getElementById('modeVersus').classList.toggle('active', mode === 'versus');
@@ -1817,6 +1818,7 @@
         }
 
         function vsCreate() {
+            unlockAudio();
             if (!vsGetClient()) { alert('⚔️ 對戰需要連上網路，請確認網路後再試！'); return; }
             vsMyName = vsFighterName();
             vsRoom = vsMakeCode();
@@ -1829,6 +1831,7 @@
         }
 
         function vsJoin() {
+            unlockAudio();
             if (!vsGetClient()) { alert('⚔️ 對戰需要連上網路，請確認網路後再試！'); return; }
             const code = document.getElementById('roomCodeInput').value.trim();
             if (!/^\d{4}$/.test(code)) { alert('請輸入 4 位數字房號！'); return; }
@@ -2025,6 +2028,7 @@
 
         function vsAnswer(si, ci, btn) {
             if (vsOver || vsMyAnswered || vsRevealed) return;
+            unlockAudio();
             vsMyAnswered = true;
             document.querySelectorAll('.answer-btn').forEach(b => b.style.pointerEvents = 'none');
             const feedback = document.getElementById('feedback');
@@ -2543,6 +2547,8 @@
             bgm.play().then(updateBgmBtn).catch(() => {});
         }
 
+        let bgmManualOff = false;
+
         function toggleBgm() {
             const bgm = document.getElementById('bgm');
             if (bgm.paused) {
@@ -2551,7 +2557,21 @@
             } else {
                 bgm.pause();
             }
+            bgmManualOff = bgm.paused;
             updateBgmBtn();
+        }
+
+        // 在使用者操作中解鎖瀏覽器音效（對戰配對成功等非手勢時機無法解鎖）
+        function unlockAudio() {
+            try {
+                if (typeof audioContext !== 'undefined' && audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+            } catch (e) {}
+            if (!bgmManualOff) {
+                const bgm = document.getElementById('bgm');
+                if (bgm.paused) startBgm();
+            }
         }
 
         // 關閉背景音樂
