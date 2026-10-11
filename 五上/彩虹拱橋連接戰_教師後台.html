@@ -102,6 +102,39 @@
       transform: translateY(-1px);
     }
 
+    .btn-delete-row {
+      padding: 5px 10px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      border: 1px solid #fecaca;
+      background-color: #fef2f2;
+      color: #dc2626;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    .btn-delete-row:hover {
+      background-color: #dc2626;
+      color: #ffffff;
+      border-color: #dc2626;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);
+    }
+
+    input[type="date"]:focus,
+    input[type="text"]:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--color-accent) !important;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
     /* --- Stats cards --- */
     .stats-grid {
       display: grid;
@@ -273,15 +306,20 @@
     <div class="card" style="margin-bottom: 25px; padding: 18px 24px;">
       <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
         <div style="display: flex; align-items: center; gap: 8px;">
+          <label for="filter-date" style="font-weight: 800; font-size: 0.95rem; color: var(--color-primary);">📅 日期篩選：</label>
+          <input type="date" id="filter-date" style="padding: 7px 12px; border-radius: 8px; border: 1px solid var(--color-border); font-size: 0.95rem; font-weight: bold; background: #fff; cursor: pointer; color: var(--color-text-main); font-family: inherit;">
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px;">
           <label for="filter-class" style="font-weight: 800; font-size: 0.95rem; color: var(--color-primary);">🏫 班級篩選：</label>
-          <select id="filter-class" style="padding: 8px 14px; border-radius: 8px; border: 1px solid var(--color-border); font-size: 0.95rem; font-weight: bold; background: #fff; cursor: pointer;">
+          <select id="filter-class" style="padding: 8px 14px; border-radius: 8px; border: 1px solid var(--color-border); font-size: 0.95rem; font-weight: bold; background: #fff; cursor: pointer; font-family: inherit;">
             <option value="">全部班級</option>
           </select>
         </div>
 
         <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 220px;">
           <label for="filter-keyword" style="font-weight: 800; font-size: 0.95rem; color: var(--color-primary);">🔍 關鍵字搜尋：</label>
-          <input type="text" id="filter-keyword" placeholder="請輸入學生姓名、班級或座號..." style="width: 100%; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--color-border); font-size: 0.95rem;">
+          <input type="text" id="filter-keyword" placeholder="請輸入學生姓名、班級或座號..." style="width: 100%; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--color-border); font-size: 0.95rem; font-family: inherit;">
         </div>
 
         <button class="btn" id="btn-reset-filter" style="background: #e2e8f0; color: #334155; padding: 8px 16px;">↺ 重置篩選</button>
@@ -329,10 +367,11 @@
                 <th>目標數字</th>
                 <th>錯誤原因</th>
                 <th>學生選/填的因數</th>
+                <th style="text-align: center; width: 90px;">操作</th>
               </tr>
             </thead>
             <tbody id="mistakes-table-body">
-              <tr><td colspan="8" style="text-align: center;">載入資料中...</td></tr>
+              <tr><td colspan="9" style="text-align: center;">載入資料中...</td></tr>
             </tbody>
           </table>
         </div>
@@ -353,10 +392,11 @@
                 <th>座號</th>
                 <th>學生姓名</th>
                 <th>總積分</th>
+                <th style="text-align: center; width: 90px;">操作</th>
               </tr>
             </thead>
             <tbody id="leaderboard-table-body">
-              <tr><td colspan="6" style="text-align: center;">載入資料中...</td></tr>
+              <tr><td colspan="7" style="text-align: center;">載入資料中...</td></tr>
             </tbody>
           </table>
         </div>
@@ -411,28 +451,30 @@
         database.ref('GCD/mistakes').on('value', snapshot => {
           let mistakesList = [];
           snapshot.forEach(child => {
-            mistakesList.push(child.val());
+            let data = child.val() || {};
+            data.id = child.key;
+            mistakesList.push(data);
           });
           mistakesList.reverse(); // Newest first
-          renderMistakes(mistakesList);
           updateStatistics(mistakesList, null);
         }, error => {
           console.error("Firebase Mistakes error:", error);
-          document.getElementById('mistakes-table-body').innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--color-danger); font-weight: bold;">連線遭拒絕 (Permission Denied)。請至 Firebase Console 將 Realtime Database 的 Rules (規則) 設為 .read: true 與 .write: true</td></tr>`;
+          document.getElementById('mistakes-table-body').innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--color-danger); font-weight: bold;">連線遭拒絕 (Permission Denied)。請至 Firebase Console 將 Realtime Database 的 Rules (規則) 設為 .read: true 與 .write: true</td></tr>`;
         });
 
         // Listen leaderboard
         database.ref('GCD/leaderboard').on('value', snapshot => {
           let leaderboardList = [];
           snapshot.forEach(child => {
-            leaderboardList.push(child.val());
+            let data = child.val() || {};
+            data.id = child.key;
+            leaderboardList.push(data);
           });
           leaderboardList.sort((a, b) => b.score - a.score);
-          renderLeaderboard(leaderboardList);
           updateStatistics(null, leaderboardList);
         }, error => {
           console.error("Firebase Leaderboard error:", error);
-          document.getElementById('leaderboard-list').innerHTML = `<li style="color: var(--color-danger); font-weight: bold; text-align: center;">載入排行榜失敗：資料庫權限未開啟。</li>`;
+          document.getElementById('leaderboard-table-body').innerHTML = `<tr><td colspan="7" style="color: var(--color-danger); font-weight: bold; text-align: center;">載入排行榜失敗：資料庫權限未開啟。</td></tr>`;
         });
       } else {
         // Fallback local storage
@@ -444,11 +486,16 @@
       let mistakesList = JSON.parse(localStorage.getItem('GCD_mistakes') || '[]');
       let leaderboardList = JSON.parse(localStorage.getItem('GCD_leaderboard') || '[]');
       
-      mistakesList.reverse();
-      leaderboardList.sort((a,b) => b.score - a.score);
+      mistakesList.forEach((item, idx) => {
+        if (!item.id) item.id = 'loc_m_' + (item.timestamp || idx) + '_' + idx;
+      });
+      leaderboardList.forEach((item, idx) => {
+        if (!item.id) item.id = 'loc_l_' + (item.timestamp || idx) + '_' + idx;
+      });
 
-      renderMistakes(mistakesList);
-      renderLeaderboard(leaderboardList);
+      mistakesList.reverse();
+      leaderboardList.sort((a, b) => b.score - a.score);
+
       updateStatistics(mistakesList, leaderboardList);
     }
 
@@ -484,6 +531,17 @@
       };
     }
 
+    // 格式化日期字串 YYYY-MM-DD
+    function getLocalDateStr(ts) {
+      if (!ts) return '';
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return '';
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
     function populateClassOptions() {
       const classSelect = document.getElementById('filter-class');
       let currentVal = classSelect.value;
@@ -508,9 +566,8 @@
     }
 
     function applyFilters() {
-      populateClassOptions();
-      
       const filterClass = document.getElementById('filter-class').value.trim().toLowerCase();
+      const filterDate = document.getElementById('filter-date').value;
       const filterKeyword = document.getElementById('filter-keyword').value.trim().toLowerCase();
 
       function matchesFilter(item) {
@@ -518,8 +575,14 @@
         if (filterClass && info.classStr.toLowerCase() !== filterClass) {
           return false;
         }
+        if (filterDate) {
+          const itemDate = getLocalDateStr(item.timestamp);
+          if (itemDate !== filterDate) {
+            return false;
+          }
+        }
         if (filterKeyword) {
-          let fullSearch = `${info.classStr} ${info.seatStr} ${info.nameStr} ${item.name || ''}`.toLowerCase();
+          let fullSearch = `${info.classStr} ${info.seatStr} ${info.nameStr} ${item.name || ''} ${item.base || ''} ${item.type || ''}`.toLowerCase();
           if (!fullSearch.includes(filterKeyword)) {
             return false;
           }
@@ -560,7 +623,7 @@
       tbody.innerHTML = '';
 
       if (list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--color-text-muted);">目前無任何答錯紀錄。</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--color-text-muted);">目前無任何答錯紀錄。</td></tr>';
         return;
       }
 
@@ -579,10 +642,13 @@
           <td style="font-weight: bold; color: var(--color-accent);">${info.classStr}</td>
           <td style="font-weight: bold;">${info.seatStr}</td>
           <td style="font-weight: bold; color: var(--color-primary);">${info.nameStr}</td>
-          <td><span class="badge ${item.type === '公因數挑戰' ? 'badge-success' : 'badge-error'}">${item.type}</span></td>
-          <td style="font-family: monospace; font-weight: bold;">${item.base}</td>
+          <td><span class="badge ${item.type === '公因數挑戰' ? 'badge-success' : 'badge-error'}">${item.type || '-'}</span></td>
+          <td style="font-family: monospace; font-weight: bold;">${item.base || '-'}</td>
           <td>${errorTypeStr}</td>
           <td style="color: var(--color-danger); font-weight: bold; font-family: monospace;">${factorsStr}</td>
+          <td style="text-align: center;">
+            <button class="btn-delete-row" data-id="${item.id}" title="刪除此筆紀錄">🗑️ 刪除</button>
+          </td>
         `;
         tbody.appendChild(tr);
       });
@@ -593,7 +659,7 @@
       tbody.innerHTML = '';
 
       if (list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--color-text-muted);">目前無任何積分成績。</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--color-text-muted);">目前無任何積分成績。</td></tr>';
         return;
       }
 
@@ -608,6 +674,9 @@
           <td style="font-weight: bold;">${info.seatStr}</td>
           <td style="font-weight: bold;">${info.nameStr}</td>
           <td style="font-weight: bold; color: var(--color-success);">${item.score}</td>
+          <td style="text-align: center;">
+            <button class="btn-delete-row" data-id="${item.id}" title="刪除此筆紀錄">🗑️ 刪除</button>
+          </td>
         `;
         tbody.appendChild(tr);
       });
@@ -621,6 +690,7 @@
       if (mistakes) cacheMistakes = mistakes;
       if (leaderboard) cacheLeaderboard = leaderboard;
 
+      populateClassOptions();
       applyFilters();
     }
 
@@ -662,12 +732,84 @@
       }
     }
 
+    // --- Delete Single Record Actions ---
+    function deleteMistakeRecord(id) {
+      if (!id) return;
+      const target = cacheMistakes.find(m => m.id === id);
+      const studentName = target ? (getStudentInfo(target).nameStr || '該學生') : '該學生';
+      if (!confirm(`確定要刪除「${studentName}」的這筆答錯紀錄嗎？\n此操作無法復原。`)) {
+        return;
+      }
+
+      if (isFirebaseActive) {
+        database.ref('GCD/mistakes/' + id).remove()
+          .then(() => {
+            // Firebase on('value') 會自動同步畫面
+          })
+          .catch(err => {
+            alert("❌ 刪除失敗：" + err.message);
+          });
+      } else {
+        let list = JSON.parse(localStorage.getItem('GCD_mistakes') || '[]');
+        list = list.filter((item, idx) => {
+          let itemId = item.id || ('loc_m_' + (item.timestamp || idx) + '_' + idx);
+          return itemId !== id;
+        });
+        localStorage.setItem('GCD_mistakes', JSON.stringify(list));
+        loadLocalData();
+      }
+    }
+
+    function deleteLeaderboardRecord(id) {
+      if (!id) return;
+      const target = cacheLeaderboard.find(l => l.id === id);
+      const studentName = target ? (getStudentInfo(target).nameStr || '該學生') : '該學生';
+      if (!confirm(`確定要刪除「${studentName}」的這筆英雄榜積分紀錄嗎？\n此操作無法復原。`)) {
+        return;
+      }
+
+      if (isFirebaseActive) {
+        database.ref('GCD/leaderboard/' + id).remove()
+          .then(() => {
+            // Firebase on('value') 會自動同步畫面
+          })
+          .catch(err => {
+            alert("❌ 刪除失敗：" + err.message);
+          });
+      } else {
+        let list = JSON.parse(localStorage.getItem('GCD_leaderboard') || '[]');
+        list = list.filter((item, idx) => {
+          let itemId = item.id || ('loc_l_' + (item.timestamp || idx) + '_' + idx);
+          return itemId !== id;
+        });
+        localStorage.setItem('GCD_leaderboard', JSON.stringify(list));
+        loadLocalData();
+      }
+    }
+
+    // Event listeners
     document.getElementById('filter-class').addEventListener('change', applyFilters);
+    document.getElementById('filter-date').addEventListener('change', applyFilters);
     document.getElementById('filter-keyword').addEventListener('input', applyFilters);
     document.getElementById('btn-reset-filter').addEventListener('click', () => {
+      document.getElementById('filter-date').value = '';
       document.getElementById('filter-class').value = '';
       document.getElementById('filter-keyword').value = '';
       applyFilters();
+    });
+
+    document.getElementById('mistakes-table-body').addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-delete-row');
+      if (btn && btn.dataset.id) {
+        deleteMistakeRecord(btn.dataset.id);
+      }
+    });
+
+    document.getElementById('leaderboard-table-body').addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-delete-row');
+      if (btn && btn.dataset.id) {
+        deleteLeaderboardRecord(btn.dataset.id);
+      }
     });
 
     // --- Clean DB Action ---
