@@ -1059,7 +1059,7 @@
 
             <div class="versus-panel" id="versusPanel" style="display:none;">
                 <div class="versus-title">⚔️ 雙人對戰</div>
-                <p class="versus-rule">雙方各 5 滴血，答對 1 題打掉對手 1 滴血，先讓對方歸零就贏！</p>
+                <p class="versus-rule">雙方各 5 滴血，答對 1 題打掉對手 1 滴血，先讓對方歸零就贏！<br>只要有人答對就立刻跳下一題，手腳要快！</p>
                 <div id="versusLobby">
                     <button class="btn btn-primary" onclick="vsCreate()">🆕 開新房間</button>
                     <div class="versus-join">
@@ -1787,6 +1787,8 @@
         let vsMyAnswered = false;
         let vsOppAnswered = false;
         let vsRoundTimer = null;
+        let vsAdvancing = false;
+        let vsAdvanceTimer = null;
 
         function vsGetClient() {
             if (sbVs) return sbVs;
@@ -1978,6 +1980,8 @@
         function vsNextRound() {
             if (vsOver) return;
             vsRound++;
+            vsAdvancing = false;
+            clearTimeout(vsAdvanceTimer);
             vsMyAnswered = false;
             vsOppAnswered = false;
             const p = vsMakePayload();
@@ -2034,7 +2038,7 @@
                 vsHits++;
                 vsOppHp = Math.max(vsOppHp - 1, 0);
                 vsHitOpponentFx();
-                feedback.textContent = '✅ 命中！對手受到 1 點傷害！';
+                feedback.textContent = '✅ 命中對手！準備跳下一題…';
                 feedback.className = 'feedback correct';
             } else {
                 playWrongSound();
@@ -2048,14 +2052,20 @@
             }
             updateGameUI();
             if (vsChannel) vsChannel.send({ type: 'broadcast', event: 'ans', payload: { n: vsRound, ok: ok } });
-            if (vsIsHost) vsHostCheckAdvance();
+            if (vsIsHost) {
+                if (ok) vsScheduleAdvance(1600);
+                vsHostCheckAdvance();
+            }
             vsCheckEnd();
         }
 
         function vsOnAns(payload) {
             if (!payload || vsOver || !vsStarted) return;
             if (payload.n !== vsRound) return;
-            if (payload.ok) vsDamageMe();
+            if (payload.ok) {
+                vsDamageMe();
+                if (vsIsHost) vsScheduleAdvance(1600);
+            }
             if (vsIsHost) {
                 vsOppAnswered = true;
                 vsHostCheckAdvance();
@@ -2064,18 +2074,25 @@
 
         function vsDamageMe() {
             vsMyHp = Math.max(vsMyHp - 1, 0);
+            gameState.lives = vsMyHp; // 同步顯示用血量，否則愛心與戰艦血條永遠不掉
             vsTaken++;
             vsTakeHitFx();
             updateGameUI();
             vsCheckEnd();
         }
 
+        // 排程跳下一題：有人答對就加速跳題，避免重複排程
+        function vsScheduleAdvance(delay) {
+            if (vsOver || vsAdvancing) return;
+            vsAdvancing = true;
+            clearTimeout(vsRoundTimer);
+            clearTimeout(vsAdvanceTimer);
+            vsAdvanceTimer = setTimeout(() => { if (!vsOver) vsNextRound(); }, delay);
+        }
+
         function vsHostCheckAdvance() {
             if (vsOver || !vsIsHost) return;
-            if (vsMyAnswered && vsOppAnswered) {
-                clearTimeout(vsRoundTimer);
-                setTimeout(() => { if (!vsOver) vsNextRound(); }, 1400);
-            }
+            if (vsMyAnswered && vsOppAnswered) vsScheduleAdvance(1400);
         }
 
         function vsCheckEnd() {
@@ -2094,6 +2111,7 @@
             if (vsOver) return;
             vsOver = true;
             clearTimeout(vsRoundTimer);
+            clearTimeout(vsAdvanceTimer);
             if (vsChannel) vsChannel.send({ type: 'broadcast', event: 'over', payload: {} });
             const titles = { win: '🏆 勝利！', lose: '😵 落敗…', draw: '🤝 平手！', 'leave-win': '🏆 對方離線，你獲勝！' };
             document.getElementById('resultTitle').textContent = titles[result] || '🏁 對戰結束';
@@ -2158,6 +2176,7 @@
 
         function vsCleanup() {
             clearTimeout(vsRoundTimer);
+            clearTimeout(vsAdvanceTimer);
             if (vsChannel) {
                 try { vsChannel.unsubscribe(); } catch (e) {}
                 vsChannel = null;
