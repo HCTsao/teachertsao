@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星際科學記號大冒險 · 英雄排行榜</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Microsoft JhengHei', 'PingFang TC', sans-serif;
+            background: linear-gradient(135deg, #0a0a2e 0%, #1a1a4e 50%, #0d0d3d 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .stars { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+        .star { position: absolute; background: #fff; border-radius: 50%; animation: twinkle 2s infinite; }
+        @keyframes twinkle { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+        .container { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 20px; }
+
+        .title { text-align: center; font-size: 2em; margin: 20px 0 5px; text-shadow: 0 0 20px #ffdd00, 0 0 40px #ff8800; }
+        .subtitle { text-align: center; color: #aaccff; margin-bottom: 20px; }
+
+        .toolbar {
+            display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 15px; padding: 15px; margin-bottom: 20px;
+        }
+
+        .toolbar select {
+            padding: 10px 14px; font-size: 1em; font-family: inherit;
+            border-radius: 10px; border: 2px solid rgba(255, 221, 0, 0.5);
+            background: rgba(255, 255, 255, 0.12); color: #fff; outline: none;
+        }
+
+        .toolbar select option { color: #000; }
+
+        .btn {
+            padding: 10px 22px; font-size: 1em; font-family: inherit;
+            border: none; border-radius: 30px; cursor: pointer; font-weight: bold;
+            text-decoration: none; display: inline-block; color: #fff;
+            background: linear-gradient(135deg, #00c6ff, #0072ff);
+        }
+
+        .btn:hover { transform: translateY(-2px); }
+        .btn-pink { background: linear-gradient(135deg, #f093fb, #f5576c); }
+
+        .panel { background: rgba(255, 255, 255, 0.06); border-radius: 15px; padding: 18px; }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.95em; }
+        th, td { padding: 10px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.12); text-align: center; }
+        th { color: #ffdd00; white-space: nowrap; }
+
+        tr.top1 td { background: rgba(255, 215, 0, 0.15); font-weight: bold; }
+        tr.top2 td { background: rgba(192, 192, 192, 0.12); font-weight: bold; }
+        tr.top3 td { background: rgba(205, 127, 50, 0.12); font-weight: bold; }
+
+        .rank { font-size: 1.3em; }
+        .score { color: #00ffff; font-weight: bold; font-size: 1.1em; }
+        .empty { color: #88aacc; text-align: center; padding: 25px; }
+
+        .notice {
+            background: rgba(255, 221, 0, 0.12);
+            border: 1px solid rgba(255, 221, 0, 0.5);
+            border-radius: 12px; padding: 15px; margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="stars" id="stars"></div>
+
+    <div class="container">
+        <h1 class="title">🏆 英雄排行榜</h1>
+        <p class="subtitle">星際科學記號大冒險 · 各關卡最高分英雄榜（取每人最佳成績）</p>
+
+        <div class="notice" id="keyNotice" style="display: none;">
+            ⚠️ 尚未設定 Supabase 金鑰，請聯絡老師。
+        </div>
+
+        <div class="toolbar">
+            <select id="filterLevel" onchange="render()">
+                <option value="">全部關卡</option>
+                <option>第1關</option><option>第2關</option><option>第3關</option>
+                <option>第4關</option><option>第5關</option><option>第6關</option>
+                <option>限時挑戰</option>
+            </select>
+            <button class="btn" onclick="loadBoard()">🔄 重新整理</button>
+            <a class="btn btn-pink" href="星際科學記號大冒險.html">🎮 回遊戲</a>
+        </div>
+
+        <div class="panel">
+            <div class="table-wrap"><table>
+                <thead><tr><th>名次</th><th>班級</th><th>座號</th><th>姓名</th><th>關卡</th><th>分數</th><th>答對</th><th>正確率</th><th>時間</th></tr></thead>
+                <tbody id="boardBody"><tr><td colspan="9" class="empty">載入中…</td></tr></tbody>
+            </table></div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://lghxyxqafzlwoadkkonk.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnaHh5eHFhZnpsd29hZGtrb25rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NTk2OTEsImV4cCI6MjEwNzIzNTY5MX0.r6rdmEDbOcr8nSgC7YR4v1C_NPiUm7vDmbbI6BKs6s8';
+        const SUPABASE_TABLE = 'sci_notation_records';
+
+        let allRecords = [];
+
+        (function () {
+            const box = document.getElementById('stars');
+            for (let i = 0; i < 80; i++) {
+                const s = document.createElement('div');
+                s.className = 'star';
+                s.style.left = Math.random() * 100 + '%';
+                s.style.top = Math.random() * 100 + '%';
+                const w = Math.random() * 3 + 1;
+                s.style.width = w + 'px';
+                s.style.height = w + 'px';
+                s.style.animationDelay = Math.random() * 2 + 's';
+                box.appendChild(s);
+            }
+        })();
+
+        const esc = (s) => String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+        const fmtTime = (iso) => {
+            try { return new Date(iso).toLocaleString('zh-TW', { hour12: false }); }
+            catch (e) { return iso; }
+        };
+
+        const medal = (i) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+        const rowClass = (i) => i === 0 ? 'top1' : i === 1 ? 'top2' : i === 2 ? 'top3' : '';
+
+        async function loadBoard() {
+            if (!SUPABASE_URL.startsWith('http') || SUPABASE_ANON_KEY.length < 20) {
+                document.getElementById('keyNotice').style.display = 'block';
+                return;
+            }
+            try {
+                const res = await fetch(
+                    `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?select=*&order=score.desc&limit=500`,
+                    { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY } }
+                );
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                allRecords = await res.json();
+            } catch (e) {
+                document.getElementById('boardBody').innerHTML =
+                    '<tr><td colspan="9" class="empty">❌ 讀取失敗：' + esc(e.message) + '</td></tr>';
+                return;
+            }
+            render();
+        }
+
+        function render() {
+            const level = document.getElementById('filterLevel').value;
+            // 同一人在同一關卡只取最高分
+            const best = {};
+            allRecords
+                .filter(r => !level || r.level === level)
+                .forEach(r => {
+                    const k = `${r.class_name}|${r.seat_no}|${r.student_name}|${r.level}`;
+                    if (!best[k] || (r.score || 0) > (best[k].score || 0)) best[k] = r;
+                });
+            const rows = Object.values(best)
+                .sort((a, b) => (b.score || 0) - (a.score || 0))
+                .slice(0, 100);
+
+            document.getElementById('boardBody').innerHTML = rows.length ? rows.map((r, i) => `
+                <tr class="${rowClass(i)}">
+                    <td class="rank">${medal(i)}</td><td>${esc(r.class_name)}</td><td>${esc(r.seat_no)}</td>
+                    <td>${esc(r.student_name)}</td><td>${esc(r.level)}</td>
+                    <td class="score">${esc(r.score)}</td>
+                    <td>${esc(r.correct_count)}/${esc(r.total_count)}</td>
+                    <td>${esc(r.accuracy)}%</td><td>${esc(fmtTime(r.played_at))}</td>
+                </tr>`).join('')
+                : '<tr><td colspan="9" class="empty">這個關卡還沒有英雄上榜，快來搶頭香！🚀</td></tr>';
+        }
+
+        loadBoard();
+    </script>
+</body>
+</html>

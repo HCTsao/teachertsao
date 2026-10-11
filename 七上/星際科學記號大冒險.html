@@ -803,10 +803,11 @@
             position: fixed;
             bottom: 14px;
             right: 14px;
-            width: 52px;
-            height: 52px;
-            font-size: 1.5em;
-            border-radius: 50%;
+            padding: 12px 18px;
+            font-size: 1em;
+            font-family: inherit;
+            color: #fff;
+            border-radius: 30px;
             border: 2px solid rgba(255, 221, 0, 0.5);
             background: rgba(10, 10, 46, 0.8);
             cursor: pointer;
@@ -877,7 +878,7 @@
     <audio id="bgm" src="bgm.mp3" loop preload="auto"></audio>
     <button class="bgm-toggle" id="bgmToggle" onclick="toggleBgm()" title="背景音樂開/關">🎵</button>
     <a class="home-btn" href="../index.html" title="回到網站首頁">🏠 回到首頁</a>
-    <button class="teacher-fab" onclick="openTeacherModal()" title="教師後台">👩‍🏫</button>
+    <button class="teacher-fab" onclick="openTeacherModal()" title="教師後台">👩‍🏫 教師後台</button>
 
     <div class="teacher-modal" id="teacherModal">
         <div class="teacher-modal-box">
@@ -947,6 +948,11 @@
                     <div class="level-icon">⏱️</div>
                     <div class="level-name">限時挑戰</div>
                     <div class="level-desc">60秒極限測試</div>
+                </div>
+                <div class="level-card" onclick="window.open('星際科學記號排行榜.html', '_blank')">
+                    <div class="level-icon">🏆</div>
+                    <div class="level-name">排行榜</div>
+                    <div class="level-desc">各關卡英雄榜</div>
                 </div>
             </div>
         </div>
@@ -1663,14 +1669,15 @@
             return true;
         }
 
+        // 只記錄錯題（供教師後台查看）
         function logAnswer(selectedHtml, correctHtml, ok) {
-            if (!gameState.currentQ) return;
+            if (ok || !gameState.currentQ) return;
             gameState.answersLog.push({
                 type: gameState.currentQ.type,
                 q: gameState.currentQ.q,
                 correct: correctHtml,
                 selected: selectedHtml,
-                ok: ok
+                ok: false
             });
         }
 
@@ -1707,8 +1714,26 @@
             }).catch(err => console.warn('成績上傳失敗', err));
         }
 
-        // 教師後台
+        // 教師後台（驗證一次後，同台電腦 12 小時內免再輸入）
+        const TEACHER_AUTH_KEY = 'sciNotationTeacherAuth';
+        const TEACHER_AUTH_HOURS = 12;
+
+        function teacherAuthed() {
+            try {
+                const t = parseInt(localStorage.getItem(TEACHER_AUTH_KEY) || '0', 10);
+                return Date.now() - t < TEACHER_AUTH_HOURS * 3600 * 1000;
+            } catch (e) { return false; }
+        }
+
+        function markTeacherAuthed() {
+            try { localStorage.setItem(TEACHER_AUTH_KEY, String(Date.now())); } catch (e) {}
+        }
+
         function openTeacherModal() {
+            if (teacherAuthed()) {
+                openTeacherAdminPage();
+                return;
+            }
             document.getElementById('teacherModal').style.display = 'flex';
             document.getElementById('teacherPw').value = '';
             document.getElementById('teacherPwError').textContent = '';
@@ -1719,10 +1744,16 @@
             document.getElementById('teacherModal').style.display = 'none';
         }
 
+        function openTeacherAdminPage() {
+            window.open('星際科學記號教師後台.html', '_blank');
+        }
+
         function openTeacherAdmin() {
             const pw = document.getElementById('teacherPw').value;
             if (pw === ADMIN_PASSWORD) {
-                location.href = '星際科學記號教師後台.html';
+                markTeacherAuthed();
+                closeTeacherModal();
+                openTeacherAdminPage();
             } else {
                 document.getElementById('teacherPwError').textContent = '❌ 密碼錯誤，請再試一次';
             }
