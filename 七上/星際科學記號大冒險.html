@@ -1052,7 +1052,7 @@
 
             <div class="versus-panel" id="versusPanel" style="display:none;">
                 <div class="versus-title">⚔️ 雙人對戰</div>
-                <p class="versus-rule">雙方各 5 滴血，答對 1 題打掉對手 1 滴血，先讓對方歸零就贏！<br>只要有人答對就立刻跳下一題，手腳要快！</p>
+                <p class="versus-rule">雙方各 5 滴血，答對 1 題打掉對手 1 滴血，先讓對方歸零就贏！<br>有人答對時，對方還有最後 3 秒作答機會！</p>
                 <div id="versusLobby">
                     <button class="btn btn-primary" onclick="vsCreate()">🆕 開新房間</button>
                     <div class="versus-join">
@@ -1855,6 +1855,7 @@
             vsChannel.on('broadcast', { event: 'start' }, ({ payload }) => vsOnStart(payload));
             vsChannel.on('broadcast', { event: 'q' }, ({ payload }) => vsOnQ(payload));
             vsChannel.on('broadcast', { event: 'ans' }, ({ payload }) => vsOnAns(payload));
+            vsChannel.on('broadcast', { event: 'hurry' }, ({ payload }) => vsOnHurry(payload));
             vsChannel.on('broadcast', { event: 'over' }, () => vsOnOver());
             vsChannel.on('presence', { event: 'sync' }, vsOnPresence);
             vsChannel.on('presence', { event: 'leave' }, ({ key }) => vsOnLeave(key));
@@ -2047,7 +2048,10 @@
             updateGameUI();
             if (vsChannel) vsChannel.send({ type: 'broadcast', event: 'ans', payload: { n: vsRound, ok: ok } });
             if (vsIsHost) {
-                if (ok) vsScheduleAdvance(1600);
+                if (ok) {
+                    vsScheduleAdvance(3000);
+                    if (!vsOppAnswered && vsChannel) vsChannel.send({ type: 'broadcast', event: 'hurry', payload: { n: vsRound } });
+                }
                 vsHostCheckAdvance();
             }
             vsCheckEnd();
@@ -2058,7 +2062,10 @@
             if (payload.n !== vsRound) return;
             if (payload.ok) {
                 vsDamageMe();
-                if (vsIsHost) vsScheduleAdvance(1600);
+                if (vsIsHost) {
+                    vsScheduleAdvance(3000);
+                    if (!vsMyAnswered) vsShowHurry();
+                }
             }
             if (vsIsHost) {
                 vsOppAnswered = true;
@@ -2082,6 +2089,20 @@
             clearTimeout(vsRoundTimer);
             clearTimeout(vsAdvanceTimer);
             vsAdvanceTimer = setTimeout(() => { if (!vsOver) vsNextRound(); }, delay);
+        }
+
+        // 對手已答對，提醒還沒作答的自己把握最後 3 秒
+        function vsShowHurry() {
+            if (vsOver || vsMyAnswered) return;
+            const feedback = document.getElementById('feedback');
+            feedback.textContent = '⚡ 對手已答對！最後 3 秒作答！';
+            feedback.className = 'feedback correct';
+        }
+
+        function vsOnHurry(payload) {
+            if (!payload || vsOver || !vsStarted) return;
+            if (payload.n !== vsRound) return;
+            vsShowHurry();
         }
 
         function vsHostCheckAdvance() {
