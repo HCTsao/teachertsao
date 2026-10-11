@@ -916,11 +916,10 @@
 
         .versus-join {
             display: flex;
-            gap: 10px;
-            justify-content: center;
+            flex-direction: column;
+            gap: 12px;
             align-items: center;
             margin-top: 15px;
-            flex-wrap: wrap;
         }
 
         .versus-join input {
@@ -929,7 +928,7 @@
             font-family: inherit;
             text-align: center;
             letter-spacing: 4px;
-            width: 170px;
+            width: 200px;
             border-radius: 10px;
             border: 2px solid rgba(255, 255, 255, 0.3);
             background: rgba(255, 255, 255, 0.12);
@@ -1060,14 +1059,14 @@
 
             <div class="versus-panel" id="versusPanel" style="display:none;">
                 <div class="versus-title">⚔️ 雙人對戰</div>
-                <p class="versus-rule">雙方各 5 滴血，答對 1 題打掉對手 1 滴血，先讓對方歸零就贏！<br>對戰成績不列入排行榜。</p>
+                <p class="versus-rule">雙方各 5 滴血，答對 1 題打掉對手 1 滴血，先讓對方歸零就贏！</p>
                 <div id="versusLobby">
                     <button class="btn btn-primary" onclick="vsCreate()">🆕 開新房間</button>
                     <div class="versus-join">
                         <input id="roomCodeInput" placeholder="輸入4位房號" maxlength="4" inputmode="numeric">
                         <button class="btn btn-secondary" onclick="vsJoin()">🚪 加入房間</button>
                     </div>
-                    <p class="versus-hint">開房者把房號告訴對手，兩人在不同裝置同時加入即可開戰！<br>出戰名號預設使用上方填寫的姓名。</p>
+                    <p class="versus-hint">開房者把房號告訴對手，兩人在不同裝置同時加入即可開戰！</p>
                 </div>
                 <div id="versusWaiting" style="display:none;">
                     <div class="room-code" id="roomCodeDisplay">房號：----</div>
@@ -1893,6 +1892,12 @@
         function vsBegin() {
             vsStarted = true;
             vsRound = 0;
+            gameState.answersLog = [];
+            gameState.player = {
+                className: (document.getElementById('inputClass').value || '').trim() || '訪客',
+                seat: (document.getElementById('inputSeat').value || '').trim(),
+                name: vsMyName
+            };
             vsMyHp = 5;
             vsOppHp = 5;
             vsHits = 0;
@@ -1915,6 +1920,12 @@
             vsOppName = (payload && payload.host) || '對手';
             vsStarted = true;
             vsRound = 0;
+            gameState.answersLog = [];
+            gameState.player = {
+                className: (document.getElementById('inputClass').value || '').trim() || '訪客',
+                seat: (document.getElementById('inputSeat').value || '').trim(),
+                name: vsMyName
+            };
             vsMyHp = 5;
             vsOppHp = 5;
             vsHits = 0;
@@ -1986,6 +1997,12 @@
         }
 
         function vsRender(p) {
+            // 記錄本題資訊（錯題上傳教師後台用）
+            gameState.currentQ = {
+                type: p.type,
+                q: stripHtml(p.question),
+                correct: stripHtml(p.answers[p.correct])
+            };
             document.getElementById('questionType').textContent = p.type;
             document.getElementById('questionText').innerHTML = p.question;
             document.getElementById('hintText').innerHTML = p.hint;
@@ -2022,7 +2039,10 @@
             } else {
                 playWrongSound();
                 btn.classList.add('wrong');
-                document.querySelectorAll('.answer-btn')[ci].classList.add('correct');
+                const vsButtons = document.querySelectorAll('.answer-btn');
+                vsButtons[ci].classList.add('correct');
+                // 對戰錯題一樣記入教師後台
+                logAnswer(stripHtml(btn.innerHTML), stripHtml(vsButtons[ci].innerHTML), false);
                 feedback.textContent = '❌ 沒打中…等待對手出招！';
                 feedback.className = 'feedback wrong';
             }
@@ -2087,6 +2107,8 @@
             const labels = document.querySelectorAll('#resultScreen .result-stat-label');
             if (labels[1]) labels[1].textContent = '命中對手';
             if (labels[3]) labels[3].textContent = '受到傷害';
+            // 對戰錯題上傳教師後台（不列入排行榜）
+            submitVersusRecord();
             showScreen('resultScreen');
         }
 
@@ -2220,6 +2242,40 @@
             }).then(res => {
                 if (!res.ok) console.warn('成績上傳失敗', res.status);
             }).catch(err => console.warn('成績上傳失敗', err));
+        }
+
+        // 對戰成績上傳（level 記為雙人對戰，只含錯題明細；排行榜會排除，不列入）
+        function submitVersusRecord() {
+            if (!SUPABASE_URL.startsWith('http') || SUPABASE_ANON_KEY.length < 20) {
+                console.log('尚未設定 Supabase 金鑰，跳過成績上傳');
+                return;
+            }
+            const p = gameState.player || {};
+            const acc = vsTotal ? Math.round(vsCorrect / vsTotal * 100) : 0;
+            const record = {
+                class_name: p.className || '訪客',
+                seat_no: p.seat || '',
+                student_name: p.name || vsMyName,
+                level: '雙人對戰',
+                score: vsCorrect * 100,
+                correct_count: vsCorrect,
+                total_count: vsTotal,
+                accuracy: acc,
+                max_combo: vsHits,
+                answers: gameState.answersLog
+            };
+            fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}`, {
+                method: 'POST',
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=minimal'
+                },
+                body: JSON.stringify(record)
+            }).then(res => {
+                if (!res.ok) console.warn('對戰成績上傳失敗', res.status);
+            }).catch(err => console.warn('對戰成績上傳失敗', err));
         }
 
         // 教師後台（驗證一次後，同台電腦 12 小時內免再輸入）
