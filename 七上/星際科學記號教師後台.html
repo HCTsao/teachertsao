@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星際科學記號大冒險 · 教師後台</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Microsoft JhengHei', 'PingFang TC', sans-serif;
+            background: linear-gradient(135deg, #0a0a2e 0%, #1a1a4e 50%, #0d0d3d 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .stars { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+        .star { position: absolute; background: #fff; border-radius: 50%; animation: twinkle 2s infinite; }
+        @keyframes twinkle { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+        .container { position: relative; z-index: 1; max-width: 1000px; margin: 0 auto; padding: 20px; }
+
+        .title { text-align: center; font-size: 2em; margin: 20px 0 5px; text-shadow: 0 0 20px #00ffff; }
+        .subtitle { text-align: center; color: #aaccff; margin-bottom: 20px; }
+
+        .toolbar {
+            display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 15px; padding: 15px; margin-bottom: 20px;
+        }
+
+        .toolbar select, .toolbar input[type="date"] {
+            padding: 10px; font-size: 1em; font-family: inherit;
+            border-radius: 10px; border: 2px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.12); color: #fff; outline: none;
+        }
+
+        .toolbar select option { color: #000; }
+
+        .btn {
+            padding: 10px 22px; font-size: 1em; font-family: inherit;
+            border: none; border-radius: 30px; cursor: pointer; font-weight: bold;
+            text-decoration: none; display: inline-block; color: #fff;
+            background: linear-gradient(135deg, #00c6ff, #0072ff);
+        }
+
+        .btn:hover { transform: translateY(-2px); }
+
+        .btn-pink { background: linear-gradient(135deg, #f093fb, #f5576c); }
+
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(0, 255, 255, 0.25);
+            border-radius: 15px; padding: 15px; text-align: center;
+        }
+
+        .stat-card .v { font-size: 1.8em; font-weight: bold; color: #00ffff; }
+        .stat-card .l { font-size: 0.85em; color: #aaccff; margin-top: 4px; }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 15px; padding: 18px; margin-bottom: 20px;
+        }
+
+        .panel h2 { font-size: 1.2em; color: #ffdd00; margin-bottom: 12px; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.92em; }
+
+        th, td { padding: 9px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.12); text-align: center; }
+
+        th { color: #00ffff; white-space: nowrap; }
+
+        tr.detail-row td { background: rgba(0, 0, 0, 0.3); text-align: left; }
+
+        .mini-table { width: 100%; font-size: 0.88em; }
+        .mini-table td { text-align: left; vertical-align: top; }
+
+        .ok { color: #00ff88; font-weight: bold; }
+        .ng { color: #ff6b6b; font-weight: bold; }
+
+        .tag {
+            display: inline-block; padding: 3px 12px; border-radius: 15px;
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            font-size: 0.85em; margin: 2px;
+        }
+
+        .notice {
+            background: rgba(255, 221, 0, 0.12);
+            border: 1px solid rgba(255, 221, 0, 0.5);
+            border-radius: 12px; padding: 15px; margin-bottom: 20px;
+        }
+
+        .empty { color: #88aacc; text-align: center; padding: 20px; }
+
+        /* 密碼 gate */
+        .gate {
+            position: fixed; inset: 0; z-index: 100;
+            background: linear-gradient(135deg, #0a0a2e, #1a1a4e);
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .gate-box {
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px solid rgba(0, 255, 255, 0.4);
+            border-radius: 20px; padding: 35px;
+            width: 90%; max-width: 360px; text-align: center;
+        }
+
+        .gate-box h2 { color: #00ffff; margin-bottom: 10px; }
+
+        .gate-box input {
+            width: 100%; padding: 12px; margin: 14px 0;
+            font-size: 1.1em; font-family: inherit; text-align: center;
+            border-radius: 10px; border: 2px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.12); color: #fff; outline: none;
+        }
+
+        .gate-error { color: #ff6b6b; min-height: 1.5em; margin-top: 8px; }
+
+        .gate-box a { color: #aaccff; font-size: 0.9em; }
+
+        .table-wrap { overflow-x: auto; }
+
+        @media (max-width: 700px) {
+            .stats { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="stars" id="stars"></div>
+
+    <div class="container">
+        <h1 class="title">👩‍🏫 教師後台</h1>
+        <p class="subtitle">星際科學記號大冒險 · 作答戰績總覽</p>
+
+        <div class="notice" id="keyNotice" style="display: none;">
+            ⚠️ 尚未設定 Supabase 金鑰：請用文字編輯器打開本檔案，填入最上方的
+            <code>SUPABASE_URL</code> 與 <code>SUPABASE_ANON_KEY</code>，並先在 Supabase SQL Editor 執行
+            <code>七上/supabase_schema.sql</code> 建表。
+        </div>
+
+        <div class="toolbar">
+            <select id="filterClass"><option value="">全部班級</option></select>
+            <select id="filterLevel">
+                <option value="">全部關卡</option>
+                <option>第1關</option><option>第2關</option><option>第3關</option>
+                <option>第4關</option><option>第5關</option><option>第6關</option>
+                <option>限時挑戰</option>
+            </select>
+            <input type="date" id="filterDate">
+            <button class="btn" onclick="loadRecords()">🔄 重新整理</button>
+            <a class="btn btn-pink" href="星際科學記號大冒險.html">🎮 回遊戲</a>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card"><div class="v" id="statCount">-</div><div class="l">作答人次</div></div>
+            <div class="stat-card"><div class="v" id="statScore">-</div><div class="l">平均分數</div></div>
+            <div class="stat-card"><div class="v" id="statAcc">-</div><div class="l">平均正確率</div></div>
+            <div class="stat-card"><div class="v" id="statHelp" style="color:#ff6b6b;">-</div><div class="l">需補救人數</div></div>
+        </div>
+
+        <div class="panel">
+            <h2>⚠️ 需補救名單（最新一次正確率未滿 60%）</h2>
+            <div class="table-wrap"><table>
+                <thead><tr><th>班級</th><th>座號</th><th>姓名</th><th>最新關卡</th><th>正確率</th><th>作答時間</th></tr></thead>
+                <tbody id="remedialBody"><tr><td colspan="6" class="empty">載入中…</td></tr></tbody>
+            </table></div>
+        </div>
+
+        <div class="panel">
+            <h2>❌ 錯題分析（錯題數排行＋學生最常誤選）</h2>
+            <div id="wrongAnalysis"><p class="empty">載入中…</p></div>
+        </div>
+
+        <div class="panel">
+            <h2>📋 作答紀錄（點「明細」看每題選答情形）</h2>
+            <div class="table-wrap"><table>
+                <thead><tr><th>時間</th><th>班級</th><th>座號</th><th>姓名</th><th>關卡</th><th>分數</th><th>答對</th><th>正確率</th><th>明細</th></tr></thead>
+                <tbody id="recordsBody"><tr><td colspan="9" class="empty">載入中…</td></tr></tbody>
+            </table></div>
+        </div>
+    </div>
+
+    <div class="gate" id="gate">
+        <div class="gate-box">
+            <h2>👩‍🏫 教師後台</h2>
+            <p>請輸入教師密碼</p>
+            <input type="password" id="gatePw" placeholder="請輸入密碼" maxlength="20" onkeydown="if(event.key==='Enter')unlock()">
+            <button class="btn" onclick="unlock()" style="width:100%;">開啟</button>
+            <p id="gateError" class="gate-error"></p>
+            <a href="星際科學記號大冒險.html">← 回遊戲</a>
+        </div>
+    </div>
+
+    <script>
+        // ===== 請填入你的 Supabase 金鑰（與遊戲端相同）=====
+        const SUPABASE_URL = '請貼上你的 Supabase Project URL';
+        const SUPABASE_ANON_KEY = '請貼上你的 anon public key';
+        const SUPABASE_TABLE = 'sci_notation_records';
+        // 教師後台密碼（請告訴我要改成什麼，目前暫用 8888）
+        const ADMIN_PASSWORD = '8888';
+
+        let allRecords = [];
+
+        // 星空背景
+        (function () {
+            const box = document.getElementById('stars');
+            for (let i = 0; i < 80; i++) {
+                const s = document.createElement('div');
+                s.className = 'star';
+                s.style.left = Math.random() * 100 + '%';
+                s.style.top = Math.random() * 100 + '%';
+                const w = Math.random() * 3 + 1;
+                s.style.width = w + 'px';
+                s.style.height = w + 'px';
+                s.style.animationDelay = Math.random() * 2 + 's';
+                box.appendChild(s);
+            }
+        })();
+
+        const esc = (s) => String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+        const fmtTime = (iso) => {
+            try { return new Date(iso).toLocaleString('zh-TW', { hour12: false }); }
+            catch (e) { return iso; }
+        };
+
+        function unlock() {
+            const pw = document.getElementById('gatePw').value;
+            if (pw === ADMIN_PASSWORD) {
+                document.getElementById('gate').style.display = 'none';
+                loadRecords();
+            } else {
+                document.getElementById('gateError').textContent = '❌ 密碼錯誤，請再試一次';
+            }
+        }
+
+        function keysReady() {
+            return SUPABASE_URL.startsWith('http') && SUPABASE_ANON_KEY.length >= 20;
+        }
+
+        async function loadRecords() {
+            if (!keysReady()) {
+                document.getElementById('keyNotice').style.display = 'block';
+                document.getElementById('recordsBody').innerHTML = '<tr><td colspan="9" class="empty">尚未設定金鑰</td></tr>';
+                document.getElementById('remedialBody').innerHTML = '<tr><td colspan="6" class="empty">尚未設定金鑰</td></tr>';
+                document.getElementById('wrongAnalysis').innerHTML = '<p class="empty">尚未設定金鑰</p>';
+                return;
+            }
+            try {
+                const res = await fetch(
+                    `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?select=*&order=played_at.desc&limit=500`,
+                    { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY } }
+                );
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                allRecords = await res.json();
+            } catch (e) {
+                document.getElementById('recordsBody').innerHTML =
+                    '<tr><td colspan="9" class="empty">❌ 讀取失敗：' + esc(e.message) + '（請檢查金鑰與資料表）</td></tr>';
+                return;
+            }
+            buildClassFilter();
+            render();
+        }
+
+        function buildClassFilter() {
+            const sel = document.getElementById('filterClass');
+            const cur = sel.value;
+            const classes = [...new Set(allRecords.map(r => r.class_name).filter(Boolean))].sort();
+            sel.innerHTML = '<option value="">全部班級</option>' +
+                classes.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+            if (classes.includes(cur)) sel.value = cur;
+        }
+
+        function filtered() {
+            const c = document.getElementById('filterClass').value;
+            const l = document.getElementById('filterLevel').value;
+            const d = document.getElementById('filterDate').value;
+            return allRecords.filter(r =>
+                (!c || r.class_name === c) &&
+                (!l || r.level === l) &&
+                (!d || String(r.played_at).startsWith(d))
+            );
+        }
+
+        function render() {
+            const rows = filtered();
+
+            // 統計
+            document.getElementById('statCount').textContent = rows.length;
+            document.getElementById('statScore').textContent =
+                rows.length ? Math.round(rows.reduce((s, r) => s + (r.score || 0), 0) / rows.length) : '-';
+            document.getElementById('statAcc').textContent =
+                rows.length ? Math.round(rows.reduce((s, r) => s + (r.accuracy || 0), 0) / rows.length) + '%' : '-';
+
+            // 需補救名單（每位學生取最新一筆）
+            const latest = {};
+            rows.forEach(r => {
+                const k = `${r.class_name}|${r.seat_no}|${r.student_name}`;
+                if (!latest[k]) latest[k] = r;
+            });
+            const help = Object.values(latest).filter(r => (r.accuracy || 0) < 60);
+            document.getElementById('statHelp').textContent = help.length;
+            document.getElementById('remedialBody').innerHTML = help.length ? help.map(r => `
+                <tr>
+                    <td>${esc(r.class_name)}</td><td>${esc(r.seat_no)}</td><td>${esc(r.student_name)}</td>
+                    <td>${esc(r.level)}</td><td class="ng">${esc(r.accuracy)}%</td><td>${esc(fmtTime(r.played_at))}</td>
+                </tr>`).join('')
+                : '<tr><td colspan="6" class="empty">太棒了！目前沒有需要補救的學生 🎉</td></tr>';
+
+            // 錯題分析
+            const typeWrong = {};
+            const picks = {};
+            rows.forEach(r => (r.answers || []).forEach(a => {
+                if (!a.ok) {
+                    typeWrong[a.type] = (typeWrong[a.type] || 0) + 1;
+                    picks[a.type] = picks[a.type] || {};
+                    picks[a.type][a.selected] = (picks[a.type][a.selected] || 0) + 1;
+                }
+            }));
+            const types = Object.keys(typeWrong).sort((a, b) => typeWrong[b] - typeWrong[a]);
+            document.getElementById('wrongAnalysis').innerHTML = types.length ? types.map(t => {
+                const top = Object.entries(picks[t]).sort((a, b) => b[1] - a[1]).slice(0, 3);
+                return `<p style="margin:10px 0;">${esc(t)}：共錯 <span class="ng">${typeWrong[t]}</span> 次<br>` +
+                    `最常誤選：` + top.map(([s, n]) => `<span class="tag">${esc(s)} ×${n}</span>`).join(' ') + `</p>`;
+            }).join('') : '<p class="empty">目前沒有錯題紀錄 🎉</p>';
+
+            // 作答紀錄
+            document.getElementById('recordsBody').innerHTML = rows.length ? rows.map((r, i) => `
+                <tr>
+                    <td>${esc(fmtTime(r.played_at))}</td><td>${esc(r.class_name)}</td><td>${esc(r.seat_no)}</td>
+                    <td>${esc(r.student_name)}</td><td>${esc(r.level)}</td><td>${esc(r.score)}</td>
+                    <td>${esc(r.correct_count)}/${esc(r.total_count)}</td>
+                    <td class="${(r.accuracy || 0) < 60 ? 'ng' : 'ok'}">${esc(r.accuracy)}%</td>
+                    <td><button class="btn" style="padding:5px 14px;font-size:0.85em;" onclick="toggleDetail(${i})">明細</button></td>
+                </tr>
+                <tr class="detail-row" id="detail-${i}" style="display:none;"><td colspan="9">${detailHtml(r)}</td></tr>
+            `).join('') : '<tr><td colspan="9" class="empty">沒有符合條件的紀錄</td></tr>';
+        }
+
+        function detailHtml(r) {
+            const list = r.answers || [];
+            if (!list.length) return '<span class="empty">無作答明細</span>';
+            return `<table class="mini-table">
+                <thead><tr><th>#</th><th>題型</th><th>題目</th><th>正確答案</th><th>學生選答</th><th>結果</th></tr></thead>
+                <tbody>` + list.map((a, j) => `
+                <tr>
+                    <td>${j + 1}</td><td>${esc(a.type)}</td><td>${esc(a.q)}</td>
+                    <td class="ok">${esc(a.correct)}</td>
+                    <td class="${a.ok ? 'ok' : 'ng'}">${esc(a.selected)}</td>
+                    <td>${a.ok ? '<span class="ok">⭕</span>' : '<span class="ng">❌</span>'}</td>
+                </tr>`).join('') + `</tbody></table>`;
+        }
+
+        function toggleDetail(i) {
+            const el = document.getElementById('detail-' + i);
+            el.style.display = el.style.display === 'none' ? '' : 'none';
+        }
+
+        document.getElementById('filterClass').addEventListener('change', render);
+        document.getElementById('filterLevel').addEventListener('change', render);
+        document.getElementById('filterDate').addEventListener('change', render);
+        setTimeout(() => document.getElementById('gatePw').focus(), 300);
+    </script>
+</body>
+</html>

@@ -761,6 +761,122 @@
             border-color: #00ffff;
             box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
         }
+
+        /* 身分填寫表 */
+        .identity-form {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 15px;
+            padding: 18px;
+            margin-bottom: 20px;
+        }
+
+        .identity-title {
+            text-align: center;
+            font-size: 1.05em;
+            margin-bottom: 12px;
+            color: #ffdd00;
+        }
+
+        .identity-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+        }
+
+        .identity-inputs input {
+            padding: 12px;
+            font-size: 1em;
+            font-family: inherit;
+            border-radius: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            text-align: center;
+            outline: none;
+            width: 100%;
+        }
+
+        .identity-inputs input::placeholder {
+            color: #88aacc;
+        }
+
+        .identity-inputs input:focus {
+            border-color: #00ffff;
+        }
+
+        /* 教師後台懸浮按鈕 */
+        .teacher-fab {
+            position: fixed;
+            bottom: 14px;
+            right: 14px;
+            width: 52px;
+            height: 52px;
+            font-size: 1.5em;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 221, 0, 0.5);
+            background: rgba(10, 10, 46, 0.8);
+            cursor: pointer;
+            z-index: 200;
+            transition: all 0.3s ease;
+        }
+
+        .teacher-fab:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 15px rgba(255, 221, 0, 0.5);
+        }
+
+        /* 教師密碼彈窗 */
+        .teacher-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
+        }
+
+        .teacher-modal-box {
+            background: linear-gradient(135deg, #1a1a4e, #0d0d3d);
+            border: 2px solid rgba(0, 255, 255, 0.4);
+            border-radius: 20px;
+            padding: 30px;
+            width: 90%;
+            max-width: 360px;
+            text-align: center;
+        }
+
+        .teacher-modal-box h3 {
+            color: #00ffff;
+            margin-bottom: 10px;
+        }
+
+        .teacher-modal-box input {
+            width: 100%;
+            padding: 12px;
+            margin: 12px 0;
+            font-size: 1.1em;
+            font-family: inherit;
+            text-align: center;
+            border-radius: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            outline: none;
+        }
+
+        .teacher-error {
+            color: #ff6b6b;
+            min-height: 1.5em;
+            margin-top: 8px;
+        }
+
+        @media (max-width: 600px) {
+            .identity-inputs {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -768,6 +884,18 @@
     <audio id="bgm" src="bgm.mp3" loop preload="auto"></audio>
     <button class="bgm-toggle" id="bgmToggle" onclick="toggleBgm()" title="背景音樂開/關">🎵</button>
     <a class="home-btn" href="../index.html" title="回到網站首頁">🏠 回到首頁</a>
+    <button class="teacher-fab" onclick="openTeacherModal()" title="教師後台">👩‍🏫</button>
+
+    <div class="teacher-modal" id="teacherModal">
+        <div class="teacher-modal-box">
+            <h3>👩‍🏫 教師後台</h3>
+            <p>請輸入教師密碼</p>
+            <input type="password" id="teacherPw" placeholder="請輸入密碼" maxlength="20" onkeydown="if(event.key==='Enter')openTeacherAdmin()">
+            <button class="btn btn-primary" onclick="openTeacherAdmin()">開啟</button>
+            <button class="btn btn-secondary" onclick="closeTeacherModal()">取消</button>
+            <p id="teacherPwError" class="teacher-error"></p>
+        </div>
+    </div>
 
     <div class="container">
         <!-- 開始畫面 -->
@@ -780,6 +908,15 @@
                 <div class="stat">
                     <div class="stat-label">最高分</div>
                     <div class="stat-value" id="highScore">0</div>
+                </div>
+            </div>
+
+            <div class="identity-form" id="identityForm">
+                <div class="identity-title">🧑‍🚀 請先填寫你的資料，戰績會傳給老師！</div>
+                <div class="identity-inputs">
+                    <input id="inputClass" placeholder="班級（例：701）" maxlength="10">
+                    <input id="inputSeat" placeholder="座號（例：12）" maxlength="10">
+                    <input id="inputName" placeholder="姓名" maxlength="10">
                 </div>
             </div>
 
@@ -922,6 +1059,13 @@
 
     <script>
         // 遊戲狀態
+        // ===== Supabase 連線設定（請填入你的專案金鑰）=====
+        const SUPABASE_URL = '請貼上你的 Supabase Project URL';
+        const SUPABASE_ANON_KEY = '請貼上你的 anon public key';
+        const SUPABASE_TABLE = 'sci_notation_records';
+        // 教師後台密碼（請告訴我要改成什麼，目前暫用 8888）
+        const ADMIN_PASSWORD = '8888';
+
         let gameState = {
             currentLevel: 1,
             score: 0,
@@ -931,6 +1075,9 @@
             questionIndex: 0,
             totalQuestions: 5,
             correctAnswers: 0,
+            player: { className: '', seat: '', name: '' },
+            answersLog: [],
+            currentQ: null,
             highScore: 0,
             unlockedLevels: 1,
             achievements: [],
@@ -956,6 +1103,7 @@
             loadGameData();
             createStars();
             updateUI();
+            prefillIdentity();
         }
 
         // 創建星空背景
@@ -1015,6 +1163,7 @@
 
         // 開始遊戲
         function startGame(level) {
+            if (!ensureIdentity()) return;
             gameState.currentLevel = level;
             gameState.challengeMode = false;
             resetGameState();
@@ -1025,6 +1174,7 @@
 
         // 開始限時挑戰
         function startChallenge() {
+            if (!ensureIdentity()) return;
             gameState.challengeMode = true;
             gameState.challengeTime = 60;
             resetGameState();
@@ -1043,6 +1193,7 @@
             gameState.lives = 3;
             gameState.questionIndex = 0;
             gameState.correctAnswers = 0;
+            gameState.answersLog = [];
             gameState.monstersDefeated = 0;
             gameState.startTime = Date.now();
             updateGameUI();
@@ -1116,6 +1267,13 @@
             // 打亂答案順序
             const shuffledAnswers = shuffleArray(answers.map((a, i) => ({ value: a, isCorrect: i === correctAnswer })));
             const newCorrectIndex = shuffledAnswers.findIndex(a => a.isCorrect);
+
+            // 記錄本題資訊（供成績上傳用，去除 HTML 標籤存純文字）
+            gameState.currentQ = {
+                type: getQuestionTypeName(type),
+                q: stripHtml(question),
+                correct: stripHtml(answers[correctAnswer])
+            };
 
             // 顯示題目
             document.getElementById('questionType').textContent = getQuestionTypeName(type);
@@ -1479,6 +1637,103 @@
             oscillator.stop(audioContext.currentTime + 0.3);
         }
 
+        // ===== Supabase 成績上傳 + 教師後台 =====
+        const stripHtml = (h) => {
+            const d = document.createElement('div');
+            d.innerHTML = h;
+            return (d.textContent || '').trim();
+        };
+
+        function prefillIdentity() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('sciNotationPlayer') || '{}');
+                if (saved.className) document.getElementById('inputClass').value = saved.className;
+                if (saved.seat) document.getElementById('inputSeat').value = saved.seat;
+                if (saved.name) document.getElementById('inputName').value = saved.name;
+            } catch (e) {}
+        }
+
+        function ensureIdentity() {
+            const className = document.getElementById('inputClass').value.trim();
+            const seat = document.getElementById('inputSeat').value.trim();
+            const name = document.getElementById('inputName').value.trim();
+            if (!className || !seat || !name) {
+                alert('🧑‍🚀 請先填寫班級、座號、姓名，才能出發冒險！');
+                document.getElementById('identityForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return false;
+            }
+            gameState.player = { className, seat, name };
+            try {
+                localStorage.setItem('sciNotationPlayer', JSON.stringify(gameState.player));
+            } catch (e) {}
+            return true;
+        }
+
+        function logAnswer(selectedHtml, correctHtml, ok) {
+            if (!gameState.currentQ) return;
+            gameState.answersLog.push({
+                type: gameState.currentQ.type,
+                q: gameState.currentQ.q,
+                correct: correctHtml,
+                selected: selectedHtml,
+                ok: ok
+            });
+        }
+
+        function submitRecord(accuracy) {
+            // 尚未設定金鑰時跳過上傳
+            if (!SUPABASE_URL.startsWith('http') || SUPABASE_ANON_KEY.length < 20) {
+                console.log('尚未設定 Supabase 金鑰，跳過成績上傳');
+                return;
+            }
+            const p = gameState.player || {};
+            const record = {
+                class_name: p.className || '',
+                seat_no: p.seat || '',
+                student_name: p.name || '',
+                level: gameState.challengeMode ? '限時挑戰' : ('第' + gameState.currentLevel + '關'),
+                score: gameState.score,
+                correct_count: gameState.correctAnswers,
+                total_count: gameState.questionIndex,
+                accuracy: accuracy,
+                max_combo: gameState.maxCombo,
+                answers: gameState.answersLog
+            };
+            fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}`, {
+                method: 'POST',
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=minimal'
+                },
+                body: JSON.stringify(record)
+            }).then(res => {
+                if (!res.ok) console.warn('成績上傳失敗', res.status);
+            }).catch(err => console.warn('成績上傳失敗', err));
+        }
+
+        // 教師後台
+        function openTeacherModal() {
+            document.getElementById('teacherModal').style.display = 'flex';
+            document.getElementById('teacherPw').value = '';
+            document.getElementById('teacherPwError').textContent = '';
+            setTimeout(() => document.getElementById('teacherPw').focus(), 100);
+        }
+
+        function closeTeacherModal() {
+            document.getElementById('teacherModal').style.display = 'none';
+        }
+
+        function openTeacherAdmin() {
+            const pw = document.getElementById('teacherPw').value;
+            if (pw === ADMIN_PASSWORD) {
+                location.href = '星際科學記號教師後台.html';
+            } else {
+                document.getElementById('teacherPwError').textContent = '❌ 密碼錯誤，請再試一次';
+            }
+        }
+
         // ===== 星際戰鬥系統 =====
         const monsters = [
             { emoji: '👾', name: '👾 黏液怪獸' },
@@ -1715,6 +1970,9 @@
                 const earnedScore = baseScore + comboBonus + levelBonus;
                 gameState.score += earnedScore;
 
+                // 記錄作答（正確）
+                logAnswer(stripHtml(btn.innerHTML), stripHtml(buttons[correctIndex].innerHTML), true);
+
                 // 🚀 戰艦開火擊倒怪獸
                 shipAttack(earnedScore);
 
@@ -1746,6 +2004,9 @@
                 buttons[correctIndex].classList.add('correct');
                 gameState.combo = 0;
                 gameState.lives--;
+
+                // 記錄作答（錯誤）
+                logAnswer(stripHtml(btn.innerHTML), stripHtml(buttons[correctIndex].innerHTML), false);
 
                 // 👾 怪獸反擊，戰艦扣一滴血
                 monsterAttack();
@@ -1850,6 +2111,9 @@
             }
 
             saveGameData();
+
+            // 上傳成績到 Supabase（含每題作答明細）
+            submitRecord(accuracy);
 
             // 顯示結果
             document.getElementById('resultTitle').textContent = 
