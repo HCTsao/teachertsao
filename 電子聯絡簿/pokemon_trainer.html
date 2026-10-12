@@ -1412,6 +1412,11 @@
           newData[id].pokemons = [];
         }
         newData[id].pokemons.forEach(poke => {
+          if (poke.actualPoints === undefined || poke.actualPoints === null) {
+            poke.actualPoints = Math.max(poke.points || 0, (poke.confirmedStage || 0) * 100);
+          } else {
+            poke.actualPoints = Math.max(poke.actualPoints, poke.points || 0);
+          }
           if (poke.points < 300 && (!poke.moves || poke.moves.length === 0)) {
             initializeDefaultMoves(poke);
           }
@@ -1423,15 +1428,22 @@
         newData['teacher'] = JSON.parse(JSON.stringify(teacherStudentData));
       }
 
-      // Preserve confirmedStage if local memory has higher confirmedStage than incoming Firebase snapshot
+      // Preserve confirmedStage & actualPoints if local memory has higher than incoming Firebase snapshot
       if (students) {
         for (let id in newData) {
           if (students[id] && students[id].pokemons && newData[id].pokemons) {
             newData[id].pokemons.forEach((newP, idx) => {
               const oldP = students[id].pokemons[idx];
-              if (oldP && oldP.family === newP.family && oldP.confirmedStage !== undefined) {
-                if (newP.confirmedStage === undefined || oldP.confirmedStage > newP.confirmedStage) {
-                  newP.confirmedStage = oldP.confirmedStage;
+              if (oldP && oldP.family === newP.family) {
+                if (oldP.confirmedStage !== undefined) {
+                  if (newP.confirmedStage === undefined || oldP.confirmedStage > newP.confirmedStage) {
+                    newP.confirmedStage = oldP.confirmedStage;
+                  }
+                }
+                if (oldP.actualPoints !== undefined && oldP.actualPoints !== null) {
+                  if (newP.actualPoints === undefined || newP.actualPoints === null || oldP.actualPoints > newP.actualPoints) {
+                    newP.actualPoints = oldP.actualPoints;
+                  }
                 }
               }
             });
@@ -1566,9 +1578,46 @@
       ]
     };
 
-    // Default moves initializer based on current level points
+    // Helper to get nominal level (帳面等級：隨平時點數增減)
+    function getNominalLevel(poke) {
+      if (!poke) return 0;
+      return Math.floor((poke.points || 0) / 10);
+    }
+
+    // Helper to get actual points (實際點數：累計最高實力，不受扣分影響)
+    function getActualPoints(poke) {
+      if (!poke) return 0;
+      let act = (poke.actualPoints !== undefined && poke.actualPoints !== null) ? Number(poke.actualPoints) : undefined;
+      const pts = (poke.points !== undefined && poke.points !== null) ? Number(poke.points) : 0;
+      const stageFloor = (poke.confirmedStage || 0) * 100;
+      if (act === undefined || isNaN(act)) {
+        return Math.max(pts, stageFloor);
+      }
+      return Math.max(act, pts, stageFloor);
+    }
+
+    // Helper to get actual level (實際等級：戰鬥能力與招式解鎖之核心依據)
+    function getActualLevel(poke) {
+      return Math.floor(getActualPoints(poke) / 10);
+    }
+
+    // Helper to add points to a pokemon (加分時若超越實際點數則同步成長，扣分時只扣帳面)
+    function addPokemonPoints(poke, delta) {
+      if (!poke) return;
+      poke.points = (poke.points || 0) + delta;
+      if (poke.points > 300) poke.points = 300;
+      if (poke.points < 0) poke.points = 0;
+      if (poke.actualPoints === undefined || poke.actualPoints === null) {
+        poke.actualPoints = getActualPoints(poke);
+      }
+      if (poke.points > poke.actualPoints) {
+        poke.actualPoints = poke.points;
+      }
+    }
+
+    // Default moves initializer based on actual level points
     function initializeDefaultMoves(poke) {
-      const level = Math.floor(poke.points / 10);
+      const level = getActualLevel(poke);
       const pool = MOVES_POOL[poke.family];
       const unlocked = pool.filter(m => level >= m.level);
       const chosen = unlocked.slice(-4).map(m => m.name);
@@ -1593,11 +1642,11 @@
       }
     }
 
-    // Get level-scaled stats (HP, Atk, Def, SpAtk, SpDef, Speed) dynamically for level 0~30
+    // Get level-scaled stats (HP, Atk, Def, SpAtk, SpDef, Speed) dynamically for level 0~30 based on actual level
     function getPokemonScaledStats(poke) {
       const base = getCurrentPokemon(poke);
       if (!base) return null;
-      const level = Math.floor((poke.points || 0) / 10);
+      const level = getActualLevel(poke);
       const hpScale = 1 + (level / 30) * 1.3;
       const statScale = 1 + (level / 30);
       return {
@@ -1639,7 +1688,7 @@
       const poke = student.pokemons[activeIndex];
       if (poke.points >= 300) return;
 
-      const level = Math.floor((poke.points || 0) / 10);
+      const level = getActualLevel(poke);
       const pool = MOVES_POOL[poke.family];
       if (!pool) return;
       
@@ -1759,7 +1808,7 @@
     function getCurrentPokemon(poke) {
       if (!poke || !poke.family) return null;
       const familyArr = POKEMON_DATA[poke.family];
-      const level = Math.floor((poke.points || 0) / 10);
+      const level = getActualLevel(poke);
       
       const statStageIndex = getStage(level, poke);
       const statObj = familyArr[statStageIndex];
@@ -1771,7 +1820,7 @@
         id: displayObj.id,
         name: displayObj.name,
         url: displayObj.url,
-        // Base stats follow current level's stage stats (數值與招式跟著等級走)
+        // Base stats follow actual level's stage stats (戰鬥數值依實際等級計算)
         hp: statObj.hp,
         atk: statObj.atk,
         def: statObj.def,
@@ -1795,7 +1844,7 @@
       let canEvolve = false;
       let targetStageName = '';
       if (activePoke) {
-        const level = Math.floor((activePoke.points || 0) / 10);
+        const level = Math.max(getActualLevel(activePoke), getNominalLevel(activePoke));
         const confirmedStage = activePoke.confirmedStage || 0;
         const targetStage = confirmedStage + 1;
         const familyArr = POKEMON_DATA[activePoke.family];
@@ -2844,8 +2893,10 @@
       const idx2 = (s2.activePokemonIndex !== undefined && s2.activePokemonIndex >= 0 && s2.activePokemonIndex < s2.pokemons.length) ? s2.activePokemonIndex : (s2.pokemons.length - 1);
       const active1 = s1.pokemons[idx1];
       const active2 = s2.pokemons[idx2];
-      const lv1 = Math.floor(active1.points / 10);
-      const lv2 = Math.floor(active2.points / 10);
+      const displayLv1 = getNominalLevel(active1);
+      const displayLv2 = getNominalLevel(active2);
+      const lv1 = getActualLevel(active1);
+      const lv2 = getActualLevel(active2);
 
       // Fetch movesets from active pokemons or load defaults
       const p1Moves = active1.moves || initializeDefaultMoves(active1);
@@ -2885,7 +2936,7 @@
         pokeDetails: p1Details,
         maxHp: Math.floor(p1Details.hp * hpScale1),
         hp: Math.floor(p1Details.hp * hpScale1),
-        level: lv1,
+        level: displayLv1,
         family: active1.family,
         atk: Math.floor(p1Details.atk * scale1),
         def: Math.floor(p1Details.def * scale1),
@@ -2909,7 +2960,7 @@
         pokeDetails: p2Details,
         maxHp: Math.floor(p2Details.hp * hpScale2),
         hp: Math.floor(p2Details.hp * hpScale2),
-        level: lv2,
+        level: displayLv2,
         family: active2.family,
         atk: Math.floor(p2Details.atk * scale2),
         def: Math.floor(p2Details.def * scale2),
@@ -3417,14 +3468,14 @@
                             const isStronger = battleState.p2 && (battleState.p2.level > battleState.p1.level);
                             if (student.isTeacher) {
                               const bonusPts = isStronger ? (Math.floor(Math.random() * 6) + 10) : (Math.floor(Math.random() * 3) + 3);
-                              activePoke.points += bonusPts;
+                              addPokemonPoints(activePoke, bonusPts);
                               saveData();
                               bonusMsg = isStronger
                                 ? `（⚔️ 越級挑戰強敵成功！泓棋老師獲得大量 ${bonusPts} 點經驗值！）`
                                 : `（泓棋老師獲得 ${bonusPts} 點經驗值！）`;
                             } else {
                               const bonusPts = isStronger ? 15 : 10;
-                              activePoke.points += bonusPts;
+                              addPokemonPoints(activePoke, bonusPts);
                               saveData();
                               bonusMsg = isStronger
                                 ? `（⚔️ 越級挑戰強敵成功！獲得加倍 ${bonusPts} 點經驗值！）`
@@ -5310,7 +5361,7 @@
           } else {
             addPts = Math.floor(Math.random() * 3) + 3; // 3~5 points
           }
-          activePoke.points += addPts;
+          addPokemonPoints(activePoke, addPts);
           saveData();
           deductionMsg = `（對戰勝利！泓棋老師獲得 ${addPts} 點經驗值！）`;
         } else {
@@ -5495,7 +5546,8 @@
       const wildPoke = WILD_POKEMON_POOL[randomIdx];
 
       const p1Details = getCurrentPokemon(activePoke);
-      const lv1 = Math.floor(activePoke.points / 10);
+      const displayLv1 = getNominalLevel(activePoke);
+      const lv1 = getActualLevel(activePoke);
 
       const p1Moves = activePoke.moves || initializeDefaultMoves(activePoke);
       const p1MovePP = {};
@@ -5524,7 +5576,7 @@
         pokeDetails: p1Details,
         maxHp: Math.floor(p1Details.hp * hpScale1),
         hp: Math.floor(p1Details.hp * hpScale1),
-        level: lv1,
+        level: displayLv1,
         family: activePoke.family,
         atk: Math.floor(p1Details.atk * scale1),
         def: Math.floor(p1Details.def * scale1),
@@ -5745,9 +5797,9 @@
                       const activePoke = student.pokemons[activeIdx];
                       if (activePoke) {
                         if (student.isTeacher) {
-                          activePoke.points += Math.floor(Math.random() * 3) + 3;
+                          addPokemonPoints(activePoke, Math.floor(Math.random() * 3) + 3);
                         } else {
-                          activePoke.points += 10;
+                          addPokemonPoints(activePoke, 10);
                         }
                       }
                       student.pokemons.push({

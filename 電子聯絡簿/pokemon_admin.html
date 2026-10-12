@@ -362,19 +362,35 @@
           </div>
 
           <div class="form-group">
-            <label for="pokemon-select">選擇要加扣分的寶可夢</label>
-            <select id="pokemon-select">
+            <label for="pokemon-select">選擇要操作的寶可夢</label>
+            <select id="pokemon-select" onchange="updateActualInputOnSelect()">
               <option value="-1">目前無寶可夢夥伴</option>
             </select>
           </div>
 
           <div class="form-group" id="points-group">
-            <label for="points-input">給予分數 (可輸入負數扣分)</label>
+            <label for="points-input">給予平時表現分數 (可輸入負數扣分，影響帳面等級)</label>
             <input type="number" id="points-input" value="1" min="-200" max="200">
           </div>
 
           <div class="form-group">
-            <button class="btn btn-primary" onclick="modifyPoints()"><i class="fa-solid fa-plus-minus"></i> 送出增減分</button>
+            <button class="btn btn-primary" onclick="modifyPoints()"><i class="fa-solid fa-plus-minus"></i> 送出帳面增減分</button>
+          </div>
+
+          <!-- 修正實際等級/點數 -->
+          <div style="margin-top: 15px; margin-bottom: 15px; background: rgba(167, 139, 250, 0.08); border: 1px solid rgba(167, 139, 250, 0.3); border-radius: 12px; padding: 12px;">
+            <div style="font-weight: 800; font-size: 0.88rem; color: #c4b5fd; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-shield-halved"></i> 修正實際等級/點數 (戰鬥實力)
+            </div>
+            <p style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 8px; line-height: 1.35;">
+              學生端只會看到帳面分數；此處可直接校正寶可夢的「實際能力點數」（0~300分），不影響學生端顯示的分數。
+            </p>
+            <div style="display: flex; gap: 8px;">
+              <input type="number" id="actual-points-input" placeholder="實際點數 (0~300)" min="0" max="300" style="flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-family: inherit;">
+              <button class="btn" onclick="modifyActualPoints()" style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; padding: 8px 12px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; border: none; cursor: pointer; white-space: nowrap;">
+                設定實際點數
+              </button>
+            </div>
           </div>
 
           <div style="margin-top: 25px; border-top: 1px dashed var(--border-color); padding-top: 20px;">
@@ -757,6 +773,15 @@
                 if ((pichuPoke.points || 0) < 100) pichuPoke.points = 101;
               }
             }
+            for (let sId in students) {
+              if (students[sId].pokemons) {
+                students[sId].pokemons.forEach(poke => {
+                  if (poke.actualPoints === undefined || poke.actualPoints === null) {
+                    poke.actualPoints = Math.max(poke.points || 0, (poke.confirmedStage || 0) * 100);
+                  }
+                });
+              }
+            }
             localStorage.setItem('pokemon_trainer_data', JSON.stringify(students));
             renderOverview();
           }
@@ -813,10 +838,33 @@
       }
     }
 
+    // Helper to get nominal level (帳面等級)
+    function getNominalLevel(poke) {
+      if (!poke) return 0;
+      return Math.floor((poke.points || 0) / 10);
+    }
+
+    // Helper to get actual points (實際點數，累計實力，不受扣分影響)
+    function getActualPoints(poke) {
+      if (!poke) return 0;
+      let act = (poke.actualPoints !== undefined && poke.actualPoints !== null) ? Number(poke.actualPoints) : undefined;
+      const pts = (poke.points !== undefined && poke.points !== null) ? Number(poke.points) : 0;
+      const stageFloor = (poke.confirmedStage || 0) * 100;
+      if (act === undefined || isNaN(act)) {
+        return Math.max(pts, stageFloor);
+      }
+      return Math.max(act, pts, stageFloor);
+    }
+
+    // Helper to get actual level (實際等級)
+    function getActualLevel(poke) {
+      return Math.floor(getActualPoints(poke) / 10);
+    }
+
     function getStage(pokeOrLevel) {
       if (typeof pokeOrLevel === 'object' && pokeOrLevel !== null) {
         const poke = pokeOrLevel;
-        const level = Math.floor((poke.points || 0) / 10);
+        const level = getActualLevel(poke);
         if (poke.stage !== undefined) return poke.stage;
         const confirmed = (poke.confirmedStage !== undefined) ? poke.confirmedStage : 0;
         if (level < 10) return 0;
@@ -873,14 +921,18 @@
         let pName = "尚未選擇";
         let pLv = 0;
         let pPoints = 0;
+        let pActualLv = 0;
+        let pActualPoints = 0;
         let imgUrl = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png";
 
         if(activePoke) {
           const currentPoke = getCurrentPokemon(activePoke);
           if (currentPoke) {
             pName = currentPoke.name;
-            pLv = Math.floor(activePoke.points / 10);
-            pPoints = activePoke.points;
+            pLv = getNominalLevel(activePoke);
+            pPoints = activePoke.points || 0;
+            pActualPoints = getActualPoints(activePoke);
+            pActualLv = getActualLevel(activePoke);
             imgUrl = currentPoke.url;
           }
         }
@@ -893,7 +945,10 @@
         if (pokes.length > 0) {
           pokes.forEach((p, idx) => {
             const pDetails = getCurrentPokemon(p);
-            const lvl = Math.floor(p.points / 10);
+            const nomLvl = getNominalLevel(p);
+            const actPts = getActualPoints(p);
+            const actLvl = getActualLevel(p);
+            const diff = actPts - (p.points || 0);
             const isActive = idx === activeIndex;
             pokeListHTML += `
               <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px 12px; margin-top: 8px;">
@@ -901,7 +956,9 @@
                   <img src="${pDetails ? pDetails.url : imgUrl}" style="width: 38px; height: 38px; object-fit: contain;">
                   <div>
                     <span style="font-weight: 700; font-size: 0.95rem; color: #f8fafc;">${pDetails ? pDetails.name : '寶可夢'}</span>
-                    <span style="font-size: 0.8rem; color: #94a3b8; margin-left: 6px;">Lv.${lvl} (${p.points}分)</span>
+                    <span style="font-size: 0.8rem; color: #38bdf8; margin-left: 6px;">帳面: Lv.${nomLvl} (${p.points || 0}分)</span>
+                    <span style="font-size: 0.8rem; color: #c4b5fd; margin-left: 6px;">實際: Lv.${actLvl} (${actPts}分)</span>
+                    ${diff > 0 ? `<span style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); font-size: 0.72rem; padding: 2px 6px; border-radius: 6px; font-weight: bold; margin-left: 6px;">⚠️ 累計被扣 ${diff} 分</span>` : ''}
                     ${isActive ? '<span style="background: #22c55e; color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; font-weight: bold; margin-left: 6px;">出戰中</span>' : ''}
                   </div>
                 </div>
@@ -935,8 +992,8 @@
               </div>
             </div>
             <div>
-              <span class="student-badge" style="${badgeBg}">
-                Lv. ${pLv} (${pPoints}分)
+              <span class="student-badge" style="${badgeBg}; font-size: 0.85rem; padding: 6px 12px;">
+                帳面 Lv.${pLv} (${pPoints}分) | 實際 Lv.${pActualLv} (${pActualPoints}分)
               </span>
             </div>
           </div>
@@ -1012,9 +1069,66 @@
       if (targetPoke.points > 300) targetPoke.points = 300;
       if (targetPoke.points < 0) targetPoke.points = 0;
 
+      // 雙等級處理：
+      // 加分時若超越實際點數，實際點數同步提高（「等到他加回實際等級以後，寶可夢才會繼續變強」）
+      // 扣分時只扣帳面點數，不扣實際點數（「學生被扣點時不會影響寶可夢能力值」）
+      if (targetPoke.actualPoints === undefined || targetPoke.actualPoints === null) {
+        targetPoke.actualPoints = getActualPoints(targetPoke);
+      }
+      if (pointsToAdd > 0 && targetPoke.points > targetPoke.actualPoints) {
+        targetPoke.actualPoints = targetPoke.points;
+      }
+
       saveData();
       renderOverview();
-      alert(`已成功為 ${student.name} 的「${targetPokeName}」送出增減分！`);
+      updateSelectedInfo();
+      alert(`已成功為 ${student.name} 的「${targetPokeName}」送出帳面增減分！\n（目前帳面：${targetPoke.points}分 / 實際：${getActualPoints(targetPoke)}分）`);
+    }
+
+    function modifyActualPoints() {
+      const selectedId = document.getElementById('student-select').value;
+      const actVal = parseInt(document.getElementById('actual-points-input').value);
+      const student = students[selectedId];
+
+      if (!student || !student.pokemons || student.pokemons.length === 0) {
+        alert("這位學生還沒有寶可夢夥伴喔！無法設定實際點數。");
+        return;
+      }
+
+      if (isNaN(actVal) || actVal < 0 || actVal > 300) {
+        alert("請輸入有效的實際點數 (0 ~ 300)！");
+        return;
+      }
+
+      const pokeSelect = document.getElementById('pokemon-select');
+      let targetIndex = pokeSelect ? parseInt(pokeSelect.value) : -1;
+      if (isNaN(targetIndex) || targetIndex < 0 || targetIndex >= student.pokemons.length) {
+        targetIndex = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < student.pokemons.length)
+          ? student.activePokemonIndex
+          : (student.pokemons.length - 1);
+      }
+
+      const targetPoke = student.pokemons[targetIndex];
+      const targetPokeData = getCurrentPokemon(targetPoke);
+      const targetPokeName = targetPokeData ? targetPokeData.name : '寶可夢';
+
+      targetPoke.actualPoints = actVal;
+      // 若設定的實際點數低於帳面點數，則自動以帳面點數為底限
+      if (targetPoke.actualPoints < (targetPoke.points || 0)) {
+        targetPoke.actualPoints = targetPoke.points || 0;
+      }
+      // 自動校正進化形態（若達到10等或20等且尚未進化）
+      const actLv = Math.floor(targetPoke.actualPoints / 10);
+      if (actLv >= 20 && (targetPoke.confirmedStage === undefined || targetPoke.confirmedStage < 2)) {
+        targetPoke.confirmedStage = 2;
+      } else if (actLv >= 10 && (targetPoke.confirmedStage === undefined || targetPoke.confirmedStage < 1)) {
+        targetPoke.confirmedStage = 1;
+      }
+
+      saveData();
+      renderOverview();
+      updateSelectedInfo();
+      alert(`已成功更新 ${student.name} 的「${targetPokeName}」實際能力點數為 ${targetPoke.actualPoints} 點 (實際等級 Lv.${Math.floor(targetPoke.actualPoints / 10)})！\n（學生端帳面點數仍維持 ${targetPoke.points || 0} 點，不受影響）`);
     }
 
     function resetStudent() {
@@ -1026,6 +1140,18 @@
         saveData();
         renderOverview();
         alert(`已成功重設 ${student.name} 的資料。`);
+      }
+    }
+
+    function updateActualInputOnSelect() {
+      const selectedId = document.getElementById('student-select').value;
+      const student = students ? students[selectedId] : null;
+      const pokeSelect = document.getElementById('pokemon-select');
+      const actualInput = document.getElementById('actual-points-input');
+      if (!student || !student.pokemons || !pokeSelect || !actualInput) return;
+      const curIdx = parseInt(pokeSelect.value);
+      if (curIdx >= 0 && curIdx < student.pokemons.length) {
+        actualInput.value = getActualPoints(student.pokemons[curIdx]);
       }
     }
 
@@ -1044,6 +1170,8 @@
         opt.value = "-1";
         opt.textContent = "目前無寶可夢夥伴";
         pokeSelect.appendChild(opt);
+        const actualInput = document.getElementById('actual-points-input');
+        if (actualInput) actualInput.value = '';
         return;
       }
 
@@ -1054,12 +1182,16 @@
       student.pokemons.forEach((poke, idx) => {
         const pokeData = getCurrentPokemon(poke);
         const name = pokeData ? pokeData.name : '寶可夢';
-        const level = Math.floor(poke.points / 10);
+        const nomLevel = getNominalLevel(poke);
+        const actLevel = getActualLevel(poke);
+        const actPoints = getActualPoints(poke);
+        const diff = actPoints - (poke.points || 0);
         const isActive = (idx === activeIndex);
 
         const opt = document.createElement('option');
         opt.value = idx;
-        opt.textContent = `${idx + 1}. ${name} (Lv.${level}, ${poke.points}分)${isActive ? ' [出戰中]' : ''}`;
+        const diffText = diff > 0 ? ` [被扣${diff}分]` : '';
+        opt.textContent = `${idx + 1}. ${name} (帳面:Lv.${nomLevel}, ${poke.points || 0}分 | 實際:Lv.${actLevel}, ${actPoints}分${diffText})${isActive ? ' [出戰中]' : ''}`;
         pokeSelect.appendChild(opt);
       });
 
@@ -1068,6 +1200,8 @@
       } else if (activeIndex >= 0 && activeIndex < student.pokemons.length) {
         pokeSelect.value = activeIndex;
       }
+
+      updateActualInputOnSelect();
     }
 
     // 頁籤切換邏輯
