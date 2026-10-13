@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>約分大冒險 - 教師管理後台</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Noto+Sans+TC:wght@500;700;900&family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- SheetJS for Excel Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <!-- Firebase Compat SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <style>
+        :root {
+            --font-main: 'Outfit', 'Noto Sans TC', sans-serif;
+        }
+        body {
+            font-family: var(--font-main);
+            background: radial-gradient(circle at 15% 15%, #1e1b4b 0%, #0f172a 45%, #020617 100%);
+            min-height: 100vh;
+            color: #f8fafc;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.5);
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            transition: all 0.25s ease;
+        }
+        .glass-card:hover {
+            border-color: rgba(250, 204, 21, 0.3);
+            transform: translateY(-2px);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(71, 85, 105, 0.6);
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(100, 116, 139, 0.8);
+        }
+        .btn-action {
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .btn-action:hover {
+            transform: translateY(-1px);
+        }
+        .btn-action:active {
+            transform: translateY(1px);
+        }
+
+        /* 數學上下垂直分數排版樣式 */
+        .math-expr {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
+            vertical-align: middle;
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+        }
+        .math-fraction {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            vertical-align: middle;
+            line-height: 1;
+            margin: 0 0.15rem;
+        }
+        .math-fraction .num {
+            display: block;
+            text-align: center;
+            font-size: 0.85em;
+            padding: 0 2px 2px 2px;
+            border-bottom: 2px solid currentColor;
+            width: 100%;
+        }
+        .math-fraction .den {
+            display: block;
+            text-align: center;
+            font-size: 0.85em;
+            padding: 2px 2px 0 2px;
+            width: 100%;
+        }
+        .math-op {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1em;
+            font-weight: 900;
+            margin: 0 0.1rem;
+        }
+    </style>
+</head>
+<body class="p-3 md:p-6 text-slate-100 flex flex-col items-center">
+
+    <!-- 主容器 -->
+    <div class="max-w-7xl w-full flex flex-col gap-6">
+
+        <!-- 頂部導航與標題列 -->
+        <header class="glass-panel rounded-3xl p-5 md:p-7 flex flex-col md:flex-row justify-between items-center gap-5">
+            <div class="flex items-center gap-4">
+                <a href="約分大冒險.html" onclick="try{sessionStorage.removeItem('reduction_teacher_auth');}catch(e){}" class="bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-300 w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-md group" title="返回學生端遊戲">
+                    <i class="fa-solid fa-gamepad text-xl group-hover:scale-110 transition-transform"></i>
+                </a>
+                <div>
+                    <div class="flex items-center gap-3">
+                        <h1 class="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500" style="font-family: 'ZCOOL KuaiLe', sans-serif;">
+                            約分大冒險 · 教師管理後台
+                        </h1>
+                        <span id="connStatusBadge" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Firebase 即時連線
+                        </span>
+                    </div>
+                    <p class="text-slate-400 text-sm mt-1 flex items-center gap-2">
+                        <span>五年級下學期 分數乘法</span>
+                        <span>•</span>
+                        <span>六年級上學期 分數除法</span>
+                        <span>•</span>
+                        <span class="text-amber-400 font-bold">錯題即時分析與學習診斷</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- 右側捷徑動作按鈕 -->
+            <div class="flex items-center gap-3 w-full md:w-auto justify-end">
+                <button onclick="exportToExcel()" class="btn-action bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-xl font-black text-sm flex items-center gap-2 shadow-lg shadow-emerald-950/40">
+                    <i class="fa-solid fa-file-excel text-lg"></i>
+                    <span>匯出 Excel</span>
+                </button>
+                <button onclick="confirmClearAllData()" class="btn-action bg-red-600/20 hover:bg-red-600 text-red-300 hover:text-white border border-red-500/30 px-4 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span class="hidden sm:inline">清除資料</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- 數據指標概覽卡片 (4 欄) -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- 錯題總數 -->
+            <div class="glass-card rounded-2xl p-5 flex items-center gap-4 border-l-4 border-l-red-500">
+                <div class="w-12 h-12 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center text-2xl shrink-0">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <div>
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block">篩選錯題筆數</span>
+                    <span id="statMistakeCount" class="text-3xl font-black text-red-400">0</span>
+                </div>
+            </div>
+
+            <!-- 未約至最簡佔比 -->
+            <div class="glass-card rounded-2xl p-5 flex items-center gap-4 border-l-4 border-l-amber-500">
+                <div class="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-2xl shrink-0">
+                    <i class="fa-solid fa-filter"></i>
+                </div>
+                <div>
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block">未約至最簡 (常態)</span>
+                    <span id="statUnreducedCount" class="text-3xl font-black text-amber-300">0</span>
+                </div>
+            </div>
+
+            <!-- 完賽通關人次 -->
+            <div class="glass-card rounded-2xl p-5 flex items-center gap-4 border-l-4 border-l-blue-500">
+                <div class="w-12 h-12 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center text-2xl shrink-0">
+                    <i class="fa-solid fa-flag-checkered"></i>
+                </div>
+                <div>
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block">完賽挑戰人次</span>
+                    <span id="statRecordCount" class="text-3xl font-black text-blue-400">0</span>
+                </div>
+            </div>
+
+            <!-- 活躍班級數 -->
+            <div class="glass-card rounded-2xl p-5 flex items-center gap-4 border-l-4 border-l-emerald-500">
+                <div class="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-2xl shrink-0">
+                    <i class="fa-solid fa-users-rectangle"></i>
+                </div>
+                <div>
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block">參與班級總數</span>
+                    <span id="statClassCount" class="text-3xl font-black text-emerald-400">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 多維度篩選工具列 (班級、姓名、日期、單元模式) -->
+        <div class="glass-panel rounded-3xl p-5 md:p-6 space-y-4">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b border-white/5 pb-3">
+                <div class="flex items-center gap-2 font-black text-lg text-amber-300">
+                    <i class="fa-solid fa-sliders text-amber-400"></i>
+                    <span>多條件即時篩選器</span>
+                </div>
+                <button onclick="resetAllFilters()" class="text-xs text-slate-400 hover:text-amber-300 flex items-center gap-1.5 transition-colors font-bold">
+                    <i class="fa-solid fa-arrow-rotate-left"></i> 重設所有條件
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3.5">
+                <!-- 1. 班級篩選 -->
+                <div class="lg:col-span-3">
+                    <label class="block text-xs font-bold text-slate-400 mb-1.5 flex items-center gap-1.5">
+                        <i class="fa-solid fa-chalkboard text-amber-400"></i> 班級 Class
+                    </label>
+                    <select id="filterClass" onchange="applyFilters()" class="w-full bg-slate-900 border border-white/10 rounded-xl px-3.5 py-2.5 text-white font-bold text-sm focus:outline-none focus:border-amber-400 transition-colors">
+                        <option value="ALL">全部班級 (All Classes)</option>
+                    </select>
+                </div>
+
+                <!-- 2. 學生姓名搜尋 -->
+                <div class="lg:col-span-3">
+                    <label class="block text-xs font-bold text-slate-400 mb-1.5 flex items-center gap-1.5">
+                        <i class="fa-solid fa-magnifying-glass text-blue-400"></i> 學生姓名 Name
+                    </label>
+                    <div class="relative">
+                        <input type="text" id="filterName" oninput="applyFilters()" placeholder="輸入學生姓名關鍵字..." class="w-full bg-slate-900 border border-white/10 rounded-xl pl-3.5 pr-8 py-2.5 text-white font-bold text-sm focus:outline-none focus:border-blue-400 transition-colors">
+                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">
+                            <i class="fa-solid fa-user"></i>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 3. 日期篩選 -->
+                <div class="lg:col-span-4">
+                    <label class="block text-xs font-bold text-slate-400 mb-1.5 flex items-center gap-1.5">
+                        <i class="fa-solid fa-calendar-days text-emerald-400"></i> 日期 Date
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <input type="date" id="filterDate" onchange="applyFilters()" class="flex-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-white font-bold text-sm focus:outline-none focus:border-emerald-400 transition-colors">
+                        <button onclick="setFilterDateToday()" class="px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/35 border border-emerald-500/30 text-emerald-300 rounded-xl text-xs font-black transition-all shrink-0">
+                            今日
+                        </button>
+                        <button onclick="clearFilterDate()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl text-xs font-bold transition-all shrink-0">
+                            全部
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 4. 單元與難度篩選 -->
+                <div class="lg:col-span-2">
+                    <label class="block text-xs font-bold text-slate-400 mb-1.5 flex items-center gap-1.5">
+                        <i class="fa-solid fa-layer-group text-purple-400"></i> 運算單元
+                    </label>
+                    <select id="filterMode" onchange="applyFilters()" class="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-white font-bold text-sm focus:outline-none focus:border-purple-400 transition-colors">
+                        <option value="ALL">全部單元</option>
+                        <option value="mul">乘法篇 (五下)</option>
+                        <option value="div">除法篇 (六上)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- 頁籤切換 (學生錯題 vs 通關紀錄) -->
+        <div class="flex items-center gap-3 border-b border-white/10 pb-1">
+            <button id="tabBtnMistakes" onclick="switchMainTab('mistakes')" class="px-6 py-3 rounded-2xl font-black text-lg flex items-center gap-2.5 transition-all bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20">
+                <i class="fa-solid fa-clipboard-question"></i>
+                <span>學生錯題分析紀錄</span>
+                <span id="badgeMistakesCount" class="bg-slate-950/20 text-slate-900 text-xs px-2 py-0.5 rounded-full font-black">0</span>
+            </button>
+            <button id="tabBtnRecords" onclick="switchMainTab('records')" class="px-6 py-3 rounded-2xl font-black text-lg flex items-center gap-2.5 transition-all bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-white/5">
+                <i class="fa-solid fa-trophy"></i>
+                <span>通關成績排行榜</span>
+                <span id="badgeRecordsCount" class="bg-white/10 text-slate-300 text-xs px-2 py-0.5 rounded-full font-black">0</span>
+            </button>
+        </div>
+
+        <!-- ================= 頁籤 1: 學生錯題紀錄 ================= -->
+        <section id="sectionMistakes" class="space-y-4">
+            
+            <!-- 錯題洞察小看板 (高頻錯題排行) -->
+            <div id="insightBox" class="glass-panel rounded-3xl p-5 border border-amber-500/20 bg-amber-950/10 hidden">
+                <h3 class="text-sm font-black text-amber-300 flex items-center gap-2 mb-3">
+                    <i class="fa-solid fa-lightbulb text-yellow-400"></i>
+                    <span>教學洞察：高頻錯誤算式 Top 3（針對當前篩選範圍）</span>
+                </h3>
+                <div id="topMistakesList" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <!-- 動態渲染高頻錯題 -->
+                </div>
+            </div>
+
+            <!-- 錯題主表格 -->
+            <div class="glass-panel rounded-3xl overflow-hidden shadow-2xl">
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-slate-900/90 text-slate-400 border-b border-white/10 text-xs uppercase font-black">
+                                <th class="p-4 whitespace-nowrap">時間</th>
+                                <th class="p-4 whitespace-nowrap">班級</th>
+                                <th class="p-4 whitespace-nowrap">座號</th>
+                                <th class="p-4 whitespace-nowrap">姓名</th>
+                                <th class="p-4 whitespace-nowrap">單元難度</th>
+                                <th class="p-4 whitespace-nowrap">題號</th>
+                                <th class="p-4 whitespace-nowrap min-w-[130px]">題目原式</th>
+                                <th class="p-4 whitespace-nowrap">學生輸入答案</th>
+                                <th class="p-4 whitespace-nowrap">正確答案</th>
+                                <th class="p-4 whitespace-nowrap">錯誤診斷</th>
+                                <th class="p-4 text-center whitespace-nowrap">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mistakesTableBody" class="divide-y divide-white/5 font-bold">
+                            <tr>
+                                <td colspan="11" class="text-center py-12 text-slate-500 font-bold">
+                                    <i class="fa-solid fa-spinner animate-spin mr-2"></i> 正在載入錯題資料中...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= 頁籤 2: 完賽挑戰與排行榜 ================= -->
+        <section id="sectionRecords" class="space-y-4 hidden">
+            <div class="glass-panel rounded-3xl overflow-hidden shadow-2xl">
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-slate-900/90 text-slate-400 border-b border-white/10 text-xs uppercase font-black">
+                                <th class="p-4 whitespace-nowrap">作答時間</th>
+                                <th class="p-4 whitespace-nowrap">班級</th>
+                                <th class="p-4 whitespace-nowrap">座號</th>
+                                <th class="p-4 whitespace-nowrap">姓名</th>
+                                <th class="p-4 whitespace-nowrap">單元模式</th>
+                                <th class="p-4 whitespace-nowrap">挑戰難度</th>
+                                <th class="p-4 whitespace-nowrap">總積分</th>
+                                <th class="p-4 text-center whitespace-nowrap">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recordsTableBody" class="divide-y divide-white/5 font-bold">
+                            <tr>
+                                <td colspan="8" class="text-center py-12 text-slate-500 font-bold">
+                                    <i class="fa-solid fa-spinner animate-spin mr-2"></i> 正在載入通關紀錄中...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- 核心 JavaScript 邏輯 -->
+    <!-- ======================================================== -->
+    <script>
+        // ==========================================
+        // 1. 教師權限驗證 (需輸入管理密碼 8888，介面不提示密碼)
+        // ==========================================
+        (function verifyTeacherAuth() {
+            let isSessionAuth = false;
+            try {
+                isSessionAuth = sessionStorage.getItem('reduction_teacher_auth') === 'true';
+            } catch (e) {}
+
+            if (isSessionAuth) {
+                return;
+            }
+
+            const inputPwd = prompt("🔒 請輸入教師後台管理密碼：");
+            if (inputPwd === "8888") {
+                try {
+                    sessionStorage.setItem('reduction_teacher_auth', 'true');
+                } catch (e) {}
+            } else {
+                if (inputPwd !== null) {
+                    alert("❌ 密碼錯誤，無法進入教師後台！");
+                }
+                window.location.href = "約分大冒險.html";
+                throw new Error("教師認證未通過");
+            }
+        })();
+
+        // ==========================================
+        // 2. Firebase Realtime Database 初始化
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyCFNaVRETt862_As1hF7Mfyr22pKM5-lvk",
+            authDomain: "chickenrabbit-ea442.firebaseapp.com",
+            databaseURL: "https://chickenrabbit-ea442-default-rtdb.firebaseio.com",
+            projectId: "chickenrabbit-ea442",
+            storageBucket: "chickenrabbit-ea442.appspot.com",
+            messagingSenderId: "65728951973",
+            appId: "1:65728951973:web:efff912caf5f6f185abf4c"
+        };
+
+        let database = null;
+        let isFirebaseActive = false;
+
+        try {
+            if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "") {
+                firebase.initializeApp(firebaseConfig);
+                database = firebase.database();
+                isFirebaseActive = true;
+                console.log("Firebase 教師後台資料庫連線成功！");
+            }
+        } catch (e) {
+            console.warn("Firebase 初始化異常，自動切換至離線模式", e);
+            const badge = document.getElementById('connStatusBadge');
+            if (badge) {
+                badge.className = "hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-500/20 text-amber-300 border border-amber-500/30";
+                badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span> 離線本機模式';
+            }
+        }
+
+        // ==========================================
+        // 3. 資料暫存與狀態管理
+        // ==========================================
+        let rawMistakes = [];
+        let rawRecords = [];
+        let activeTab = 'mistakes'; // 'mistakes' | 'records'
+
+        // 日期轉字串輔助 (YYYY-MM-DD)
+        function formatYMD(ts) {
+            if (!ts) return '';
+            const d = new Date(ts);
+            if (isNaN(d.getTime())) return '';
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        // 時間轉詳細字串 (YYYY-MM-DD HH:mm:ss)
+        function formatFullTime(ts) {
+            if (!ts) return '-';
+            const d = new Date(ts);
+            if (isNaN(d.getTime())) return '-';
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            const ss = String(d.getSeconds()).padStart(2, '0');
+            return `${y}/${m}/${day} ${hh}:${mm}:${ss}`;
+        }
+
+        // 數學上下垂直分數排版格式化 (將 "8/15 × 5/12"、"40/180" 等轉為上下形式 HTML)
+        function formatMathFormula(rawStr) {
+            if (!rawStr || rawStr === '-' || rawStr === '未作答') return rawStr || '-';
+            if (!/\d+\s*\/\s*\d+/.test(rawStr)) {
+                return rawStr;
+            }
+            const normalized = rawStr.replace(/([×÷\+\-=])/g, ' $1 ').trim();
+            const tokens = normalized.split(/\s+/);
+            const formattedTokens = tokens.map(token => {
+                if (/^\d+\/\d+$/.test(token)) {
+                    const [num, den] = token.split('/');
+                    return `<span class="math-fraction"><span class="num">${num}</span><span class="den">${den}</span></span>`;
+                }
+                if (token === '×' || token === '÷' || token === '+' || token === '-' || token === '=') {
+                    return `<span class="math-op">${token}</span>`;
+                }
+                return `<span>${token}</span>`;
+            });
+            return `<span class="math-expr">${formattedTokens.join('')}</span>`;
+        }
+
+        // ==========================================
+        // 4. 資料載入與即時監聽
+        // ==========================================
+        function initDataLoad() {
+            if (isFirebaseActive && database) {
+                // 1. 監聽錯題節點
+                database.ref('FractionReduce/mistakes').on('value', snapshot => {
+                    let list = [];
+                    snapshot.forEach(child => {
+                        const val = child.val() || {};
+                        val.id = child.key;
+                        list.push(val);
+                    });
+                    list.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); // 最新在前
+                    rawMistakes = list;
+                    updateClassDropdownOptions();
+                    applyFilters();
+                }, err => {
+                    console.error("Firebase mistakes 監聽失敗，切換讀取本地緩存", err);
+                    loadLocalData();
+                });
+
+                // 2. 監聽完賽紀錄節點
+                database.ref('FractionReduce/records').on('value', snapshot => {
+                    let list = [];
+                    snapshot.forEach(child => {
+                        const val = child.val() || {};
+                        val.id = child.key;
+                        list.push(val);
+                    });
+                    list.sort((a, b) => (b.timestamp || b.date || 0) - (a.timestamp || a.date || 0));
+                    rawRecords = list;
+                    updateClassDropdownOptions();
+                    applyFilters();
+                }, err => {
+                    console.error("Firebase records 監聽失敗", err);
+                });
+
+            } else {
+                loadLocalData();
+            }
+        }
+
+        function loadLocalData() {
+            let mList = JSON.parse(localStorage.getItem('FractionReduce_mistakes') || '[]');
+            mList.forEach((item, idx) => {
+                if (!item.id) item.id = 'loc_m_' + (item.timestamp || idx) + '_' + idx;
+            });
+            mList.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            rawMistakes = mList;
+
+            let rList = JSON.parse(localStorage.getItem('FractionReduce_records') || '[]');
+            rList.forEach((item, idx) => {
+                if (!item.id) item.id = 'loc_r_' + (item.timestamp || idx) + '_' + idx;
+            });
+            rList.sort((a, b) => (b.timestamp || b.date || 0) - (a.timestamp || a.date || 0));
+            rawRecords = rList;
+
+            updateClassDropdownOptions();
+            applyFilters();
+        }
+
+        // ==========================================
+        // 5. 班級選單動態填裝
+        // ==========================================
+        function updateClassDropdownOptions() {
+            const classSelect = document.getElementById('filterClass');
+            const currentSelected = classSelect.value;
+
+            // 蒐集所有不重複班級
+            const classSet = new Set();
+            rawMistakes.forEach(item => {
+                if (item.className && item.className.trim()) classSet.add(item.className.trim());
+            });
+            rawRecords.forEach(item => {
+                if (item.className && item.className.trim()) classSet.add(item.className.trim());
+            });
+
+            const sortedClasses = Array.from(classSet).sort();
+
+            let optionsHtml = '<option value="ALL">全部班級 (All Classes)</option>';
+            sortedClasses.forEach(c => {
+                optionsHtml += `<option value="${c}">${c === '訪客' ? '訪客' : `${c} 班`}</option>`;
+            });
+
+            classSelect.innerHTML = optionsHtml;
+            if (sortedClasses.includes(currentSelected)) {
+                classSelect.value = currentSelected;
+            } else {
+                classSelect.value = 'ALL';
+            }
+
+            document.getElementById('statClassCount').innerText = sortedClasses.length;
+        }
+
+        // ==========================================
+        // 6. 多條件篩選計算
+        // ==========================================
+        function applyFilters() {
+            const selectedClass = document.getElementById('filterClass').value;
+            const searchName = document.getElementById('filterName').value.trim().toLowerCase();
+            const selectedDate = document.getElementById('filterDate').value; // YYYY-MM-DD
+            const selectedMode = document.getElementById('filterMode').value; // ALL | mul | div
+
+            // 錯題篩選
+            const filteredMistakes = rawMistakes.filter(item => {
+                // 班級比對
+                if (selectedClass !== 'ALL' && item.className !== selectedClass) return false;
+                // 姓名模糊搜尋
+                if (searchName && (!item.name || !item.name.toLowerCase().includes(searchName))) return false;
+                // 日期比對
+                if (selectedDate && formatYMD(item.timestamp) !== selectedDate) return false;
+                // 模式比對
+                if (selectedMode !== 'ALL' && item.mode !== selectedMode) return false;
+                return true;
+            });
+
+            // 完賽紀錄篩選
+            const filteredRecords = rawRecords.filter(item => {
+                if (selectedClass !== 'ALL' && item.className !== selectedClass) return false;
+                if (searchName && (!item.name || !item.name.toLowerCase().includes(searchName))) return false;
+                if (selectedDate && formatYMD(item.timestamp || item.date) !== selectedDate) return false;
+                if (selectedMode !== 'ALL' && item.mode !== selectedMode) return false;
+                return true;
+            });
+
+            // 更新統計卡片
+            updateStatisticsCards(filteredMistakes, filteredRecords);
+
+            // 渲染錯題表格與高頻洞察
+            renderMistakesTable(filteredMistakes);
+            renderInsights(filteredMistakes);
+
+            // 渲染完賽表格
+            renderRecordsTable(filteredRecords);
+        }
+
+        function updateStatisticsCards(mistakes, records) {
+            document.getElementById('statMistakeCount').innerText = mistakes.length;
+            document.getElementById('badgeMistakesCount').innerText = mistakes.length;
+            
+            const unreduced = mistakes.filter(m => m.errorType === '未約至最簡').length;
+            document.getElementById('statUnreducedCount').innerText = unreduced;
+
+            document.getElementById('statRecordCount').innerText = records.length;
+            document.getElementById('badgeRecordsCount').innerText = records.length;
+        }
+
+        // ==========================================
+        // 7. 高頻錯題洞察渲染
+        // ==========================================
+        function renderInsights(mistakes) {
+            const insightBox = document.getElementById('insightBox');
+            const topList = document.getElementById('topMistakesList');
+            if (!mistakes || mistakes.length === 0) {
+                insightBox.classList.add('hidden');
+                return;
+            }
+
+            // 計算各題目出現次數
+            const freqMap = {};
+            mistakes.forEach(m => {
+                const q = m.question || '未知題目';
+                freqMap[q] = (freqMap[q] || 0) + 1;
+            });
+
+            const sortedEntries = Object.entries(freqMap).sort((a, b) => b[1] - a[1]).slice(0, 3);
+            if (sortedEntries.length === 0) {
+                insightBox.classList.add('hidden');
+                return;
+            }
+
+            insightBox.classList.remove('hidden');
+            topList.innerHTML = sortedEntries.map(([question, count], idx) => `
+                <div class="bg-slate-900/80 border border-amber-500/30 rounded-2xl p-3 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-300 font-black text-xs flex items-center justify-center">#${idx + 1}</span>
+                        <span class="font-extrabold text-white text-base font-mono">${formatMathFormula(question)}</span>
+                    </div>
+                    <span class="text-xs bg-red-500/20 text-red-300 border border-red-500/30 px-2 py-0.5 rounded-full font-black">
+                        ${count} 次出錯
+                    </span>
+                </div>
+            `).join('');
+        }
+
+        // ==========================================
+        // 8. 錯題表格渲染
+        // ==========================================
+        function renderMistakesTable(mistakes) {
+            const tbody = document.getElementById('mistakesTableBody');
+            if (!mistakes || mistakes.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="11" class="text-center py-16 text-slate-500 font-bold">
+                            <i class="fa-solid fa-circle-check text-4xl text-emerald-500/30 mb-3 block"></i>
+                            目前無符合條件之錯題紀錄！學生表現優異 🎉
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = mistakes.map(item => {
+                // 單元徽章
+                const modeBadge = item.mode === 'mul'
+                    ? '<span class="px-2 py-0.5 rounded-md text-[11px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30">乘法</span>'
+                    : '<span class="px-2 py-0.5 rounded-md text-[11px] font-black bg-blue-500/20 text-blue-300 border border-blue-500/30">除法</span>';
+
+                // 難度徽章
+                const diffMap = {
+                    'easy': '<span class="text-xs text-emerald-400 font-extrabold">🌱 簡單</span>',
+                    'normal': '<span class="text-xs text-amber-400 font-extrabold">⭐ 普通</span>',
+                    'hard': '<span class="text-xs text-purple-400 font-extrabold">🔥 困難</span>'
+                };
+                const diffBadge = diffMap[item.difficulty] || '<span class="text-xs text-slate-400 font-bold">一般</span>';
+
+                // 錯誤類型標籤
+                let errorClass = "bg-red-500/20 text-red-300 border-red-500/30";
+                if (item.errorType === '未約至最簡') {
+                    errorClass = "bg-amber-500/20 text-amber-300 border-amber-500/30";
+                } else if (item.errorType === '逾時未答') {
+                    errorClass = "bg-purple-500/20 text-purple-300 border-purple-500/30";
+                }
+
+                return `
+                    <tr class="hover:bg-slate-800/40 transition-colors">
+                        <td class="p-4 text-slate-400 text-xs font-mono whitespace-nowrap">${formatFullTime(item.timestamp)}</td>
+                        <td class="p-4 text-white font-extrabold whitespace-nowrap">${item.className || '訪客'}</td>
+                        <td class="p-4 text-slate-300 whitespace-nowrap">${item.seatNumber ? `${item.seatNumber} 號` : '-'}</td>
+                        <td class="p-4 text-amber-300 font-black text-base whitespace-nowrap">${item.name || '訪客'}</td>
+                        <td class="p-4 whitespace-nowrap">
+                            <div class="flex items-center gap-1.5">
+                                ${modeBadge}
+                                ${diffBadge}
+                            </div>
+                        </td>
+                        <td class="p-4 text-slate-300 whitespace-nowrap">第 ${item.round || 1} 題</td>
+                        <td class="p-4 font-mono font-black text-white text-base tracking-wide whitespace-nowrap">${formatMathFormula(item.question)}</td>
+                        <td class="p-4 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2.5 py-1.5 rounded-lg bg-red-950/80 text-red-400 font-mono font-black border border-red-500/30">
+                                ${formatMathFormula(item.studentAnswer)}
+                            </span>
+                        </td>
+                        <td class="p-4 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2.5 py-1.5 rounded-lg bg-emerald-950/80 text-emerald-400 font-mono font-black border border-emerald-500/30">
+                                ${formatMathFormula(item.correctAnswer)}
+                            </span>
+                        </td>
+                        <td class="p-4 whitespace-nowrap">
+                            <span class="inline-block px-2.5 py-1 rounded-full text-xs font-black border ${errorClass}">
+                                ${item.errorType || '運算錯誤'}
+                            </span>
+                        </td>
+                        <td class="p-4 text-center whitespace-nowrap">
+                            <button onclick="deleteSingleMistake('${item.id}')" class="p-2 rounded-lg bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white transition-all text-xs" title="刪除此筆紀錄">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // ==========================================
+        // 9. 完賽紀錄表格渲染
+        // ==========================================
+        function renderRecordsTable(records) {
+            const tbody = document.getElementById('recordsTableBody');
+            if (!records || records.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center py-16 text-slate-500 font-bold">
+                            <i class="fa-solid fa-trophy text-4xl text-yellow-500/20 mb-3 block"></i>
+                            目前無符合條件之通關挑戰紀錄！
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = records.map(item => {
+                const modeBadge = item.mode === 'mul'
+                    ? '<span class="px-2 py-0.5 rounded-md text-[11px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30">乘法篇</span>'
+                    : '<span class="px-2 py-0.5 rounded-md text-[11px] font-black bg-blue-500/20 text-blue-300 border border-blue-500/30">除法篇</span>';
+
+                const diffMap = {
+                    'easy': '<span class="text-xs text-emerald-400 font-extrabold">🌱 簡單</span>',
+                    'normal': '<span class="text-xs text-amber-400 font-extrabold">⭐ 普通</span>',
+                    'hard': '<span class="text-xs text-purple-400 font-extrabold">🔥 困難</span>'
+                };
+                const diffBadge = diffMap[item.difficulty] || '<span class="text-xs text-slate-400 font-bold">一般</span>';
+
+                return `
+                    <tr class="hover:bg-slate-800/40 transition-colors">
+                        <td class="p-4 text-slate-400 text-xs font-mono whitespace-nowrap">${formatFullTime(item.timestamp || item.date)}</td>
+                        <td class="p-4 text-white font-extrabold whitespace-nowrap">${item.className || '訪客'}</td>
+                        <td class="p-4 text-slate-300 whitespace-nowrap">${item.seatNumber ? `${item.seatNumber} 號` : '-'}</td>
+                        <td class="p-4 text-amber-300 font-black text-base whitespace-nowrap">${item.name || '訪客'}</td>
+                        <td class="p-4 whitespace-nowrap">${modeBadge}</td>
+                        <td class="p-4 whitespace-nowrap">${diffBadge}</td>
+                        <td class="p-4 whitespace-nowrap">
+                            <span class="text-2xl font-black text-emerald-400 font-mono">${item.score || 0}</span>
+                            <span class="text-xs text-slate-400 font-bold ml-1">分</span>
+                        </td>
+                        <td class="p-4 text-center whitespace-nowrap">
+                            <button onclick="deleteSingleRecord('${item.id}')" class="p-2 rounded-lg bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white transition-all text-xs" title="刪除此筆紀錄">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // ==========================================
+        // 10. 頁籤切換控制
+        // ==========================================
+        function switchMainTab(tab) {
+            activeTab = tab;
+            const btnMistakes = document.getElementById('tabBtnMistakes');
+            const btnRecords = document.getElementById('tabBtnRecords');
+            const secMistakes = document.getElementById('sectionMistakes');
+            const secRecords = document.getElementById('sectionRecords');
+
+            if (tab === 'mistakes') {
+                btnMistakes.className = "px-6 py-3 rounded-2xl font-black text-lg flex items-center gap-2.5 transition-all bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20";
+                btnRecords.className = "px-6 py-3 rounded-2xl font-black text-lg flex items-center gap-2.5 transition-all bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-white/5";
+                secMistakes.classList.remove('hidden');
+                secRecords.classList.add('hidden');
+            } else {
+                btnRecords.className = "px-6 py-3 rounded-2xl font-black text-lg flex items-center gap-2.5 transition-all bg-blue-600 text-white shadow-lg shadow-blue-500/20";
+                btnMistakes.className = "px-6 py-3 rounded-2xl font-black text-lg flex items-center gap-2.5 transition-all bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-white/5";
+                secRecords.classList.remove('hidden');
+                secMistakes.classList.add('hidden');
+            }
+        }
+
+        // ==========================================
+        // 11. 快捷篩選輔助
+        // ==========================================
+        function setFilterDateToday() {
+            const todayStr = formatYMD(Date.now());
+            document.getElementById('filterDate').value = todayStr;
+            applyFilters();
+        }
+
+        function clearFilterDate() {
+            document.getElementById('filterDate').value = '';
+            applyFilters();
+        }
+
+        function resetAllFilters() {
+            document.getElementById('filterClass').value = 'ALL';
+            document.getElementById('filterName').value = '';
+            document.getElementById('filterDate').value = '';
+            document.getElementById('filterMode').value = 'ALL';
+            applyFilters();
+        }
+
+        // ==========================================
+        // 12. 單筆與批次刪除功能
+        // ==========================================
+        function deleteSingleMistake(id) {
+            if (!confirm("確定要刪除此筆錯題紀錄嗎？此動作無法復原。")) return;
+
+            // 1. 本地緩存刪除
+            rawMistakes = rawMistakes.filter(m => m.id !== id);
+            localStorage.setItem('FractionReduce_mistakes', JSON.stringify(rawMistakes));
+            applyFilters();
+
+            // 2. Firebase 節點刪除
+            if (isFirebaseActive && database) {
+                database.ref('FractionReduce/mistakes/' + id).remove()
+                    .then(() => console.log("Firebase 錯題已成功刪除"))
+                    .catch(e => console.error("Firebase 刪除失敗", e));
+            }
+        }
+
+        function deleteSingleRecord(id) {
+            if (!confirm("確定要刪除此筆挑戰成績紀錄嗎？此動作無法復原。")) return;
+
+            rawRecords = rawRecords.filter(r => r.id !== id);
+            localStorage.setItem('FractionReduce_records', JSON.stringify(rawRecords));
+            applyFilters();
+
+            if (isFirebaseActive && database) {
+                database.ref('FractionReduce/records/' + id).remove()
+                    .then(() => console.log("Firebase 完賽紀錄已刪除"))
+                    .catch(e => console.error("Firebase 刪除失敗", e));
+            }
+        }
+
+        function confirmClearAllData() {
+            const pwd = prompt("⚠️ 警告：這將會清除所有學生錯題與完賽紀錄！\n請輸入管理員密碼以確認清除：");
+            if (pwd !== "8888") {
+                if (pwd !== null) alert("❌ 密碼錯誤，取消清除操作。");
+                return;
+            }
+
+            // 清除本地
+            localStorage.removeItem('FractionReduce_mistakes');
+            localStorage.removeItem('FractionReduce_records');
+            rawMistakes = [];
+            rawRecords = [];
+            applyFilters();
+
+            // 清除 Firebase 節點
+            if (isFirebaseActive && database) {
+                database.ref('FractionReduce').remove()
+                    .then(() => alert("✅ 已成功重置並清空所有紀錄！"))
+                    .catch(e => alert("清除失敗：" + e.message));
+            } else {
+                alert("✅ 本地緩存紀錄已清空！");
+            }
+        }
+
+        // ==========================================
+        // 13. 匯出 Excel (SheetJS 支援)
+        // ==========================================
+        function exportToExcel() {
+            if (activeTab === 'mistakes') {
+                exportMistakesToExcel();
+            } else {
+                exportRecordsToExcel();
+            }
+        }
+
+        function exportMistakesToExcel() {
+            const selectedClass = document.getElementById('filterClass').value;
+            const searchName = document.getElementById('filterName').value.trim().toLowerCase();
+            const selectedDate = document.getElementById('filterDate').value;
+            const selectedMode = document.getElementById('filterMode').value;
+
+            const exportData = rawMistakes.filter(item => {
+                if (selectedClass !== 'ALL' && item.className !== selectedClass) return false;
+                if (searchName && (!item.name || !item.name.toLowerCase().includes(searchName))) return false;
+                if (selectedDate && formatYMD(item.timestamp) !== selectedDate) return false;
+                if (selectedMode !== 'ALL' && item.mode !== selectedMode) return false;
+                return true;
+            }).map((item, idx) => ({
+                "序號": idx + 1,
+                "作答時間": formatFullTime(item.timestamp),
+                "班級": item.className || '訪客',
+                "座號": item.seatNumber ? item.seatNumber : '',
+                "學生姓名": item.name || '訪客',
+                "單元模式": item.mode === 'mul' ? '分數乘法' : '分數除法',
+                "挑戰難度": item.difficulty === 'easy' ? '簡單' : (item.difficulty === 'normal' ? '普通' : '困難'),
+                "第幾題": item.round || 1,
+                "題目算式": item.question || '',
+                "學生輸入答案": item.studentAnswer || '未作答',
+                "正確答案": item.correctAnswer || '',
+                "錯誤診斷": item.errorType || '運算錯誤'
+            }));
+
+            if (exportData.length === 0) {
+                alert("目前無資料可供匯出！");
+                return;
+            }
+
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "學生錯題紀錄");
+
+            // 自動欄寬設定
+            const colWidths = [
+                { wch: 6 },  // 序號
+                { wch: 20 }, // 作答時間
+                { wch: 10 }, // 班級
+                { wch: 8 },  // 座號
+                { wch: 14 }, // 學生姓名
+                { wch: 12 }, // 單元模式
+                { wch: 10 }, // 挑戰難度
+                { wch: 8 },  // 第幾題
+                { wch: 16 }, // 題目算式
+                { wch: 14 }, // 學生輸入答案
+                { wch: 12 }, // 正確答案
+                { wch: 16 }  // 錯誤診斷
+            ];
+            worksheet['!cols'] = colWidths;
+
+            const filename = `約分大冒險_學生錯題表_${formatYMD(Date.now())}.xlsx`;
+            XLSX.writeFile(workbook, filename);
+        }
+
+        function exportRecordsToExcel() {
+            const selectedClass = document.getElementById('filterClass').value;
+            const searchName = document.getElementById('filterName').value.trim().toLowerCase();
+            const selectedDate = document.getElementById('filterDate').value;
+            const selectedMode = document.getElementById('filterMode').value;
+
+            const exportData = rawRecords.filter(item => {
+                if (selectedClass !== 'ALL' && item.className !== selectedClass) return false;
+                if (searchName && (!item.name || !item.name.toLowerCase().includes(searchName))) return false;
+                if (selectedDate && formatYMD(item.timestamp || item.date) !== selectedDate) return false;
+                if (selectedMode !== 'ALL' && item.mode !== selectedMode) return false;
+                return true;
+            }).map((item, idx) => ({
+                "序號": idx + 1,
+                "挑戰時間": formatFullTime(item.timestamp || item.date),
+                "班級": item.className || '訪客',
+                "座號": item.seatNumber ? item.seatNumber : '',
+                "學生姓名": item.name || '訪客',
+                "單元模式": item.mode === 'mul' ? '分數乘法' : '分數除法',
+                "難度等級": item.difficulty === 'easy' ? '簡單' : (item.difficulty === 'normal' ? '普通' : '困難'),
+                "總積分": item.score || 0
+            }));
+
+            if (exportData.length === 0) {
+                alert("目前無完賽紀錄可供匯出！");
+                return;
+            }
+
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "通關挑戰榜");
+
+            const colWidths = [
+                { wch: 6 },
+                { wch: 20 },
+                { wch: 10 },
+                { wch: 8 },
+                { wch: 14 },
+                { wch: 12 },
+                { wch: 10 },
+                { wch: 12 }
+            ];
+            worksheet['!cols'] = colWidths;
+
+            const filename = `約分大冒險_通關挑戰榜_${formatYMD(Date.now())}.xlsx`;
+            XLSX.writeFile(workbook, filename);
+        }
+
+        // ==========================================
+        // 14. 頁面啟動執行
+        // ==========================================
+        window.addEventListener('DOMContentLoaded', () => {
+            initDataLoad();
+        });
+
+    </script>
+</body>
+</html>
