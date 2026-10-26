@@ -2,13 +2,27 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>可口分數披薩(遊戲)</title>
   <!-- 引入 Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- 引入 Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
+    /* 鎖定手機與平板螢幕，防止點擊時誤判為雙擊縮放螢幕 */
+    html, body {
+      touch-action: manipulation;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      overscroll-behavior: none;
+      -webkit-text-size-adjust: 100%;
+    }
+    button, input, select, textarea, .wobbly-btn, .arcade-btn-circle-red, .arcade-btn-circle-yellow {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
     /* 隱藏預設數字輸入框的上下箭頭 */
     input[type=number]::-webkit-inner-spin-button, 
     input[type=number]::-webkit-outer-spin-button { 
@@ -209,8 +223,32 @@
   <img src="https://api.visitorbadge.io/api/visitors?path=hctsao.teachertsao&label=Views&labelColor=%23475569&countColor=%23ea580c" alt="Visitor Counter" style="display: none;">
   
   <!-- HOME_BUTTON_START -->
-  <a href="../index.html" style="position: fixed; top: 12px; left: 12px; z-index: 999999; background: #fdf6e2; color: #3f2021; padding: 8px 16px; border-radius: 20px; text-decoration: none; font-size: 14px; font-weight: bold; border: 3px solid #3f2021; transition: all 0.2s ease; box-shadow: 0 4px 0px #3f2021;" onmouseover="this.style.background='#f5ebd0'" onmouseout="this.style.background='#fdf6e2'">&#127969; 回首頁</a>
-  <script>(function() { function adjustViewport() { var targetWidth = 1024; var screenWidth = window.innerWidth || document.documentElement.clientWidth || window.screen.width; if (screenWidth > 0 && screenWidth < targetWidth) { var scale = screenWidth / targetWidth; var meta = document.querySelector('meta[name="viewport"]'); if (!meta) { meta = document.createElement('meta'); meta.setAttribute('name', 'viewport'); document.head.appendChild(meta); } meta.setAttribute('content', 'width=' + targetWidth + ', initial-scale=' + scale + ', minimum-scale=' + scale + ', maximum-scale=2.0, user-scalable=yes'); } else { var meta = document.querySelector('meta[name="viewport"]'); if (meta) { meta.setAttribute('content', 'width=device-width, initial-scale=1.0'); } } } adjustViewport(); var timer = null; window.addEventListener('resize', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); window.addEventListener('orientationchange', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); })();</script>
+  <script>(function() { 
+    function adjustViewport() { 
+      var targetWidth = 1024; 
+      var screenWidth = window.innerWidth || document.documentElement.clientWidth || window.screen.width; 
+      var meta = document.querySelector('meta[name="viewport"]');
+      if (!meta) { 
+        meta = document.createElement('meta'); 
+        meta.setAttribute('name', 'viewport'); 
+        document.head.appendChild(meta); 
+      }
+      if (screenWidth > 0 && screenWidth < targetWidth) { 
+        var scale = screenWidth / targetWidth; 
+        meta.setAttribute('content', 'width=' + targetWidth + ', initial-scale=' + scale + ', minimum-scale=' + scale + ', maximum-scale=' + scale + ', user-scalable=no, viewport-fit=cover'); 
+      } else { 
+        meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover'); 
+      } 
+    } 
+    adjustViewport(); 
+    var timer = null; 
+    window.addEventListener('resize', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); 
+    window.addEventListener('orientationchange', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); 
+    // 防止 iOS Safari 手勢雙指縮放
+    document.addEventListener('gesturestart', function(e) { e.preventDefault(); }, { passive: false });
+    document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false });
+    document.addEventListener('gestureend', function(e) { e.preventDefault(); }, { passive: false });
+  })();</script>
   <!-- HOME_BUTTON_END -->
 
   <!-- 頂部返回主選單按鈕 (跟隨回首頁按鈕置左且放在其下方) -->
@@ -375,7 +413,7 @@
       </div>
 
       <!-- 3. 底部全幅式街機控制台面板 (新增送出按鈕，字體放大至 20 號字) -->
-      <div class="absolute bottom-[2%] inset-x-[3%] h-[27%] bg-[#dfba9d] border-[3.5px] border-[#3f2021] rounded-2xl shadow-[0_6px_0_#3f2021] z-20 p-2 flex items-center justify-between gap-2">
+      <div id="main-console-panel" class="absolute bottom-[2%] inset-x-[3%] h-[27%] bg-[#dfba9d] border-[3.5px] border-[#3f2021] rounded-2xl shadow-[0_6px_0_#3f2021] z-20 p-2 flex items-center justify-between gap-2">
         
         <!-- 左側配置：清空 + 切片數(分母)設定控制 (佔 28% 寬) -->
         <div class="w-[28%] h-full flex flex-col justify-between items-center py-0.5">
@@ -431,6 +469,18 @@
           </button>
         </div>
 
+      </div>
+
+      <!-- 4. 換算輸入面板 (送出訂單後，看著上方披薩盒圖示輸入換算結果) -->
+      <div id="conversion-panel" class="hidden absolute bottom-[2%] inset-x-[3%] h-[27%] bg-[#fefcf3] border-[3.5px] border-[#3f2021] rounded-2xl shadow-[0_6px_0_#3f2021] z-20 p-2 sm:p-2.5 flex flex-col justify-between items-center">
+        <div class="w-full flex items-center justify-between px-2">
+          <span id="conv-title" class="font-black text-[#3f2021] text-xs sm:text-sm">🍕 披薩製作正確！請看著上方圖示，換算成帶分數：</span>
+          <button onclick="cancelConversion()" class="text-xs text-amber-900 bg-amber-100 hover:bg-amber-200 border border-[#3f2021] px-2 py-0.5 rounded font-black">返回修改</button>
+        </div>
+        <div id="conv-formula-row" class="flex items-center justify-center gap-2 sm:gap-4 my-auto w-full">
+          <!-- JS 動態插入題目與輸入框 -->
+        </div>
+        <div id="conv-msg" class="text-xs font-black text-red-600 h-4 text-center"></div>
       </div>
 
       <!-- 隱藏資料傳遞用 Input，避免 JS 報錯 -->
@@ -696,6 +746,9 @@
     function goHome() {
       synth.playClick();
       if (gameInterval) clearInterval(gameInterval);
+      clearTimeout(window._convAutoNextTimer);
+      document.getElementById('conversion-panel')?.classList.add('hidden');
+      document.getElementById('main-console-panel')?.classList.remove('hidden');
       document.getElementById('lobby-back-btn').classList.add('hidden');
       document.getElementById('fixed-volume-control').classList.add('hidden'); // 隱藏音量控制
       document.getElementById('feedback-correct').classList.add('hidden');
@@ -727,6 +780,9 @@
     function startGame(selectedMode) {
       synth.init();
       synth.playClick();
+      clearTimeout(window._convAutoNextTimer);
+      document.getElementById('conversion-panel')?.classList.add('hidden');
+      document.getElementById('main-console-panel')?.classList.remove('hidden');
 
       // 啟動背景音樂
       const bgMusic = document.getElementById('bg-music');
@@ -793,7 +849,7 @@
         avatar: avatar,
         flavor: flavorObj.id,
         flavorName: flavorObj.name,
-        timeRemaining: 30, // 每個顧客時間大約 30 秒
+        timeRemaining: 60, // 每個顧客時間 60 秒
         satisfaction: 100,
         
         // 儲存此顧客的個別進度
@@ -916,7 +972,7 @@
         document.getElementById(`cust-timer-${i}`).innerText = `⏱️ ${activeSlots[i].timeRemaining}s`;
         document.getElementById(`cust-satisfy-${i}`).innerText = `❤️ ${activeSlots[i].satisfaction}分`;
         
-        const pct = (activeSlots[i].timeRemaining / 30) * 100;
+        const pct = (activeSlots[i].timeRemaining / 60) * 100;
         const pbar = document.getElementById(`cust-progress-bar-${i}`);
         if (pbar) {
           pbar.style.width = pct + '%';
@@ -966,12 +1022,12 @@
           const cust = activeSlots[i];
           if (cust) {
             cust.timeRemaining--;
-            cust.satisfaction = Math.max(10, Math.ceil((cust.timeRemaining / 30) * 100));
+            cust.satisfaction = Math.max(10, Math.ceil((cust.timeRemaining / 60) * 100));
 
             document.getElementById(`cust-timer-${i}`).innerText = `⏱️ ${cust.timeRemaining}s`;
             document.getElementById(`cust-satisfy-${i}`).innerText = `❤️ ${cust.satisfaction}分`;
 
-            const pct = (cust.timeRemaining / 30) * 100;
+            const pct = (cust.timeRemaining / 60) * 100;
             const pbar = document.getElementById(`cust-progress-bar-${i}`);
             if (pbar) {
               pbar.style.width = pct + '%';
@@ -1297,36 +1353,27 @@
     }
 
     // ==========================================================================
-    // 實時自動檢驗答案是否正確 (做出正確答案立刻自動送餐給客人，免手動敲鈴)
+    // 檢驗披薩是否符合任何一位客人的訂單
     // ==========================================================================
-    function checkCorrectInstant() {
-      if (isFrozen || isPaused) return false;
+    function getMatchedCustomerSlot() {
+      if (isFrozen || isPaused) return -1;
 
-      // 檢查目前打包盒內容是否符合任何一位活躍客人的訂單
       for (let i = 0; i < 3; i++) {
         const cur = activeSlots[i];
         if (!cur) continue;
 
-        let isCorrect = false;
-
         if (mode === 'I2M') {
           if (playerWholeCount === cur.whole && playerSliceCount === cur.numPart && currentDenPickerVal === cur.den) {
-            isCorrect = true;
+            return i;
           }
         } else {
-          // 帶分數換假分數無收據欄位，只要披薩盒中裝的總片數等於假分數分子、且切片分母相符即可！
+          // 帶分數換假分數：披薩盒中裝的總片數等於假分數分子、且切片分母相符
           if (playerSliceCount === cur.impNum && currentDenPickerVal === cur.den) {
-            isCorrect = true;
+            return i;
           }
         }
-
-        if (isCorrect) {
-          selectedSlotIdx = i; // 設定當前出餐的顧客 Slot 索引
-          handleCorrect();
-          return true;
-        }
       }
-      return false;
+      return -1;
     }
 
     // ==========================================================================
@@ -1334,18 +1381,164 @@
     // ==========================================================================
     function serveOrder() {
       if (isFrozen || isPaused) return;
-      const ok = checkCorrectInstant();
-      if (!ok) {
+      const matchedIdx = getMatchedCustomerSlot();
+      if (matchedIdx === -1) {
         handleIncorrect();
+      } else {
+        selectedSlotIdx = matchedIdx;
+        openConversionStep(activeSlots[matchedIdx]);
       }
     }
 
-    function handleCorrect() {
-      synth.playBell();
-      isPaused = true;
+    // ==========================================================================
+    // 開啟圖示換算步驟 (看著披薩盒圖示輸入換算結果)
+    // ==========================================================================
+    function openConversionStep(cur) {
+      synth.playClick();
+      isPaused = true; // 暫停倒數計時，讓學生專注思考圖示換算
 
+      document.getElementById('main-console-panel').classList.add('hidden');
+      const convPanel = document.getElementById('conversion-panel');
+      convPanel.classList.remove('hidden');
+
+      const titleEl = document.getElementById('conv-title');
+      const rowEl = document.getElementById('conv-formula-row');
+      const msgEl = document.getElementById('conv-msg');
+      msgEl.innerText = '';
+
+      if (mode === 'I2M') {
+        titleEl.innerHTML = `<span>🍕 披薩製作正確！請看著上方圖示，換算成<strong>帶分數</strong>：</span>`;
+        rowEl.innerHTML = `
+          <span class="vertical-fraction text-2xl font-black">
+            <span class="num-den">
+              <span class="numerator">${cur.impNum}</span>
+              <span class="denominator">${cur.den}</span>
+            </span>
+          </span>
+          <span class="text-2xl font-black text-[#3f2021] mx-1">＝</span>
+          <div class="flex items-center gap-1.5 bg-white border-2 border-[#3f2021] rounded-xl px-2.5 py-1 shadow-inner">
+            <input type="number" id="conv-input-whole" class="w-12 h-10 text-center text-2xl font-black text-[#542a2b] bg-amber-50 border-2 border-[#3f2021] rounded-lg outline-none focus:border-amber-600 focus:bg-white" placeholder="整數" min="0" onkeydown="handleConvKeydown(event)">
+            <span class="text-xs font-black text-[#3f2021]">又</span>
+            <div class="flex flex-col items-center">
+              <input type="number" id="conv-input-num" class="w-11 h-7 text-center text-lg font-black text-[#542a2b] bg-amber-50 border-2 border-[#3f2021] rounded outline-none focus:border-amber-600 focus:bg-white" placeholder="分子" min="0" onkeydown="handleConvKeydown(event)">
+              <div class="w-full h-[2px] bg-[#3f2021] my-0.5"></div>
+              <input type="number" id="conv-input-den" class="w-11 h-7 text-center text-lg font-black text-[#542a2b] bg-amber-50 border-2 border-[#3f2021] rounded outline-none focus:border-amber-600 focus:bg-white" value="${cur.den}" placeholder="分母" min="1" onkeydown="handleConvKeydown(event)">
+            </div>
+          </div>
+          <button id="btn-submit-conversion" onclick="submitConversion()" class="wobbly-btn px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-base shadow-[0_3px_0_#3f2021] flex items-center gap-1">
+            <span>確認</span> ➔
+          </button>
+        `;
+        setTimeout(() => document.getElementById('conv-input-whole')?.focus(), 60);
+      } else {
+        titleEl.innerHTML = `<span>🍕 披薩製作正確！請看著上方圖示，換算成<strong>假分數</strong>：</span>`;
+        rowEl.innerHTML = `
+          <span class="vertical-fraction text-2xl font-black">
+            <span class="whole-num mr-1 text-2xl">${cur.whole}</span>
+            <span class="num-den">
+              <span class="numerator">${cur.numPart}</span>
+              <span class="denominator">${cur.den}</span>
+            </span>
+          </span>
+          <span class="text-2xl font-black text-[#3f2021] mx-1">＝</span>
+          <div class="flex items-center gap-1.5 bg-white border-2 border-[#3f2021] rounded-xl px-2.5 py-1 shadow-inner">
+            <div class="flex flex-col items-center">
+              <input type="number" id="conv-input-num" class="w-14 h-7 text-center text-lg font-black text-[#542a2b] bg-amber-50 border-2 border-[#3f2021] rounded outline-none focus:border-amber-600 focus:bg-white" placeholder="分子" min="0" onkeydown="handleConvKeydown(event)">
+              <div class="w-full h-[2px] bg-[#3f2021] my-0.5"></div>
+              <input type="number" id="conv-input-den" class="w-14 h-7 text-center text-lg font-black text-[#542a2b] bg-amber-50 border-2 border-[#3f2021] rounded outline-none focus:border-amber-600 focus:bg-white" value="${cur.den}" placeholder="分母" min="1" onkeydown="handleConvKeydown(event)">
+            </div>
+          </div>
+          <button id="btn-submit-conversion" onclick="submitConversion()" class="wobbly-btn px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-base shadow-[0_3px_0_#3f2021] flex items-center gap-1">
+            <span>確認</span> ➔
+          </button>
+        `;
+        setTimeout(() => document.getElementById('conv-input-num')?.focus(), 60);
+      }
+    }
+
+    function handleConvKeydown(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (mode === 'I2M') {
+          const wholeEl = document.getElementById('conv-input-whole');
+          const numEl = document.getElementById('conv-input-num');
+          const denEl = document.getElementById('conv-input-den');
+          if (document.activeElement === wholeEl && !numEl.value.trim()) {
+            numEl.focus();
+            return;
+          }
+          if (document.activeElement === numEl && !denEl.value.trim()) {
+            denEl.focus();
+            return;
+          }
+        } else {
+          const numEl = document.getElementById('conv-input-num');
+          const denEl = document.getElementById('conv-input-den');
+          if (document.activeElement === numEl && !denEl.value.trim()) {
+            denEl.focus();
+            return;
+          }
+        }
+        submitConversion();
+      }
+    }
+
+    function submitConversion() {
       const cur = activeSlots[selectedSlotIdx];
       if (!cur) return;
+      const msgEl = document.getElementById('conv-msg');
+
+      if (mode === 'I2M') {
+        const uW = parseInt(document.getElementById('conv-input-whole')?.value);
+        const uN = parseInt(document.getElementById('conv-input-num')?.value);
+        const uD = parseInt(document.getElementById('conv-input-den')?.value);
+
+        if (isNaN(uW) || isNaN(uN) || isNaN(uD)) {
+          synth.playHurt();
+          msgEl.innerText = "請將整數、分子與分母填寫完整喔！";
+          shakeConversionPanel();
+          return;
+        }
+
+        if (uW === cur.whole && uN === cur.numPart && uD === cur.den) {
+          msgEl.innerText = "";
+          handleConversionSuccess(cur);
+        } else {
+          synth.playHurt();
+          msgEl.innerText = "換算不對喔！請數一數上方披薩盒的完整披薩與切片再試試！";
+          shakeConversionPanel();
+        }
+      } else {
+        const uN = parseInt(document.getElementById('conv-input-num')?.value);
+        const uD = parseInt(document.getElementById('conv-input-den')?.value);
+
+        if (isNaN(uN) || isNaN(uD)) {
+          synth.playHurt();
+          msgEl.innerText = "請將分子與分母填寫完整喔！";
+          shakeConversionPanel();
+          return;
+        }
+
+        if (uN === cur.impNum && uD === cur.den) {
+          msgEl.innerText = "";
+          handleConversionSuccess(cur);
+        } else {
+          synth.playHurt();
+          msgEl.innerText = "換算不對喔！請數一數上方披薩盒裡總共有幾片切片再試試！";
+          shakeConversionPanel();
+        }
+      }
+    }
+
+    function shakeConversionPanel() {
+      const panel = document.getElementById('conversion-panel');
+      panel.classList.add('shake-active');
+      setTimeout(() => panel.classList.remove('shake-active'), 400);
+    }
+
+    function handleConversionSuccess(cur) {
+      synth.playBell();
+      synth.playCoin();
 
       spawnConfetti(document.getElementById(`cust-slot-${selectedSlotIdx}`));
 
@@ -1354,67 +1547,71 @@
 
       const comboMult = 1 + Math.floor(comboCount / 2);
       const scoreEarned = cur.satisfaction * comboMult;
-      
       globalScore += scoreEarned;
       document.getElementById('score-val').innerText = globalScore;
 
-      const formulaBox = document.getElementById('math-formula-box');
-      if (mode === 'I2M') {
-        formulaBox.innerHTML = `
-          <span class="vertical-fraction"><span class="num-den"><span class="numerator">${cur.impNum}</span><span class="denominator">${cur.den}</span></span></span>
-          <span class="mx-3">=</span>
-          <span class="vertical-fraction"><span class="whole-num">${cur.whole}</span><span class="num-den"><span class="numerator">${cur.numPart}</span><span class="denominator">${cur.den}</span></span></span>
-        `;
-      } else {
-        formulaBox.innerHTML = `
-          <span class="vertical-fraction"><span class="whole-num">${cur.whole}</span><span class="num-den"><span class="numerator">${cur.numPart}</span><span class="denominator">${cur.den}</span></span></span>
-          <span class="mx-3">=</span>
-          <span class="vertical-fraction"><span class="num-den"><span class="numerator">${cur.impNum}</span><span class="denominator">${cur.den}</span></span></span>
-        `;
-      }
-
-      const textTitle = document.querySelector('#feedback-correct > span');
-      if (mode === 'I2M') {
-        textTitle.innerHTML = `
-          <i data-lucide="party-popper" class="w-6 h-6 text-emerald-500 inline-block mr-1"></i>
-          沒錯！ 
-          <span class="vertical-fraction"><span class="num-den"><span class="numerator">${cur.impNum}</span><span class="denominator">${cur.den}</span></span></span> 
-          ＝ 
-          <span class="vertical-fraction"><span class="whole-num">${cur.whole}</span><span class="num-den"><span class="numerator">${cur.numPart}</span><span class="denominator">${cur.den}</span></span></span> 
-          ，客人非常滿意地拿走了！
-        `;
-      } else {
-        textTitle.innerHTML = `
-          <i data-lucide="party-popper" class="w-6 h-6 text-emerald-500 inline-block mr-1"></i>
-          沒錯！ 
-          <span class="vertical-fraction"><span class="whole-num">${cur.whole}</span><span class="num-den"><span class="numerator">${cur.numPart}</span><span class="denominator">${cur.den}</span></span></span> 
-          ＝ 
-          <span class="vertical-fraction"><span class="num-den"><span class="numerator">${cur.impNum}</span><span class="denominator">${cur.den}</span></span></span> 
-          ，客人非常滿意地拿走了！
-        `;
-      }
-
-      document.getElementById('feedback-correct').classList.remove('hidden');
-
+      // 打包蓋盒動畫
       const cover = document.getElementById('serving-box-cover');
       cover.classList.remove('hidden');
       cover.classList.add('box-serve-animate');
-      
-      synth.playCoin();
+
+      // 轉換面板切換為成功提示
+      const titleEl = document.getElementById('conv-title');
+      const rowEl = document.getElementById('conv-formula-row');
+      const msgEl = document.getElementById('conv-msg');
+      msgEl.innerText = "";
+
+      let formulaStr = "";
+      if (mode === 'I2M') {
+        formulaStr = `<span class="vertical-fraction font-black"><span class="num-den"><span class="numerator">${cur.impNum}</span><span class="denominator">${cur.den}</span></span></span> ＝ <span class="vertical-fraction font-black"><span class="whole-num">${cur.whole}</span><span class="num-den"><span class="numerator">${cur.numPart}</span><span class="denominator">${cur.den}</span></span></span>`;
+      } else {
+        formulaStr = `<span class="vertical-fraction font-black"><span class="whole-num">${cur.whole}</span><span class="num-den"><span class="numerator">${cur.numPart}</span><span class="denominator">${cur.den}</span></span></span> ＝ <span class="vertical-fraction font-black"><span class="num-den"><span class="numerator">${cur.impNum}</span><span class="denominator">${cur.den}</span></span></span>`;
+      }
+
+      titleEl.innerHTML = `<span>🎉 <strong>換算完全正確，客人滿意地取餐了！</strong></span>`;
+      rowEl.innerHTML = `
+        <div class="flex items-center gap-3">
+          <div class="bg-emerald-50 border-2 border-emerald-600 px-3 py-1 rounded-xl text-emerald-900 font-black text-lg flex items-center shadow">
+            ${formulaStr}
+          </div>
+          <button id="btn-next-customer" onclick="nextCustomer()" class="wobbly-btn px-4 py-2 bg-amber-500 hover:bg-amber-400 active:scale-95 text-white font-black text-base shadow-[0_3px_0_#3f2021] flex items-center gap-1">
+            <span>下一位顧客</span> ➔
+          </button>
+        </div>
+      `;
+
+      // 自動在 2.5 秒後進行下一位顧客，若玩家手動點按鈕則立即進行
+      clearTimeout(window._convAutoNextTimer);
+      window._convAutoNextTimer = setTimeout(() => {
+        const nextBtn = document.getElementById('btn-next-customer');
+        if (nextBtn) nextCustomer();
+      }, 2500);
+    }
+
+    function cancelConversion() {
+      synth.playClick();
+      document.getElementById('conversion-panel').classList.add('hidden');
+      document.getElementById('main-console-panel').classList.remove('hidden');
+      isPaused = false;
     }
 
     function nextCustomer() {
+      clearTimeout(window._convAutoNextTimer);
       synth.playClick();
       
       const cover = document.getElementById('serving-box-cover');
       cover.classList.add('hidden');
       cover.classList.remove('box-serve-animate');
 
+      // 關閉轉換面板，重開主控制面板
+      document.getElementById('conversion-panel').classList.add('hidden');
+      document.getElementById('main-console-panel').classList.remove('hidden');
+
       const slotEl = document.getElementById(`cust-slot-${selectedSlotIdx}`);
-      slotEl.classList.add('animate-cust-leave-success');
+      if (slotEl) slotEl.classList.add('animate-cust-leave-success');
 
       setTimeout(() => {
-        slotEl.classList.remove('animate-cust-leave-success');
+        if (slotEl) slotEl.classList.remove('animate-cust-leave-success');
 
         activeSlots[selectedSlotIdx] = null;
         totalCustomersServed++;
@@ -1449,9 +1646,11 @@
       animatePizzaExplosion(() => {
         playerWholeCount = 0;
         playerSliceCount = 0;
-        activeSlots[selectedSlotIdx].playerWholeCount = 0;
-        activeSlots[selectedSlotIdx].playerSliceCount = 0;
-        activeSlots[selectedSlotIdx].receiptNum = 0;
+        if (activeSlots[selectedSlotIdx]) {
+          activeSlots[selectedSlotIdx].playerWholeCount = 0;
+          activeSlots[selectedSlotIdx].playerSliceCount = 0;
+          activeSlots[selectedSlotIdx].receiptNum = 0;
+        }
         
         if (mode === 'M2I') {
           document.getElementById('ans-m2i-num').value = 0;
