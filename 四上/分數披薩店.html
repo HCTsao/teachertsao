@@ -448,8 +448,14 @@
             </button>
           </div>
 
-          <!-- 模式二按鈕組 (單鈕，移除收據調整欄位，直接算片數) -->
-          <div id="console-buttons-m2i" class="w-full h-full flex justify-center items-center hidden">
+          <!-- 模式二按鈕組 (雙鈕：加整個依分母加對應片數、加一片) -->
+          <div id="console-buttons-m2i" class="w-full h-full flex justify-center items-center gap-6 hidden">
+            <!-- 鋪整個按鈕 (依照分母加相對應片數) -->
+            <button onclick="addPizzaWholeM2I()" class="arcade-btn-circle-red w-18 h-18 md:w-20 md:h-20 flex flex-col items-center justify-center font-black">
+              <i data-lucide="circle-dot" class="w-5 h-5"></i>
+              <span class="text-xs mt-0.5">加整個</span>
+            </button>
+            <!-- 鋪單片按鈕 -->
             <button onclick="addPizzaSliceM2I()" class="arcade-btn-circle-yellow w-18 h-18 md:w-20 md:h-20 flex flex-col items-center justify-center font-black">
               <i data-lucide="pie-chart" class="w-5 h-5"></i>
               <span class="text-xs mt-0.5">加一片</span>
@@ -1170,6 +1176,7 @@
       const flavor = cur.flavor || 'pepperoni';
 
       if (mode === 'I2M') {
+        container.className = "flex flex-wrap gap-1.5 justify-start items-start w-full h-full overflow-y-auto p-1 content-start";
         const den = currentDenPickerVal;
         
         for (let i = 0; i < playerWholeCount; i++) {
@@ -1186,12 +1193,44 @@
           container.appendChild(wrap);
         }
       } else {
+        container.className = "flex flex-col gap-1.5 justify-start items-start w-full h-full overflow-y-auto p-1";
         const den = currentDenPickerVal;
-        for (let i = 0; i < playerSliceCount; i++) {
-          const wrap = document.createElement('div');
-          wrap.className = "w-9 h-9 md:w-10 md:h-10 relative transition-transform transform hover:scale-105 p-0.5 bg-amber-50/20 border border-[#3f2021]/30 rounded-lg flex items-center justify-center animate-pizza-pop";
-          wrap.innerHTML = drawPizzaSVG(1, den, flavor);
-          container.appendChild(wrap);
+        const totalRows = Math.ceil(playerSliceCount / den);
+
+        for (let r = 0; r < totalRows; r++) {
+          const rowDiv = document.createElement('div');
+          const slicesInRow = Math.min(den, playerSliceCount - r * den);
+          const isFull = (slicesInRow === den);
+
+          rowDiv.className = `flex items-center gap-2 w-full p-1 sm:p-1.5 rounded-xl border-2 transition-all animate-pizza-pop shrink-0 ${
+            isFull 
+              ? 'bg-amber-100/80 border-amber-500/70 shadow-sm' 
+              : 'bg-white/90 border-dashed border-[#3f2021]/30'
+          }`;
+
+          const label = document.createElement('div');
+          label.className = `text-[11px] sm:text-xs font-black px-2 py-0.5 rounded border whitespace-nowrap shrink-0 flex items-center gap-1 ${
+            isFull 
+              ? 'bg-amber-500 text-white border-amber-700' 
+              : 'bg-stone-200 text-stone-700 border-stone-400'
+          }`;
+          label.innerHTML = isFull 
+            ? `<span>🍕 第 ${r + 1} 個 (滿 1)</span>` 
+            : `<span>🍕 第 ${r + 1} 個 (${slicesInRow}/${den})</span>`;
+          rowDiv.appendChild(label);
+
+          const slicesWrap = document.createElement('div');
+          slicesWrap.className = "flex items-center gap-1 sm:gap-1.5 flex-wrap flex-grow";
+
+          for (let s = 0; s < slicesInRow; s++) {
+            const wrap = document.createElement('div');
+            wrap.className = "w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 relative transition-transform transform hover:scale-105 p-0.5 bg-amber-50/50 border border-[#3f2021]/40 rounded-lg flex items-center justify-center shrink-0";
+            wrap.innerHTML = drawPizzaSVG(1, den, flavor);
+            slicesWrap.appendChild(wrap);
+          }
+
+          rowDiv.appendChild(slicesWrap);
+          container.appendChild(rowDiv);
         }
       }
 
@@ -1328,6 +1367,14 @@
         renderPizzaVisuals();
         onInputsChange();
       });
+    }
+
+    function addPizzaWholeM2I() {
+      if (isFrozen || isPaused) return;
+      synth.playSlice();
+      playerSliceCount += currentDenPickerVal;
+      renderPizzaVisuals();
+      onInputsChange();
     }
 
     function addPizzaSliceM2I() {
