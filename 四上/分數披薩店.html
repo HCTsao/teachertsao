@@ -334,7 +334,7 @@
 
           <button onclick="startPracticeMode()" class="wobbly-btn w-full flex items-center justify-center py-3.5 px-4 text-base font-black text-white bg-[#b45309] hover:bg-[#92400e] shadow-[0_4px_0_#3f2021] hover:translate-y-[2px] hover:shadow-[0_2px_0_#3f2021]">
             <span class="flex items-center gap-1.5" style="font-size: 17px;">
-              <i data-lucide="calculator" class="w-5 h-5"></i> 挑戰三：純算特訓（混合題目）
+              <i data-lucide="calculator" class="w-5 h-5"></i> 題目練習
             </span>
           </button>
         </div>
@@ -553,17 +553,18 @@
 
     </div>
     
-    <!-- ================= 純練習特訓畫面 (無遊戲情境、純算混合題) ================= -->
+    <!-- ================= 題目練習畫面 (無遊戲情境、純算混合題、限時3分鐘) ================= -->
     <div id="practice-screen" class="hidden absolute inset-0 bg-[#faebdd] z-20 flex flex-col justify-between items-center p-4 md:p-6 select-none">
       <!-- 頂部資訊列 -->
       <div class="w-full flex justify-between items-center bg-[#fffdf5] border-2 border-[#3f2021] rounded-2xl px-4 py-2 shadow-sm">
         <div class="flex items-center gap-2">
-          <span class="text-base md:text-lg font-black text-[#542a2b]">✏️ 假帶分數轉換特訓</span>
+          <span class="text-base md:text-lg font-black text-[#542a2b]">✏️ 題目練習</span>
           <span class="text-xs bg-amber-100 text-amber-900 border border-[#3f2021]/30 px-2 py-0.5 rounded font-black">純算混合</span>
         </div>
-        <div class="flex items-center gap-4 text-xs md:text-sm font-black">
-          <span class="text-slate-700">題號：第 <span id="practice-total-count" class="font-mono text-base text-amber-900">1</span> 題</span>
-          <span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300">已答對：<span id="practice-correct-count" class="font-mono text-base text-emerald-800">0</span> 題</span>
+        <div class="flex items-center gap-3 md:gap-4 text-xs md:text-sm font-black">
+          <span class="text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-300 font-mono text-base font-black flex items-center gap-1">⏱️ <span id="practice-timer-val">180s</span></span>
+          <span class="text-slate-700">第 <span id="practice-total-count" class="font-mono text-base text-amber-900">1</span> 題</span>
+          <span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300">答對：<span id="practice-correct-count" class="font-mono text-base text-emerald-800">0</span> 題</span>
         </div>
       </div>
 
@@ -595,7 +596,35 @@
 
       <!-- 底部提示小條 -->
       <div class="text-[11px] font-black text-amber-900/60 bg-white/50 px-3 py-1 rounded-full border border-[#3f2021]/10">
-        💡 提示：輸入數字後可直接按鍵盤 Enter 切換或送出答案
+        💡 提示：輸入數字後可直接按鍵盤 Enter 切換或送出答案（限時 3 分鐘）
+      </div>
+
+      <!-- 題目練習時間到結算遮罩 -->
+      <div id="practice-over-screen" class="hidden absolute inset-0 bg-[#3f2021]/95 z-50 flex flex-col items-center justify-center gap-4 p-6">
+        <span class="text-yellow-400 text-3xl font-black flex items-center gap-2 animate-bounce">
+          🏆 時間到！練習結束
+        </span>
+        <div class="bg-[#fefcf3] border-[3px] border-[#3f2021] rounded-2xl p-6 my-2 text-center shadow-lg w-[85%] max-w-sm">
+          <p class="font-black text-lg text-slate-500">練習成果</p>
+          <div class="mt-4 flex flex-col gap-3">
+            <div class="flex justify-between font-black text-lg border-b pb-1 border-slate-200">
+              <span>答對題數：</span>
+              <span id="practice-final-correct" class="text-emerald-600 font-mono text-2xl">0 題</span>
+            </div>
+            <div class="flex justify-between font-black text-base border-b pb-1 border-slate-200 text-slate-600">
+              <span>回答總題數：</span>
+              <span id="practice-final-total" class="font-mono">0 題</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex gap-4">
+          <button onclick="startPracticeMode()" class="wobbly-btn px-6 py-3 bg-[#d97706] text-white font-black text-sm md:text-base shadow-[0_4px_0_#3f2021] hover:bg-amber-600">
+            🔄 再練一次
+          </button>
+          <button onclick="goHome()" class="wobbly-btn px-6 py-3 bg-slate-500 text-white font-black text-sm md:text-base shadow-[0_4px_0_#3f2021] hover:bg-slate-600">
+            🚪 回主選單
+          </button>
+        </div>
       </div>
     </div>
 
@@ -806,6 +835,7 @@
     function goHome() {
       synth.playClick();
       if (gameInterval) clearInterval(gameInterval);
+      if (practiceTimerInterval) clearInterval(practiceTimerInterval);
       clearTimeout(window._convAutoNextTimer);
       clearTimeout(window._practiceAutoNextTimer);
       document.getElementById('conversion-panel')?.classList.add('hidden');
@@ -814,6 +844,7 @@
       document.getElementById('fixed-volume-control').classList.add('hidden'); // 隱藏音量控制
       document.getElementById('feedback-correct').classList.add('hidden');
       document.getElementById('serving-box-cover').classList.add('hidden');
+      document.getElementById('practice-over-screen')?.classList.add('hidden');
       document.getElementById('score-board')?.classList.remove('hidden');
       showScreen('home-screen');
     }
@@ -951,22 +982,26 @@
     }
 
     // ==========================================================================
-    // 純算特訓關卡邏輯 (無遊戲情境、假帶互換混合題、同一輪不重複)
+    // 題目練習關卡邏輯 (無遊戲情境、假帶互換混合題、同一輪不重複、限時3分鐘、大數字)
     // ==========================================================================
     let currentPracticeProblem = null;
     let practiceCorrectCount = 0;
     let practiceTotalCount = 1;
     let practiceUsedQuestions = new Set();
+    let practiceTimerInterval = null;
+    let practiceTimeRemaining = 180;
 
     function startPracticeMode() {
       synth.init();
       synth.playClick();
       clearTimeout(window._convAutoNextTimer);
       clearTimeout(window._practiceAutoNextTimer);
+      if (practiceTimerInterval) clearInterval(practiceTimerInterval);
 
       practiceUsedQuestions.clear();
       practiceCorrectCount = 0;
       practiceTotalCount = 1;
+      practiceTimeRemaining = 180; // 限時 3 分鐘 (180秒)
 
       // 啟動背景音樂
       const bgMusic = document.getElementById('bg-music');
@@ -976,25 +1011,57 @@
         bgMusic.play().catch(e => console.log("Audio play blocked by browser policies."));
       }
 
-      // 隱藏披薩店遊戲專屬計分板
+      // 隱藏披薩店遊戲專屬計分板與結算遮罩
       document.getElementById('score-board')?.classList.add('hidden');
+      document.getElementById('practice-over-screen')?.classList.add('hidden');
       document.getElementById('lobby-back-btn').classList.remove('hidden');
       document.getElementById('fixed-volume-control').classList.remove('hidden');
+
+      const timerEl = document.getElementById('practice-timer-val');
+      if (timerEl) {
+        timerEl.innerText = '180s';
+        timerEl.className = '';
+      }
+
+      // 啟動 3 分鐘倒數計時器
+      practiceTimerInterval = setInterval(() => {
+        practiceTimeRemaining--;
+        const tEl = document.getElementById('practice-timer-val');
+        if (tEl) {
+          tEl.innerText = `${practiceTimeRemaining}s`;
+          if (practiceTimeRemaining <= 30) {
+            tEl.className = 'text-rose-600 font-black animate-pulse';
+          }
+        }
+        if (practiceTimeRemaining <= 0) {
+          endPracticeMode();
+        }
+      }, 1000);
 
       showScreen('practice-screen');
       loadNextPracticeProblem();
     }
 
+    function endPracticeMode() {
+      if (practiceTimerInterval) clearInterval(practiceTimerInterval);
+      clearTimeout(window._practiceAutoNextTimer);
+      synth.playHurt();
+      document.getElementById('practice-final-correct').innerText = `${practiceCorrectCount} 題`;
+      document.getElementById('practice-final-total').innerText = `${practiceTotalCount} 題`;
+      document.getElementById('practice-over-screen')?.classList.remove('hidden');
+    }
+
     function generateUniquePracticeProblem() {
-      if (practiceUsedQuestions.size >= 40) {
+      if (practiceUsedQuestions.size >= 200) {
         practiceUsedQuestions.clear();
       }
       let den, whole, numPart, impNum, key;
       let attempts = 0;
       do {
-        den = Math.floor(Math.random() * 5) + 2; // 分母 2 ~ 6
-        whole = Math.floor(Math.random() * 3) + 1; // 整數 1 ~ 3
-        numPart = Math.floor(Math.random() * (den - 1)) + 1; // 分子
+        // 數字大一點：分母 2 ~ 12，整數 2 ~ 9，分子 1 ~ (den - 1)
+        den = Math.floor(Math.random() * 11) + 2; // 分母 2 ~ 12
+        whole = Math.floor(Math.random() * 8) + 2; // 整數 2 ~ 9
+        numPart = Math.floor(Math.random() * (den - 1)) + 1; // 分子 1 ~ (den - 1)
         impNum = (whole * den) + numPart;
         key = `${whole}_${numPart}_${den}`;
         attempts++;
@@ -1019,22 +1086,22 @@
       const formulaRow = document.getElementById('practice-formula-row');
 
       if (p.pType === 'I2M') {
-        // 假分數 ➔ 帶分數
-        typeLabel.innerHTML = `請將 <span class="text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300 font-black">假分數</span> 換算為 <span class="text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300 font-black">帶分數</span>：`;
+        // 假分數 ➔ 帶分數 (大字體、清晰直式)
+        typeLabel.innerHTML = `請將 <span class="text-amber-800 bg-amber-100 px-3 py-1 rounded-lg border border-amber-300 font-black text-lg md:text-xl">假分數</span> 換算為 <span class="text-emerald-800 bg-emerald-100 px-3 py-1 rounded-lg border border-emerald-300 font-black text-lg md:text-xl">帶分數</span>：`;
         formulaRow.innerHTML = `
-          <span class="vertical-fraction text-3xl md:text-4xl font-black">
+          <span class="vertical-fraction text-4xl md:text-5xl font-black">
             <span class="num-den">
               <span class="numerator">${p.impNum}</span>
               <span class="denominator">${p.den}</span>
             </span>
           </span>
-          <span class="text-3xl md:text-4xl font-black text-[#3f2021] mx-3">＝</span>
-          <div class="flex items-center gap-2 bg-white border-2 border-[#3f2021] rounded-2xl px-4 py-2 shadow-inner">
-            <input type="number" id="prac-input-whole" class="w-14 h-12 md:w-16 md:h-14 text-center text-2xl md:text-3xl font-black text-[#542a2b] bg-amber-50 border-2 border-[#3f2021] rounded-xl outline-none focus:border-amber-600 focus:bg-white" placeholder="" min="0" onkeydown="handlePracticeKeydown(event, 'whole')">
-            <span class="vertical-fraction text-2xl md:text-3xl font-black inline-flex flex-col items-center">
-              <input type="number" id="prac-input-num" class="w-14 h-10 md:w-16 md:h-11 text-center text-xl md:text-2xl font-black text-[#542a2b] bg-amber-50 border-2 border-[#3f2021] rounded-lg outline-none focus:border-amber-600 focus:bg-white" placeholder="" min="0" onkeydown="handlePracticeKeydown(event, 'num')">
-              <span class="w-full h-1 bg-[#3f2021] my-1 rounded-full"></span>
-              <input type="number" id="prac-input-den" class="w-14 h-10 md:w-16 md:h-11 text-center text-xl md:text-2xl font-black text-[#542a2b] bg-amber-50 border-2 border-[#3f2021] rounded-lg outline-none focus:border-amber-600 focus:bg-white" placeholder="" min="1" onkeydown="handlePracticeKeydown(event, 'den')">
+          <span class="text-4xl md:text-5xl font-black text-[#3f2021] mx-3 md:mx-5">＝</span>
+          <div class="flex items-center gap-3 bg-white border-[3.5px] border-[#3f2021] rounded-2xl px-5 py-3 shadow-inner">
+            <input type="number" id="prac-input-whole" class="w-16 h-14 md:w-20 md:h-16 text-center text-3xl md:text-4xl font-black text-[#542a2b] bg-amber-50 border-2 border-[#3f2021] rounded-xl outline-none focus:border-amber-600 focus:bg-white" placeholder="" min="0" onkeydown="handlePracticeKeydown(event, 'whole')">
+            <span class="vertical-fraction text-3xl md:text-4xl font-black inline-flex flex-col items-center">
+              <input type="number" id="prac-input-num" class="w-18 h-12 md:w-22 md:h-13 text-center text-2xl md:text-3xl font-black text-[#542a2b] bg-amber-50 border-2 border-[#3f2021] rounded-lg outline-none focus:border-amber-600 focus:bg-white" placeholder="" min="0" onkeydown="handlePracticeKeydown(event, 'num')">
+              <span class="w-full h-1.5 bg-[#3f2021] my-1 rounded-full"></span>
+              <input type="number" id="prac-input-den" class="w-18 h-12 md:w-22 md:h-13 text-center text-2xl md:text-3xl font-black text-[#542a2b] bg-amber-50 border-2 border-[#3f2021] rounded-lg outline-none focus:border-amber-600 focus:bg-white" placeholder="" min="1" onkeydown="handlePracticeKeydown(event, 'den')">
             </span>
           </div>
         `;
@@ -1042,10 +1109,10 @@
           document.getElementById('prac-input-whole')?.focus();
         }, 50);
       } else {
-        // 帶分數 ➔ 假分數
-        typeLabel.innerHTML = `請將 <span class="text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300 font-black">帶分數</span> 換算為 <span class="text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300 font-black">假分數</span>：`;
+        // 帶分數 ➔ 假分數 (大字體、清晰直式)
+        typeLabel.innerHTML = `請將 <span class="text-emerald-800 bg-emerald-100 px-3 py-1 rounded-lg border border-emerald-300 font-black text-lg md:text-xl">帶分數</span> 換算為 <span class="text-amber-800 bg-amber-100 px-3 py-1 rounded-lg border border-amber-300 font-black text-lg md:text-xl">假分數</span>：`;
         formulaRow.innerHTML = `
-          <div class="flex items-center gap-1.5 text-3xl md:text-4xl font-black text-[#3f2021]">
+          <div class="flex items-center gap-2.5 text-4xl md:text-5xl font-black text-[#3f2021]">
             <span>${p.whole}</span>
             <span class="vertical-fraction">
               <span class="num-den">
@@ -1054,12 +1121,12 @@
               </span>
             </span>
           </div>
-          <span class="text-3xl md:text-4xl font-black text-[#3f2021] mx-3">＝</span>
-          <div class="flex items-center bg-white border-2 border-[#3f2021] rounded-2xl px-4 py-2 shadow-inner">
-            <span class="vertical-fraction text-2xl md:text-3xl font-black inline-flex flex-col items-center">
-              <input type="number" id="prac-input-num" class="w-16 h-10 md:w-20 md:h-11 text-center text-xl md:text-2xl font-black text-[#542a2b] bg-amber-50 border-2 border-[#3f2021] rounded-lg outline-none focus:border-amber-600 focus:bg-white" placeholder="" min="0" onkeydown="handlePracticeKeydown(event, 'num')">
-              <span class="w-full h-1 bg-[#3f2021] my-1 rounded-full"></span>
-              <input type="number" id="prac-input-den" class="w-16 h-10 md:w-20 md:h-11 text-center text-xl md:text-2xl font-black text-[#542a2b] bg-amber-50 border-2 border-[#3f2021] rounded-lg outline-none focus:border-amber-600 focus:bg-white" placeholder="" min="1" onkeydown="handlePracticeKeydown(event, 'den')">
+          <span class="text-4xl md:text-5xl font-black text-[#3f2021] mx-3 md:mx-5">＝</span>
+          <div class="flex items-center bg-white border-[3.5px] border-[#3f2021] rounded-2xl px-5 py-3 shadow-inner">
+            <span class="vertical-fraction text-3xl md:text-4xl font-black inline-flex flex-col items-center">
+              <input type="number" id="prac-input-num" class="w-20 h-12 md:w-24 md:h-13 text-center text-2xl md:text-3xl font-black text-[#542a2b] bg-amber-50 border-2 border-[#3f2021] rounded-lg outline-none focus:border-amber-600 focus:bg-white" placeholder="" min="0" onkeydown="handlePracticeKeydown(event, 'num')">
+              <span class="w-full h-1.5 bg-[#3f2021] my-1 rounded-full"></span>
+              <input type="number" id="prac-input-den" class="w-20 h-12 md:w-24 md:h-13 text-center text-2xl md:text-3xl font-black text-[#542a2b] bg-amber-50 border-2 border-[#3f2021] rounded-lg outline-none focus:border-amber-600 focus:bg-white" placeholder="" min="1" onkeydown="handlePracticeKeydown(event, 'den')">
             </span>
           </div>
         `;
