@@ -82,7 +82,7 @@
         }
 
         /* 霓虹發光與選取狀態 */
-        .card-container:hover .card-front:not(.locked) {
+        .card-container:hover .card-front:not(.locked):not(.waiting-flip-card) {
             background: rgba(255, 255, 255, 0.15);
             border-color: rgba(255, 255, 255, 0.3);
             transform: scale(1.03);
@@ -641,6 +641,13 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- 除法篇顛倒確認按鈕 (僅在除法篇待填入時顯示) -->
+                            <div id="flipConfirmWrap" class="hidden flex items-center">
+                                <button id="btnConfirmFlip" onclick="confirmFlip()" class="bg-blue-600 hover:bg-blue-500 active:scale-95 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl font-black text-sm sm:text-base shadow-lg transition-all flex items-center gap-1.5 whitespace-nowrap">
+                                    <i class="fa-solid fa-check"></i> 確認
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -687,18 +694,6 @@
         </div>
     </div>
 
-    <!-- ================== 數字輸入彈窗 (除法篇專用) ================== -->
-    <div id="flipModal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-white/10 p-8 rounded-3xl max-w-xs w-full text-center shadow-2xl celebration">
-            <span class="w-14 h-14 rounded-2xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center text-2xl mx-auto mb-4">
-                <i class="fa-solid fa-pen-to-square"></i>
-            </span>
-            <h3 class="text-2xl font-black text-white mb-2">填入數字</h3>
-            <p class="text-slate-400 mb-6 font-bold">請輸入此位置變換後的數字</p>
-            <input type="number" id="flipInput" class="w-full bg-slate-950 border-4 border-slate-800 rounded-2xl p-4 text-center text-5xl font-black text-blue-400 mb-6 outline-none focus:border-blue-500" placeholder="?">
-            <button onclick="applyFlip()" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-xl font-black text-xl transition-colors">確認數字</button>
-        </div>
-    </div>
 
     <!-- ================== 結算排行榜彈窗 ================== -->
     <div id="gameOverModal" class="fixed inset-0 bg-black/95 z-50 hidden flex items-center justify-center p-4">
@@ -1558,11 +1553,18 @@
                     return;
                 }
 
-                // 處理除法篇轉為乘法但尚未填入數值的情況 (顯示問號 ?，不提示顛倒)
+                // 處理除法篇轉為乘法但尚未填入數值的情況 (直接在第二行卡牌位置呈現輸入框，絕不彈出遮擋題目的新視窗)
                 if (gameState.mode === 'div' && gameState.isMultiplication && (id === 'num2' || id === 'den2') && !gameState.flipped[id]) {
+                    const existingVal = document.getElementById('flipInput_' + id)?.value || '';
                     cardBox.innerHTML = `
-                        <div class="card-front waiting-flip-card flex items-center justify-center">
-                            <span class="text-3xl font-black text-blue-400 leading-none">?</span>
+                        <div class="card-front waiting-flip-card !p-0.5 flex items-center justify-center">
+                            <input type="number" id="flipInput_${id}" 
+                                   class="w-full h-full bg-slate-950/90 border-2 border-dashed border-blue-400 rounded-xl text-center text-3xl font-black text-blue-300 focus:outline-none focus:border-yellow-400 focus:text-yellow-300 input-glow" 
+                                   placeholder="?" 
+                                   value="${existingVal}"
+                                   onclick="event.stopPropagation()" 
+                                   onkeydown="handleFlipKeydown(event, '${id}')"
+                            >
                         </div>
                     `;
                     return;
@@ -1592,6 +1594,17 @@
                     </div>
                 `;
             });
+
+            // 更新除法篇顛倒確認按鈕顯示狀態
+            const flipConfirm = document.getElementById('flipConfirmWrap');
+            if (flipConfirm) {
+                if (gameState.mode === 'div' && gameState.isMultiplication && (!gameState.flipped.num2 || !gameState.flipped.den2)) {
+                    flipConfirm.classList.remove('hidden');
+                } else {
+                    flipConfirm.classList.add('hidden');
+                }
+            }
+
             updateAnswerAreaLayout();
         }
 
@@ -1614,6 +1627,10 @@
             // 需求 2：除法變乘法後，不要提示要顛倒
             showSuccessMsg("除號成功變乘號！請對照第一行題目原式填入第二行數字！");
             renderNumbers();
+            // 自動聚焦在第二行分子輸入框
+            setTimeout(() => {
+                document.getElementById('flipInput_num2')?.focus();
+            }, 60);
         }
 
         function handleSelect(id) {
@@ -1623,17 +1640,17 @@
                 return;
             }
 
-            // 限制：除數第二行數字驗證
+            // 限制：除數第二行數字驗證 (點擊直接聚焦輸入框，不彈出遮擋視窗)
             if (gameState.mode === 'div' && (id === 'num2' || id === 'den2')) {
                 if (!gameState.flipped[id]) {
-                    openFlipModal(id);
+                    document.getElementById('flipInput_' + id)?.focus();
                     return;
                 }
             }
 
             // 限制：除法篇必須在第二行兩個數都填入後，才可約分
             if (gameState.mode === 'div' && (!gameState.flipped.num2 || !gameState.flipped.den2)) {
-                showWarning("請先完成第二行算式數字填入！");
+                showWarning("請先完成第二行算式數字填入並點選確認！");
                 return;
             }
 
@@ -1678,44 +1695,124 @@
         }
 
         // ==========================================================================
-        // 顛倒輸入視窗 (除法篇)
+        // 顛倒輸入與確認邏輯 (除法篇：直接在第二行行內輸入，絕不遮擋第一行題目)
         // ==========================================================================
-        function openFlipModal(id) {
-            stopHintTimer(); 
-            gameState.currentFlipTarget = id;
-            document.getElementById('flipModal').classList.remove('hidden');
-            document.getElementById('flipInput').value = '';
-            document.getElementById('flipInput').focus();
-            synth.playClick();
+        function handleFlipKeydown(e, id) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                // 若在分子，且分母尚未填且目前為空，自動切換至分母輸入框
+                if (id === 'num2' && !gameState.flipped.den2) {
+                    const denInput = document.getElementById('flipInput_den2');
+                    if (denInput && !denInput.value.trim()) {
+                        denInput.focus();
+                        return;
+                    }
+                }
+                // 若在分母，且分子尚未填且目前為空，自動切換至分子輸入框
+                if (id === 'den2' && !gameState.flipped.num2) {
+                    const numInput = document.getElementById('flipInput_num2');
+                    if (numInput && !numInput.value.trim()) {
+                        numInput.focus();
+                        return;
+                    }
+                }
+                confirmFlip();
+            }
         }
 
-        function applyFlip() {
-            const inputVal = parseInt(document.getElementById('flipInput').value);
-            const target = gameState.currentFlipTarget;
-            
-            if (inputVal === gameState.originalTarget[target]) {
-                gameState.flipped[target] = true;
-                gameState.data[target].current = inputVal;
-                document.getElementById('flipModal').classList.add('hidden');
-                
-                synth.playFlip();
-                triggerParticles(target, '#3b82f6');
-                
-                gameState.score += 30;
-                document.getElementById('score').innerText = gameState.score;
-                spawnFloatingScore(target, '+30 填答正確', '#60a5fa');
-                
-                if (gameState.flipped.num2 && gameState.flipped.den2) {
-                    showSuccessMsg("請點擊第二行算式進行約分");
-                    stopHintTimer();
-                } else {
-                    showSuccessMsg("答對了！請對照第一行題目算式，填入另一個位置的數字！");
+        function confirmFlip() {
+            stopHintTimer();
+            let anyHandled = false;
+            let anyError = false;
+            let errorMsg = "";
+            let handledCount = 0;
+
+            // 檢查 num2
+            if (!gameState.flipped.num2) {
+                const inputEl = document.getElementById('flipInput_num2');
+                if (inputEl) {
+                    const val = parseInt(inputEl.value);
+                    if (isNaN(val)) {
+                        errorMsg = "請在第二行分子填入數字！";
+                        anyError = true;
+                    } else if (val === gameState.originalTarget.num2) {
+                        gameState.flipped.num2 = true;
+                        gameState.data.num2.current = val;
+                        synth.playFlip();
+                        triggerParticles('num2', '#3b82f6');
+                        anyHandled = true;
+                        handledCount++;
+                    } else {
+                        anyError = true;
+                        errorMsg = "分子數值不正確，請對照第一行題目原式重新思考！";
+                    }
                 }
-                renderNumbers();
-            } else {
-                synth.playWrong();
-                alert("不對喔！數值不正確，請對照第一行題目原式重新思考！");
             }
+
+            // 檢查 den2
+            if (!gameState.flipped.den2) {
+                const inputEl = document.getElementById('flipInput_den2');
+                if (inputEl) {
+                    const val = parseInt(inputEl.value);
+                    if (isNaN(val)) {
+                        if (!errorMsg) errorMsg = "請在第二行分母填入數字！";
+                        anyError = true;
+                    } else if (val === gameState.originalTarget.den2) {
+                        gameState.flipped.den2 = true;
+                        gameState.data.den2.current = val;
+                        synth.playFlip();
+                        triggerParticles('den2', '#3b82f6');
+                        anyHandled = true;
+                        handledCount++;
+                    } else {
+                        anyError = true;
+                        if (!errorMsg) {
+                            errorMsg = "分母數值不正確，請對照第一行題目原式重新思考！";
+                        } else if (errorMsg.includes("分子")) {
+                            errorMsg = "分子與分母數值不正確，請對照第一行題目原式重新思考！";
+                        }
+                    }
+                }
+            }
+
+            if (handledCount > 0) {
+                const addedScore = handledCount * 30;
+                gameState.score += addedScore;
+                document.getElementById('score').innerText = gameState.score;
+                spawnFloatingScore('num2', `+${addedScore} 填答正確`, '#60a5fa');
+            }
+
+            if (gameState.flipped.num2 && gameState.flipped.den2) {
+                showSuccessMsg("答對了！倒數變換成功，請點擊第二行算式進行約分！");
+                stopHintTimer();
+                renderNumbers();
+            } else if (anyHandled && !anyError) {
+                showSuccessMsg("答對了！請對照第一行題目原式，填入另一個位置的數字！");
+                renderNumbers();
+                setTimeout(() => {
+                    if (!gameState.flipped.num2) document.getElementById('flipInput_num2')?.focus();
+                    else if (!gameState.flipped.den2) document.getElementById('flipInput_den2')?.focus();
+                }, 50);
+            } else if (anyHandled && anyError) {
+                synth.playWrong();
+                showWarning(errorMsg);
+                renderNumbers();
+                setTimeout(() => {
+                    if (!gameState.flipped.num2) document.getElementById('flipInput_num2')?.focus();
+                    else if (!gameState.flipped.den2) document.getElementById('flipInput_den2')?.focus();
+                }, 50);
+            } else if (anyError) {
+                synth.playWrong();
+                showWarning(errorMsg || "數值不正確，請對照第一行題目原式重新思考！");
+            }
+        }
+
+        // 相容性函式
+        function openFlipModal(id) {
+            document.getElementById('flipInput_' + id)?.focus();
+        }
+        function applyFlip() {
+            confirmFlip();
         }
 
         // ==========================================================================
@@ -1817,6 +1914,13 @@
         // 最終答案驗證
         // ==========================================================================
         function checkFinalAnswer(isTimeUp = false) {
+            // 除法篇若尚未填妥第二行倒數數字，提醒先完成填入
+            if (!isTimeUp && gameState.mode === 'div' && (!gameState.flipped.num2 || !gameState.flipped.den2)) {
+                synth.playWrong();
+                showWarning("請先完成第二行算式數字填入並點選確認！");
+                return;
+            }
+
             const uN = parseInt(document.getElementById('ansNum').value);
             const uD = parseInt(document.getElementById('ansDen').value);
             
