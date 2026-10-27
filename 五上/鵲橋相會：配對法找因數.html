@@ -1515,6 +1515,38 @@
       }
     }
 
+
+    function updateHellSlots() {
+      let leftGroup = document.getElementById('hell-left-group');
+      let rightGroup = document.getElementById('hell-right-group');
+      if (!leftGroup || !rightGroup) return;
+
+      leftGroup.innerHTML = '';
+      rightGroup.innerHTML = '';
+
+      let M = placedValues.length;
+      let sortedCurrent = placedValues.slice().sort((a, b) => a - b);
+      let leftCount = Math.ceil(M / 2);
+      let rightCount = Math.floor(M / 2);
+
+      // 填入左側石階群（由小到大排列）
+      for (let i = 0; i < leftCount; i++) {
+        let s = document.createElement('div');
+        s.className = 'slot filled';
+        s.innerText = sortedCurrent[i];
+        s.setAttribute('data-val', sortedCurrent[i]);
+        leftGroup.appendChild(s);
+      }
+
+      // 填入右側石階群（因 hell-right-group 為 row-reverse，第0個子元素靠右岸，因此由大到小加入，讓畫面從銀河中央往右岸為由小到大）
+      for (let i = M - 1; i >= leftCount; i--) {
+        let s = document.createElement('div');
+        s.className = 'slot filled';
+        s.innerText = sortedCurrent[i];
+        s.setAttribute('data-val', sortedCurrent[i]);
+        rightGroup.appendChild(s);
+      }
+    }
     function getDistractors(targetNum, needed) {
       let factors = [];
       for (let i = 1; i <= targetNum; i++) {
@@ -1722,39 +1754,30 @@
 
         if (gameMode === 'hell') {
           sound.playClick();
-          let leftGroup = document.getElementById('hell-left-group');
-          let rightGroup = document.getElementById('hell-right-group');
 
           placedValues.push(val1);
-          let s1 = document.createElement('div');
-          s1.className = 'slot filled';
-          s1.innerText = val1;
-          leftGroup.appendChild(s1);
+          if (val1 !== val2) {
+            placedValues.push(val2);
+          }
+
+          updateHellSlots();
+
+          let s1 = hellMatchedRow.querySelector(`.slot[data-val="${val1}"]`);
+          let s2 = (val1 !== val2) ? hellMatchedRow.querySelector(`.slot[data-val="${val2}"]`) : null;
 
           let elForVal1 = (v1 <= v2) ? inputFactor1 : inputFactor2;
           let elForVal2 = (v1 <= v2) ? inputFactor2 : inputFactor1;
 
-          animateFlyingBubble(elForVal1, s1, val1);
-
-          let s2 = null;
-          if (val1 !== val2) {
-            placedValues.push(val2);
-            s2 = document.createElement('div');
-            s2.className = 'slot filled';
-            s2.innerText = val2;
-            rightGroup.appendChild(s2);
-            animateFlyingBubble(elForVal2, s2, val2);
-          }
+          if (s1) animateFlyingBubble(elForVal1, s1, val1);
+          if (s2) animateFlyingBubble(elForVal2, s2, val2);
 
           inputFactor1.value = '';
           inputFactor2.value = '';
           setActiveInput(inputFactor1);
 
           setGameTimeout(() => {
-            createExplosion(s1.getBoundingClientRect());
-            if (s2) {
-              createExplosion(s2.getBoundingClientRect());
-            }
+            if (s1) createExplosion(s1.getBoundingClientRect());
+            if (s2) createExplosion(s2.getBoundingClientRect());
             matchedPairs.push({ id: 'dummy-' + Date.now(), f1: v1, f2: v2, isDummy: true });
             isMatchingAnimationActive = false;
             checkGameProgress();
@@ -1823,48 +1846,19 @@
       }
 
       if (gameMode === 'hell') {
-        let leftGroup = document.getElementById('hell-left-group');
-        let rightGroup = document.getElementById('hell-right-group');
-        let idx1 = sortedFactors.indexOf(Math.min(v1, v2));
-        let idx2 = sortedFactors.indexOf(Math.max(v1, v2));
-        
-        // Populate hidden slots so they are ready for the bridge reveal later
-        let realLeftSlot = document.getElementById(`slot-${idx1}`);
-        if(realLeftSlot) {
-          realLeftSlot.className = 'slot filled';
-          realLeftSlot.innerText = Math.min(v1, v2);
-        }
-        
-        let s1 = document.createElement('div');
-        s1.className = 'slot filled';
-        s1.innerText = Math.min(v1, v2);
-        leftGroup.appendChild(s1);
-        
-        let targetEl = s1;
+        updateHellSlots();
+
+        let s1 = hellMatchedRow.querySelector(`.slot[data-val="${val1}"]`);
+        let s2 = (!match.isSquare) ? hellMatchedRow.querySelector(`.slot[data-val="${val2}"]`) : null;
+
         let elForVal1 = (v1 <= v2) ? originEl1 : originEl2;
         let elForVal2 = (v1 <= v2) ? originEl2 : originEl1;
-        animateFlyingBubble(elForVal1, s1, val1);
-
-        if (!match.isSquare) {
-          let realRightSlot = document.getElementById('slot-' + idx2);
-          if(realRightSlot) {
-            realRightSlot.className = 'slot filled';
-            realRightSlot.innerText = val2;
-          }
-
-          let s2 = document.createElement('div');
-          s2.className = 'slot filled';
-          s2.innerText = val2;
-          rightGroup.appendChild(s2);
-          animateFlyingBubble(elForVal2, s2, val2);
-          targetEl = s2;
-        }
+        if (s1) animateFlyingBubble(elForVal1, s1, val1);
+        if (s2) animateFlyingBubble(elForVal2, s2, val2);
 
         setGameTimeout(() => {
-          createExplosion(s1.getBoundingClientRect());
-          if (!match.isSquare) {
-            createExplosion(targetEl.getBoundingClientRect());
-          }
+          if (s1) createExplosion(s1.getBoundingClientRect());
+          if (s2) createExplosion(s2.getBoundingClientRect());
           isMatchingAnimationActive = false;
           checkGameProgress();
         }, 800);
@@ -2146,35 +2140,38 @@
       cowherdBox.innerHTML = getCowherdSVG('walk');
       weaverBox.innerHTML = getWeaverGirlSVG('walk');
       
-      let step = 0;
-      let totalSteps = 120; // 2 seconds walking animation
+      let startTime = null;
+      let walkDuration = 5500; // 5.5 秒慢速漫步鵲橋
+      let lastParticleTime = 0;
 
-      function walkFrame() {
+      function walkFrame(timestamp) {
         if (gameState !== 'walking') {
           walkAnimId = null;
           return;
         }
-        if (step <= totalSteps) {
-          let t = step / totalSteps;
-          
-          let leftC = 12 + t * (48 - 12);
-          let bottomC = 30; // 固定在 30%
+        if (!startTime) startTime = timestamp;
+        let elapsed = timestamp - startTime;
+        let t = Math.min(1, elapsed / walkDuration);
+        
+        let leftC = 12 + t * (48 - 12);
+        let bottomC = 30; // 固定在 30%
 
-          let leftW = 88 - t * (88 - 52);
-          let bottomW = 30; // 固定在 30%
+        let leftW = 88 - t * (88 - 52);
+        let bottomW = 30; // 固定在 30%
 
-          cowherdBox.style.left = `${leftC}%`;
-          cowherdBox.style.bottom = `${bottomC}%`;
-          
-          weaverBox.style.left = `${leftW}%`;
-          weaverBox.style.bottom = `${bottomW}%`;
+        cowherdBox.style.left = `${leftC}%`;
+        cowherdBox.style.bottom = `${bottomC}%`;
+        
+        weaverBox.style.left = `${leftW}%`;
+        weaverBox.style.bottom = `${bottomW}%`;
 
-          if (step % 6 === 0 && !questionHadMistake) {
-            createExplosion(cowherdBox.getBoundingClientRect());
-            createExplosion(weaverBox.getBoundingClientRect());
-          }
+        if (elapsed - lastParticleTime >= 120 && !questionHadMistake) {
+          lastParticleTime = elapsed;
+          createExplosion(cowherdBox.getBoundingClientRect());
+          createExplosion(weaverBox.getBoundingClientRect());
+        }
 
-          step++;
+        if (t < 1) {
           walkAnimId = requestAnimationFrame(walkFrame);
         } else {
           walkAnimId = null;
@@ -2208,7 +2205,7 @@
             }, i * 150);
           }
 
-          setGameTimeout(showClearScreen, 1200);
+          setGameTimeout(showClearScreen, 1500);
         }
       }
       walkAnimId = requestAnimationFrame(walkFrame);
@@ -3066,8 +3063,11 @@
       }
 
       if (editingSlotData.isHell) {
-        editingSlotData.element.innerText = newVal;
-        createExplosion(editingSlotData.element.getBoundingClientRect());
+        updateHellSlots();
+        let targetSlot = hellMatchedRow.querySelector(`.slot[data-val="${newVal}"]`);
+        if (targetSlot) {
+          createExplosion(targetSlot.getBoundingClientRect());
+        }
       } else {
         updateBridgeSlots();
         let targetSlot = document.querySelectorAll('#slots-overlay .slot.filled');
