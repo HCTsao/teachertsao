@@ -265,13 +265,12 @@
     <img src="https://api.visitorbadge.io/api/visitors?path=hctsao.teachertsao&label=Views&labelColor=%23475569&countColor=%23ea580c" alt="Visitor Counter" style="display: none;">
   <div class="container">
     <h1>⚔️ 數學神兵 - 教師管理後台</h1>
-    <div class="subtitle">即時監控學生之正負數加減乘除絕對值作答歷程</div>
+    <div class="subtitle">即時監控學生之正負數加減乘除絕對值錯題紀錄</div>
 
     <!-- 統計概覽 -->
     <div class="stats-container">
-      <div class="stat-badge">總作答題數 <span id="stat-total">0</span></div>
-      <div class="stat-badge">答對題數 <span id="stat-correct" style="color: var(--neon-green);">0</span></div>
-      <div class="stat-badge">整體正確率 <span id="stat-rate" style="color: #eab308;">0%</span></div>
+      <div class="stat-badge">錯題紀錄總數 <span id="stat-total" style="color: var(--neon-pink);">0</span> 筆</div>
+      <div class="stat-badge">錯題學生人數 <span id="stat-students" style="color: var(--neon-cyan);">0</span> 人</div>
     </div>
 
     <!-- 控制列 -->
@@ -279,17 +278,6 @@
       <div class="search-box">
         <input type="text" id="search-input" class="search-input" placeholder="🔍 輸入班級/座號/姓名、題目關鍵字進行搜尋...">
       </div>
-      <select id="mode-filter" class="filter-select">
-        <option value="all">所有遊戲模式</option>
-        <option value="戰役模式">🤖 戰役模式</option>
-        <option value="雙人同屏">⚔️ 雙人同屏</option>
-        <option value="線上對決">🌐 線上對決</option>
-      </select>
-      <select id="result-filter" class="filter-select">
-        <option value="all">所有答題結果</option>
-        <option value="correct">✅ 答對</option>
-        <option value="wrong">❌ 答錯</option>
-      </select>
       <button class="btn btn-primary" onclick="loadData()">🔄 重新整理</button>
       <button class="btn btn-danger" onclick="clearAllData()">🗑️ 清空所有數據</button>
       <a href="index.html" class="btn btn-secondary">🔙 返回數學神兵</a>
@@ -301,12 +289,11 @@
         <thead>
           <tr>
             <th style="width: 8%;">序號</th>
-            <th style="width: 17%;">作答時間</th>
-            <th style="width: 25%;">學生班級/座號/姓名</th>
-            <th style="width: 15%;">遊戲模式</th>
-            <th style="width: 15%;">作答題目</th>
-            <th style="width: 10%;">選答選項</th>
-            <th style="width: 10%;">作答結果</th>
+            <th style="width: 18%;">作答時間</th>
+            <th style="width: 26%;">學生班級/座號/姓名</th>
+            <th style="width: 24%;">作答題目</th>
+            <th style="width: 12%;">選答選項</th>
+            <th style="width: 12%;">作答結果</th>
           </tr>
         </thead>
         <tbody id="table-body">
@@ -331,29 +318,22 @@
 
     function renderTable() {
       const searchVal = document.getElementById('search-input').value.toLowerCase().trim();
-      const modeFilter = document.getElementById('mode-filter').value;
-      const resultFilter = document.getElementById('result-filter').value;
       const tbody = document.getElementById('table-body');
       
       tbody.innerHTML = '';
 
-      // 進行資料篩選
+      // 進行資料篩選：只列出錯誤的答題結果
       const filtered = rawRecords.filter(item => {
-        // 1. 關鍵字搜尋
+        // 排除正確紀錄，只列出錯誤紀錄
+        if (item.isCorrect === true) return false;
+
+        // 關鍵字搜尋
         const matchSearch = !searchVal || 
                             (item.studentInfo && item.studentInfo.toLowerCase().includes(searchVal)) ||
                             (item.question && item.question.toLowerCase().includes(searchVal)) ||
                             (item.selectedOption && item.selectedOption.toLowerCase().includes(searchVal));
-        
-        // 2. 模式篩選
-        const matchMode = modeFilter === 'all' || item.mode === modeFilter;
 
-        // 3. 結果篩選
-        let matchResult = true;
-        if (resultFilter === 'correct') matchResult = item.isCorrect === true;
-        else if (resultFilter === 'wrong') matchResult = item.isCorrect === false;
-
-        return matchSearch && matchMode && matchResult;
+        return matchSearch;
       });
 
       // 更新統計指標
@@ -362,7 +342,7 @@
       if (filtered.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="7" class="empty-state">📭 尚無符合篩選條件的作答數據歷程</td>
+            <td colspan="6" class="empty-state">📭 尚無符合條件的錯題數據歷程</td>
           </tr>
         `;
         return;
@@ -381,9 +361,6 @@
         studentTd.style.fontWeight = 'bold';
         studentTd.innerText = item.studentInfo || '';
         
-        const modeTd = document.createElement('td');
-        modeTd.innerHTML = `<span class="badge badge-mode">${item.mode || '未知'}</span>`;
-        
         const questionTd = document.createElement('td');
         questionTd.style.fontFamily = 'Outfit, monospace';
         questionTd.style.fontWeight = '700';
@@ -394,16 +371,11 @@
         selectTd.innerText = item.selectedOption || '';
         
         const resultTd = document.createElement('td');
-        if (item.isCorrect) {
-          resultTd.innerHTML = '<span class="badge badge-success">✅ 答對</span>';
-        } else {
-          resultTd.innerHTML = '<span class="badge badge-danger">❌ 答錯</span>';
-        }
+        resultTd.innerHTML = '<span class="badge badge-danger">❌ 答錯</span>';
 
         tr.appendChild(indexTd);
         tr.appendChild(timeTd);
         tr.appendChild(studentTd);
-        tr.appendChild(modeTd);
         tr.appendChild(questionTd);
         tr.appendChild(selectTd);
         tr.appendChild(resultTd);
@@ -414,12 +386,10 @@
 
     function updateStats(records) {
       const total = records.length;
-      const correct = records.filter(r => r.isCorrect).length;
-      const rate = total > 0 ? Math.round((correct / total) * 100) : 0;
+      const studentCount = new Set(records.map(r => r.studentInfo).filter(Boolean)).size;
 
       document.getElementById('stat-total').innerText = total;
-      document.getElementById('stat-correct').innerText = correct;
-      document.getElementById('stat-rate').innerText = `${rate}%`;
+      document.getElementById('stat-students').innerText = studentCount;
     }
 
     function clearAllData() {
@@ -435,8 +405,6 @@
 
     // 綁定動態篩選事件
     document.getElementById('search-input').addEventListener('input', renderTable);
-    document.getElementById('mode-filter').addEventListener('change', renderTable);
-    document.getElementById('result-filter').addEventListener('change', renderTable);
 
     // 初始化載入
     window.onload = loadData;

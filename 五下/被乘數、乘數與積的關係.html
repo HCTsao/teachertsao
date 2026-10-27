@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
@@ -183,7 +183,7 @@
             </div>
         </div>
 
-        <div id="scoreboard" class="grid grid-cols-4 gap-4 mb-4"></div>
+        <div id="scoreboard" class="grid grid-cols-2 gap-4 mb-4"></div>
 
         <div class="table-surface p-6 shadow-2xl">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
@@ -215,9 +215,7 @@
         const PAIRS_COUNT = 12;
         let players = [
             { id: 0, name: "你", score: 0, type: 'human' },
-            { id: 1, name: "AI 小算", score: 0, type: 'ai' },
-            { id: 2, name: "AI 阿數", score: 0, type: 'ai' },
-            { id: 3, name: "AI 豆豆", score: 0, type: 'ai' }
+            { id: 1, name: "AI 小算", score: 0, type: 'ai' }
         ];
 
         let currentPlayerIdx = 0;
@@ -256,6 +254,7 @@
             document.getElementById('game-over').classList.add('hidden');
             document.getElementById('game-title-display').innerText = `對對碰：${mode === 'decimals' ? '小數挑戰' : '分數挑戰'}`;
             init();
+            updateStatusMsg("換你了，請選兩張牌進行配對！");
         }
 
         function resetToMain() {
@@ -379,29 +378,26 @@
                 return;
             }
 
-            if (!selectedCards.green && !selectedCards.yellow) {
-                const unflipCount = document.querySelectorAll(`#${type}-grid .card:not(.flipped)`).length;
-                if (p.type === 'human' && card.classList.contains('flipped') && unflipCount > 0) {
-                    updateStatusMsg("請先翻開一張蓋住的牌來開始回合！", true);
-                    return; 
-                }
-            } 
-            else if (selectedCards[type] === card) {
+            // 1. 若點選當前已選取的同一張牌，則取消選取
+            if (selectedCards[type] === card) {
                 card.classList.remove('selected-card');
                 selectedCards[type] = null;
                 updateStatusMsg("已取消選取。");
                 return;
             }
-            else {
-                const firstCard = selectedCards.green || selectedCards.yellow;
-                if (p.type === 'human' && card.classList.contains('flipped') && card.dataset.val !== firstCard.dataset.val) {
-                    updateStatusMsg("這張牌不符合配對，請選擇另一張！", true);
-                    return; 
-                }
 
-                if (selectedCards[type] && selectedCards[type] !== card) {
-                    selectedCards[type].classList.remove('selected-card');
-                }
+            // 2. 若同一牌堆已選取其他牌，取消原本那張的選取（允許更換選取同堆其他牌）
+            if (selectedCards[type] && selectedCards[type] !== card) {
+                selectedCards[type].classList.remove('selected-card');
+                selectedCards[type] = null;
+            }
+
+            // 3. 若已選了另一堆牌，且此牌已翻開但不符合配對，提醒玩家
+            const otherType = type === 'green' ? 'yellow' : 'green';
+            const otherCard = selectedCards[otherType];
+            if (otherCard && p.type === 'human' && card.classList.contains('flipped') && card.dataset.val !== otherCard.dataset.val) {
+                updateStatusMsg("這張牌不符合配對，請選擇另一張！", true);
+                return;
             }
 
             const wasFlipped = card.classList.contains('flipped');
@@ -452,7 +448,7 @@
             g.classList.remove('selected-card');
             y.classList.remove('selected-card');
 
-            currentPlayerIdx = (currentPlayerIdx + 1) % 4;
+            currentPlayerIdx = (currentPlayerIdx + 1) % players.length;
             selectedCards = { green: null, yellow: null };
             
             updateUI();
