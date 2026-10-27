@@ -136,9 +136,8 @@
         <p class="subtitle">星際科學記號大冒險 · 作答戰績總覽</p>
 
         <div class="notice" id="keyNotice" style="display: none;">
-            ⚠️ 尚未設定 Supabase 金鑰：請用文字編輯器打開本檔案，填入最上方的
-            <code>SUPABASE_URL</code> 與 <code>SUPABASE_ANON_KEY</code>，並先在 Supabase SQL Editor 執行
-            <code>七上/supabase_schema.sql</code> 建表。
+            ⚠️ 無法連上 Firestore 資料庫：請確認 Firebase 專案已建立 Firestore 資料庫，
+            且安全性規則允許公開讀取 <code>sci_notation_records</code> 集合。
         </div>
 
         <div class="toolbar">
@@ -181,11 +180,19 @@
         </div>
     </div>
 
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
     <script>
-        // ===== 請填入你的 Supabase 金鑰（與遊戲端相同）=====
-        const SUPABASE_URL = 'https://lghxyxqafzlwoadkkonk.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnaHh5eHFhZnpsd29hZGtrb25rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NTk2OTEsImV4cCI6MjEwNzIzNTY5MX0.r6rdmEDbOcr8nSgC7YR4v1C_NPiUm7vDmbbI6BKs6s8';
-        const SUPABASE_TABLE = 'sci_notation_records';
+        // ===== Firebase 連線設定（與遊戲端相同）=====
+        const FIREBASE_CONFIG = {
+            apiKey: 'AIzaSyBuAOf_SdoITojaj9nERW1CtOYiTCz1oag',
+            authDomain: 'junior-4cd29.firebaseapp.com',
+            projectId: 'junior-4cd29',
+            storageBucket: 'junior-4cd29.firebasestorage.app',
+            messagingSenderId: '1056938100969',
+            appId: '1:1056938100969:web:d5e28048cd13137c06c878'
+        };
+        const SCI_RECORDS = 'sci_notation_records';
         // 教師後台密碼（請告訴我要改成什麼，目前暫用 8888）
         const ADMIN_PASSWORD = '8888';
         // 與遊戲端共用驗證狀態：驗證一次後，同台電腦 12 小時內免再輸入
@@ -241,26 +248,27 @@
             }
         }
 
-        function keysReady() {
-            return SUPABASE_URL.startsWith('http') && SUPABASE_ANON_KEY.length >= 20;
+        let fbApp = null;
+        function fsDb() {
+            if (fbApp) return fbApp.firestore();
+            if (typeof firebase === 'undefined' || !FIREBASE_CONFIG.apiKey) return null;
+            fbApp = firebase.initializeApp(FIREBASE_CONFIG);
+            return fbApp.firestore();
         }
 
         async function loadRecords() {
-            if (!keysReady()) {
+            const db = fsDb();
+            if (!db) {
                 document.getElementById('keyNotice').style.display = 'block';
-                document.getElementById('recordsBody').innerHTML = '<tr><td colspan="9" class="empty">尚未設定金鑰</td></tr>';
+                document.getElementById('recordsBody').innerHTML = '<tr><td colspan="9" class="empty">無法連上 Firestore</td></tr>';
                 return;
             }
             try {
-                const res = await fetch(
-                    `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?select=*&order=played_at.desc&limit=500`,
-                    { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY } }
-                );
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                allRecords = await res.json();
+                const snap = await db.collection(SCI_RECORDS).orderBy('played_at', 'desc').limit(500).get();
+                allRecords = snap.docs.map(d => d.data());
             } catch (e) {
                 document.getElementById('recordsBody').innerHTML =
-                    '<tr><td colspan="9" class="empty">❌ 讀取失敗：' + esc(e.message) + '（請檢查金鑰與資料表）</td></tr>';
+                    '<tr><td colspan="9" class="empty">❌ 讀取失敗：' + esc(e.message) + '（請檢查 Firestore 資料庫與安全性規則）</td></tr>';
                 return;
             }
             buildClassFilter();

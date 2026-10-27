@@ -76,7 +76,7 @@
         <p class="subtitle">星際科學記號大冒險 · 各關卡最高分英雄榜（取每人最佳成績）</p>
 
         <div class="notice" id="keyNotice" style="display: none;">
-            ⚠️ 尚未設定 Supabase 金鑰，請聯絡老師。
+            ⚠️ 無法連上 Firestore 資料庫，請聯絡老師。
         </div>
 
         <div class="toolbar">
@@ -98,10 +98,26 @@
         </div>
     </div>
 
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
     <script>
-        const SUPABASE_URL = 'https://lghxyxqafzlwoadkkonk.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnaHh5eHFhZnpsd29hZGtrb25rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NTk2OTEsImV4cCI6MjEwNzIzNTY5MX0.r6rdmEDbOcr8nSgC7YR4v1C_NPiUm7vDmbbI6BKs6s8';
-        const SUPABASE_TABLE = 'sci_notation_records';
+        const FIREBASE_CONFIG = {
+            apiKey: 'AIzaSyBuAOf_SdoITojaj9nERW1CtOYiTCz1oag',
+            authDomain: 'junior-4cd29.firebaseapp.com',
+            projectId: 'junior-4cd29',
+            storageBucket: 'junior-4cd29.firebasestorage.app',
+            messagingSenderId: '1056938100969',
+            appId: '1:1056938100969:web:d5e28048cd13137c06c878'
+        };
+        const SCI_RECORDS = 'sci_notation_records';
+
+        let fbApp = null;
+        function fsDb() {
+            if (fbApp) return fbApp.firestore();
+            if (typeof firebase === 'undefined' || !FIREBASE_CONFIG.apiKey) return null;
+            fbApp = firebase.initializeApp(FIREBASE_CONFIG);
+            return fbApp.firestore();
+        }
 
         let allRecords = [];
 
@@ -133,20 +149,17 @@
         const rowClass = (i) => i === 0 ? 'top1' : i === 1 ? 'top2' : i === 2 ? 'top3' : '';
 
         async function loadBoard() {
-            if (!SUPABASE_URL.startsWith('http') || SUPABASE_ANON_KEY.length < 20) {
+            const db = fsDb();
+            if (!db) {
                 document.getElementById('keyNotice').style.display = 'block';
                 return;
             }
             try {
-                const res = await fetch(
-                    `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?select=*&order=score.desc&limit=500`,
-                    { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY } }
-                );
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                allRecords = await res.json();
+                const snap = await db.collection(SCI_RECORDS).orderBy('score', 'desc').limit(500).get();
+                allRecords = snap.docs.map(d => d.data());
             } catch (e) {
                 document.getElementById('boardBody').innerHTML =
-                    '<tr><td colspan="9" class="empty">❌ 讀取失敗：' + esc(e.message) + '</td></tr>';
+                    '<tr><td colspan="9" class="empty">❌ 讀取失敗：' + esc(e.message) + '（請檢查 Firestore 資料庫與安全性規則）</td></tr>';
                 return;
             }
             render();

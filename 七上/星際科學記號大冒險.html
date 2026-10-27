@@ -970,7 +970,8 @@
 </head>
 <body>
     <div class="stars" id="stars"></div>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
     <audio id="bgm" src="bgm.mp3" loop preload="auto"></audio>
     <button class="bgm-toggle" id="bgmToggle" onclick="toggleBgm()" title="背景音樂開/關">🎵</button>
     <a class="home-btn" href="../index.html" title="回到網站首頁">🏠 回到首頁</a>
@@ -1169,10 +1170,25 @@
 
     <script>
         // 遊戲狀態
-        // ===== Supabase 連線設定（請填入你的專案金鑰）=====
-        const SUPABASE_URL = 'https://lghxyxqafzlwoadkkonk.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnaHh5eHFhZnpsd29hZGtrb25rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NTk2OTEsImV4cCI6MjEwNzIzNTY5MX0.r6rdmEDbOcr8nSgC7YR4v1C_NPiUm7vDmbbI6BKs6s8';
-        const SUPABASE_TABLE = 'sci_notation_records';
+        // ===== Firebase 連線設定（Firestore：成績上傳＋雙人對戰即時同步）=====
+        const FIREBASE_CONFIG = {
+            apiKey: 'AIzaSyBuAOf_SdoITojaj9nERW1CtOYiTCz1oag',
+            authDomain: 'junior-4cd29.firebaseapp.com',
+            projectId: 'junior-4cd29',
+            storageBucket: 'junior-4cd29.firebasestorage.app',
+            messagingSenderId: '1056938100969',
+            appId: '1:1056938100969:web:d5e28048cd13137c06c878'
+        };
+        const SCI_RECORDS = 'sci_notation_records'; // 成績紀錄集合
+        const SCI_ROOMS = 'sci_battle';             // 雙人對戰房間集合
+        let fbApp = null;
+
+        function fsDb() {
+            if (fbApp) return fbApp.firestore();
+            if (typeof firebase === 'undefined' || !FIREBASE_CONFIG.apiKey) return null;
+            fbApp = firebase.initializeApp(FIREBASE_CONFIG);
+            return fbApp.firestore();
+        }
         // 教師後台密碼（請告訴我要改成什麼，目前暫用 8888）
         const ADMIN_PASSWORD = '8888';
 
@@ -1351,6 +1367,7 @@
             const lives = Math.max(gameState.lives, 0);
             document.getElementById('hearts').textContent = '❤️'.repeat(lives) + '🖤'.repeat(Math.max(maxLives - lives, 0));
             document.getElementById('shipHpFill').style.width = (lives / maxLives * 100) + '%';
+            if (isVs) document.getElementById('monsterHpFill').style.width = (Math.max(Math.min(vsOppHp, 5), 0) / 5 * 100) + '%';
         }
 
         // 生成題目
@@ -1761,10 +1778,10 @@
             oscillator.stop(audioContext.currentTime + 0.3);
         }
 
-        // ===== 雙人對戰模式（Supabase Realtime 連線，不記入排行榜）=====
-        let sbVs = null;
-        let vsChannel = null;
-        let vsClientId = '';
+        // ===== 雙人對戰模式（Firebase Firestore 即時同步，不記入排行榜）=====
+        let vsUnsub = null;          // Firestore 即時監聽
+        let vsHeartbeatTimer = null; // 心跳定時器
+        let vsJoined = false;        // 是否已成功建立/加入房間
         let vsRoom = '';
         let vsIsHost = false;
         let vsStarted = false;
@@ -1786,11 +1803,23 @@
         let vsAdvancing = false;
         let vsAdvanceTimer = null;
 
-        function vsGetClient() {
-            if (sbVs) return sbVs;
-            if (typeof supabase === 'undefined' || !SUPABASE_URL.startsWith('http')) return null;
-            sbVs = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            return sbVs;
+        function vsGetDb() {
+            return fsDb();
+        }
+
+        // 房間文件的 Firestore 參照
+        function vsRef() {
+            const db = fsDb();
+            return db ? db.collection(SCI_ROOMS).doc(vsRoom) : null;
+        }
+
+        // 心跳：定時回報自己在線（對手超過 15 秒沒心跳視為離線）
+        function vsPing() {
+            const ref = vsRef();
+            if (!ref) return;
+            const f = {};
+            f[vsIsHost ? 'hostPing' : 'guestPing'] = Date.now();
+            ref.update(f).catch(() => {});
         }
 
         function setMode(mode) {
@@ -1819,127 +1848,168 @@
 
         function vsCreate() {
             unlockAudio();
-            if (!vsGetClient()) { alert('⚔️ 對戰需要連上網路，請確認網路後再試！'); return; }
+            if (!vsGetDb()) { alert('⚔️ 對戰需要連上網路（Firebase），請確認網路後再試！'); return; }
             vsMyName = vsFighterName();
             vsRoom = vsMakeCode();
             vsIsHost = true;
-            vsJoinChannel();
-            document.getElementById('versusLobby').style.display = 'none';
-            document.getElementById('versusWaiting').style.display = '';
-            document.getElementById('roomCodeDisplay').textContent = '房號：' + vsRoom;
-            document.getElementById('waitingText').textContent = '等待對手加入…（請告訴對手房號）';
+            const db = vsGetDb();
+            // 房號撞房時自動換號重試
+            const tryCreate = (attempt) => {
+                const ref = db.collection(SCI_ROOMS).doc(vsRoom);
+                db.runTransaction(function (tx) {
+                    return tx.get(ref).then((doc) => {
+                        if (doc.exists) throw new Error('taken');
+                        tx.set(ref, {
+                            status: 'waiting',
+                            hostName: vsMyName, guestName: '',
+                            round: 0, q: null,
+                            hostOk: null, guestOk: null,
+                            hostHp: 5, guestHp: 5,
+                            hostPing: Date.now(), guestPing: 0,
+                            result: '', createdAt: Date.now()
+                        });
+                    });
+                }).then(() => {
+                    vsWatchRoom();
+                    document.getElementById('versusLobby').style.display = 'none';
+                    document.getElementById('versusWaiting').style.display = '';
+                    document.getElementById('roomCodeDisplay').textContent = '房號：' + vsRoom;
+                    document.getElementById('waitingText').textContent = '等待對手加入…（請告訴對手房號）';
+                }).catch((e) => {
+                    if (String(e && e.message) === 'taken' && attempt < 15) { vsRoom = vsMakeCode(); tryCreate(attempt + 1); }
+                    else { alert('⚠️ 開房失敗，請確認網路後再試一次！'); vsCancel(); }
+                });
+            };
+            tryCreate(0);
         }
 
         function vsJoin() {
             unlockAudio();
-            if (!vsGetClient()) { alert('⚔️ 對戰需要連上網路，請確認網路後再試！'); return; }
+            if (!vsGetDb()) { alert('⚔️ 對戰需要連上網路（Firebase），請確認網路後再試！'); return; }
             const code = document.getElementById('roomCodeInput').value.trim();
             if (!/^\d{4}$/.test(code)) { alert('請輸入 4 位數字房號！'); return; }
             vsMyName = vsFighterName();
             vsRoom = code;
             vsIsHost = false;
-            vsJoinChannel();
-            document.getElementById('versusLobby').style.display = 'none';
-            document.getElementById('versusWaiting').style.display = '';
-            document.getElementById('roomCodeDisplay').textContent = '房號：' + vsRoom;
-            document.getElementById('waitingText').textContent = '已送出加入請求，等待房主開始…';
+            const ref = vsRef();
+            ref.get().then((doc) => {
+                if (!doc.exists) { alert('❌ 找不到房號 ' + code + '，請跟房主再次確認！'); vsCancel(); return; }
+                const d = doc.data();
+                if (d.status !== 'waiting') { alert('⛔ 這個房間已經開始或滿人了！'); vsCancel(); return; }
+                ref.update({ guestName: vsMyName, status: 'ready', guestPing: Date.now() }).then(() => {
+                    vsWatchRoom();
+                    document.getElementById('versusLobby').style.display = 'none';
+                    document.getElementById('versusWaiting').style.display = '';
+                    document.getElementById('roomCodeDisplay').textContent = '房號：' + vsRoom;
+                    document.getElementById('waitingText').textContent = '已送出加入請求，等待房主開始…';
+                }).catch(() => { alert('⛔ 加入房間失敗，請再試一次！'); vsCancel(); });
+            }).catch(() => { alert('⚔️ 連線失敗，請確認網路後再試！'); vsCancel(); });
         }
 
         function vsCancel() {
+            const ref = vsJoined && vsRoom ? vsRef() : null;
+            if (ref && !vsStarted) {
+                if (vsIsHost) ref.delete().catch(() => {});
+                else ref.update({ guestName: '', status: 'waiting' }).catch(() => {});
+            }
             vsCleanup();
             document.getElementById('versusLobby').style.display = '';
             document.getElementById('versusWaiting').style.display = 'none';
         }
 
-        function vsJoinChannel() {
-            const sb = vsGetClient();
-            vsClientId = 'c' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+        function vsWatchRoom() {
+            vsJoined = true;
             vsStarted = false;
             vsOver = false;
-            vsChannel = sb.channel('sci-battle-' + vsRoom, { config: { presence: { key: vsClientId } } });
-            vsChannel.on('broadcast', { event: 'start' }, ({ payload }) => vsOnStart(payload));
-            vsChannel.on('broadcast', { event: 'q' }, ({ payload }) => vsOnQ(payload));
-            vsChannel.on('broadcast', { event: 'ans' }, ({ payload }) => vsOnAns(payload));
-            vsChannel.on('broadcast', { event: 'over' }, () => vsOnOver());
-            vsChannel.on('presence', { event: 'sync' }, vsOnPresence);
-            vsChannel.on('presence', { event: 'leave' }, ({ key }) => vsOnLeave(key));
-            vsChannel.subscribe((status) => {
-                if (status === 'SUBSCRIBED') vsChannel.track({ name: vsMyName });
-            });
+            const ref = vsRef();
+            if (vsUnsub) { try { vsUnsub(); } catch (e) {} vsUnsub = null; }
+            if (!ref) { alert('⚔️ 對戰需要連上網路，請確認網路後再試！'); vsJoined = false; return; }
+            vsUnsub = ref.onSnapshot((snap) => {
+                if (!snap.exists) {
+                    // 房間被房主刪除（房主取消）→ 進行中就判對方離線
+                    if (vsStarted && !vsOver) vsEnd('leave-win');
+                    return;
+                }
+                vsApply(snap.data());
+            }, (err) => console.warn('對戰同步失敗', err));
+            if (vsHeartbeatTimer) clearInterval(vsHeartbeatTimer);
+            vsHeartbeatTimer = setInterval(() => { if (!vsOver) vsPing(); }, 3000);
         }
 
-        function vsPresenceMembers() {
-            if (!vsChannel) return [];
-            const state = vsChannel.presenceState();
-            return Object.entries(state).map(([key, metas]) => ({ key, name: (metas[0] && metas[0].name) || '?' }));
-        }
-
-        function vsOnPresence() {
-            if (!vsIsHost || vsStarted || !vsChannel) return;
-            const members = vsPresenceMembers();
-            if (members.length >= 2) {
-                const guest = members.find(m => m.key !== vsClientId);
-                vsOppName = guest ? guest.name : '對手';
-                vsBegin();
+        // 根據房間文件最新狀態，同步本機顯示與流程（雙方各自觸發）
+        function vsApply(d) {
+            // 對手心跳逾時 → 判定離線（進行中才有意義）
+            if (vsStarted && !vsOver) {
+                const oppPing = vsIsHost ? d.guestPing : d.hostPing;
+                if (oppPing && Date.now() - oppPing > 15000) { vsEnd('leave-win'); return; }
             }
-        }
-
-        function vsOnLeave(key) {
-            if (vsStarted && !vsOver && key !== vsClientId) {
-                vsEnd('leave-win');
+            // 房主：對手就緒 → 開始；加入者：房主開始 → 進入畫面
+            if (!vsStarted) {
+                if (vsIsHost && d.status === 'ready') {
+                    vsOppName = d.guestName || '對手';
+                    vsBegin();
+                } else if (!vsIsHost && d.status === 'playing') {
+                    vsOppName = d.hostName || '對手';
+                    vsBeginLocal();
+                }
             }
+            if (vsOver || !vsStarted) return;
+            // 加入者：新題目到了
+            if (!vsIsHost && d.q && d.round > vsRound) vsOnQ(d.q);
+            // 血量同步：我方血量減少 → 特效＋公布正確答案；顯示永遠跟著文件校準
+            const docMyHp = Math.max(0, d[vsIsHost ? 'hostHp' : 'guestHp'] || 0);
+            const docOppHp = Math.max(0, d[vsIsHost ? 'guestHp' : 'hostHp'] || 0);
+            if (docMyHp < vsMyHp) {
+                vsMyHp = docMyHp;
+                vsTaken++;
+                vsTakeHitFx();
+                if (!vsMyAnswered && !vsRevealed) vsRevealAnswer();
+            }
+            vsOppHp = docOppHp;
+            gameState.lives = vsMyHp; // 愛心與戰艦血條的顯示來源
+            updateGameUI();
+            // 對手作答追蹤（房主用來排程跳題）
+            const oppOk = vsIsHost ? d.guestOk : d.hostOk;
+            if (oppOk !== null && oppOk !== undefined && !vsOppAnswered) {
+                vsOppAnswered = true;
+                if (oppOk && vsIsHost) vsScheduleAdvance(3000);
+            }
+            if (vsIsHost) vsHostCheckAdvance();
+            // 血量歸零判定
+            vsCheckEnd();
         }
 
+        // 共用：進入對戰畫面（房主、加入者各自呼叫）
+        function vsBeginLocal() {
+            vsStarted = true;
+            vsRound = 0;
+            gameState.answersLog = [];
+            gameState.player = {
+                className: (document.getElementById('inputClass').value || '').trim() || '訪客',
+                seat: (document.getElementById('inputSeat').value || '').trim(),
+                name: vsMyName
+            };
+            vsMyHp = 5;
+            vsOppHp = 5;
+            vsHits = 0;
+            vsTaken = 0;
+            vsCorrect = 0;
+            vsTotal = 0;
+            gameState.mode = 'versus';
+            gameState.lives = 5;
+            gameState.challengeMode = false;
+            showScreen('gameScreen');
+            vsSetupArena();
+            updateGameUI();
+            startBgm();
+        }
+
+        // 房主：對手就緒，開始並於 1 秒後出第一題
         function vsBegin() {
-            vsStarted = true;
-            vsRound = 0;
-            gameState.answersLog = [];
-            gameState.player = {
-                className: (document.getElementById('inputClass').value || '').trim() || '訪客',
-                seat: (document.getElementById('inputSeat').value || '').trim(),
-                name: vsMyName
-            };
-            vsMyHp = 5;
-            vsOppHp = 5;
-            vsHits = 0;
-            vsTaken = 0;
-            vsCorrect = 0;
-            vsTotal = 0;
-            gameState.mode = 'versus';
-            gameState.lives = 5;
-            gameState.challengeMode = false;
-            showScreen('gameScreen');
-            vsSetupArena();
-            updateGameUI();
-            startBgm();
-            vsChannel.send({ type: 'broadcast', event: 'start', payload: { host: vsMyName, guest: vsOppName } });
+            vsBeginLocal();
+            const ref = vsRef();
+            if (ref) ref.update({ status: 'playing' }).catch(() => {});
             setTimeout(() => { if (!vsOver) vsNextRound(); }, 1000);
-        }
-
-        function vsOnStart(payload) {
-            if (vsIsHost || vsStarted) return;
-            vsOppName = (payload && payload.host) || '對手';
-            vsStarted = true;
-            vsRound = 0;
-            gameState.answersLog = [];
-            gameState.player = {
-                className: (document.getElementById('inputClass').value || '').trim() || '訪客',
-                seat: (document.getElementById('inputSeat').value || '').trim(),
-                name: vsMyName
-            };
-            vsMyHp = 5;
-            vsOppHp = 5;
-            vsHits = 0;
-            vsTaken = 0;
-            vsCorrect = 0;
-            vsTotal = 0;
-            gameState.mode = 'versus';
-            gameState.lives = 5;
-            gameState.challengeMode = false;
-            showScreen('gameScreen');
-            vsSetupArena();
-            updateGameUI();
-            startBgm();
         }
 
         function vsSetupArena() {
@@ -1987,7 +2057,10 @@
             const p = vsMakePayload();
             p.n = vsRound;
             vsRender(p);
-            vsChannel.send({ type: 'broadcast', event: 'q', payload: p });
+            const ref = vsRef();
+            if (ref) {
+                ref.update({ round: vsRound, q: p, hostOk: null, guestOk: null }).catch((e) => console.warn('出題同步失敗', e));
+            }
             clearTimeout(vsRoundTimer);
             vsRoundTimer = setTimeout(() => { if (!vsOver) vsNextRound(); }, 30000);
         }
@@ -1996,9 +2069,12 @@
             if (!p || vsOver || !vsStarted) return;
             if (p.n <= vsRound) return;
             vsRound = p.n;
+            vsAdvancing = false;
             vsMyAnswered = false;
+            vsOppAnswered = false;
             vsRevealed = false;
             vsRender(p);
+            clearTimeout(vsRoundTimer);
         }
 
         function vsRender(p) {
@@ -2039,7 +2115,6 @@
                 btn.classList.add('correct');
                 vsCorrect++;
                 vsHits++;
-                vsOppHp = Math.max(vsOppHp - 1, 0);
                 vsHitOpponentFx();
                 feedback.textContent = '✅ 命中對手！準備跳下一題…';
                 feedback.className = 'feedback correct';
@@ -2054,35 +2129,20 @@
                 feedback.className = 'feedback wrong';
             }
             updateGameUI();
-            if (vsChannel) vsChannel.send({ type: 'broadcast', event: 'ans', payload: { n: vsRound, ok: ok } });
-            if (vsIsHost) {
-                if (ok) vsScheduleAdvance(3000);
-                vsHostCheckAdvance();
+            // 我的作答寫入房間文件；答對時同步扣對手一滴血
+            const ref = vsRef();
+            if (ref) {
+                const upd = {};
+                upd[vsIsHost ? 'hostOk' : 'guestOk'] = ok;
+                if (ok) upd[vsIsHost ? 'guestHp' : 'hostHp'] = firebase.firestore.FieldValue.increment(-1);
+                ref.update(upd).catch((e) => console.warn('作答同步失敗', e));
             }
-            vsCheckEnd();
-        }
-
-        function vsOnAns(payload) {
-            if (!payload || vsOver || !vsStarted) return;
-            if (payload.n !== vsRound) return;
-            if (payload.ok) {
-                vsDamageMe();
-                if (!vsMyAnswered) vsRevealAnswer();
-                if (vsIsHost) vsScheduleAdvance(3000);
+            if (vsIsHost && ok) vsScheduleAdvance(3000);
+            // 本機先扣對手血並即時判定（對手畫面經 Firestore 快照同步）
+            if (ok) {
+                vsOppHp = Math.max(vsOppHp - 1, 0);
+                vsCheckEnd();
             }
-            if (vsIsHost) {
-                vsOppAnswered = true;
-                vsHostCheckAdvance();
-            }
-        }
-
-        function vsDamageMe() {
-            vsMyHp = Math.max(vsMyHp - 1, 0);
-            gameState.lives = vsMyHp; // 同步顯示用血量，否則愛心與戰艦血條永遠不掉
-            vsTaken++;
-            vsTakeHitFx();
-            updateGameUI();
-            vsCheckEnd();
         }
 
         // 排程跳下一題：有人答對就加速跳題，避免重複排程
@@ -2118,17 +2178,14 @@
             else if (vsMyHp <= 0) vsEnd('lose');
         }
 
-        function vsOnOver() {
-            if (vsOver) return;
-            vsCheckEnd();
-        }
-
         function vsEnd(result) {
             if (vsOver) return;
             vsOver = true;
             clearTimeout(vsRoundTimer);
             clearTimeout(vsAdvanceTimer);
-            if (vsChannel) vsChannel.send({ type: 'broadcast', event: 'over', payload: {} });
+            if (vsHeartbeatTimer) { clearInterval(vsHeartbeatTimer); vsHeartbeatTimer = null; }
+            const ref = vsRef();
+            if (ref) ref.update({ status: 'over' }).catch(() => {});
             const titles = { win: '🏆 勝利！', lose: '😵 落敗…', draw: '🤝 平手！', 'leave-win': '🏆 對方離線，你獲勝！' };
             document.getElementById('resultTitle').textContent = titles[result] || '🏁 對戰結束';
             document.getElementById('starsEarned').style.display = 'none';
@@ -2193,14 +2250,13 @@
         function vsCleanup() {
             clearTimeout(vsRoundTimer);
             clearTimeout(vsAdvanceTimer);
-            if (vsChannel) {
-                try { vsChannel.unsubscribe(); } catch (e) {}
-                vsChannel = null;
-            }
+            if (vsHeartbeatTimer) { clearInterval(vsHeartbeatTimer); vsHeartbeatTimer = null; }
+            if (vsUnsub) { try { vsUnsub(); } catch (e) {} vsUnsub = null; }
+            vsJoined = false;
             vsStarted = false;
         }
 
-        // ===== Supabase 成績上傳 + 教師後台 =====
+        // ===== Firestore 成績上傳 + 教師後台 =====
         const stripHtml = (h) => {
             const d = document.createElement('div');
             d.innerHTML = h;
@@ -2247,13 +2303,10 @@
         }
 
         function submitRecord(accuracy) {
-            // 尚未設定金鑰時跳過上傳
-            if (!SUPABASE_URL.startsWith('http') || SUPABASE_ANON_KEY.length < 20) {
-                console.log('尚未設定 Supabase 金鑰，跳過成績上傳');
-                return;
-            }
+            const db = fsDb();
+            if (!db) { console.log('Firebase 未載入，跳過成績上傳'); return; }
             const p = gameState.player || {};
-            const record = {
+            db.collection(SCI_RECORDS).add({
                 class_name: p.className || '',
                 seat_no: p.seat || '',
                 student_name: p.name || '',
@@ -2263,31 +2316,18 @@
                 total_count: gameState.questionIndex,
                 accuracy: accuracy,
                 max_combo: gameState.maxCombo,
-                answers: gameState.answersLog
-            };
-            fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}`, {
-                method: 'POST',
-                headers: {
-                    'apikey': SUPABASE_ANON_KEY,
-                    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'return=minimal'
-                },
-                body: JSON.stringify(record)
-            }).then(res => {
-                if (!res.ok) console.warn('成績上傳失敗', res.status);
+                answers: gameState.answersLog,
+                played_at: new Date().toISOString()
             }).catch(err => console.warn('成績上傳失敗', err));
         }
 
         // 對戰成績上傳（level 記為雙人對戰，只含錯題明細；排行榜會排除，不列入）
         function submitVersusRecord() {
-            if (!SUPABASE_URL.startsWith('http') || SUPABASE_ANON_KEY.length < 20) {
-                console.log('尚未設定 Supabase 金鑰，跳過成績上傳');
-                return;
-            }
+            const db = fsDb();
+            if (!db) { console.log('Firebase 未載入，跳過成績上傳'); return; }
             const p = gameState.player || {};
             const acc = vsTotal ? Math.round(vsCorrect / vsTotal * 100) : 0;
-            const record = {
+            db.collection(SCI_RECORDS).add({
                 class_name: p.className || '訪客',
                 seat_no: p.seat || '',
                 student_name: p.name || vsMyName,
@@ -2297,19 +2337,8 @@
                 total_count: vsTotal,
                 accuracy: acc,
                 max_combo: vsHits,
-                answers: gameState.answersLog
-            };
-            fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}`, {
-                method: 'POST',
-                headers: {
-                    'apikey': SUPABASE_ANON_KEY,
-                    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'return=minimal'
-                },
-                body: JSON.stringify(record)
-            }).then(res => {
-                if (!res.ok) console.warn('對戰成績上傳失敗', res.status);
+                answers: gameState.answersLog,
+                played_at: new Date().toISOString()
             }).catch(err => console.warn('對戰成績上傳失敗', err));
         }
 
@@ -2752,7 +2781,7 @@
 
             saveGameData();
 
-            // 上傳成績到 Supabase（含每題作答明細）
+            // 上傳成績到 Firestore（含每題作答明細）
             submitRecord(accuracy);
 
             // 顯示結果
