@@ -2457,47 +2457,65 @@
       cowherdBox.innerHTML = getCowherdSVG('walk');
       weaverBox.innerHTML = getWeaverGirlSVG('walk');
       
-      let step = 0;
-      let walkSteps = fromCenter ? 0 : 45; // walk to cliff
-      let fallSteps = 45; // fall down
-      let totalSteps = walkSteps + fallSteps;
+      let startTime = null;
+      const walkTime = 1065; // 走到一半的時間（速度與成功過橋一致：2130ms * 0.5）
+      const fallTime = 900;  // 跌落銀河的時間
+      const totalDuration = walkTime + fallTime;
+      let lastParticleTime = 0;
 
-      function fallFrame() {
+      function fallFrame(timestamp) {
         if (gameState !== 'falling') {
           fallAnimId = null;
           return;
         }
-        if (step <= totalSteps) {
-          if (step <= walkSteps) {
-            let t = step / walkSteps;
-            let leftC = 12 + t * (22 - 12);
-            let leftW = 88 - t * (88 - 78);
-            cowherdBox.style.left = `${leftC}%`;
-            weaverBox.style.left = `${leftW}%`;
-            cowherdBox.style.bottom = `30%`;
-            weaverBox.style.bottom = `30%`;
-          } else {
-            let t = (step - walkSteps) / fallSteps;
-            let startC = fromCenter ? 48 : 22;
-            let startW = fromCenter ? 52 : 78;
-            let leftC = startC + t * 4;
-            let leftW = startW - t * 4;
-            let bottomVal = 30 - t * 50;
+        if (!startTime) startTime = timestamp;
+        let elapsed = timestamp - startTime;
 
-            cowherdBox.style.left = `${leftC}%`;
-            cowherdBox.style.bottom = `${bottomVal}%`;
-            cowherdBox.style.transform = `translateX(-50%) rotate(${t * 180}deg)`;
+        if (elapsed <= walkTime) {
+          // 前半段：用與成功完全相同的速度慢步走到一半
+          let tWalk = elapsed / 2130; // tWalk 從 0 到 0.5 (走到一半)
+          let leftC = 12 + tWalk * (48 - 12); // 從 12% 走到 30%
+          let leftW = 88 - tWalk * (88 - 52); // 從 88% 走到 70%
 
-            weaverBox.style.left = `${leftW}%`;
-            weaverBox.style.bottom = `${bottomVal}%`;
-            weaverBox.style.transform = `translateX(-50%) rotate(${-t * 180}deg)`;
-            
-            if (step % 5 === 0) {
-              createExplosion(cowherdBox.getBoundingClientRect());
-              createExplosion(weaverBox.getBoundingClientRect());
-            }
+          cowherdBox.style.left = `${leftC}%`;
+          cowherdBox.style.bottom = `30%`;
+          cowherdBox.style.transform = '';
+
+          weaverBox.style.left = `${leftW}%`;
+          weaverBox.style.bottom = `30%`;
+          weaverBox.style.transform = '';
+
+          if (elapsed - lastParticleTime >= 60) {
+            lastParticleTime = elapsed;
+            createExplosion(cowherdBox.getBoundingClientRect());
+            createExplosion(weaverBox.getBoundingClientRect());
           }
-          step++;
+        } else if (elapsed <= totalDuration) {
+          // 後半段：走到一半失足墜河
+          let tFall = Math.min(1, (elapsed - walkTime) / fallTime);
+          let startC = 12 + 0.5 * (48 - 12); // 30%
+          let startW = 88 - 0.5 * (88 - 52); // 70%
+
+          let leftC = startC + tFall * 3;
+          let leftW = startW - tFall * 3;
+          let bottomVal = 30 - tFall * 50;
+
+          cowherdBox.style.left = `${leftC}%`;
+          cowherdBox.style.bottom = `${bottomVal}%`;
+          cowherdBox.style.transform = `translateX(-50%) rotate(${tFall * 180}deg)`;
+
+          weaverBox.style.left = `${leftW}%`;
+          weaverBox.style.bottom = `${bottomVal}%`;
+          weaverBox.style.transform = `translateX(-50%) rotate(${-tFall * 180}deg)`;
+
+          if (elapsed - lastParticleTime >= 70) {
+            lastParticleTime = elapsed;
+            createExplosion(cowherdBox.getBoundingClientRect());
+            createExplosion(weaverBox.getBoundingClientRect());
+          }
+        }
+
+        if (elapsed < totalDuration) {
           fallAnimId = requestAnimationFrame(fallFrame);
         } else {
           fallAnimId = null;
