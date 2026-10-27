@@ -1952,19 +1952,19 @@
         this.x = startX;
         this.y = startY;
         this.progress = 0;
-        this.speed = 0.025 + Math.random() * 0.025;
+        this.duration = 1.6 + Math.random() * 0.4; // 1.6 ~ 2.0 秒飛行時間，平緩優雅
         this.angle = 0;
         this.wingFlap = Math.random() * 10;
         this.settled = false;
         this.scale = 0.6 + Math.random() * 0.4;
       }
 
-      update() {
+      update(dt = 0.016) {
         if (this.settled) {
-          this.wingFlap += 0.2;
+          this.wingFlap += dt * 10;
           return;
         }
-        this.progress += this.speed;
+        this.progress += dt / this.duration;
         if (this.progress >= 1) {
           this.progress = 1;
           this.settled = true;
@@ -1975,7 +1975,7 @@
           let t = this.progress;
           this.x = this.startX + t * (this.targetX - this.startX);
           this.y = this.startY + t * (this.targetY - this.startY) - Math.sin(t * Math.PI) * 120;
-          this.wingFlap += 0.45;
+          this.wingFlap += dt * 18;
         }
       }
 
@@ -2141,7 +2141,7 @@
       weaverBox.innerHTML = getWeaverGirlSVG('walk');
       
       let startTime = null;
-      let walkDuration = 5500; // 5.5 秒慢速漫步鵲橋
+      let walkDuration = 3200; // 3.2 秒適中舒適的過橋相會速度
       let lastParticleTime = 0;
 
       function walkFrame(timestamp) {
@@ -2165,7 +2165,7 @@
         weaverBox.style.left = `${leftW}%`;
         weaverBox.style.bottom = `${bottomW}%`;
 
-        if (elapsed - lastParticleTime >= 120 && !questionHadMistake) {
+        if (elapsed - lastParticleTime >= 90 && !questionHadMistake) {
           lastParticleTime = elapsed;
           createExplosion(cowherdBox.getBoundingClientRect());
           createExplosion(weaverBox.getBoundingClientRect());
@@ -2205,7 +2205,7 @@
             }, i * 150);
           }
 
-          setGameTimeout(showClearScreen, 1500);
+          setGameTimeout(showClearScreen, 1200);
         }
       }
       walkAnimId = requestAnimationFrame(walkFrame);
@@ -2558,12 +2558,19 @@
       }
     }
 
-    function animateParticles() {
+    let lastAnimTimestamp = null;
+    function animateParticles(timestamp) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
+      let dt = 0.016;
+      if (timestamp && lastAnimTimestamp) {
+        dt = Math.min((timestamp - lastAnimTimestamp) / 1000, 0.05);
+      }
+      lastAnimTimestamp = timestamp;
+
       // Update and draw magpies
       magpies.forEach(m => {
-        m.update();
+        m.update(dt);
         m.draw(ctx);
       });
       
