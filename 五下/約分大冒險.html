@@ -339,54 +339,88 @@
             cursor: pointer;
         }
 
-        /* 拔河遊戲專屬樣式 */
-        .tug-track {
+        /* 連線對戰 (知識王模式) 專屬樣式 */
+        .vs-battle-arena {
             position: relative;
-            background: radial-gradient(ellipse at center, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
-            border: 2px solid rgba(250, 204, 21, 0.3);
+            background: radial-gradient(ellipse at center, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98));
+            border: 2px solid rgba(250, 204, 21, 0.35);
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+        .vs-sidebar {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            padding: 0.75rem 0.5rem;
+            min-width: 90px;
+        }
+        .vs-bar-container {
+            position: relative;
+            width: 28px;
+            height: 110px;
+            background: rgba(15, 23, 42, 0.85);
             border-radius: 9999px;
-            box-shadow: inset 0 2px 8px rgba(0,0,0,0.6), 0 0 20px rgba(0,0,0,0.5);
+            border: 2px solid rgba(255, 255, 255, 0.15);
             overflow: hidden;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.6);
+            display: flex;
+            align-items: flex-end;
         }
-        .tug-rope-body {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 160%;
-            height: 14px;
-            margin-left: -80%;
-            margin-top: -7px;
-            background: repeating-linear-gradient(45deg, #b45309, #b45309 6px, #78350f 6px, #78350f 12px);
-            border-radius: 7px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
-            transition: transform 0.65s cubic-bezier(0.34, 1.56, 0.64, 1);
+        .vs-bar-fill {
+            width: 100%;
+            border-radius: 9999px;
+            transition: height 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-        .tug-ribbon {
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: radial-gradient(circle, #ef4444 0%, #b91c1c 100%);
-            border: 3px solid #fde047;
-            box-shadow: 0 0 15px rgba(239, 68, 68, 0.9), 0 0 25px rgba(250, 204, 21, 0.6);
+        .vs-bar-p1 {
+            background: linear-gradient(to top, #2563eb, #38bdf8, #67e8f9);
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
+        }
+        .vs-bar-p2 {
+            background: linear-gradient(to top, #dc2626, #f87171, #fca5a5);
+            box-shadow: 0 0 12px rgba(248, 113, 113, 0.6);
+        }
+        .vs-timer-circle {
+            position: relative;
+            width: 76px;
+            height: 76px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #fef08a;
-            font-size: 13px;
-            z-index: 10;
         }
-        .tug-shake {
-            animation: tugShake 0.4s ease-in-out;
+        .vs-timer-circle svg {
+            transform: rotate(-90deg);
         }
-        @keyframes tugShake {
-            0%, 100% { transform: translateY(0); }
-            25% { transform: translateY(-3px) rotate(1deg); }
-            50% { transform: translateY(3px) rotate(-1deg); }
-            75% { transform: translateY(-2px); }
+        .vs-timer-text {
+            position: absolute;
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: #fde047;
+            font-family: monospace;
+            text-shadow: 0 0 10px rgba(250, 204, 21, 0.5);
+        }
+        .vs-timer-text.danger {
+            color: #ef4444;
+            animation: pulseFast 0.5s infinite;
+        }
+        @keyframes pulseFast {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.18); }
+        }
+        .vs-float-score {
+            font-size: 1.4rem;
+            font-weight: 900;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            animation: floatUp 1.2s ease-out forwards;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+        }
+        @keyframes floatUp {
+            0% { opacity: 0; transform: translate(-50%, 0) scale(0.6); }
+            20% { opacity: 1; transform: translate(-50%, -15px) scale(1.2); }
+            80% { opacity: 1; transform: translate(-50%, -35px) scale(1.0); }
+            100% { opacity: 0; transform: translate(-50%, -50px) scale(0.8); }
         }
         .radar-pulse {
             animation: radarPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
@@ -395,13 +429,7 @@
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.6; transform: scale(1.08); }
         }
-        .star-filled {
-            color: #facc15 !important;
-            filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.9));
-            transform: scale(1.15);
-        }
-
-    </style>
+</style>
 </head>
 <body class="flex flex-col items-center justify-center p-4 relative">
     
@@ -454,13 +482,13 @@
             </div>
         </div>
 
-        <!-- 主選單模式切換 (單人闖關 vs 雙人拔河對戰) -->
+        <!-- 主選單模式切換 (單人闖關 vs 連線對戰) -->
         <div class="flex bg-slate-950/80 p-1.5 rounded-2xl border border-white/10 text-base font-black">
             <button id="tabModeSingle" type="button" onclick="switchMainTab('single')" class="flex-1 py-3 rounded-xl transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 shadow-lg font-black">
                 <i class="fa-solid fa-user"></i> 🎮 單人闖關
             </button>
             <button id="tabModeVersus" type="button" onclick="switchMainTab('versus')" class="flex-1 py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-slate-400 hover:text-white font-black">
-                <i class="fa-solid fa-people-arrows"></i> ⚔️ 雙人拔河對戰
+                <i class="fa-solid fa-bolt"></i> ⚔️ 連線對戰
             </button>
         </div>
 
@@ -504,7 +532,7 @@
                 </div>
             </button>
 
-            <!-- 雙人拔河對戰超顯眼大卡片 -->
+            <!-- 連線對戰超顯眼大卡片 -->
             <button onclick="switchMainTab('versus')" class="btn-game w-full p-6 rounded-2xl border-2 border-red-500/60 bg-gradient-to-r from-red-600/30 via-amber-600/25 to-yellow-600/30 hover:from-red-600/45 hover:to-yellow-600/40 transition-all text-left shadow-2xl group hover:scale-[1.02] relative overflow-hidden">
                 <div class="flex items-center justify-between relative z-10">
                     <div class="flex items-center gap-4">
@@ -513,10 +541,10 @@
                         </span>
                         <div>
                             <div class="flex items-center gap-2">
-                                <h3 class="text-3xl font-black text-white group-hover:text-yellow-300 transition-colors">雙人拔河對戰</h3>
+                                <h3 class="text-3xl font-black text-white group-hover:text-yellow-300 transition-colors">連線對戰</h3>
                                 <span class="bg-red-500 text-white text-xs px-2.5 py-0.5 rounded-full font-black animate-pulse">HOT 新功能</span>
                             </div>
-                            <span class="text-base font-extrabold text-amber-300">開房連線搶答 · 乘法/除法可選 · 先搶 5 題獲勝！</span>
+                            <span class="text-base font-extrabold text-amber-300">120 秒知識王模式 · 乘法/除法可選 · 越快答分數加乘越高！</span>
                         </div>
                     </div>
                     <span class="text-2xl text-yellow-400 font-black">
@@ -551,55 +579,46 @@
         </div>
         <!-- 單人模式區塊結束 -->
 
-        <!-- ================== 雙人拔河對戰面板 ================== -->
+        <!-- ================== 連線對戰面板 ================== -->
         <div id="versusSection" class="space-y-6 hidden pt-1">
             <div class="flex items-center justify-between pb-1">
                 <button type="button" onclick="switchMainTab('single')" class="bg-slate-800/90 hover:bg-slate-700 text-slate-300 px-3.5 py-1.5 rounded-xl flex items-center gap-2 text-xs font-bold transition-all border border-white/10 hover:scale-105">
                     <i class="fa-solid fa-arrow-left"></i> 回單人選單
                 </button>
                 <span class="text-xs px-3 py-1 rounded-full font-black bg-red-500/20 text-red-300 border border-red-500/40">
-                    <i class="fa-solid fa-bolt mr-1"></i> 即時雙人拔河對戰
+                    <i class="fa-solid fa-bolt mr-1"></i> 即時連線對戰 (知識王風格)
                 </span>
             </div>
-            <!-- 步驟 1: 選擇對戰單元 -->
-            <div class="bg-slate-950/70 border border-white/10 rounded-2xl p-4 text-left space-y-2">
-                <div class="text-xs text-amber-300 font-extrabold flex items-center gap-1.5">
-                    <i class="fa-solid fa-book-open"></i> 1. 選擇對戰單元
+            <!-- 選擇對戰關卡 (乘法篇 vs 除法篇，難度全隨機) -->
+            <div class="bg-slate-950/70 border border-white/10 rounded-2xl p-4 text-left space-y-2.5">
+                <div class="flex items-center justify-between text-xs text-amber-300 font-extrabold">
+                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-book-open"></i> 選擇對戰關卡</span>
+                    <span class="text-slate-400 font-bold">（🎲 題目難度隨機）</span>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
-                    <button id="vsUnitMul" type="button" onclick="setVersusUnit('mul')" class="p-3.5 rounded-xl border-2 border-amber-500 bg-amber-500/20 text-amber-300 font-black text-base flex items-center justify-center gap-2 transition-all shadow-md">
-                        <i class="fa-solid fa-square-xmark text-xl"></i> 分數乘法篇
+                    <button id="vsUnitMul" type="button" onclick="setVersusUnit('mul')" class="p-4 rounded-xl border-2 border-amber-500 bg-amber-500/20 text-amber-300 font-black text-base flex flex-col sm:flex-row items-center justify-center gap-2 transition-all shadow-md">
+                        <i class="fa-solid fa-square-xmark text-2xl"></i>
+                        <span class="text-center sm:text-left">
+                            <span class="block">分數乘法篇</span>
+                            <span class="text-xs text-amber-400 font-extrabold">五年級下學期</span>
+                        </span>
                     </button>
-                    <button id="vsUnitDiv" type="button" onclick="setVersusUnit('div')" class="p-3.5 rounded-xl border-2 border-white/10 bg-slate-900 text-slate-400 hover:text-white font-black text-base flex items-center justify-center gap-2 transition-all">
-                        <i class="fa-solid fa-divide text-xl"></i> 分數除法篇
-                    </button>
-                </div>
-            </div>
-
-            <!-- 步驟 2: 選擇對戰難度 -->
-            <div class="bg-slate-950/70 border border-white/10 rounded-2xl p-4 text-left space-y-2">
-                <div class="text-xs text-amber-300 font-extrabold flex items-center gap-1.5">
-                    <i class="fa-solid fa-sliders"></i> 2. 選擇題目難度
-                </div>
-                <div class="grid grid-cols-3 gap-2">
-                    <button id="vsDiffEasy" type="button" onclick="setVersusDiff('easy')" class="py-2.5 rounded-xl border border-white/10 text-slate-400 hover:text-white font-black text-sm transition-all">
-                        🌱 簡單
-                    </button>
-                    <button id="vsDiffNormal" type="button" onclick="setVersusDiff('normal')" class="py-2.5 rounded-xl border-2 border-amber-500 bg-amber-500/20 text-amber-300 font-black text-sm transition-all shadow-md">
-                        ⭐ 普通
-                    </button>
-                    <button id="vsDiffHard" type="button" onclick="setVersusDiff('hard')" class="py-2.5 rounded-xl border border-white/10 text-slate-400 hover:text-white font-black text-sm transition-all">
-                        🔥 困難
+                    <button id="vsUnitDiv" type="button" onclick="setVersusUnit('div')" class="p-4 rounded-xl border-2 border-white/10 bg-slate-900 text-slate-400 hover:text-white font-black text-base flex flex-col sm:flex-row items-center justify-center gap-2 transition-all">
+                        <i class="fa-solid fa-divide text-2xl"></i>
+                        <span class="text-center sm:text-left">
+                            <span class="block">分數除法篇</span>
+                            <span class="text-xs text-blue-400 font-extrabold">六年級上學期</span>
+                        </span>
                     </button>
                 </div>
             </div>
 
-            <!-- 步驟 3: 開房 / 加入房間操作 -->
+            <!-- 對戰操作 (開房間 / 輸入房號加入) -->
             <div id="vsLobbyActions" class="space-y-4">
                 <!-- 創建房間大按鈕 -->
                 <button type="button" onclick="createVersusRoom()" class="btn-game w-full p-4.5 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xl shadow-xl flex items-center justify-center gap-3 transition-transform hover:scale-[1.02]">
                     <i class="fa-solid fa-plus-circle text-2xl"></i>
-                    <span>創建拔河房間 (我是房主)</span>
+                    <span>創建對戰房間 (我是房主)</span>
                 </button>
 
                 <!-- 分隔線 -->
@@ -620,7 +639,7 @@
                 <!-- 單機練習按鈕 -->
                 <div class="pt-1">
                     <button type="button" onclick="startBotVersus()" class="w-full py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-amber-300 border border-white/10 text-xs font-bold transition-all flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-robot text-sm"></i> 找不到對手？立即與電腦進行拔河搶答練習
+                        <i class="fa-solid fa-robot text-sm"></i> 找不到對手？立即與電腦進行 120 秒連線搶答練習
                     </button>
                 </div>
             </div>
@@ -733,95 +752,71 @@
         </div>
 
         <!-- 遊戲主對戰卡片 -->
-                <!-- ================== 雙人拔河競技場專屬面板 (對戰時顯示) ================== -->
-        <div id="versusTugArena" class="w-full glass-panel rounded-2xl p-4 md:p-5 mb-2 border border-amber-500/30 shadow-2xl relative overflow-hidden hidden">
-            <!-- 雙方資訊與目標 -->
-            <div class="flex items-center justify-between gap-2 mb-2">
-                <!-- 藍隊 (我方/房主) -->
-                <div class="flex items-center gap-2.5">
-                    <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-blue-500/20 border-2 border-blue-400 flex items-center justify-center text-xl md:text-2xl text-blue-300 shadow">
-                        <i class="fa-solid fa-person-running -scale-x-100"></i>
+                <!-- ================== 連線對戰競技場專屬面板 (知識王風格) ================== -->
+        <div id="versusTugArena" class="w-full vs-battle-arena p-4 md:p-5 mb-2 relative overflow-hidden hidden">
+            <!-- 左右側欄比分/長條圖與頂部倒數資訊 -->
+            <div class="flex items-center justify-between gap-3">
+                <!-- 左側欄：藍隊 (我方/房主) -->
+                <div class="vs-sidebar text-left">
+                    <div class="flex items-center gap-1.5 mb-1">
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/30 text-blue-200 font-black border border-blue-400/40">藍隊 (我方)</span>
                     </div>
-                    <div class="text-left">
-                        <div class="flex items-center gap-1.5">
-                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/30 text-blue-200 font-black">藍隊</span>
-                            <span id="vsPlayer1Name" class="text-white font-black text-sm md:text-base truncate max-w-[110px] md:max-w-[150px]">我方</span>
+                    <span id="vsPlayer1Name" class="text-white font-black text-sm md:text-base truncate max-w-[100px] md:max-w-[140px] block mb-1">我方</span>
+                    
+                    <!-- 垂直長條圖與分數數值 -->
+                    <div class="flex items-end gap-2.5 mt-1">
+                        <div class="vs-bar-container" title="藍隊得分長條圖">
+                            <div id="vsBar1" class="vs-bar-fill vs-bar-p1" style="height: 0%;"></div>
                         </div>
-                        <div id="vsPlayer1Stars" class="flex gap-1 mt-1 text-base md:text-lg text-slate-600">
-                            <i class="fa-solid fa-star"></i>
-                            <i class="fa-solid fa-star"></i>
-                            <i class="fa-solid fa-star"></i>
-                            <i class="fa-solid fa-star"></i>
-                            <i class="fa-solid fa-star"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 中間拔河目標 -->
-                <div class="text-center px-2 py-1 bg-black/50 rounded-xl border border-white/10 shrink-0">
-                    <div class="text-[10px] font-black tracking-wider text-amber-400 uppercase">⚡ 拔河爭霸賽 ⚡</div>
-                    <div class="text-xs md:text-sm font-black text-white">先搶 <span class="text-yellow-400 text-base md:text-lg font-black">5 題</span> 獲勝</div>
-                    <div id="vsRoundBadge" class="text-[10px] text-slate-400 font-bold">第 1 題搶答中</div>
-                </div>
-
-                <!-- 紅隊 (客端/對手) -->
-                <div class="flex items-center gap-2.5 flex-row-reverse text-right">
-                    <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-red-500/20 border-2 border-red-400 flex items-center justify-center text-xl md:text-2xl text-red-300 shadow">
-                        <i class="fa-solid fa-person-running"></i>
-                    </div>
-                    <div>
-                        <div class="flex items-center gap-1.5 justify-end">
-                            <span id="vsPlayer2Name" class="text-white font-black text-sm md:text-base truncate max-w-[110px] md:max-w-[150px]">對手</span>
-                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-red-500/30 text-red-200 font-black">紅隊</span>
-                        </div>
-                        <div id="vsPlayer2Stars" class="flex gap-1 mt-1 text-base md:text-lg text-slate-600 justify-end">
-                            <i class="fa-solid fa-star"></i>
-                            <i class="fa-solid fa-star"></i>
-                            <i class="fa-solid fa-star"></i>
-                            <i class="fa-solid fa-star"></i>
-                            <i class="fa-solid fa-star"></i>
+                        <div class="flex flex-col items-start">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Score</span>
+                            <span id="vsScore1" class="text-3xl md:text-4xl font-black text-blue-300 font-mono tracking-tight">0</span>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- 拔河繩軌道 -->
-            <div class="relative w-full py-2 select-none">
-                <div class="tug-track relative w-full h-8 flex items-center justify-between px-4">
-                    <!-- 左勝界線 -->
-                    <div class="absolute left-4 top-0 bottom-0 w-0.5 bg-blue-500/60 z-0"></div>
-                    <!-- 中線 -->
-                    <div class="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-1 bg-yellow-400 z-0 shadow-[0_0_8px_rgba(250,204,21,0.8)]"></div>
-                    <!-- 右勝界線 -->
-                    <div class="absolute right-4 top-0 bottom-0 w-0.5 bg-red-500/60 z-0"></div>
-
-                    <!-- 刻度 -->
-                    <div class="w-full flex justify-between z-0 opacity-40 text-[9px] md:text-[10px] font-bold text-slate-300 px-6">
-                        <span>◀ 5</span>
-                        <span>4</span>
-                        <span>3</span>
-                        <span>2</span>
-                        <span>1</span>
-                        <span class="text-yellow-400 font-black">0</span>
-                        <span>1</span>
-                        <span>2</span>
-                        <span>3</span>
-                        <span>4</span>
-                        <span>5 ▶</span>
+                <!-- 中間：知識王 120 秒圓形倒數與加乘資訊 -->
+                <div class="flex flex-col items-center justify-center text-center px-2 py-1 flex-1">
+                    <div class="text-[11px] font-black tracking-wider text-purple-300 uppercase mb-1">
+                        ⚡ 知識王爭霸 ⚡
                     </div>
+                    <!-- 圓形倒數計時器 (r=32, 周長 ≈ 201.06) -->
+                    <div class="vs-timer-circle my-0.5">
+                        <svg width="76" height="76">
+                            <circle cx="38" cy="38" r="32" stroke="rgba(255,255,255,0.1)" stroke-width="6" fill="transparent" />
+                            <circle id="vsTimerProgress" cx="38" cy="38" r="32" stroke="#a855f7" stroke-width="6" fill="transparent"
+                                stroke-dasharray="201.06" stroke-dashoffset="0" stroke-linecap="round"
+                                style="transition: stroke-dashoffset 1s linear, stroke 0.3s;" />
+                        </svg>
+                        <div id="vsTimerText" class="vs-timer-text">120</div>
+                    </div>
+                    <div id="vsRoundBadge" class="text-xs font-black text-yellow-300 mt-1">第 1 題搶答中</div>
+                    <div class="text-[10px] text-slate-400 font-bold hidden sm:block">答對越快 · 加乘越高 (最高 2.0 倍)</div>
+                </div>
 
-                    <!-- 拔河粗繩與紅絲帶 (transform 依比分差位移) -->
-                    <div id="tugRopeBody" class="tug-rope-body" style="transform: translateX(0%);">
-                        <div class="tug-ribbon">
-                            <i class="fa-solid fa-ribbon"></i>
+                <!-- 右側欄：紅隊 (對手/客端) -->
+                <div class="vs-sidebar text-right">
+                    <div class="flex items-center gap-1.5 mb-1 justify-end">
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-red-500/30 text-red-200 font-black border border-red-400/40">紅隊 (對手)</span>
+                    </div>
+                    <span id="vsPlayer2Name" class="text-white font-black text-sm md:text-base truncate max-w-[100px] md:max-w-[140px] block mb-1">對手</span>
+                    
+                    <!-- 垂直長條圖與分數數值 -->
+                    <div class="flex items-end gap-2.5 flex-row-reverse mt-1">
+                        <div class="vs-bar-container" title="紅隊得分長條圖">
+                            <div id="vsBar2" class="vs-bar-fill vs-bar-p2" style="height: 0%;"></div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Score</span>
+                            <span id="vsScore2" class="text-3xl md:text-4xl font-black text-red-400 font-mono tracking-tight">0</span>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- 戰況即時跑馬播報 -->
-            <div id="vsBannerText" class="mt-1 text-center text-xs md:text-sm font-black text-amber-300 h-5 flex items-center justify-center gap-1.5 transition-all">
-                <i class="fa-solid fa-bell animate-pulse text-yellow-400"></i> 請點擊第二行算式約分並計算最簡答案，搶先送出！
+            <div id="vsBannerText" class="mt-2 text-center text-xs md:text-sm font-black text-amber-300 h-5 flex items-center justify-center gap-1.5 transition-all">
+                <i class="fa-solid fa-bolt animate-pulse text-yellow-400"></i> 請點擊第二行算式約分並計算最簡答案，搶先送出得分！
             </div>
         </div>
 
@@ -1025,6 +1020,43 @@
                 </button>
                 <button onclick="backToLobby()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-4 rounded-xl font-bold text-lg transition-colors">
                     返回選單
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================== 連線對戰結算彈窗 ================== -->
+    <div id="versusGameOverModal" class="fixed inset-0 bg-black/95 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-white/10 p-8 rounded-3xl max-w-md w-full text-center shadow-2xl celebration">
+            <span id="vsWinnerIcon" class="text-7xl mb-4 block">👑</span>
+            <h2 id="vsWinnerTitle" class="text-3xl font-black text-yellow-400 mb-2">對戰結束！</h2>
+            <p id="vsWinnerSubtitle" class="text-slate-300 mb-6 font-bold text-sm">120 秒搶答結束，統計最終積分！</p>
+            
+            <!-- 比分卡片 -->
+            <div class="bg-black/50 border border-white/10 rounded-2xl p-5 mb-6">
+                <div class="text-xs text-amber-400 font-extrabold tracking-wider uppercase mb-3">⚡ 最終積分</div>
+                <div class="grid grid-cols-2 gap-4 items-end">
+                    <div class="p-3 rounded-xl bg-blue-500/20 border border-blue-500/30">
+                        <div id="vsEndP1Label" class="text-xs text-blue-300 font-bold mb-1">🔵 藍隊</div>
+                        <div id="vsEndP1Name" class="text-xs text-slate-400 font-bold mb-2 truncate">我方</div>
+                        <div id="vsEndP1Score" class="text-5xl font-black text-blue-300">0</div>
+                        <div class="text-xs text-slate-500 mt-1">分</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-red-500/20 border border-red-500/30">
+                        <div id="vsEndP2Label" class="text-xs text-red-300 font-bold mb-1">🔴 紅隊</div>
+                        <div id="vsEndP2Name" class="text-xs text-slate-400 font-bold mb-2 truncate">對手</div>
+                        <div id="vsEndP2Score" class="text-5xl font-black text-red-300">0</div>
+                        <div class="text-xs text-slate-500 mt-1">分</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex gap-4">
+                <button onclick="rematchVersus()" class="flex-1 bg-gradient-to-r from-purple-500 to-indigo-500 hover:brightness-110 text-white py-3.5 rounded-xl font-black text-base transition-all shadow-md">
+                    <i class="fa-solid fa-rotate-right mr-1"></i> 再戰一局
+                </button>
+                <button onclick="exitVersusToLobby()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-3.5 rounded-xl font-bold text-base transition-colors">
+                    返回大廳
                 </button>
             </div>
         </div>
@@ -1432,7 +1464,7 @@
         function backToLobby() {
             synth.playClick();
             if (typeof vsState !== 'undefined' && vsState.active) {
-                if (!confirm("確定要退出拔河對戰返回選單嗎？")) return;
+                if (!confirm("確定要退出連線對戰返回選單嗎？")) return;
                 exitVersusToLobby();
                 return;
             }
@@ -2752,8 +2784,12 @@
         })();
 
         // ==========================================================================
-        // 雙人拔河對戰核心模組 (Versus Tug of War Module)
+        // 連線對戰核心模組 (Versus Quiz Battle - 知識王風格)
+        // 規則：120 秒倒數，每題答對依剩餘時間加乘得分，時間結束比總積分
         // ==========================================================================
+        const VS_TOTAL_TIME = 120; // 秒
+        const VS_BASE_SCORE = 100; // 基本分
+
         let vsState = {
             active: false,
             isHost: false,
@@ -2763,19 +2799,134 @@
             myPlayerId: 'p_' + Math.random().toString(36).substring(2, 9),
             myName: '冒險者',
             opponentName: '對手',
-            selectedUnit: 'mul', // 'mul' 或 'div'
-            selectedDiff: 'normal', // 'easy', 'normal', 'hard'
-            p1Score: 0,
-            p2Score: 0,
-            targetScore: 5,
-            currentRound: 1,
-            localRound: 0,
-            roundHandled: {},
+            selectedUnit: 'mul',
+            mode: 'mul',
+            difficulty: 'random',
+            myRound: 1,
+            p1Score: 0,    // 積分
+            p2Score: 0,    // 積分
+            p1PrevScore: 0,
+            p2PrevScore: 0,
+            p1MaxScore: 0, // 本局最高積分 (用於長條圖比例)
+            p2MaxScore: 0,
             isAnswering: false,
-            botTimer: null
+            botTimer: null,
+            // 倒數計時
+            countdownSec: VS_TOTAL_TIME,
+            timerInterval: null,
+            questionStartSec: VS_TOTAL_TIME, // 本題開始時剩餘秒數
         };
 
-        // 主選單分頁切換 (單人闖關 vs 雙人拔河對戰)
+        // 隨機難度抽取函式
+        function getRandomDiff() {
+            const diffs = ['easy', 'normal', 'hard'];
+            return diffs[Math.floor(Math.random() * diffs.length)];
+        }
+
+        // 計算時間加乘分數
+        // 剩餘時間 >= 100s → ×2.0, >= 80s → ×1.8, >= 60s → ×1.5, >= 40s → ×1.3, >= 20s → ×1.1, else → ×1.0
+        function calcVsScore(remainSec) {
+            let mult;
+            if (remainSec >= 100)     mult = 2.0;
+            else if (remainSec >= 80) mult = 1.8;
+            else if (remainSec >= 60) mult = 1.5;
+            else if (remainSec >= 40) mult = 1.3;
+            else if (remainSec >= 20) mult = 1.1;
+            else                       mult = 1.0;
+            return Math.round(VS_BASE_SCORE * mult);
+        }
+
+        // 更新得分側欄長條圖與分數
+        function updateScoreBar(p1Score, p2Score) {
+            const maxScore = Math.max(800, p1Score, p2Score);
+            const p1Pct = Math.min(100, Math.round((p1Score / maxScore) * 100));
+            const p2Pct = Math.min(100, Math.round((p2Score / maxScore) * 100));
+
+            const bar1 = document.getElementById('vsBar1');
+            const bar2 = document.getElementById('vsBar2');
+            if (bar1) bar1.style.height = p1Pct + '%';
+            if (bar2) bar2.style.height = p2Pct + '%';
+
+            const s1 = document.getElementById('vsScore1');
+            const s2 = document.getElementById('vsScore2');
+            if (s1) s1.innerText = p1Score;
+            if (s2) s2.innerText = p2Score;
+        }
+
+        // 更新圓形倒數計時器 (r=32 -> 2*PI*32 ≈ 201.06)
+        function updateTimerRing(remainSec) {
+            const totalCircum = 201.06;
+            const progress = Math.max(0, remainSec / VS_TOTAL_TIME);
+            const offset = totalCircum * (1 - progress);
+            const ring = document.getElementById('vsTimerProgress');
+            const txt  = document.getElementById('vsTimerText');
+            if (ring) {
+                ring.style.strokeDashoffset = offset;
+                if (remainSec <= 30)      ring.style.stroke = '#f87171';
+                else if (remainSec <= 60) ring.style.stroke = '#fbbf24';
+                else                       ring.style.stroke = '#a855f7';
+            }
+            if (txt) {
+                txt.innerText = remainSec;
+                if (remainSec <= 10) {
+                    txt.className = 'vs-timer-text danger';
+                } else {
+                    txt.className = 'vs-timer-text';
+                }
+            }
+        }
+
+        // 啟動 120 秒倒數
+        function startVsCountdown() {
+            clearInterval(vsState.timerInterval);
+            updateTimerRing(vsState.countdownSec);
+            vsState.timerInterval = setInterval(() => {
+                if (!vsState.active) { clearInterval(vsState.timerInterval); return; }
+                vsState.countdownSec--;
+                updateTimerRing(vsState.countdownSec);
+                if (vsState.countdownSec <= 0) {
+                    clearInterval(vsState.timerInterval);
+                    // 時間到，結算
+                    handleVsTimeUp();
+                }
+            }, 1000);
+        }
+
+        // 時間到結算
+        function handleVsTimeUp() {
+            if (!vsState.active) return;
+            vsState.active = false;
+            clearTimeout(vsState.botTimer);
+
+            if (vsState.isBot) {
+                // 單機：直接顯示結算
+                const winner = vsState.p1Score >= vsState.p2Score ? 'host' : 'guest';
+                showVersusGameOver(winner, true);
+                return;
+            }
+            // 線上：通知對方時間結束
+            if (vsState.roomRef) {
+                vsState.roomRef.update({
+                    status: 'finished',
+                    finalWinner: vsState.p1Score >= vsState.p2Score ? 'host' : 'guest',
+                });
+            }
+        }
+
+        // 得分飄字
+        function spawnVsFloatScore(anchorId, text, color) {
+            const anchor = document.getElementById(anchorId);
+            if (!anchor) return;
+            const rect = anchor.getBoundingClientRect();
+            const el = document.createElement('div');
+            el.className = 'vs-float-score';
+            el.style.cssText = `left:${rect.left + rect.width/2}px; top:${rect.top}px; color:${color}; position:fixed;`;
+            el.innerText = text;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1300);
+        }
+
+        // 主選單分頁切換 (單人闖關 vs 連線對戰)
         function switchMainTab(tab) {
             synth.playClick();
             const tabSingle = document.getElementById('tabModeSingle');
@@ -2796,38 +2947,19 @@
             }
         }
 
-        // 選擇對戰單元 (乘法 vs 除法)
+        // 選擇對戰關卡 (乘法 vs 除法)
         function setVersusUnit(unit) {
             synth.playClick();
             vsState.selectedUnit = unit;
             const btnMul = document.getElementById('vsUnitMul');
             const btnDiv = document.getElementById('vsUnitDiv');
             if (unit === 'mul') {
-                if (btnMul) btnMul.className = "p-3.5 rounded-xl border-2 border-amber-500 bg-amber-500/20 text-amber-300 font-black text-base flex items-center justify-center gap-2 transition-all shadow-md";
-                if (btnDiv) btnDiv.className = "p-3.5 rounded-xl border-2 border-white/10 bg-slate-900 text-slate-400 hover:text-white font-black text-base flex items-center justify-center gap-2 transition-all";
+                if (btnMul) btnMul.className = "p-4 rounded-xl border-2 border-amber-500 bg-amber-500/20 text-amber-300 font-black text-base flex flex-col sm:flex-row items-center justify-center gap-2 transition-all shadow-md";
+                if (btnDiv) btnDiv.className = "p-4 rounded-xl border-2 border-white/10 bg-slate-900 text-slate-400 hover:text-white font-black text-base flex flex-col sm:flex-row items-center justify-center gap-2 transition-all";
             } else {
-                if (btnMul) btnMul.className = "p-3.5 rounded-xl border-2 border-white/10 bg-slate-900 text-slate-400 hover:text-white font-black text-base flex items-center justify-center gap-2 transition-all";
-                if (btnDiv) btnDiv.className = "p-3.5 rounded-xl border-2 border-blue-500 bg-blue-500/20 text-blue-300 font-black text-base flex items-center justify-center gap-2 transition-all shadow-md";
+                if (btnMul) btnMul.className = "p-4 rounded-xl border-2 border-white/10 bg-slate-900 text-slate-400 hover:text-white font-black text-base flex flex-col sm:flex-row items-center justify-center gap-2 transition-all";
+                if (btnDiv) btnDiv.className = "p-4 rounded-xl border-2 border-blue-500 bg-blue-500/20 text-blue-300 font-black text-base flex flex-col sm:flex-row items-center justify-center gap-2 transition-all shadow-md";
             }
-        }
-
-        // 選擇對戰難度 (簡單、普通、困難)
-        function setVersusDiff(diff) {
-            synth.playClick();
-            vsState.selectedDiff = diff;
-            const diffMap = {
-                'easy': document.getElementById('vsDiffEasy'),
-                'normal': document.getElementById('vsDiffNormal'),
-                'hard': document.getElementById('vsDiffHard')
-            };
-            Object.keys(diffMap).forEach(k => {
-                if (!diffMap[k]) return;
-                if (k === diff) {
-                    diffMap[k].className = "py-2.5 rounded-xl border-2 border-amber-500 bg-amber-500/20 text-amber-300 font-black text-sm transition-all shadow-md";
-                } else {
-                    diffMap[k].className = "py-2.5 rounded-xl border border-white/10 text-slate-400 hover:text-white font-black text-sm transition-all";
-                }
-            });
         }
 
         // 取得參賽者完整姓名
@@ -2843,14 +2975,20 @@
             synth.playClick();
             saveStudentInfo();
             if (!gameState.isFirebaseActive || typeof firebase === 'undefined') {
-                alert("⚔️ 連線對戰需要連上網路 (Firebase)，目前網路離線，建議點選下方「與電腦練習拔河」！");
+                alert("⚔️ 連線對戰需要連上網路 (Firebase)，目前網路離線，建議點選下方「與電腦練習」！");
                 return;
             }
 
+            vsState.active = false;
             vsState.myName = getFighterDisplayName();
             vsState.isHost = true;
             vsState.isBot = false;
-            vsState.roundHandled = {};
+            vsState.myRound = 1;
+            vsState.p1Score = 0;
+            vsState.p2Score = 0;
+            vsState.p1PrevScore = 0;
+            vsState.p2PrevScore = 0;
+            vsState.isAnswering = false;
 
             // 產生 4 位數房號
             const roomCode = Math.floor(1000 + Math.random() * 9000).toString();
@@ -2859,10 +2997,13 @@
             const roomRef = firebase.database().ref('FractionReduce/battle_rooms/' + roomCode);
             vsState.roomRef = roomRef;
 
+            // 第一題由房主生成共享第一題，難度隨機
+            const firstProb = generateValidProblem(vsState.selectedUnit || 'mul', getRandomDiff(), 1);
+
             const roomData = {
                 id: roomCode,
-                mode: vsState.selectedUnit,
-                difficulty: vsState.selectedDiff,
+                mode: vsState.selectedUnit || 'mul',
+                difficulty: 'random',
                 status: 'waiting',
                 createdAt: firebase.database.ServerValue.TIMESTAMP,
                 host: {
@@ -2871,13 +3012,11 @@
                     score: 0
                 },
                 guest: null,
-                currentRound: 0,
-                currentProblem: null
+                initialProblem: firstProb
             };
 
             roomRef.set(roomData)
                 .then(() => {
-                    // 房主離線時自動清除房間，避免殘留
                     roomRef.onDisconnect().remove();
 
                     // 切換至等待介面
@@ -2886,7 +3025,6 @@
                     waitCard.classList.remove('hidden');
                     document.getElementById('displayRoomCode').innerText = roomCode;
 
-                    // 監聽房間動態
                     vsWatchRoom(roomCode);
                 })
                 .catch(err => {
@@ -2918,6 +3056,7 @@
                 vsState.roomRef = null;
             }
             vsState.roomId = null;
+            vsState.active = false;
             document.getElementById('vsWaitingCard').classList.add('hidden');
             document.getElementById('vsLobbyActions').classList.remove('hidden');
         }
@@ -2927,22 +3066,28 @@
             synth.playClick();
             saveStudentInfo();
             if (!gameState.isFirebaseActive || typeof firebase === 'undefined') {
-                alert("⚔️ 連線對戰需要連上網路 (Firebase)，目前網路離線，建議點選下方「與電腦練習拔河」！");
+                alert("⚔️ 連線對戰需要連上網路 (Firebase)，目前網路離線，建議點選下方「與電腦練習連線對戰」！");
                 return;
             }
 
             const codeInput = document.getElementById('joinRoomCodeInput');
             const code = codeInput ? codeInput.value.trim() : '';
-            if (!/^\d{4}$/.test(code)) {
+            if (!/^d{4}$/.test(code)) {
                 alert("請輸入正確的 4 位數數字房號！");
                 return;
             }
 
+            vsState.active = false;
             vsState.myName = getFighterDisplayName();
             vsState.isHost = false;
             vsState.isBot = false;
             vsState.roomId = code;
-            vsState.roundHandled = {};
+            vsState.myRound = 1;
+            vsState.p1Score = 0;
+            vsState.p2Score = 0;
+            vsState.p1PrevScore = 0;
+            vsState.p2PrevScore = 0;
+            vsState.isAnswering = false;
 
             const roomRef = firebase.database().ref('FractionReduce/battle_rooms/' + code);
             vsState.roomRef = roomRef;
@@ -2958,7 +3103,6 @@
                     return;
                 }
 
-                // 加入房間
                 return roomRef.update({
                     guest: {
                         id: vsState.myPlayerId,
@@ -2975,7 +3119,7 @@
             });
         }
 
-        // 監聽房間即時數據
+        // 監聽房間即時數據 (關鍵：對方答對時我方繼續留在同一題，只拉動繩索與播報)
         function vsWatchRoom(roomCode) {
             if (!vsState.roomRef) return;
 
@@ -2989,24 +3133,16 @@
                     return;
                 }
 
-                // 房主端：對手加入後，生成第一題並開戰
+                // 房主端：對手加入後，啟動開戰狀態並確保寫入 shared initialProblem
                 if (vsState.isHost && data.status === 'waiting' && data.guest) {
-                    vsState.selectedUnit = data.mode || 'mul';
-                    vsState.selectedDiff = data.difficulty || 'normal';
-                    const firstProb = generateValidProblem(vsState.selectedUnit, vsState.selectedDiff, 1);
+                    vsState.selectedUnit = data.mode || vsState.selectedUnit || 'mul';
+                    const q1 = (data.initialProblem && data.initialProblem.n1)
+                        ? data.initialProblem
+                        : generateValidProblem(vsState.selectedUnit, getRandomDiff(), 1);
+
                     vsState.roomRef.update({
                         status: 'playing',
-                        currentRound: 1,
-                        currentProblem: {
-                            n1: firstProb.n1,
-                            d1: firstProb.d1,
-                            n2: firstProb.n2,
-                            d2: firstProb.d2,
-                            g1: firstProb.g1,
-                            g2: firstProb.g2,
-                            winner: null,
-                            winnerName: null
-                        }
+                        initialProblem: q1
                     });
                     return;
                 }
@@ -3014,60 +3150,36 @@
                 // 對戰進行中
                 if (data.status === 'playing') {
                     if (!vsState.active) {
-                        enterVersusBattleScreen(data);
+                        const q1 = (data.initialProblem && data.initialProblem.n1)
+                            ? data.initialProblem
+                            : generateValidProblem(data.mode || vsState.selectedUnit || 'mul', getRandomDiff(), 1);
+                        enterVersusBattleScreen(data, q1);
                     }
 
-                    // 同步比分與拔河繩
+                    // 同步比分
                     const p1 = (data.host && data.host.score) || 0;
                     const p2 = (data.guest && data.guest.score) || 0;
                     vsState.p1Score = p1;
                     vsState.p2Score = p2;
-                    updateTugRope(p1, p2);
+                    updateScoreBar(p1, p2);
 
-                    // 檢查本回合是否有人搶先答對
-                    if (data.currentProblem && data.currentProblem.winner && !vsState.roundHandled[data.currentRound]) {
-                        vsState.roundHandled[data.currentRound] = true;
+                    // 檢查對方是否得分 (對方得分時：拉繩 + 音效 + 提示，但我方題目完全不換！)
+                    const oppScore = vsState.isHost ? p2 : p1;
+                    const oppPrevScore = vsState.isHost ? vsState.p2PrevScore : vsState.p1PrevScore;
+
+                    if (oppScore > oppPrevScore) {
+                        if (vsState.isHost) vsState.p2PrevScore = p2;
+                        else vsState.p1PrevScore = p1;
+
                         synth.playTug();
-
-                        const winnerRole = data.currentProblem.winner;
-                        const winnerName = data.currentProblem.winnerName;
-                        const isMe = (vsState.isHost && winnerRole === 'host') || (!vsState.isHost && winnerRole === 'guest');
-
-                        if (isMe) {
-                            setVersusBanner("🎯 你率先搶答成功！拔河向前推進 1 步！", "#4ade80");
-                            spawnFloatingScore('gameTitleDisplay', "+1 搶答獲勝！", "#facc15");
-                        } else {
-                            setVersusBanner("⚡ " + (winnerName || '對手') + " 搶先答對！繩子被拉過去了！", "#f87171");
-                        }
-
-                        // 由房主負責在 1.8 秒後產生下一題
-                        if (vsState.isHost && p1 < vsState.targetScore && p2 < vsState.targetScore) {
-                            setTimeout(() => {
-                                const nextRound = data.currentRound + 1;
-                                const nextProb = generateValidProblem(vsState.selectedUnit, vsState.selectedDiff, nextRound);
-                                vsState.roomRef.update({
-                                    currentRound: nextRound,
-                                    currentProblem: {
-                                        n1: nextProb.n1,
-                                        d1: nextProb.d1,
-                                        n2: nextProb.n2,
-                                        d2: nextProb.d2,
-                                        g1: nextProb.g1,
-                                        g2: nextProb.g2,
-                                        winner: null,
-                                        winnerName: null
-                                    }
-                                });
-                            }, 1800);
-                        }
+                        const oppName = vsState.isHost ? ((data.guest && data.guest.name) || '對手') : ((data.host && data.host.name) || '對手');
+                        setVersusBanner("⚡ " + oppName + " 答對了！趕快加速！", "#f87171");
+                        // 提示：我方題目與輸入框完全不變，繼續解題直到答對！
                     }
 
-                    // 載入新題目
-                    if (data.currentProblem && data.currentRound !== vsState.localRound) {
-                        vsState.localRound = data.currentRound;
-                        vsState.isAnswering = false;
-                        loadVersusProblem(data.currentProblem, data.currentRound);
-                    }
+                    // 若自己得分更新已由自己觸發，同步自己 prevScore
+                    if (vsState.isHost) vsState.p1PrevScore = p1;
+                    else vsState.p2PrevScore = p2;
                 }
 
                 // 戰鬥結束
@@ -3076,7 +3188,7 @@
                     const p2 = (data.guest && data.guest.score) || 0;
                     vsState.p1Score = p1;
                     vsState.p2Score = p2;
-                    updateTugRope(p1, p2);
+                    updateScoreBar(p1, p2);
                     showVersusGameOver(data.finalWinner);
                 }
 
@@ -3088,62 +3200,77 @@
             });
         }
 
-        // 單機拔河對戰練習 (VS 電腦機器人)
+        // 單機連線對戰練習 (VS 電腦機器人)
         function startBotVersus() {
             synth.playClick();
             saveStudentInfo();
+            vsState.active = false;
             vsState.myName = getFighterDisplayName();
             vsState.opponentName = "小智電腦 (AI)";
             vsState.isHost = true;
             vsState.isBot = true;
+            vsState.myRound = 1;
             vsState.p1Score = 0;
             vsState.p2Score = 0;
-            vsState.currentRound = 1;
-            vsState.roundHandled = {};
+            vsState.p1PrevScore = 0;
+            vsState.p2PrevScore = 0;
+            vsState.isAnswering = false;
+            vsState.countdownSec = VS_TOTAL_TIME;
 
             const dummyData = {
-                mode: vsState.selectedUnit,
-                difficulty: vsState.selectedDiff,
+                mode: vsState.selectedUnit || 'mul',
+                difficulty: 'random',
                 host: { name: vsState.myName, score: 0 },
                 guest: { name: vsState.opponentName, score: 0 }
             };
 
-            enterVersusBattleScreen(dummyData);
-
-            const prob = generateValidProblem(vsState.selectedUnit, vsState.selectedDiff, 1);
-            loadVersusProblem(prob, 1);
+            const prob = generateValidProblem(vsState.selectedUnit || 'mul', getRandomDiff(), 1);
+            enterVersusBattleScreen(dummyData, prob);
             startBotTimer();
         }
 
-        // 電腦機器人出題計時
+        // 電腦機器人答題計時（隨機 10~20 秒答對一題，積分同樣依當時剩餘時間計算）
         function startBotTimer() {
             clearTimeout(vsState.botTimer);
             if (!vsState.isBot || !vsState.active) return;
 
-            // 依難度設定電腦答對時間
-            let delay = 16000;
-            if (vsState.selectedDiff === 'easy') delay = 15000 + Math.random() * 8000;
-            else if (vsState.selectedDiff === 'normal') delay = 12000 + Math.random() * 6000;
-            else delay = 9000 + Math.random() * 5000;
+            // 隨機 10 ~ 20 秒答對一題
+            const delay = 10000 + Math.random() * 10000;
 
             vsState.botTimer = setTimeout(() => {
-                if (!vsState.active || vsState.isAnswering) return;
-                handleVersusPointWon('p2', vsState.opponentName);
+                if (!vsState.active) return;
+
+                // 電腦答對，依剩餘時間計分
+                const earned = calcVsScore(vsState.countdownSec);
+                vsState.p2Score += earned;
+                updateScoreBar(vsState.p1Score, vsState.p2Score);
+                synth.playTug();
+                setVersusBanner("⚡ " + vsState.opponentName + " 答對了！+" + earned + " 分！趕快加速！", "#f87171");
+                spawnVsFloatScore('vsScore2', '+' + earned, '#f87171');
+
+                // 繼續答下一題
+                startBotTimer();
             }, delay);
         }
 
-        // 進入拔河戰鬥畫面
-        function enterVersusBattleScreen(data) {
+        // 進入對戰畫面 (知識王模式，初次載入第 1 題)
+        function enterVersusBattleScreen(data, initialProb) {
             vsState.active = true;
-            vsState.mode = data.mode || vsState.selectedUnit;
-            vsState.difficulty = data.difficulty || vsState.selectedDiff;
+            vsState.mode = (data && data.mode) || vsState.selectedUnit || 'mul';
+            vsState.difficulty = 'random';
             vsState.p1Score = 0;
             vsState.p2Score = 0;
+            vsState.p1PrevScore = 0;
+            vsState.p2PrevScore = 0;
+            vsState.myRound = 1;
+            vsState.isAnswering = false;
+            vsState.countdownSec = VS_TOTAL_TIME;
+            vsState.questionStartSec = VS_TOTAL_TIME;
 
             // 選手名稱顯示
-            const hostName = (data.host && data.host.name) || vsState.myName;
-            const guestName = (data.guest && data.guest.name) || vsState.opponentName;
-            
+            const hostName = (data && data.host && data.host.name) || (vsState.isHost ? vsState.myName : '對手');
+            const guestName = (data && data.guest && data.guest.name) || (!vsState.isHost ? vsState.myName : '對手');
+
             document.getElementById('vsPlayer1Name').innerText = hostName;
             document.getElementById('vsPlayer2Name').innerText = guestName;
 
@@ -3153,20 +3280,21 @@
             const diffBadgeEl = document.getElementById('diffBadge');
 
             if (vsState.mode === 'mul') {
-                titleEl.innerHTML = '<i class="fa-solid fa-people-arrows text-amber-400 mr-2"></i>拔河對決：分數乘法篇';
+                titleEl.innerHTML = '<i class="fa-solid fa-bolt text-purple-400 mr-2"></i>連線對戰：分數乘法篇';
                 gradeBadgeEl.innerText = '五年級下學期';
                 gradeBadgeEl.className = "px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-amber-500/25 text-amber-300 border border-amber-500/30";
             } else {
-                titleEl.innerHTML = '<i class="fa-solid fa-people-arrows text-blue-400 mr-2"></i>拔河對決：分數除法篇';
+                titleEl.innerHTML = '<i class="fa-solid fa-bolt text-blue-400 mr-2"></i>連線對戰：分數除法篇';
                 gradeBadgeEl.innerText = '六年級上學期';
                 gradeBadgeEl.className = "px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-blue-500/25 text-blue-300 border border-blue-500/30";
             }
 
             if (diffBadgeEl) {
-                diffBadgeEl.innerHTML = vsState.difficulty === 'easy' ? '🌱 簡單' : (vsState.difficulty === 'normal' ? '⭐ 普通' : '🔥 困難');
+                diffBadgeEl.innerHTML = '<i class="fa-solid fa-dice mr-1"></i>難度隨機';
+                diffBadgeEl.className = "px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-purple-500/25 text-purple-300 border border-purple-500/30";
             }
 
-            // 隱藏選單，顯示遊戲主卡片與拔河擂台
+            // 隱藏選單，顯示遊戲主卡片與對戰競技場
             document.getElementById('mainLobby').classList.add('hidden');
             const diffLobby = document.getElementById('difficultyLobby');
             if (diffLobby) diffLobby.classList.add('hidden');
@@ -3174,21 +3302,38 @@
             document.getElementById('gameScreen').classList.remove('hidden');
             document.getElementById('versusTugArena').classList.remove('hidden');
 
-            updateTugRope(0, 0);
+            updateScoreBar(0, 0);
+            updateTimerRing(VS_TOTAL_TIME);
             synth.playClick();
+
+            // 核心保證：進入戰鬥介面時，立即載入第 1 題！
+            let q = initialProb || (data && data.initialProblem);
+            if (!q || !q.n1 || !q.d1 || !q.n2 || !q.d2) {
+                q = generateValidProblem(vsState.mode, getRandomDiff(), 1);
+            }
+            loadVersusProblem(q, 1);
+
+            // 啟動倒數（Bot 模式：先等 0.5 秒讓畫面渲染完成再開始）
+            setTimeout(() => startVsCountdown(), 500);
         }
 
-        // 載入拔河題目進三行算式
+        // 載入對戰題目進三行算式 (我方題目，防禦性預防 undefined 題目)
         function loadVersusProblem(prob, roundNum) {
             document.getElementById('successOverlay').classList.add('hidden');
-            document.getElementById('vsRoundBadge').innerText = "第 " + roundNum + " 題搶答中";
-            document.getElementById('roundDisplay').innerText = "拔河爭霸 (先搶 5 題獲勝)";
+            document.getElementById('vsRoundBadge').innerText = "第 " + roundNum + " 題";
+            document.getElementById('roundDisplay').innerText = "連線對戰 (第 " + roundNum + " 題)";
+            vsState.questionStartSec = vsState.countdownSec; // 記錄本題開始時剩餘秒數
+
+            // 防禦性檢查：若傳入題目不完整，立即動態生成合法題目，絕不讓卡牌顯示 0
+            if (!prob || !prob.n1 || !prob.d1 || !prob.n2 || !prob.d2) {
+                prob = generateValidProblem(vsState.mode || 'mul', getRandomDiff(), roundNum || 1);
+            }
 
             const n1 = prob.n1, d1 = prob.d1;
             const n2 = prob.n2, d2 = prob.d2;
 
-            gameState.mode = vsState.mode;
-            gameState.difficulty = vsState.difficulty;
+            gameState.mode = vsState.mode || 'mul';
+            gameState.difficulty = 'random';
             gameState.round = roundNum;
 
             gameState.originalProblem = {
@@ -3255,37 +3400,10 @@
             if (ansDenEl && ansDenEl.type !== 'hidden') ansDenEl.value = '';
 
             renderNumbers();
-            setVersusBanner("⚡ 題目就位！請以最快速度完成約分與最終答案，搶先送出！", "#fde047");
+            setVersusBanner("⚡ 題目就位！越快答分數越高！", "#fde047");
         }
 
-        // 更新拔河繩索位置與選手星星
-        function updateTugRope(p1Score, p2Score) {
-            const rope = document.getElementById('tugRopeBody');
-            if (rope) {
-                // 藍隊在左 (負方向)，紅隊在右 (正方向)
-                const diff = p2Score - p1Score;
-                const offsetPercent = Math.max(-42, Math.min(42, diff * 8.4));
-                rope.style.transform = "translateX(" + offsetPercent + "%)";
-                rope.classList.remove('tug-shake');
-                void rope.offsetWidth;
-                rope.classList.add('tug-shake');
-            }
-
-            // 更新雙方星級指示燈
-            const p1Stars = document.querySelectorAll('#vsPlayer1Stars i');
-            p1Stars.forEach((star, idx) => {
-                if (idx < p1Score) star.className = "fa-solid fa-star star-filled";
-                else star.className = "fa-solid fa-star text-slate-600";
-            });
-
-            const p2Stars = document.querySelectorAll('#vsPlayer2Stars i');
-            p2Stars.forEach((star, idx) => {
-                if (idx < p2Score) star.className = "fa-solid fa-star star-filled";
-                else star.className = "fa-solid fa-star text-slate-600";
-            });
-        }
-
-        // 設定拔河播報跑馬燈
+        // 設定對戰播報
         function setVersusBanner(msg, color = '#fde047') {
             const banner = document.getElementById('vsBannerText');
             if (banner) {
@@ -3294,7 +3412,7 @@
             }
         }
 
-        // 處理對戰搶答送出答案
+        // 處理對戰答案檢查（知識王：答對依剩餘時間加乘得分，答錯可繼續）
         function handleVersusCheckAnswer(uN, uD, correctNum, correctDen) {
             if (vsState.isAnswering) return;
 
@@ -3305,47 +3423,30 @@
                 triggerParticles('ansNum', '#4ade80');
                 triggerParticles('ansDen', '#4ade80');
 
-                // 單機機器人模式
-                if (vsState.isBot) {
-                    clearTimeout(vsState.botTimer);
-                    handleVersusPointWon('p1', vsState.myName);
-                    return;
-                }
+                // 依剩餘時間計算加乘分數
+                const earned = calcVsScore(vsState.countdownSec);
+                vsState.p1Score += earned;
+                updateScoreBar(vsState.p1Score, vsState.p2Score);
+                setVersusBanner('🎯 答對！+' + earned + ' 分！(剩 ' + vsState.countdownSec + '秒)', '#4ade80');
+                spawnVsFloatScore('vsScore1', '+' + earned, '#4ade80');
 
-                // 線上連線模式 (使用 Firebase 原子事務競爭搶答)
+                // 下一題
+                setTimeout(() => {
+                    vsState.myRound++;
+                    vsState.isAnswering = false;
+                    const nextProb = generateValidProblem(vsState.mode, getRandomDiff(), vsState.myRound);
+                    loadVersusProblem(nextProb, vsState.myRound);
+                }, 900);
+
+                // 單機機器人模式：不需 Firebase 同步
+                if (vsState.isBot) return;
+
+                // 線上模式：同步我方積分到 Firebase
                 if (vsState.roomRef) {
                     const myRole = vsState.isHost ? 'host' : 'guest';
-                    vsState.roomRef.child('currentProblem').transaction(cp => {
-                        if (!cp) return cp;
-                        if (cp.winner) return; // 已經有人搶答了
-                        cp.winner = myRole;
-                        cp.winnerName = vsState.myName;
-                        return cp;
-                    }, (err, committed, snap) => {
-                        if (err) {
-                            console.error("搶答事務發生錯誤", err);
-                            vsState.isAnswering = false;
-                            return;
-                        }
-                        if (committed && snap.val() && snap.val().winner === myRole) {
-                            // 我搶答成功！增加分數
-                            const scoreRef = vsState.roomRef.child(myRole + '/score');
-                            scoreRef.transaction(s => (s || 0) + 1, (sErr, sCommitted, sSnap) => {
-                                const newS = sSnap.val() || 0;
-                                if (newS >= vsState.targetScore) {
-                                    vsState.roomRef.update({
-                                        status: 'finished',
-                                        finalWinner: myRole,
-                                        finalWinnerName: vsState.myName
-                                    });
-                                }
-                            });
-                        } else {
-                            synth.playWrong();
-                            setVersusBanner("⚡ 哎呀！對手搶先一步答對了！", '#f87171');
-                        }
-                    });
+                    vsState.roomRef.child(myRole + '/score').set(vsState.p1Score);
                 }
+
             } 
             // 數值正確但未約分至最簡
             else if (uN === correctNum && uD === correctDen && gcd(correctNum, correctDen) > 1) {
@@ -3359,117 +3460,100 @@
             }
         }
 
-        // 單機拔河獲勝一題處理
-        function handleVersusPointWon(winnerRole, winnerName) {
-            synth.playTug();
-            if (winnerRole === 'p1') {
-                vsState.p1Score++;
-            } else {
-                vsState.p2Score++;
-            }
-            updateTugRope(vsState.p1Score, vsState.p2Score);
-
-            const isMe = (vsState.isHost && winnerRole === 'p1') || (!vsState.isHost && winnerRole === 'p2');
-            if (isMe) {
-                setVersusBanner("🎯 你率先搶答成功！拔河向前拉進 1 步！", "#4ade80");
-                spawnFloatingScore('gameTitleDisplay', "+1 搶答獲勝！", "#facc15");
-            } else {
-                setVersusBanner("⚡ " + (winnerName || '對手') + " 搶先答對！繩子被拉過去了！", "#f87171");
-            }
-
-            if (vsState.p1Score >= vsState.targetScore || vsState.p2Score >= vsState.targetScore) {
-                const finalWinner = vsState.p1Score >= vsState.targetScore ? 'host' : 'guest';
-                setTimeout(() => {
-                    showVersusGameOver(finalWinner);
-                }, 1200);
-                return;
-            }
-
-            setTimeout(() => {
-                vsState.currentRound++;
-                vsState.isAnswering = false;
-                const nextProb = generateValidProblem(vsState.mode, vsState.difficulty, vsState.currentRound);
-                loadVersusProblem(nextProb, vsState.currentRound);
-                if (vsState.isBot) {
-                    startBotTimer();
-                }
-            }, 1800);
-        }
-
-        // 結算拔河冠軍
-        function showVersusGameOver(finalWinner) {
+        // 結算連線對戰
+        function showVersusGameOver(finalWinner, isTimeUp = false) {
+            vsState.active = false;
             clearTimeout(vsState.botTimer);
-            const isMeWinner = (vsState.isHost && finalWinner === 'host') || (!vsState.isHost && finalWinner === 'guest');
+            clearInterval(vsState.timerInterval);
 
-            const iconEl = document.getElementById('vsWinnerIcon');
-            const titleEl = document.getElementById('vsWinnerTitle');
+            // 判斷我方是否勝出（積分比較）
+            const myScoreIsFinal = vsState.isHost ? vsState.p1Score : vsState.p2Score;
+            const oppScoreFinal  = vsState.isHost ? vsState.p2Score : vsState.p1Score;
+            const isMeWinner = myScoreIsFinal > oppScoreFinal;
+            const isTie      = myScoreIsFinal === oppScoreFinal;
+
+            const iconEl     = document.getElementById('vsWinnerIcon');
+            const titleEl    = document.getElementById('vsWinnerTitle');
             const subtitleEl = document.getElementById('vsWinnerSubtitle');
 
-            if (isMeWinner) {
-                iconEl.innerText = "👑";
-                titleEl.innerText = "勇奪拔河冠軍！";
-                subtitleEl.innerText = "恭喜成為約分拔河之王！手速與心算實力超群！";
-                synth.playWin();
-                triggerParticles('gameScreen', '#facc15');
-            } else {
-                iconEl.innerText = "🤝";
-                titleEl.innerText = "惜敗！再接再厲！";
-                subtitleEl.innerText = "對手搶先奪下 5 題，再戰一局奪回面子！";
-                synth.playWrong();
+            if (iconEl && titleEl && subtitleEl) {
+                if (isTie) {
+                    iconEl.innerText = '🤝';
+                    titleEl.innerText = '平局！';
+                    subtitleEl.innerText = '雙方積分相同，真是旗鼓相當！';
+                    synth.playClick();
+                } else if (isMeWinner) {
+                    iconEl.innerText = '👑';
+                    titleEl.innerText = '勝利！你贏了！';
+                    subtitleEl.innerText = '120 秒搶答結束，積分最高者獲勝！';
+                    synth.playWin();
+                    triggerParticles('gameScreen', '#facc15');
+                } else {
+                    iconEl.innerText = '🤝';
+                    titleEl.innerText = '惜敗！再接再厲！';
+                    subtitleEl.innerText = '對手積分較高，再戰一局奪回面子！';
+                    synth.playWrong();
+                }
             }
 
-            // 比分展示
-            document.getElementById('vsEndP1Score').innerText = vsState.p1Score;
-            document.getElementById('vsEndP2Score').innerText = vsState.p2Score;
+            // 填入結算積分
+            const endP1Score = document.getElementById('vsEndP1Score');
+            const endP2Score = document.getElementById('vsEndP2Score');
+            const endP1Name  = document.getElementById('vsEndP1Name');
+            const endP2Name  = document.getElementById('vsEndP2Name');
 
-            if (vsState.isHost) {
-                document.getElementById('vsEndP1Label').innerText = "我方 (藍隊)";
-                document.getElementById('vsEndP2Label').innerText = "對手 (紅隊)";
-            } else {
-                document.getElementById('vsEndP1Label').innerText = "對手 (藍隊)";
-                document.getElementById('vsEndP2Label').innerText = "我方 (紅隊)";
-            }
+            const hostName  = document.getElementById('vsPlayer1Name')?.innerText || '藍隊';
+            const guestName = document.getElementById('vsPlayer2Name')?.innerText || '紅隊';
 
-            document.getElementById('versusGameOverModal').classList.remove('hidden');
+            if (endP1Name) endP1Name.innerText = hostName;
+            if (endP2Name) endP2Name.innerText = guestName;
+            if (endP1Score) endP1Score.innerText = vsState.p1Score;
+            if (endP2Score) endP2Score.innerText = vsState.p2Score;
+
+            const modal = document.getElementById('versusGameOverModal');
+            if (modal) modal.classList.remove('hidden');
         }
 
         // 再戰一局
         function rematchVersus() {
             synth.playClick();
-            document.getElementById('versusGameOverModal').classList.add('hidden');
-            vsState.roundHandled = {};
+            const modal = document.getElementById('versusGameOverModal');
+            if (modal) modal.classList.add('hidden');
+            vsState.active = false;
             vsState.isAnswering = false;
+            vsState.myRound = 1;
+            vsState.p1Score = 0;
+            vsState.p2Score = 0;
+            vsState.p1PrevScore = 0;
+            vsState.p2PrevScore = 0;
+            vsState.countdownSec = VS_TOTAL_TIME;
+            clearInterval(vsState.timerInterval);
+            clearTimeout(vsState.botTimer);
+            updateScoreBar(0, 0);
+            updateTimerRing(VS_TOTAL_TIME);
 
             if (vsState.isBot) {
-                vsState.p1Score = 0;
-                vsState.p2Score = 0;
-                vsState.currentRound = 1;
-                updateTugRope(0, 0);
-                const prob = generateValidProblem(vsState.selectedUnit, vsState.selectedDiff, 1);
-                loadVersusProblem(prob, 1);
+                const prob = generateValidProblem(vsState.selectedUnit || 'mul', getRandomDiff(), 1);
+                const dummyData = {
+                    mode: vsState.selectedUnit || 'mul',
+                    difficulty: 'random',
+                    host: { name: vsState.myName, score: 0 },
+                    guest: { name: vsState.opponentName, score: 0 }
+                };
+                enterVersusBattleScreen(dummyData, prob);
                 startBotTimer();
                 return;
             }
 
             if (vsState.roomRef && vsState.isHost) {
-                const firstProb = generateValidProblem(vsState.selectedUnit, vsState.selectedDiff, 1);
+                const firstProb = generateValidProblem(vsState.selectedUnit || 'mul', getRandomDiff(), 1);
                 vsState.roomRef.update({
                     status: 'playing',
                     'host/score': 0,
                     'guest/score': 0,
-                    currentRound: 1,
                     finalWinner: null,
                     finalWinnerName: null,
-                    currentProblem: {
-                        n1: firstProb.n1,
-                        d1: firstProb.d1,
-                        n2: firstProb.n2,
-                        d2: firstProb.d2,
-                        g1: firstProb.g1,
-                        g2: firstProb.g2,
-                        winner: null,
-                        winnerName: null
-                    }
+                    initialProblem: firstProb
                 });
             }
         }
@@ -3478,6 +3562,7 @@
         function exitVersusToLobby() {
             synth.playClick();
             clearTimeout(vsState.botTimer);
+            clearInterval(vsState.timerInterval);
             if (vsState.roomRef) {
                 if (vsState.isHost) {
                     vsState.roomRef.remove();
@@ -3488,8 +3573,16 @@
 
             vsState.active = false;
             vsState.roomId = null;
+            vsState.p1Score = 0;
+            vsState.p2Score = 0;
+            vsState.p1PrevScore = 0;
+            vsState.p2PrevScore = 0;
+            vsState.myRound = 1;
+            vsState.isAnswering = false;
+            vsState.countdownSec = VS_TOTAL_TIME;
 
-            document.getElementById('versusGameOverModal').classList.add('hidden');
+            const modal = document.getElementById('versusGameOverModal');
+            if (modal) modal.classList.add('hidden');
             document.getElementById('gameScreen').classList.add('hidden');
             document.getElementById('versusTugArena').classList.add('hidden');
             document.getElementById('vsWaitingCard').classList.add('hidden');
@@ -3497,7 +3590,7 @@
             document.getElementById('mainLobby').classList.remove('hidden');
             renderLobbyLeaderboard();
         }
-
+    
     </script>
 </body>
 </html>
