@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>三角泡泡對戰・教師後台・錯題一覽 📋</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Microsoft JhengHei", "PingFang TC", system-ui, sans-serif; background: #f1f5f9; color: #1e293b; padding: 16px; }
+  #app { max-width: 960px; margin: 0 auto; }
+  header { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  header h1 { margin: 0; font-size: 26px; }
+  header a { font-size: 14px; color: #5e60ce; }
+  .filters { background: #fff; border-radius: 14px; padding: 14px; display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  .filters label { font-size: 13px; font-weight: 700; display: flex; flex-direction: column; gap: 4px; }
+  .filters input[type="text"], .filters input[type="date"] { font-size: 16px; font-family: inherit; border: 2px solid #cbd5e1; border-radius: 10px; padding: 8px 10px; }
+  .filters .chk { flex-direction: row; align-items: center; gap: 6px; font-size: 15px; }
+  #qBtn { font-size: 17px; font-weight: 900; font-family: inherit; border: none; border-radius: 12px; padding: 10px 26px; cursor: pointer; background: #5e60ce; color: #fff; }
+  #status { font-size: 14px; color: #64748b; margin: 10px 2px; }
+  .stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .stat { flex: 1; min-width: 130px; background: #fff; border-radius: 14px; padding: 10px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  .stat .l { font-size: 13px; color: #64748b; }
+  .stat .v { font-size: 24px; font-weight: 900; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.08); font-size: 15px; }
+  th, td { padding: 9px 8px; border-bottom: 1px solid #e2e8f0; text-align: center; }
+  th { background: #5e60ce; color: #fff; font-size: 14px; white-space: nowrap; }
+  tr.wrong td { background: #fef2f2; }
+  tr.good td { background: #f0fdf4; }
+  .wrap { overflow-x: auto; border-radius: 14px; }
+  .empty { text-align: center; padding: 30px; color: #94a3b8; background: #fff; border-radius: 14px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>👾 三角泡泡對戰・教師後台</h1>
+    <a href="index.html">← 回遊戲天地首頁</a>
+  </header>
+  <div style="font-size:14px;color:#64748b;margin:-6px 0 12px;">本後台只收錄「三角泡泡對戰」的作答與錯題紀錄 📝</div>
+  <div class="filters">
+    <label>日期<input type="date" id="fDate"></label>
+    <label>班級<input type="text" id="fCls" placeholder="例：501" style="width:110px"></label>
+    <label>姓名<input type="text" id="fName" placeholder="例：王小明" style="width:130px"></label>
+    <label class="chk"><input type="checkbox" id="fWrong" checked> 只看錯題</label>
+    <button id="qBtn">🔍 查詢</button>
+  </div>
+  <div id="status">載入中…</div>
+  <div class="stats">
+    <div class="stat"><div class="l">作答題數</div><div class="v" id="stN">--</div></div>
+    <div class="stat"><div class="l">答對率</div><div class="v" id="stAcc">--</div></div>
+    <div class="stat"><div class="l">錯題數</div><div class="v" id="stW">--</div></div>
+    <div class="stat"><div class="l">作答人數</div><div class="v" id="stP">--</div></div>
+  </div>
+  <div class="wrap"><table id="tbl" style="display:none">
+    <thead><tr><th>時間</th><th>班級</th><th>姓名</th><th>座號</th><th>三邊 (cm)</th><th>學生判斷</th><th>正解</th><th>對錯</th><th>困住怪獸</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+  <div id="empty" class="empty" style="display:none">這個篩選條件沒有資料，換個條件試試 👀</div>
+</div>
+<script>
+const SB_URL='https://YOUR-PROJECT-REF.supabase.co', SB_KEY='YOUR-ANON-KEY';
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,'0');
+(function initDate(){const d=new Date();$('fDate').value=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;})();
+function fmtSides(s){ // "{4,5,9}" -> "4、5、9"
+  const m=String(s).replace(/[{}]/g,'').split(',').map(x=>x.trim()).filter(Boolean);
+  return m.join('、');
+}
+function fmtTime(iso){const d=new Date(iso);return `${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;}
+async function query(){
+  $('status').textContent='查詢中…';$('tbl').style.display='none';$('empty').style.display='none';
+  try{
+    const p=new URLSearchParams({select:'*',order:'created_at.desc',limit:'500'});
+    const cls=$('fCls').value.trim(), name=$('fName').value.trim(), dt=$('fDate').value;
+    if(cls)p.append('class','eq.'+cls);
+    if(name)p.append('name','eq.'+name);
+    if(dt){const base=new Date(dt+'T00:00:00');p.append('created_at','gte.'+base.toISOString());p.append('created_at','lt.'+new Date(base.getTime()+864e5).toISOString());}
+    if($('fWrong').checked)p.append('correct','is.false');
+    const r=await fetch(SB_URL+'/rest/v1/attempts?'+p.toString(),{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    render(await r.json());
+  }catch(e){ $('status').textContent='❌ 讀取失敗（網路或資料庫連線問題）：'+e.message; }
+}
+function render(rows){
+  const tb=$('rows');tb.innerHTML='';
+  let ok=0;const who=new Set();
+  rows.forEach(a=>{
+    if(a.correct)ok++;
+    who.add((a.class||'')+'|'+(a.name||''));
+    const tr=document.createElement('tr');tr.className=a.correct?'good':'wrong';
+    tr.innerHTML=`<td>${fmtTime(a.created_at)}</td><td>${a.class||'-'}</td><td>${a.name||'-'}</td><td>${a.seat||'-'}</td>`
+      +`<td><b>${fmtSides(a.sides)}</b></td><td>${a.guess_can?'⭕可以':'❌不能'}</td><td>${a.truth_can?'可以':'不可以'}</td>`
+      +`<td>${a.correct?'✔':'<b>✘</b>'}</td><td>${a.captured?'🫧':''}</td>`;
+    tb.appendChild(tr);
+  });
+  $('stN').textContent=rows.length;
+  $('stAcc').textContent=rows.length?Math.round(ok/rows.length*100)+'%':'--';
+  $('stW').textContent=rows.length-ok;
+  $('stP').textContent=who.size;
+  $('status').textContent=`共 ${rows.length} 筆（${$('fWrong').checked?'只看錯題':'全部'}）`;
+  $('tbl').style.display=rows.length?'':'none';
+  $('empty').style.display=rows.length?'none':'';
+}
+$('qBtn').onclick=query;
+query();
+</script>
+</body>
+</html>

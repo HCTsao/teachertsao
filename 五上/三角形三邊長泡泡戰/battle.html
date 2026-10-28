@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>三角泡泡對戰・雙人怪獸對戰 ⚔️</title>
+<style>
+  * { box-sizing: border-box; user-select: none; }
+  body { margin: 0; font-family: "Microsoft JhengHei", "PingFang TC", system-ui, sans-serif; background: #0d1330; color: #fff; min-height: 100vh; display: flex; justify-content: center; padding: 14px; }
+  #app { width: min(680px, 100%); }
+  .hud { display: flex; gap: 8px; margin-bottom: 10px; }
+  .stat { flex: 1; background: rgba(255,255,255,.08); border-radius: 12px; padding: 6px; text-align: center; border: 2px solid rgba(255,255,255,.12); }
+  .stat .l { font-size: 12px; opacity: .75; }
+  .stat .v { font-size: 20px; font-weight: 900; }
+  #stage { background: linear-gradient(180deg,#1a2452,#0e1638); border: 3px solid #ff9f1c; border-radius: 18px; overflow: hidden; }
+  #stage.shake { animation: shake .45s; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-10px)} 40%{transform:translateX(10px)} 60%{transform:translateX(-7px)} 80%{transform:translateX(7px)} }
+  #talkBar { text-align: center; padding: 8px 10px 2px; min-height: 46px; }
+  #talk { display: inline-block; background: #fff; color: #222; border-radius: 12px; padding: 6px 12px; font-size: 15px; font-weight: 700; max-width: 95%; }
+  .teamrow { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 8px; min-height: 64px; }
+  .teamrow .tname { font-size: 14px; font-weight: 900; color: #ffd54f; margin-right: 4px; }
+  .mon { font-size: 60px; line-height: 1; transition: all .3s; }
+  .mon.dead { opacity: .3; filter: grayscale(1); transform: scale(.85); }
+  .hp { font-size: 18px; letter-spacing: 2px; }
+  .mon.hit { animation: hit .5s 2; }
+  @keyframes hit { 0%,100%{transform:scale(1)} 40%{transform:scale(1.4) rotate(-10deg)} }
+  canvas#cv { display: block; width: 100%; height: auto; }
+  #sides { display: flex; gap: 10px; justify-content: center; margin: 12px 0; }
+  .side { flex: 1; max-width: 160px; background: linear-gradient(180deg,#ffffff,#b3e5fc); color: #0d47a1; border-radius: 14px; padding: 10px 6px; text-align: center; }
+  .side .n { font-size: 34px; font-weight: 900; }
+  .side .u { font-size: 14px; }
+  #judge { display: flex; gap: 10px; }
+  #judge button { flex: 1; font-size: 20px; font-weight: 900; border: none; border-radius: 14px; padding: 14px; cursor: pointer; font-family: inherit; }
+  #yesBtn { background: linear-gradient(180deg,#69f0ae,#00c853); color: #003318; }
+  #noBtn { background: linear-gradient(180deg,#ff8a80,#d50000); color: #fff; }
+  #judge button:disabled { filter: grayscale(.7); opacity: .45; cursor: default; }
+  #msg { margin-top: 10px; min-height: 56px; text-align: center; font-size: 17px; font-weight: 700; background: rgba(255,255,255,.08); border-radius: 12px; padding: 10px 12px; line-height: 1.6; }
+  #msg .ok { color: #69f0ae; } #msg .no { color: #ff8a80; }
+  #homeBtn { position: fixed; top: 12px; left: 12px; z-index: 60; width: 46px; height: 46px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); background: rgba(255,255,255,.12); color: #fff; font-size: 22px; cursor: pointer; }
+  #muteBtn { position: fixed; top: 12px; right: 12px; z-index: 60; width: 46px; height: 46px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); background: rgba(255,255,255,.12); color: #fff; font-size: 22px; cursor: pointer; }
+  #overlay { position: fixed; inset: 0; background: rgba(4,8,25,.92); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+  #panel { background: linear-gradient(180deg,#fff,#ffe0b2); color: #102027; border-radius: 20px; padding: 26px; max-width: 480px; width: 100%; text-align: center; }
+  #panel h1 { margin: 0 0 8px; }
+  #panel p { text-align: left; line-height: 1.8; }
+  #panel input { width: 100%; font-size: 22px; font-weight: 900; font-family: inherit; text-align: center; letter-spacing: 6px; border: 3px solid #102027; border-radius: 12px; padding: 10px; margin: 6px 0; text-transform: uppercase; }
+  #panel .idrow { display: flex; gap: 6px; }
+  #panel .idrow input { flex: 1; min-width: 0; font-size: 16px; letter-spacing: 0; padding: 9px 6px; }
+  #netStat { font-size: 14px; font-weight: 900; background: #eceff1; border-radius: 10px; padding: 6px; margin-bottom: 4px; }
+  #panel button { width: 100%; font-size: 19px; font-weight: 900; font-family: inherit; border: none; border-radius: 14px; padding: 12px; cursor: pointer; margin-top: 8px; }
+  #createBtn { background: linear-gradient(180deg,#69f0ae,#00c853); }
+  #joinBtn { background: linear-gradient(180deg,#ffe082,#ffb300); }
+  #aiBtn { background: linear-gradient(180deg,#ce93d8,#7b1fa2); color: #fff; }
+  #backBtn { background: #b0bec5; }
+  #roomCodeBig { font-size: 52px; font-weight: 900; letter-spacing: 10px; background: #fff59d; border-radius: 14px; padding: 8px; margin: 8px 0; }
+</style>
+</head>
+<body>
+<button id="homeBtn" title="回首頁">🏠</button>
+<button id="muteBtn" title="音樂開關">🔊</button>
+<div id="app">
+  <div class="hud">
+    <div class="stat"><div class="l">🏠 房號</div><div class="v" id="roomVal">----</div></div>
+    <div class="stat"><div class="l">🫧 對方損血</div><div class="v" id="meVal">0 / 5</div></div>
+    <div class="stat"><div class="l">💥 我方損血</div><div class="v" id="foeVal">0 / 5</div></div>
+  </div>
+  <div id="stage">
+    <div class="teamrow" id="foeRow"></div>
+    <div id="talkBar"><span id="talk">雙方各派一隻怪獸（5 條命），先打光對方血量的人獲勝！</span></div>
+    <div id="cvWrap"><canvas id="cv" width="660" height="300"></canvas></div>
+    <div class="teamrow" id="myRow"></div>
+  </div>
+  <div id="sides"></div>
+  <div id="judge">
+    <button id="yesBtn" disabled>⭕ 可以拼成</button>
+    <button id="noBtn" disabled>❌ 不能拼成</button>
+  </div>
+  <div id="msg">連線中…</div>
+</div>
+
+<div id="overlay">
+  <div id="panel">
+    <div id="menuView">
+      <h1>⚔️ 雙人怪獸對戰</h1>
+      <p>1️⃣ 一人按 <b>建立房間</b>，把 4 碼房號告訴同學<br>2️⃣ 同學輸入房號按 <b>加入房間</b><br>3️⃣ 兩人同時看到三邊，<b>搶快作答</b>！先答對的人發射火球<br>4️⃣ 答錯會被對方火球反擊、先打光對方 <b>5 條命</b>的人獲勝！<br>找不到人？可以和電腦搶答 🤖</p>
+      <div id="netStat">連線測試中…</div>
+      <div class="idrow">
+        <input id="bCls" maxlength="10" placeholder="班級" autocomplete="off">
+        <input id="bName" maxlength="10" placeholder="姓名" autocomplete="off">
+        <input id="bSeat" maxlength="5" placeholder="座號" inputmode="numeric" autocomplete="off">
+      </div>
+      <input id="inRoom" maxlength="4" placeholder="房號（加入時填）" autocomplete="off">
+      <button id="createBtn">🆕 建立房間</button>
+      <button id="joinBtn">🚪 加入房間</button>
+      <button id="aiBtn">🤖 單機 vs 電腦</button>
+      <button id="backBtn">← 回單人遊戲</button>
+    </div>
+    <div id="lobbyView" style="display:none">
+      <h1>🏠 房號</h1>
+      <div id="roomCodeBig">----</div>
+      <p>把房號告訴同學，等對手加入…</p>
+      <button id="cancelBtn" style="background:#b0bec5">取消</button>
+    </div>
+    <div id="endView" style="display:none">
+      <h1 id="endTitle">🎉</h1>
+      <p id="endText"></p>
+      <button id="againBtn" style="background:linear-gradient(180deg,#69f0ae,#00c853)">🔁 再來一局</button>
+      <button id="homeBtn2" style="background:#b0bec5">🏠 回首頁</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SB_URL='https://YOUR-PROJECT-REF.supabase.co', SB_KEY='YOUR-ANON-KEY';
+const H={ 'apikey': SB_KEY, 'Authorization': 'Bearer '+SB_KEY, 'Content-Type': 'application/json' };
+async function sbGet(q){ const r=await fetch(SB_URL+'/rest/v1/rooms?'+q,{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}}); if(!r.ok)throw new Error('HTTP '+r.status); return r.json(); }
+async function sbPost(row){ const r=await fetch(SB_URL+'/rest/v1/rooms',{method:'POST',headers:Object.assign({},H,{'Prefer':'return=minimal'}),body:JSON.stringify(row)}); if(!r.ok)throw new Error('HTTP '+r.status); }
+async function sbPatch(code,body){ const r=await fetch(SB_URL+'/rest/v1/rooms?code=eq.'+code,{method:'PATCH',headers:Object.assign({},H,{'Prefer':'return=minimal'}),body:JSON.stringify(body)}); if(!r.ok)throw new Error('HTTP '+r.status); }
+// 搶答：round 條件更新，原子判定誰先按（回傳有列＝搶到）
+async function claimRound(){
+  const r=await fetch(SB_URL+'/rest/v1/rooms?code=eq.'+code+'&round=eq.'+round+'&last_actor=eq.',{method:'PATCH',headers:Object.assign({},H,{'Prefer':'return=representation'}),body:JSON.stringify({last_actor:mode})});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  return (await r.json()).length>0;
+}
+function postRow(table,row){ try{ fetch(SB_URL+'/rest/v1/'+table,{method:'POST',headers:Object.assign({},H,{'Prefer':'return=minimal'}),body:JSON.stringify(row)}).catch(()=>{}); }catch(e){} }
+
+let player={cls:'',name:'訪客',seat:''};
+try{ const p=JSON.parse(localStorage.getItem('triPlayer')||'null'); if(p)player={cls:p.cls||'',name:p.name||'訪客',seat:p.seat||''}; }catch(e){}
+let mode=null, code='', myName=player.name, foeName='', myScore=0, foeScore=0;
+let round=1, turn='p1', triple=[], busy=false, over=false, myTurnActive=false, answered=false, holdUntil=0, claimNoticeSince=0, lobbyTicks=0;
+let lastSeenRound=0, justPlayedRound=0, pollBusy=false, pollTimer=null, aiTimer=null;
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+const sidesEl=document.getElementById('sides'), msgEl=document.getElementById('msg'), talkEl=document.getElementById('talk');
+const yesBtn=document.getElementById('yesBtn'), noBtn=document.getElementById('noBtn');
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const rnd=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const truth=t=>{const s=[...t].sort((a,b)=>a-b);return s[0]+s[1]>s[2];};
+function cmpWord(t){const s=[...t].sort((a,b)=>a-b),sum=s[0]+s[1];return sum>s[2]?'大於':(sum<s[2]?'小於':'等於');}
+let AC=null;
+function beep(f,d=.15,t='sine',v=.2,w=0){ if(!sound)return; try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended')AC.resume(); const o=AC.createOscillator(),g=AC.createGain(); o.type=t;o.frequency.value=f; g.gain.setValueAtTime(v,AC.currentTime+w); g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+w+d); o.connect(g);g.connect(AC.destination); o.start(AC.currentTime+w);o.stop(AC.currentTime+w+d);}catch(e){} }
+const sClick=()=>beep(700,.06,'square',.1);
+const sGood=()=>{beep(523,.12,'triangle',.22);beep(659,.12,'triangle',.22,.1);beep(784,.12,'triangle',.22,.2);beep(1047,.3,'triangle',.22,.3);};
+const sBad=()=>{beep(280,.2,'sawtooth',.18);beep(170,.35,'sawtooth',.18,.15);};
+const sShoot=()=>{try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.type='sawtooth';o.frequency.setValueAtTime(250,AC.currentTime);o.frequency.exponentialRampToValueAtTime(950,AC.currentTime+.35);g.gain.setValueAtTime(.13,AC.currentTime);g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.35);o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+.35);}catch(e){}};
+const sPop=()=>sBad();
+// 對戰配樂（與單人版同曲，音量輕）
+let sound=true, musicTimer=null, musicStep=0;
+const MEL=[523,587,659,784, 880,784,659,587, 659,784,880,784, 659,587,523,0,
+           587,659,784,659, 587,659,523,587, 523,587,659,587, 523,0,392,392];
+const BAS=[131,0,196,0, 165,0,196,0, 196,0,165,0, 131,0,196,0,
+           131,0,196,0, 165,0,196,0, 131,0,196,0, 131,0,131,0];
+function startBGM(){
+  if(musicTimer)return;
+  try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended')AC.resume(); }catch(e){ return; }
+  musicStep=0;
+  musicTimer=setInterval(()=>{
+    if(!sound||over)return;
+    const m=MEL[musicStep%MEL.length], b=BAS[musicStep%BAS.length];
+    if(m)beep(m,.16,'triangle',.055);
+    if(b)beep(b,.2,'sine',.07);
+    if(musicStep%4===2)beep(2093,.04,'sine',.018);
+    musicStep++;
+  },190);
+}
+function stopBGM(){ if(musicTimer){clearInterval(musicTimer);musicTimer=null;} }
+// 火球攻擊：從攻擊方怪獸方向射向對方（dir -1 往上打對方，+1 往下打我方），命中閃光＋震動
+async function fireballAnim(dir,lay,m1,fin){
+  sShoot();
+  const bg=()=>drawAssemble(1,m1,0,fin,lay);
+  const x0=330, y0=dir<0?285:15, y1=dir<0?15:285;
+  await drive(800,t=>{
+    bg();
+    const y=y0+(y1-y0)*t*t, r=8+14*t;
+    for(let i=1;i<=3;i++){const tt=Math.max(0,t-i*0.06), ty=y0+(y1-y0)*tt*tt;
+      ctx.globalAlpha=0.22*(1-i/4);ctx.fillStyle='#ff9800';
+      ctx.beginPath();ctx.arc(x0,ty,r*0.7,0,7);ctx.fill();ctx.globalAlpha=1;}
+    const g=ctx.createRadialGradient(x0,y,1,x0,y,r*1.6);
+    g.addColorStop(0,'#fff59d');g.addColorStop(0.5,'#ff9800');g.addColorStop(1,'rgba(255,60,0,0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(x0,y,r*1.6,0,7);ctx.fill();
+    if(t>=1){
+      ctx.fillStyle='rgba(255,60,30,.5)';ctx.fillRect(0,0,cv.width,cv.height);
+      ctx.strokeStyle='#fff';ctx.lineWidth=5;
+      ctx.beginPath();ctx.arc(x0,y1,26,0,7);ctx.stroke();
+      document.getElementById('stage').classList.add('shake');
+      beep(65,.35,'sine',.3);
+      setTimeout(()=>{document.getElementById('stage').classList.remove('shake');},450);
+    }
+  });
+}
+
+// ---- 題目：房號＋回合決定種子，兩台裝置算出同一組三邊 ----
+function hashStr(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function genTripleSeeded(seed){
+  const R=mulberry32(seed>>>0), pk=(a,b)=>a+Math.floor(R()*(b-a+1));
+  const wantCan=R()<0.55;
+  for(let k=0;k<300;k++){
+    let t; const r=R();
+    if(r<0.18){const a=pk(3,9),b=pk(3,9);t=[a,b,a+b];}
+    else if(r<0.35){const a=pk(4,10),b=pk(3,8);t=[a,b,a+b-1];}
+    else t=[pk(3,12),pk(3,12),pk(3,12)];
+    if(t[0]===t[1]&&t[1]===t[2]&&R()<0.7)continue;
+    if(truth(t)===wantCan)return t;
+  }
+  return wantCan?[4,5,6]:[3,4,8];
+}
+const seedBase=()=>mode==='ai'?hashStr('ai-battle'):hashStr(code);
+const tripleFor=r=>genTripleSeeded((seedBase()+r*7919)>>>0);
+
+// ---- 畫布（沿用單人版拼合動畫） ----
+function sstep(x){x=Math.min(1,Math.max(0,x));return x*x*(3-2*x);}
+function seg(x0,y0,x1,y1,color){ctx.strokeStyle=color;ctx.lineWidth=13;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.stroke();}
+function tag(x0,y0,x1,y1,label){
+  const mx=(x0+x1)/2,my=(y0+y1)/2;
+  ctx.font='bold 14px sans-serif';
+  const w=ctx.measureText(label+'cm').width+14;
+  ctx.fillStyle='rgba(255,255,255,.95)';
+  if(ctx.roundRect){ctx.beginPath();ctx.roundRect(mx-w/2,my-12,w,21,8);ctx.fill();}
+  else ctx.fillRect(mx-w/2,my-12,w,21);
+  ctx.fillStyle='#102027';ctx.textAlign='center';ctx.fillText(label+'cm',mx,my+3);
+}
+function joint(x,y){ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,6,0,7);ctx.fill();ctx.strokeStyle='#102027';ctx.lineWidth=2;ctx.stroke();}
+function layout(t){
+  const s=[...t].sort((a,b)=>b-a), SC=16, BY=250, CX=330;
+  const L=s[0]*SC,l1=s[1]*SC,l2=s[2]*SC,x0=CX-L/2,x1=CX+L/2;
+  const can=(s[1]+s[2])>s[0];
+  let apex=null;
+  if(can){const a=(l1*l1-l2*l2+L*L)/(2*L),h=Math.sqrt(Math.max(0,l1*l1-a*a));apex={x:x0+a,y:BY-h};}
+  return{L,l1,l2,x0,x1,apex,can,sorted:s,BY,CX};
+}
+function drawAssemble(q,m1,m2,fin,lay){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const{L,l1,l2,x0,x1,apex,can,sorted,BY,CX}=lay;
+  const C=['#ff5252','#ffd740','#69f0ae'];
+  const mv=(a,b)=>a+(b-a)*q;
+  const b0x=mv(CX-L/2,x0), b0y=mv(150,BY), b1x=mv(CX+L/2,x1), b1y=mv(150,BY);
+  const pLx=mv(CX-l1/2,x0), pLy=mv(195,BY);
+  const pRx=mv(CX+l2/2,x1), pRy=mv(240,BY);
+  seg(b0x,b0y,b1x,b1y,C[0]);
+  let aL,aR;
+  if(can){
+    const endL=-Math.atan2(BY-apex.y,apex.x-x0);
+    let endR=Math.atan2(apex.y-BY,apex.x-x1);
+    while(endR<Math.PI) endR+=Math.PI*2;
+    aL=0+(endL-0)*m1; aR=Math.PI+(endR-Math.PI)*m1;
+  }else{ const A=1.1345; aL=0+(-A)*m1+m2; aR=Math.PI+A*m1-m2; }
+  const lex=pLx+Math.cos(aL)*l1, ley=pLy+Math.sin(aL)*l1;
+  const rex=pRx+Math.cos(aR)*l2, rey=pRy+Math.sin(aR)*l2;
+  seg(pLx,pLy,lex,ley,C[1]); seg(pRx,pRy,rex,rey,C[2]);
+  if(q<1){ // 動畫開始前顯示長度，一開始移動就淡出
+    ctx.globalAlpha=1-q;
+    tag(b0x,b0y,b1x,b1y,sorted[0]);
+    tag(pLx,pLy,lex,ley,sorted[1]);
+    tag(pRx,pRy,rex,rey,sorted[2]);
+    ctx.globalAlpha=1;
+  }
+  if(q>=1){joint(x0,BY);joint(x1,BY);}
+  if(can){
+    if(m1>=1){
+      const{x0:x0b,x1:x1b,apex:ap,BY:by}=lay;
+      ctx.beginPath();ctx.moveTo(x0b,by);ctx.lineTo(ap.x,ap.y);ctx.lineTo(x1b,by);ctx.closePath();
+      ctx.fillStyle='rgba(105,240,174,.25)';ctx.fill();
+      ctx.strokeStyle='#69f0ae';ctx.lineWidth=4;ctx.stroke();joint(ap.x,ap.y);
+    }
+  }else if(fin>0){
+    ctx.globalAlpha=fin;
+    const ssum=sorted[1]+sorted[2];
+    if(ssum<sorted[0]){
+      ctx.setLineDash([8,6]);ctx.strokeStyle='#ff5252';ctx.lineWidth=4;
+      ctx.beginPath();ctx.moveTo(lex,ley);ctx.lineTo(rex,rey);ctx.stroke();ctx.setLineDash([]);
+    }else{ joint((lex+rex)/2,(ley+rey)/2); }
+    ctx.fillStyle='#ff5252';ctx.font='bold 18px "Microsoft JhengHei",sans-serif';ctx.textAlign='center';
+    ctx.fillText(ssum<sorted[0]?'較短的兩條邊合起來的長度小於第三邊':'較短的兩條邊合起來的長度等於第三邊，只能變成一條線',330,30);
+    ctx.globalAlpha=1;
+  }
+}
+// 動畫驅動：rAF 為主、setTimeout 備援，分頁被暫停也不會卡死
+function drive(DUR,draw){
+  return new Promise(res=>{
+    const T0=performance.now();
+    let done=false, timer=null;
+    function frame(){
+      if(done)return;
+      const t=Math.min(1,(performance.now()-T0)/DUR);
+      draw(t);
+      if(t>=1){done=true;if(timer)clearTimeout(timer);res();return;}
+      requestAnimationFrame(frame);
+      if(timer)clearTimeout(timer);
+      timer=setTimeout(()=>{if(!done)frame();},120);
+    }
+    frame();
+  });
+}
+async function playAssemble(can,lay){
+  const DUR=can?3000:4400;
+  await drive(DUR,t=>{
+    const q=sstep((t-0.03)/0.27);
+    let m1=0,m2=0,fin=0;
+    if(can){ m1=sstep((t-0.33)/0.3); }
+    else{ const up=sstep((t-0.33)/0.2), dn=sstep((t-0.68)/0.17); m1=up*(1-dn);
+      const wenv=sstep((t-0.53)/0.03)*(1-sstep((t-0.64)/0.04)); m2=Math.sin(t*DUR/85)*0.07*wenv;
+      fin=sstep((t-0.86)/0.12); }
+    drawAssemble(q,m1,m2,fin,lay);
+  });
+  if(!can){sPop();await wait(350);}
+}
+
+// ---- 隊伍顯示 ----
+const MY_EMO='👾', FOE_EMO='👹';
+function renderTeams(){
+  const myHP=5-foeScore, foeHP=5-myScore;
+  const hearts=hp=>'❤'.repeat(Math.max(0,hp))+'🖤'.repeat(5-Math.max(0,hp));
+  document.getElementById('foeRow').innerHTML=`<span class="tname">${foeName||'對手'}</span><span class="mon${foeHP<=0?' dead':''}" id="foeM">${FOE_EMO}</span><span class="hp">${hearts(foeHP)}</span>`;
+  document.getElementById('myRow').innerHTML=`<span class="tname">${myName}（我）</span><span class="mon${myHP<=0?' dead':''}" id="myM">${MY_EMO}</span><span class="hp">${hearts(myHP)}</span>`;
+  document.getElementById('meVal').textContent=myScore+' / 5';
+  document.getElementById('foeVal').textContent=foeScore+' / 5';
+}
+function renderSides(){
+  sidesEl.innerHTML='';
+  triple.forEach(v=>{const d=document.createElement('div');d.className='side';d.innerHTML=`<div class="n">${v}<span class="u">cm</span></div>`;sidesEl.appendChild(d);});
+}
+function showSeparated(){ if(triple.length)drawAssemble(0,0,0,0,layout(triple)); }
+
+// ---- 同時搶答：新回合雙方同時開放 ----
+function startMyTurn(){
+  myTurnActive=true;busy=false;answered=false;
+  triple=tripleFor(round);
+  renderSides();showSeparated();
+  talkEl.textContent=`第 ${round} 回合，搶答開始！看誰快又準！`;
+  msgEl.textContent='判斷三根邊能不能拼成三角形！';
+  yesBtn.disabled=noBtn.disabled=false;
+}
+async function answer(guess){
+  if(busy||over||!myTurnActive)return;busy=true;myTurnActive=false;
+  yesBtn.disabled=noBtn.disabled=true;
+  if(mode!=='ai'){
+    // 搶答：先搶到回合的人才能作答（round 條件更新，原子判定先後）
+    let won=false;
+    try{ won=await claimRound(); }
+    catch(e){ msgEl.innerHTML='<span class="no">❌ 連線失敗，請再按一次作答</span>'; busy=false; myTurnActive=true; yesBtn.disabled=noBtn.disabled=false; return; }
+    if(!won){ msgEl.innerHTML='⚡ 對方搶先了！看對方表演…'; busy=false; return; }
+  }else{
+    if(aiTimer){clearTimeout(aiTimer);aiTimer=null;}
+    answered=true;
+  }
+  const s=[...triple].sort((a,b)=>a-b);
+  const can=truth(triple), correct=(guess===can), word=cmpWord(triple), sum=s[0]+s[1], L=s[2];
+  const lay=layout(triple);
+  talkEl.textContent='拼合驗證中…';
+  await playAssemble(can,lay);
+  let win='';
+  if(correct&&can){
+    myScore++;
+    await fireballAnim(-1,lay,1,0);
+    markTrapped('foeM');sGood();
+    talkEl.textContent='判斷正確！火球打掉對方一條命！';
+    msgEl.innerHTML=`<span class="ok">✔ ${s[0]}＋${s[1]}＝${sum}，${word} ${L}，可以拼成！火球命中！</span>`;
+    if(myScore>=5)win='me';
+  }else if(correct&&!can){
+    myScore++;
+    await fireballAnim(-1,lay,0,1);
+    markTrapped('foeM');sGood();
+    talkEl.textContent='判斷正確！火球打掉對方一條命！';
+    msgEl.innerHTML=`<span class="ok">✔ ${s[0]}＋${s[1]}＝${sum}，${word} ${L}，不可以拼成！火球命中！</span>`;
+    if(myScore>=5)win='me';
+  }else{
+    foeScore++;sBad();
+    await fireballAnim(+1,lay,can?1:0,can?0:1);
+    markTrapped('myM');
+    talkEl.textContent='判斷錯誤！被對方火球反擊了！';
+    msgEl.innerHTML=`<span class="no">✘ 答錯了，其實是${can?'可以':'不可以'}拼成。你少一條命！</span>`;
+    if(foeScore>=5)win='foe';
+  }
+  postRow('attempts',{class:player.cls,name:player.name,seat:player.seat,sides:triple,guess_can:guess,truth_can:can,correct:correct,captured:correct&&can});
+  renderTeams();
+  if(mode==='ai'){
+    busy=false;
+    if(win){endBattle(win==='me');return;}
+    round++;aiTurn();return;
+  }
+  // 連線：只有出招者寫入房間
+  const body={round:round+1,turn:mode==='p1'?'p2':'p1',last_actor:'',last_sides:triple,last_guess:guess,last_can:can,last_correct:correct,winner:win===''?'':(win==='me'?mode:(mode==='p1'?'p2':'p1'))};
+  body[mode==='p1'?'p1_score':'p2_score']=myScore;
+  body[mode==='p1'?'p2_score':'p1_score']=foeScore;
+  justPlayedRound=round+1;
+  try{ await sbPatch(code,body); holdUntil=Date.now()+2000; }
+  catch(e){
+    try{await sbPatch(code,{last_actor:''});}catch(e2){}
+    msgEl.innerHTML='<span class="no">❌ 連線寫入失敗，請再按一次作答</span>';
+    busy=false;myTurnActive=true;yesBtn.disabled=noBtn.disabled=false;return;
+  }
+  busy=false;
+  if(win){endBattle(win==='me');return;}
+  msgEl.innerHTML+= '<br>等待對方出招…';
+}
+function markTrapped(id){const el=document.getElementById(id);if(el){el.classList.add('hit');setTimeout(()=>el.classList.remove('hit'),1100);}}
+
+// ---- 對方回合結果（連線） ----
+async function showFoeResult(rm){
+  const s=[...rm.last_sides].sort((a,b)=>a-b);
+  const word=(()=>{const sum=s[0]+s[1];return sum>s[2]?'大於':(sum<s[2]?'小於':'等於');})();
+  const foeLay=layout(rm.last_sides);
+  const endM1=rm.last_can?1:0, endFin=rm.last_can?0:1;
+  if(rm.last_correct){
+    await fireballAnim(+1,foeLay,endM1,endFin);
+    markTrapped('myM');sBad();
+    talkEl.textContent=`對方判斷正確，火球打中你！（${s.join('、')}${rm.last_can?'可以':'不可以'}拼成）`;
+    msgEl.innerHTML=`<span class="no">對方出招：${s[0]}＋${s[1]}，${word} ${s[2]}，你少一條命！</span>`;
+  }else{
+    await fireballAnim(-1,foeLay,endM1,endFin);
+    markTrapped('foeM');sGood();
+    talkEl.textContent='對方答錯！你的火球反擊，打掉對方一條命！';
+    msgEl.innerHTML=`<span class="ok">對方答錯了，火球反擊打掉對方一條命！</span>`;
+  }
+  renderTeams();
+  await wait(1600);
+}
+
+// ---- 輪詢 ----
+async function tick(){
+  if(pollBusy||over||busy)return;pollBusy=true;
+  try{
+    const rows=await sbGet('code=eq.'+code+'&select=*');
+    if(!rows.length){msgEl.innerHTML='<span class="no">❌ 房間不存在或已關閉</span>';stopPoll();pollBusy=false;return;}
+    const rm=rows[0];
+    myScore=mode==='p1'?rm.p1_score:rm.p2_score;
+    foeScore=mode==='p1'?rm.p2_score:rm.p1_score;
+    round=rm.round;turn=rm.turn;renderTeams();
+    if(rm.winner){endBattle(rm.winner===mode);pollBusy=false;return;}
+    if(rm.phase==='lobby'){
+      lobbyTicks++;
+      if(mode==='p1'&&rm.p2_name){foeName=rm.p2_name;lobbyTicks=0;await sbPatch(code,{phase:'answer'});}
+      else if(lobbyTicks>20){msgEl.innerHTML='等很久了…請確認對方還在線上，必要時取消重開房間';}
+      else{msgEl.textContent='等待對手加入…';}
+      pollBusy=false;return;
+    }
+    lobbyTicks=0;
+    if(rm.phase!=='answer'){pollBusy=false;return;}
+    if(!foeName)foeName=mode==='p1'?rm.p2_name:rm.p1_name;
+    if(round!==lastSeenRound){
+      lastSeenRound=round;claimNoticeSince=0;
+      if(round!==justPlayedRound&&round>1)await showFoeResult(rm);
+      justPlayedRound=0;
+      if(!busy&&Date.now()>holdUntil)startMyTurn();
+    }else if(rm.last_actor&&rm.last_actor!==mode&&!busy){
+      if(!claimNoticeSince)claimNoticeSince=Date.now();
+      if(Date.now()-claimNoticeSince>20000){
+        try{await sbPatch(code,{last_actor:''});}catch(e){}
+        claimNoticeSince=Date.now();
+        msgEl.innerHTML='⚡ 對方好像斷線了，已重置搶答，再按一次作答！';
+      }else{
+        msgEl.innerHTML='⚡ 對方搶先作答中…';
+        talkEl.textContent=`${foeName} 搶答中…`;
+      }
+    }else{claimNoticeSince=0;}
+  }catch(e){ msgEl.innerHTML='<span class="no">❌ 連線中斷，重整頁面重試</span>'; }
+  pollBusy=false;
+}
+function startPoll(){stopPoll();pollTimer=setInterval(tick,1500);tick();}
+function stopPoll(){if(pollTimer){clearInterval(pollTimer);pollTimer=null;}}
+
+// ---- AI ----
+function aiTurn(){
+  if(over)return;
+  yesBtn.disabled=noBtn.disabled=true;
+  triple=tripleFor(round);
+  renderSides();showSeparated();
+  talkEl.textContent=`第 ${round} 回合，搶答開始！電腦也在搶！`;
+  msgEl.textContent='看誰先按！你也可以搶答！';
+  aiTimer=setTimeout(async()=>{
+    if(over||answered)return;
+    const s=[...triple].sort((a,b)=>a-b);
+    const can=truth(triple), aiGuess=Math.random()<0.78?can:!can, word=cmpWord(triple);
+    const lay=layout(triple);
+    await playAssemble(can,lay);
+    if(aiGuess===can){
+      foeScore++;await fireballAnim(+1,lay,can?1:0,can?0:1);markTrapped('myM');sBad();
+      talkEl.textContent='電腦判斷正確，火球打中你！';
+      msgEl.innerHTML=`<span class="no">電腦：${s[0]}＋${s[1]}，${word} ${s[2]}，${can?'可以':'不可以'}拼成！你少一條命！</span>`;
+      if(foeScore>=5){renderTeams();endBattle(false);return;}
+    }else{
+      myScore++;await fireballAnim(-1,lay,can?1:0,can?0:1);markTrapped('foeM');sGood();
+      talkEl.textContent='電腦答錯！火球打掉對方一條命！';
+      msgEl.innerHTML=`<span class="ok">電腦答錯了，火球打掉對方一條命！</span>`;
+      if(myScore>=5){renderTeams();endBattle(true);return;}
+    }
+    renderTeams();round++;startMyTurn();
+  },1500+Math.random()*2000);
+}
+
+// ---- 結束 ----
+function endBattle(win){
+  over=true;stopPoll();if(aiTimer)clearTimeout(aiTimer);stopBGM();
+  yesBtn.disabled=noBtn.disabled=true;
+  document.getElementById('endTitle').textContent=win?'🎉 你贏了！':'💔 你輸了！';
+  document.getElementById('endText').innerHTML=`比數 <b>${myScore} : ${foeScore}</b>（先打光對方 5 條命獲勝）<br>${win?'太厲害了，三角形大師就是你！':'多觀察拼合動畫，下次贏回來！'}`;
+  showView('endView');
+  if(win)sGood();else sBad();
+}
+function showView(id){
+  ['menuView','lobbyView','endView'].forEach(v=>document.getElementById(v).style.display=v===id?'':'none');
+  document.getElementById('overlay').style.display=id?'flex':'none';
+}
+function mkCode(){const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let c='';for(let i=0;i<4;i++)c+=A[Math.floor(Math.random()*A.length)];return c;}
+async function createRoom(){
+  sClick();readIdentity();
+  for(let k=0;k<3;k++){
+    const c=mkCode();
+    try{ await sbPost({code:c,p1_name:myName}); code=c;mode='p1';foeName='';
+      document.getElementById('roomVal').textContent=c;
+      document.getElementById('roomCodeBig').textContent=c;
+      showView('lobbyView');renderTeams();startPoll();startBGM();return;
+    }catch(e){}
+  }
+  alert('建立房間失敗，檢查網路後重試');
+}
+async function joinRoom(){
+  sClick();readIdentity();
+  const c=document.getElementById('inRoom').value.trim().toUpperCase();
+  if(c.length!==4){alert('請輸入 4 碼房號');return;}
+  try{
+    const rows=await sbGet('code=eq.'+c+'&select=*');
+    if(!rows.length){alert('找不到這個房間，確認房號');return;}
+    if(rows[0].p2_name){alert('這個房間已經客滿了');return;}
+    await sbPatch(c,{p2_name:myName});
+    code=c;mode='p2';foeName=rows[0].p1_name;
+    document.getElementById('roomVal').textContent=c;
+    document.getElementById('overlay').style.display='none';
+    renderTeams();startPoll();startBGM();
+  }catch(e){alert('加入失敗，檢查網路後重試');}
+}
+function startAI(){
+  sClick();readIdentity();mode='ai';foeName='電腦怪獸王 🤖';
+  document.getElementById('roomVal').textContent='AI';
+  document.getElementById('overlay').style.display='none';
+  myScore=0;foeScore=0;round=1;renderTeams();startBGM();startMyTurn();
+}
+document.getElementById('createBtn').onclick=createRoom;
+document.getElementById('joinBtn').onclick=joinRoom;
+document.getElementById('aiBtn').onclick=startAI;
+document.getElementById('backBtn').onclick=()=>{location.href='三角泡泡對戰.html';};
+document.getElementById('cancelBtn').onclick=()=>{stopPoll();showView('menuView');};
+document.getElementById('againBtn').onclick=()=>location.reload();
+document.getElementById('homeBtn2').onclick=()=>{location.href='index.html';};
+document.getElementById('homeBtn').onclick=()=>{location.href='index.html';};
+document.getElementById('muteBtn').onclick=e=>{sound=!sound;e.target.textContent=sound?'🔊':'🔇';if(sound)startBGM();};
+yesBtn.onclick=()=>{sClick();answer(true);};
+noBtn.onclick=()=>{sClick();answer(false);};
+renderTeams();
+function readIdentity(){
+  const gv=id=>{const el=document.getElementById(id);return el?el.value.trim():'';};
+  player={cls:gv('bCls'),name:gv('bName')||'訪客',seat:gv('bSeat')};
+  myName=player.name;
+  try{localStorage.setItem('triPlayer',JSON.stringify(player));}catch(e){}
+  renderTeams();
+}
+async function netTest(){
+  const el=document.getElementById('netStat');
+  try{ await sbGet('select=code&limit=1'); el.textContent='✅ 連線正常，可以建立房間'; el.style.background='#e8f5e9'; }
+  catch(e){ el.textContent='❌ 連線失敗：檢查網路或稍後重試（'+e.message+'）'; el.style.background='#ffebee'; }
+}
+(function initBattle(){
+  try{const p=JSON.parse(localStorage.getItem('triPlayer')||'null');
+    if(p){
+      if(p.cls)document.getElementById('bCls').value=p.cls;
+      if(p.name&&p.name!=='訪客')document.getElementById('bName').value=p.name;
+      if(p.seat)document.getElementById('bSeat').value=p.seat;
+    }
+  }catch(e){}
+  netTest();
+})();
+</script>
+</body>
+</html>
