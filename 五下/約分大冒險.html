@@ -3072,7 +3072,8 @@
 
             const codeInput = document.getElementById('joinRoomCodeInput');
             const code = codeInput ? codeInput.value.trim() : '';
-            if (!/^d{4}$/.test(code)) {
+            const cleanCode = code.replace(/\D/g, '');
+            if (cleanCode.length !== 4) {
                 alert("請輸入正確的 4 位數數字房號！");
                 return;
             }
@@ -3081,7 +3082,7 @@
             vsState.myName = getFighterDisplayName();
             vsState.isHost = false;
             vsState.isBot = false;
-            vsState.roomId = code;
+            vsState.roomId = cleanCode;
             vsState.myRound = 1;
             vsState.p1Score = 0;
             vsState.p2Score = 0;
@@ -3089,17 +3090,17 @@
             vsState.p2PrevScore = 0;
             vsState.isAnswering = false;
 
-            const roomRef = firebase.database().ref('FractionReduce/battle_rooms/' + code);
+            const roomRef = firebase.database().ref('FractionReduce/battle_rooms/' + cleanCode);
             vsState.roomRef = roomRef;
 
             roomRef.once('value').then(snapshot => {
                 const data = snapshot.val();
                 if (!data) {
-                    alert("❌ 找不到房號 " + code + "，請確認房號是否正確！");
+                    alert("❌ 找不到房號 " + cleanCode + "，請確認房號是否正確！");
                     return;
                 }
                 if (data.status !== 'waiting' || data.guest) {
-                    alert("⛔ 房間 " + code + " 已經開始遊戲或人數已滿！");
+                    alert("⛔ 房間 " + cleanCode + " 已經開始遊戲或人數已滿！");
                     return;
                 }
 
@@ -3111,7 +3112,7 @@
                     }
                 }).then(() => {
                     roomRef.onDisconnect().update({ status: 'abandoned' });
-                    vsWatchRoom(code);
+                    vsWatchRoom(cleanCode);
                 });
             }).catch(err => {
                 console.error("加入房間失敗", err);
