@@ -109,19 +109,12 @@
   </div>
 </div>
 
+<script src="firebase-db.js?v=1"></script>
 <script>
-const SB_URL='https://YOUR-PROJECT-REF.supabase.co', SB_KEY='YOUR-ANON-KEY';
-const H={ 'apikey': SB_KEY, 'Authorization': 'Bearer '+SB_KEY, 'Content-Type': 'application/json' };
-async function sbGet(q){ const r=await fetch(SB_URL+'/rest/v1/rooms?'+q,{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}}); if(!r.ok)throw new Error('HTTP '+r.status); return r.json(); }
-async function sbPost(row){ const r=await fetch(SB_URL+'/rest/v1/rooms',{method:'POST',headers:Object.assign({},H,{'Prefer':'return=minimal'}),body:JSON.stringify(row)}); if(!r.ok)throw new Error('HTTP '+r.status); }
-async function sbPatch(code,body){ const r=await fetch(SB_URL+'/rest/v1/rooms?code=eq.'+code,{method:'PATCH',headers:Object.assign({},H,{'Prefer':'return=minimal'}),body:JSON.stringify(body)}); if(!r.ok)throw new Error('HTTP '+r.status); }
-// 搶答：round 條件更新，原子判定誰先按（回傳有列＝搶到）
-async function claimRound(){
-  const r=await fetch(SB_URL+'/rest/v1/rooms?code=eq.'+code+'&round=eq.'+round+'&last_actor=eq.',{method:'PATCH',headers:Object.assign({},H,{'Prefer':'return=representation'}),body:JSON.stringify({last_actor:mode})});
-  if(!r.ok)throw new Error('HTTP '+r.status);
-  return (await r.json()).length>0;
-}
-function postRow(table,row){ try{ fetch(SB_URL+'/rest/v1/'+table,{method:'POST',headers:Object.assign({},H,{'Prefer':'return=minimal'}),body:JSON.stringify(row)}).catch(()=>{}); }catch(e){} }
+// Firebase HighGrade / triangleBubble：以交易處理房間與同時搶答。
+async function readRoom(roomCode){const room=await TriangleDatabase.getRoom(roomCode);return room?[room]:[];}
+async function claimRound(){return TriangleDatabase.claimRound(code,round,mode);}
+function postRow(table,row){return TriangleDatabase.saveLog(table,{...row,source:mode==='ai'?'ai':'battle'}).catch(TriangleDatabase.showSaveError);}
 
 let player={cls:'',name:'訪客',seat:''};
 try{ const p=JSON.parse(localStorage.getItem('triPlayer')||'null'); if(p)player={cls:p.cls||'',name:p.name||'訪客',seat:p.seat||''}; }catch(e){}
@@ -309,8 +302,8 @@ const MY_EMO='👾', FOE_EMO='👹';
 function renderTeams(){
   const myHP=5-foeScore, foeHP=5-myScore;
   const hearts=hp=>'❤'.repeat(Math.max(0,hp))+'🖤'.repeat(5-Math.max(0,hp));
-  document.getElementById('foeRow').innerHTML=`<span class="tname">${foeName||'對手'}</span><span class="mon${foeHP<=0?' dead':''}" id="foeM">${FOE_EMO}</span><span class="hp">${hearts(foeHP)}</span>`;
-  document.getElementById('myRow').innerHTML=`<span class="tname">${myName}（我）</span><span class="mon${myHP<=0?' dead':''}" id="myM">${MY_EMO}</span><span class="hp">${hearts(myHP)}</span>`;
+  document.getElementById('foeRow').innerHTML=`<span class="tname">${TriangleDatabase.escapeHTML(foeName||'對手')}</span><span class="mon${foeHP<=0?' dead':''}" id="foeM">${FOE_EMO}</span><span class="hp">${hearts(foeHP)}</span>`;
+  document.getElementById('myRow').innerHTML=`<span class="tname">${TriangleDatabase.escapeHTML(myName)}（我）</span><span class="mon${myHP<=0?' dead':''}" id="myM">${MY_EMO}</span><span class="hp">${hearts(myHP)}</span>`;
   document.getElementById('meVal').textContent=myScore+' / 5';
   document.getElementById('foeVal').textContent=foeScore+' / 5';
 }
@@ -382,9 +375,9 @@ async function answer(guess){
   body[mode==='p1'?'p1_score':'p2_score']=myScore;
   body[mode==='p1'?'p2_score':'p1_score']=foeScore;
   justPlayedRound=round+1;
-  try{ await sbPatch(code,body); holdUntil=Date.now()+2000; }
+  try{ await TriangleDatabase.completeRound(code,round,mode,body); holdUntil=Date.now()+2000; }
   catch(e){
-    try{await sbPatch(code,{last_actor:''});}catch(e2){}
+    try{await TriangleDatabase.releaseClaim(code,round,mode);}catch(e2){}
     msgEl.innerHTML='<span class="no">❌ 連線寫入失敗，請再按一次作答</span>';
     busy=false;myTurnActive=true;yesBtn.disabled=noBtn.disabled=false;return;
   }
@@ -419,7 +412,7 @@ async function showFoeResult(rm){
 async function tick(){
   if(pollBusy||over||busy)return;pollBusy=true;
   try{
-    const rows=await sbGet('code=eq.'+code+'&select=*');
+    const rows=await readRoom(code);
     if(!rows.length){msgEl.innerHTML='<span class="no">❌ 房間不存在或已關閉</span>';stopPoll();pollBusy=false;return;}
     const rm=rows[0];
     myScore=mode==='p1'?rm.p1_score:rm.p2_score;
@@ -428,13 +421,14 @@ async function tick(){
     if(rm.winner){endBattle(rm.winner===mode);pollBusy=false;return;}
     if(rm.phase==='lobby'){
       lobbyTicks++;
-      if(mode==='p1'&&rm.p2_name){foeName=rm.p2_name;lobbyTicks=0;await sbPatch(code,{phase:'answer'});}
+      if(mode==='p1'&&rm.p2_name){foeName=rm.p2_name;lobbyTicks=0;await TriangleDatabase.startRoom(code);}
       else if(lobbyTicks>20){msgEl.innerHTML='等很久了…請確認對方還在線上，必要時取消重開房間';}
       else{msgEl.textContent='等待對手加入…';}
       pollBusy=false;return;
     }
     lobbyTicks=0;
     if(rm.phase!=='answer'){pollBusy=false;return;}
+    showView(null);
     if(!foeName)foeName=mode==='p1'?rm.p2_name:rm.p1_name;
     if(round!==lastSeenRound){
       lastSeenRound=round;claimNoticeSince=0;
@@ -444,14 +438,18 @@ async function tick(){
     }else if(rm.last_actor&&rm.last_actor!==mode&&!busy){
       if(!claimNoticeSince)claimNoticeSince=Date.now();
       if(Date.now()-claimNoticeSince>20000){
-        try{await sbPatch(code,{last_actor:''});}catch(e){}
+        try{await TriangleDatabase.releaseStaleClaim(code);}catch(e){}
         claimNoticeSince=Date.now();
         msgEl.innerHTML='⚡ 對方好像斷線了，已重置搶答，再按一次作答！';
       }else{
         msgEl.innerHTML='⚡ 對方搶先作答中…';
         talkEl.textContent=`${foeName} 搶答中…`;
       }
-    }else{claimNoticeSince=0;}
+    }else{
+      claimNoticeSince=0;
+      // 自己送出上一回合後可能仍在動畫緩衝期；下一次同步時重新開放搶答。
+      if(!rm.last_actor&&!myTurnActive&&!busy&&Date.now()>holdUntil)startMyTurn();
+    }
   }catch(e){ msgEl.innerHTML='<span class="no">❌ 連線中斷，重整頁面重試</span>'; }
   pollBusy=false;
 }
@@ -505,7 +503,7 @@ async function createRoom(){
   sClick();readIdentity();
   for(let k=0;k<3;k++){
     const c=mkCode();
-    try{ await sbPost({code:c,p1_name:myName}); code=c;mode='p1';foeName='';
+    try{ await TriangleDatabase.createRoom(c,myName); code=c;mode='p1';foeName='';
       document.getElementById('roomVal').textContent=c;
       document.getElementById('roomCodeBig').textContent=c;
       showView('lobbyView');renderTeams();startPoll();startBGM();return;
@@ -518,10 +516,10 @@ async function joinRoom(){
   const c=document.getElementById('inRoom').value.trim().toUpperCase();
   if(c.length!==4){alert('請輸入 4 碼房號');return;}
   try{
-    const rows=await sbGet('code=eq.'+c+'&select=*');
+    const rows=await readRoom(c);
     if(!rows.length){alert('找不到這個房間，確認房號');return;}
     if(rows[0].p2_name){alert('這個房間已經客滿了');return;}
-    await sbPatch(c,{p2_name:myName});
+    await TriangleDatabase.joinRoom(c,myName);
     code=c;mode='p2';foeName=rows[0].p1_name;
     document.getElementById('roomVal').textContent=c;
     document.getElementById('overlay').style.display='none';
@@ -555,7 +553,7 @@ function readIdentity(){
 }
 async function netTest(){
   const el=document.getElementById('netStat');
-  try{ await sbGet('select=code&limit=1'); el.textContent='✅ 連線正常，可以建立房間'; el.style.background='#e8f5e9'; }
+  try{ await TriangleDatabase.checkConnection(); el.textContent='✅ 資料庫連線正常，可以建立房間'; el.style.background='#e8f5e9'; }
   catch(e){ el.textContent='❌ 連線失敗：檢查網路或稍後重試（'+e.message+'）'; el.style.background='#ffebee'; }
 }
 (function initBattle(){

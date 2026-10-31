@@ -57,8 +57,8 @@
   </table></div>
   <div id="empty" class="empty" style="display:none">這個篩選條件沒有資料，換個條件試試 👀</div>
 </div>
+<script src="firebase-db.js?v=1"></script>
 <script>
-const SB_URL='https://YOUR-PROJECT-REF.supabase.co', SB_KEY='YOUR-ANON-KEY';
 const $=id=>document.getElementById(id);
 const pad=n=>String(n).padStart(2,'0');
 (function initDate(){const d=new Date();$('fDate').value=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;})();
@@ -70,15 +70,11 @@ function fmtTime(iso){const d=new Date(iso);return `${pad(d.getMonth()+1)}/${pad
 async function query(){
   $('status').textContent='查詢中…';$('tbl').style.display='none';$('empty').style.display='none';
   try{
-    const p=new URLSearchParams({select:'*',order:'created_at.desc',limit:'500'});
-    const cls=$('fCls').value.trim(), name=$('fName').value.trim(), dt=$('fDate').value;
-    if(cls)p.append('class','eq.'+cls);
-    if(name)p.append('name','eq.'+name);
-    if(dt){const base=new Date(dt+'T00:00:00');p.append('created_at','gte.'+base.toISOString());p.append('created_at','lt.'+new Date(base.getTime()+864e5).toISOString());}
-    if($('fWrong').checked)p.append('correct','is.false');
-    const r=await fetch(SB_URL+'/rest/v1/attempts?'+p.toString(),{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    render(await r.json());
+    const rows=await TriangleDatabase.listAttempts({
+      date:$('fDate').value, cls:$('fCls').value.trim(), name:$('fName').value.trim(),
+      wrongOnly:$('fWrong').checked
+    });
+    render(rows);
   }catch(e){ $('status').textContent='❌ 讀取失敗（網路或資料庫連線問題）：'+e.message; }
 }
 function render(rows){
@@ -88,8 +84,8 @@ function render(rows){
     if(a.correct)ok++;
     who.add((a.class||'')+'|'+(a.name||''));
     const tr=document.createElement('tr');tr.className=a.correct?'good':'wrong';
-    tr.innerHTML=`<td>${fmtTime(a.created_at)}</td><td>${a.class||'-'}</td><td>${a.name||'-'}</td><td>${a.seat||'-'}</td>`
-      +`<td><b>${fmtSides(a.sides)}</b></td><td>${a.guess_can?'⭕可以':'❌不能'}</td><td>${a.truth_can?'可以':'不可以'}</td>`
+    tr.innerHTML=`<td>${fmtTime(a.created_at)}</td><td>${TriangleDatabase.escapeHTML(a.class||'-')}</td><td>${TriangleDatabase.escapeHTML(a.name||'-')}</td><td>${TriangleDatabase.escapeHTML(a.seat||'-')}</td>`
+      +`<td><b>${TriangleDatabase.escapeHTML(fmtSides(a.sides))}</b></td><td>${a.guess_can?'⭕可以':'❌不能'}</td><td>${a.truth_can?'可以':'不可以'}</td>`
       +`<td>${a.correct?'✔':'<b>✘</b>'}</td><td>${a.captured?'🫧':''}</td>`;
     tb.appendChild(tr);
   });
@@ -97,7 +93,7 @@ function render(rows){
   $('stAcc').textContent=rows.length?Math.round(ok/rows.length*100)+'%':'--';
   $('stW').textContent=rows.length-ok;
   $('stP').textContent=who.size;
-  $('status').textContent=`共 ${rows.length} 筆（${$('fWrong').checked?'只看錯題':'全部'}）`;
+  $('status').textContent=`共 ${rows.length} 筆（${$('fWrong').checked?'只看錯題':'全部'}；${$('fDate').value?'所選日期':'最近 500 筆內'}，最多顯示 500 筆）`;
   $('tbl').style.display=rows.length?'':'none';
   $('empty').style.display=rows.length?'none':'';
 }

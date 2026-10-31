@@ -163,6 +163,7 @@
   </div>
 </div>
 
+<script src="firebase-db.js?v=1"></script>
 <script>
 const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 const sidesEl = document.getElementById('sides'), msgEl = document.getElementById('msg');
@@ -176,22 +177,18 @@ let lives = 3, score = 0, okCount = 0, judgments = 0, captured = 0, mi = 0;
 let triple = [], busy = false, started = false;
 const MON = [['👾','泡泡怪'],['👹','尖牙怪'],['🤖','鐵皮怪'],['👻','搗蛋鬼'],['🐲','小火龍'],['🦖','暴暴龍'],['👽','外星怪'],['🎃','南瓜王'],['🐙','章魚哥'],['😈','黑魔王']];
 let AC = null, sound = true;
-// 作答紀錄後端（Supabase，失敗不影響遊戲）
-const SB_URL='https://YOUR-PROJECT-REF.supabase.co', SB_KEY='YOUR-ANON-KEY';
+// 作答紀錄、排行榜：Firebase HighGrade / triangleBubble
 let player={cls:'',name:'訪客',seat:''};
 function logAttempt(row){ postRow('attempts',row); }
-function postRow(table,row){ try{ fetch(SB_URL+'/rest/v1/'+table,{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(row)}).catch(()=>{}); }catch(e){} }
-function logScore(){ postRow('highscores',{class:player.cls,name:player.name,seat:player.seat,score:score,captured:captured,judgments:judgments,ok_count:okCount}); }
+function postRow(table,row){ return TriangleDatabase.saveLog(table,{...row,source:'single'}).catch(TriangleDatabase.showSaveError); }
+function logScore(){ return postRow('highscores',{class:player.cls,name:player.name,seat:player.seat,score:score,captured:captured,judgments:judgments,ok_count:okCount}); }
 async function loadBoard(elId,limit){
   const el=document.getElementById(elId);if(!el)return;
   try{
-    const p=new URLSearchParams({select:'class,name,seat,score',order:'score.desc,created_at.desc',limit:String(limit)});
-    const r=await fetch(SB_URL+'/rest/v1/highscores?'+p.toString(),{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
-    if(!r.ok)throw 0;
-    const rows=await r.json();
+    const rows=await TriangleDatabase.listScores(limit);
     if(!rows.length){el.innerHTML='<div class="brow">還沒有紀錄，快來當第一名！🎉</div>';return;}
     const medal=['🥇','🥈','🥉'];
-    el.innerHTML=rows.map((x,i)=>`<div class="brow"><span>${medal[i]||(i+1)}</span><span>${x.class?x.class+' ':''}${x.name||'訪客'}${x.seat?'('+x.seat+')':''}</span><b>${x.score}分</b></div>`).join('');
+    el.innerHTML=rows.map((x,i)=>`<div class="brow"><span>${medal[i]||(i+1)}</span><span>${TriangleDatabase.escapeHTML(x.class?x.class+' ':'')}${TriangleDatabase.escapeHTML(x.name||'訪客')}${TriangleDatabase.escapeHTML(x.seat?'('+x.seat+')':'')}</span><b>${x.score}分</b></div>`).join('');
   }catch(e){ el.innerHTML='<div class="brow">排行榜載入失敗</div>'; }
 }
 // 基礎音色
@@ -504,8 +501,7 @@ function endGame(win){
     +`<p>👾 捕獲：<b>${captured} / ${GOAL}</b><br>🎯 共判斷 ${judgments} 次、答對 ${okCount} 次（${acc}%）<br>⭐ 得分：<b>${score}</b></p><h3 style="margin:8px 0 4px">🏆 高分排行榜 TOP 10</h3><div id="board">載入中…</div><button id="startBtn">🔁 再玩一次</button>`;
   document.getElementById('overlay').style.display='flex';
   document.getElementById('startBtn').onclick=resetGame;
-  logScore();
-  loadBoard('board',10);
+  logScore().then(()=>loadBoard('board',10));
   stopBGM(); if(win) sWin(); else sLose();
 }
 function resetGame(){
