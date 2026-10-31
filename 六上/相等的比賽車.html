@@ -1,0 +1,3901 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>相等的比賽車 - 瑪利歐賽車競速學數學</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Noto+Sans+TC:wght@400;600;700;900&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #0b0f19;
+            color: #ffffff;
+            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
+        .font-racing {
+            font-family: 'Orbitron', 'Noto Sans TC', sans-serif;
+        }
+
+        .font-bubble {
+            font-family: 'Fredoka', 'Noto Sans TC', sans-serif;
+        }
+
+        /* 擬真賽道 Canvas 容器 */
+        #game-canvas-container {
+            position: relative;
+            width: 100%;
+            height: 440px;
+            background: #000;
+            overflow: hidden;
+            border-radius: 1.25rem;
+            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.7), inset 0 0 15px rgba(255, 255, 255, 0.1);
+            transition: transform 0.05s ease-out;
+        }
+
+        #game-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 賽車儀表板霓虹發光 */
+        .neon-border {
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5), inset 0 0 10px rgba(59, 130, 246, 0.2);
+        }
+
+        .neon-gold {
+            box-shadow: 0 0 20px rgba(234, 179, 8, 0.8), inset 0 0 10px rgba(234, 179, 8, 0.3);
+        }
+
+        .neon-star {
+            animation: rainbow-glow 0.6s infinite alternate;
+        }
+
+        .neon-dash {
+            animation: dash-glow 0.5s infinite alternate;
+        }
+
+        @keyframes rainbow-glow {
+            0% { box-shadow: 0 0 25px #ff0055, 0 0 50px #ff7700; border-color: #ff0055; }
+            50% { box-shadow: 0 0 35px #ffff00, 0 0 60px #00ff66; border-color: #ffff00; }
+            100% { box-shadow: 0 0 25px #00ffff, 0 0 50px #9900ff; border-color: #00ffff; }
+        }
+
+        @keyframes dash-glow {
+            0% { box-shadow: 0 0 20px #f59e0b, 0 0 40px #ef4444; border-color: #f59e0b; }
+            100% { box-shadow: 0 0 35px #fbbf24, 0 0 65px #f97316; border-color: #fbbf24; }
+        }
+
+        /* 選項卡牌點擊反饋 */
+        .option-card {
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            background: linear-gradient(145deg, #1f2937, #111827);
+            border: 2px solid #374151;
+        }
+
+        .option-card:hover:not(:disabled) {
+            transform: translateY(-3px) scale(1.02);
+            border-color: #60a5fa;
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.35);
+        }
+
+        .option-card:active:not(:disabled) {
+            transform: translateY(1px) scale(0.98);
+        }
+
+        .option-card.correct-ans {
+            background: linear-gradient(145deg, #065f46, #047857) !important;
+            border-color: #34d399 !important;
+            box-shadow: 0 0 25px rgba(52, 211, 153, 0.8) !important;
+            animation: pulse-correct 0.4s ease-out;
+        }
+
+        .option-card.wrong-ans {
+            background: linear-gradient(145deg, #7f1d1d, #991b1b) !important;
+            border-color: #f87171 !important;
+            box-shadow: 0 0 25px rgba(239, 68, 68, 0.8) !important;
+            animation: shake 0.5s ease;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            40% { transform: translateX(8px); }
+            60% { transform: translateX(-6px); }
+            80% { transform: translateX(6px); }
+        }
+
+        @keyframes pulse-correct {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* 道具轉盤動畫 */
+        @keyframes item-spin {
+            0% { transform: rotateY(0deg) scale(0.8); }
+            50% { transform: rotateY(180deg) scale(1.15); }
+            100% { transform: rotateY(360deg) scale(1); }
+        }
+
+        .item-roulette {
+            animation: item-spin 0.25s linear infinite;
+        }
+
+        /* 終點彩帶落下 */
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 14px;
+            opacity: 0.9;
+            pointer-events: none;
+            animation: fall linear forwards;
+        }
+
+        @keyframes fall {
+            to {
+                transform: translateY(600px) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        /* 倒數動畫效果 */
+        @keyframes countdown-pop {
+            0% { transform: scale(2.2); opacity: 0; }
+            40% { transform: scale(0.95); opacity: 1; }
+            70% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .animate-countdown {
+            animation: countdown-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        /* 地圖玩家指示呼吸光圈 */
+        @keyframes player-pulse {
+            0% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.4); opacity: 0.2; }
+            100% { transform: scale(1); opacity: 0.8; }
+        }
+
+        .map-pulse {
+            animation: player-pulse 1.2s infinite ease-in-out;
+            transform-origin: center;
+        }
+
+        /* 虛擬按鍵反饋 */
+        .ctrl-btn {
+            touch-action: manipulation;
+            transition: transform 0.1s, background-color 0.1s;
+        }
+        .ctrl-btn:active {
+            transform: scale(0.92);
+        }
+
+        /* 自訂滾動條 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-950 flex flex-col items-center justify-start p-2 sm:p-4">
+    <!-- 遊戲背景音樂 (Coin Rush) -->
+    <audio id="bgm-audio" loop preload="auto" src="Coin%20Rush.mp3"></audio>
+
+    <!-- 主遊戲外框 -->
+    <div class="w-full max-w-5xl flex flex-col gap-3">
+
+        <!-- 頂部標頭與操作選單 -->
+        <header class="flex flex-wrap items-center justify-between bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-2.5 shadow-lg backdrop-blur">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 via-amber-500 to-yellow-400 flex items-center justify-center text-2xl shadow-md shadow-red-500/30">
+                    🏎️
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-black tracking-wide font-racing text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-red-500">
+                        相等的比賽車
+                    </h1>
+                </div>
+            </div>
+
+            <!-- 控制小按鈕 -->
+            <div class="flex items-center gap-2">
+                <button id="btn-help" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs sm:text-sm font-medium text-slate-200 border border-slate-700 transition flex items-center gap-1 shadow cursor-pointer">
+                    <span>📖</span> 規則說明
+                </button>
+                <button id="btn-sound" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs sm:text-sm font-medium text-slate-200 border border-slate-700 transition flex items-center gap-1 shadow cursor-pointer">
+                    <span id="sound-icon">🔊</span> <span id="sound-text">音效: 開</span>
+                </button>
+                <button id="btn-restart" class="px-3 py-1.5 rounded-xl bg-red-900/40 hover:bg-red-800/60 text-xs sm:text-sm font-medium text-red-200 border border-red-700/50 transition flex items-center gap-1 shadow cursor-pointer">
+                    <span>🔄</span> 重新挑戰
+                </button>
+            </div>
+        </header>
+
+        <!-- ============================================== -->
+        <!-- 畫面 1: 開始選單 (START MENU - 極簡簡潔版) -->
+        <!-- ============================================== -->
+        <section id="screen-start" class="w-full max-w-xl mx-auto bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur flex flex-col items-center text-center relative overflow-hidden my-4">
+            <div class="absolute -top-24 -left-24 w-60 h-60 bg-red-600/15 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-24 -right-24 w-60 h-60 bg-yellow-500/15 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-red-600 via-amber-500 to-yellow-400 flex items-center justify-center text-4xl shadow-lg shadow-red-500/30 mb-3">
+                🏎️
+            </div>
+
+            <h2 class="text-3xl sm:text-4xl font-black font-racing text-white tracking-wide mb-1">
+                相等的比賽車
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-400 font-bold mb-6">
+                選擇難度發動引擎
+            </p>
+
+            <!-- 難度排氣量選擇 (CC Mode) -->
+            <div class="w-full mb-6">
+                <div class="grid grid-cols-3 gap-3">
+                    <button class="mode-select-btn active p-3 rounded-2xl border-2 border-emerald-500 bg-emerald-950/40 hover:bg-emerald-900/50 text-center transition flex flex-col items-center justify-center gap-1 cursor-pointer" data-mode="50cc">
+                        <span class="text-emerald-400 font-racing font-black text-xl">50cc</span>
+                        <span class="text-white text-xs font-bold">新手巡迴</span>
+                    </button>
+                    <button class="mode-select-btn p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/40 hover:bg-slate-700/50 text-center transition flex flex-col items-center justify-center gap-1 cursor-pointer" data-mode="100cc">
+                        <span class="text-amber-400 font-racing font-black text-xl">100cc</span>
+                        <span class="text-white text-xs font-bold">錦標大賽</span>
+                    </button>
+                    <button class="mode-select-btn p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/40 hover:bg-slate-700/50 text-center transition flex flex-col items-center justify-center gap-1 cursor-pointer" data-mode="150cc">
+                        <span class="text-red-400 font-racing font-black text-xl">150cc</span>
+                        <span class="text-white text-xs font-bold">極速爭霸</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 開始按鈕 -->
+            <button id="btn-start-race" class="w-full py-4 rounded-2xl bg-gradient-to-r from-red-600 via-orange-500 to-yellow-500 hover:from-red-500 hover:to-yellow-400 text-white font-racing font-black text-xl tracking-wider shadow-xl shadow-red-600/30 transform transition hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer">
+                <span>開始遊戲</span>
+                <span>🏁</span>
+            </button>
+        </section>
+
+        <!-- ============================================== -->
+        <!-- 畫面 2: 競速主畫面 (RACE ACTIVE SCREEN) -->
+        <!-- ============================================== -->
+        <main id="screen-race" class="w-full flex flex-col gap-3 hidden">
+            
+            <!-- 賽道與 HUD 區域 -->
+            <div id="game-canvas-container" class="relative">
+                <canvas id="game-canvas"></canvas>
+
+                <!-- 3秒倒數計時覆蓋層 -->
+                <div id="countdown-overlay" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-30 hidden backdrop-blur-[2px] bg-black/40">
+                    <div id="countdown-number" class="text-8xl sm:text-9xl font-black font-racing text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 via-amber-400 to-red-500 drop-shadow-[0_10px_25px_rgba(0,0,0,0.9)] animate-countdown">
+                        3
+                    </div>
+                    <div id="countdown-subtitle" class="text-white text-sm sm:text-xl font-bold font-racing tracking-widest mt-2 uppercase bg-slate-900/80 px-4 py-1.5 rounded-full border border-slate-700">
+                        GET READY!
+                    </div>
+                </div>
+
+
+                <!-- HUD 左上狀態：名次、連勝、道具槽 -->
+                <div class="absolute top-2.5 left-2.5 flex items-center gap-2 pointer-events-none z-10">
+                    <div id="hud-rank-badge" class="px-3 py-1.5 rounded-xl bg-slate-900/90 border-2 border-yellow-400 text-yellow-300 font-racing font-black text-base sm:text-lg flex items-center gap-1.5 shadow-lg backdrop-blur">
+                        <span id="hud-rank-icon">🥇</span>
+                        <span id="hud-rank-text">1st</span>
+                    </div>
+
+                    <div class="px-3 py-1.5 rounded-xl bg-slate-900/85 border border-slate-700 text-slate-300 text-xs sm:text-sm font-bold flex items-center gap-1 shadow backdrop-blur">
+                        <span>🔥 連續答對:</span>
+                        <span id="hud-streak" class="text-amber-400 font-racing font-extrabold text-base">0</span>
+                    </div>
+
+                    <div class="pointer-events-auto">
+                        <button id="btn-use-item" class="group relative px-3 py-1.5 rounded-xl bg-slate-900/90 border-2 border-amber-400/80 text-amber-300 font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg backdrop-blur transition hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 cursor-pointer" title="點擊或按空白鍵 [Space] 發射道具">
+                            <div id="hud-item-box" class="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-xl">
+                                ❓
+                            </div>
+                            <div class="text-left hidden sm:block">
+                                <div class="text-[10px] text-slate-400 leading-none">道具 [Space]</div>
+                                <div id="hud-item-name" class="text-white text-xs font-bold leading-tight">無道具</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- HUD 右上：瑪利歐賽車完整賽道地圖 -->
+                <div id="hud-minimap-container" class="absolute top-2.5 right-2.5 bg-slate-950/85 border border-slate-700/80 rounded-2xl p-2 shadow-2xl backdrop-blur z-20 flex flex-col items-center">
+                    <div class="flex items-center justify-between w-full text-[10px] font-racing font-bold text-slate-300 mb-1 px-1 gap-2">
+                        <span id="hud-lap-badge" class="text-amber-400 font-extrabold flex items-center gap-1">
+                            <span>🏁</span> <span id="hud-lap-text">LAP 1/3</span>
+                        </span>
+                        <span id="hud-map-dist" class="text-slate-400 font-mono text-[10px]">0%</span>
+                    </div>
+                    
+                    <div class="relative w-[155px] h-[110px]">
+                        <svg id="svg-track-map" viewBox="0 0 195 145" class="w-full h-full overflow-visible">
+                            <!-- 等比皇家格蘭披治 3600m 賽道 (1分半標準圈) -->
+                            <path id="track-path-bg" d="M 63,113 L 135,113 C 154,113 166,103 168,88 C 171,73 156,63 147,60 C 132,56 120,66 118,76 C 117,86 128,91 135,86 C 141,81 130,68 120,60 C 111,53 101,63 94,55 C 87,48 89,38 82,36 L 68,36 C 48,36 32,55 29,75 C 27,95 39,113 56,113 Z" 
+                                  fill="none" stroke="#1e293b" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+                            <path id="track-path-road" d="M 63,113 L 135,113 C 154,113 166,103 168,88 C 171,73 156,63 147,60 C 132,56 120,66 118,76 C 117,86 128,91 135,86 C 141,81 130,68 120,60 C 111,53 101,63 94,55 C 87,48 89,38 82,36 L 68,36 C 48,36 32,55 29,75 C 27,95 39,113 56,113 Z" 
+                                  fill="none" stroke="#090d16" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" />
+                            <path id="track-path-main" d="M 63,113 L 135,113 C 154,113 166,103 168,88 C 171,73 156,63 147,60 C 132,56 120,66 118,76 C 117,86 128,91 135,86 C 141,81 130,68 120,60 C 111,53 101,63 94,55 C 87,48 89,38 82,36 L 68,36 C 48,36 32,55 29,75 C 27,95 39,113 56,113 Z" 
+                                  fill="none" stroke="#334155" stroke-width="1.5" stroke-dasharray="3,3" />
+
+                            <line x1="63" y1="105" x2="63" y2="121" stroke="#ffffff" stroke-width="3" stroke-dasharray="2,2" />
+                            <text x="63" y="101" font-size="9" text-anchor="middle">🏁</text>
+
+                            <!-- 地圖寶箱排標記 -->
+                            <g id="map-boxes-group"></g>
+
+                            <!-- 對手 1 (綠) -->
+                            <circle id="map-ai1" cx="63" cy="113" r="3.5" fill="#10b981" stroke="#ffffff" stroke-width="1.2" />
+                            <!-- 對手 2 (藍) -->
+                            <circle id="map-ai2" cx="63" cy="113" r="3.5" fill="#3b82f6" stroke="#ffffff" stroke-width="1.2" />
+                            <!-- 對手 3 (黃) -->
+                            <circle id="map-ai3" cx="63" cy="113" r="3.5" fill="#eab308" stroke="#ffffff" stroke-width="1.2" />
+                            <!-- 玩家標記 (紅) -->
+                            <circle id="map-player-halo" cx="63" cy="113" r="6.5" fill="none" stroke="#ef4444" stroke-width="1.5" class="map-pulse" />
+                            <circle id="map-player" cx="63" cy="113" r="4.5" fill="#ef4444" stroke="#ffffff" stroke-width="1.5" />
+                        </svg>
+                    </div>
+                            <circle id="map-player-halo" cx="45" cy="100" r="6.5" fill="none" stroke="#ef4444" stroke-width="1.5" class="map-pulse" />
+                            <circle id="map-player" cx="45" cy="100" r="4.5" fill="#ef4444" stroke="#ffffff" stroke-width="1.5" />
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- 5題加速衝刺5秒狀態光條 -->
+                <div id="hud-dash-banner" class="absolute top-14 left-1/2 -translate-x-1/2 px-5 py-2 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-red-600 border-2 border-yellow-300 text-white font-racing font-black text-xs sm:text-sm flex items-center gap-2 shadow-2xl z-20 hidden neon-dash">
+                    <span class="text-lg">⚡</span>
+                    <span>5題答對！極速衝刺 5 秒中！</span>
+                    <span id="hud-dash-time" class="bg-black text-yellow-300 px-2 py-0.5 rounded-lg text-xs font-mono font-bold">5.0s</span>
+                    <span class="text-lg">⚡</span>
+                </div>
+
+                <!-- 無敵星星狀態光條 -->
+                <div id="hud-star-banner" class="absolute top-24 left-1/2 -translate-x-1/2 px-5 py-2 rounded-2xl bg-gradient-to-r from-pink-600 via-yellow-400 to-cyan-500 border-2 border-white text-black font-racing font-black text-xs sm:text-sm flex items-center gap-2 shadow-2xl z-20 hidden neon-star">
+                    <span>⭐</span>
+                    <span>無敵星星發動！免碰撞傷害！</span>
+                    <span id="hud-star-time" class="bg-black text-yellow-300 px-2 py-0.5 rounded-lg text-xs font-mono font-bold">3.0s</span>
+                    <span>⭐</span>
+                </div>
+
+                <!-- 浮動文字彈窗 -->
+                <div id="hud-floating-alert" class="absolute inset-0 flex items-center justify-center pointer-events-none z-30 transition-all duration-300 opacity-0 scale-50">
+                    <div id="hud-floating-alert-text" class="px-6 py-2.5 rounded-2xl bg-red-600/90 border-2 border-yellow-300 text-yellow-200 font-racing font-black text-xl sm:text-2xl shadow-2xl drop-shadow-md text-center">
+                        OVERTAKE!
+                    </div>
+                </div>
+
+                <!-- 底部時速儀表看板 (左下) -->
+                <div class="absolute bottom-2.5 left-2.5 flex items-center gap-3 bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-1.5 shadow-lg backdrop-blur z-10 pointer-events-none">
+                    <div class="text-center">
+                        <div class="text-[10px] text-slate-400 font-bold uppercase flex items-center justify-between gap-1">
+                            <span>SPEEDOMETER</span>
+                            <span id="hud-throttle-tag" class="hidden text-[9px] px-1.5 py-0.5 bg-amber-500 text-black font-black rounded-sm font-racing">ACCEL ⚡</span>
+                        </div>
+                        <div class="flex items-baseline gap-1">
+                            <span id="hud-speed" class="text-2xl sm:text-3xl font-racing font-black text-emerald-400 tracking-wider">000</span>
+                            <span class="text-xs text-slate-400 font-bold">km/h</span>
+                        </div>
+                    </div>
+                    <div class="w-16 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                        <div id="hud-speed-bar" class="h-full bg-gradient-to-r from-emerald-500 via-amber-400 to-red-500 w-1/3 transition-all duration-100"></div>
+                    </div>
+                </div>
+
+                <!-- 答對進度與5題衝刺能量槽 (右下) -->
+                <div class="absolute bottom-2.5 right-2.5 bg-slate-950/85 border border-slate-800 rounded-xl px-3 py-1.5 shadow-lg backdrop-blur z-10 text-right pointer-events-none">
+                    <div class="flex items-center justify-end gap-1 mb-0.5">
+                        <span class="text-[10px] text-slate-400 font-bold">衝刺能量:</span>
+                        <div class="flex gap-1">
+                            <span id="dash-gauge-1" class="w-3 h-3 rounded-full bg-slate-700 border border-slate-600"></span>
+                            <span id="dash-gauge-2" class="w-3 h-3 rounded-full bg-slate-700 border border-slate-600"></span>
+                            <span id="dash-gauge-3" class="w-3 h-3 rounded-full bg-slate-700 border border-slate-600"></span>
+                            <span id="dash-gauge-4" class="w-3 h-3 rounded-full bg-slate-700 border border-slate-600"></span>
+                            <span id="dash-gauge-5" class="w-3 h-3 rounded-full bg-slate-700 border border-slate-600"></span>
+                        </div>
+                    </div>
+                    <div class="text-xs sm:text-sm font-bold text-slate-200">
+                        已答對: <span id="hud-correct-count" class="text-yellow-400 font-racing font-bold text-base">0</span> / <span id="hud-target-count">8</span>
+                    </div>
+                    <div class="text-[10px] text-amber-400">
+                        🎁 撞擊跑道上的旋轉問號寶箱 | ⚡ 滿5題衝刺5秒
+                    </div>
+                </div>
+
+                <!-- 操作提示懸浮指示 (中下方) -->
+                <div id="hud-controls-hint" class="absolute bottom-3 left-1/2 -translate-x-1/2 bg-slate-900/80 border border-slate-700 rounded-full px-3 py-1 text-[11px] text-slate-300 font-bold backdrop-blur pointer-events-none hidden sm:block">
+                    🎮 方向鍵 <kbd class="px-1 bg-slate-800 rounded">←</kbd><kbd class="px-1 bg-slate-800 rounded">→</kbd> 大幅轉向 | <kbd class="px-1 bg-slate-800 rounded">↑</kbd> 加速 | <kbd class="px-1 bg-slate-800 rounded">↓</kbd> 煞車 | <kbd class="px-1.5 bg-slate-800 rounded">Space</kbd> 發射道具
+                </div>
+            </div>
+
+            <!-- ============================================== -->
+            <!-- 寶箱解題挑戰彈窗 (TREASURE BOX QUIZ MODAL) -->
+            <!-- ============================================== -->
+            <div id="modal-quiz" class="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+                <div class="bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-amber-500/80 rounded-3xl max-w-xl w-full p-4 sm:p-6 shadow-2xl relative neon-gold flex flex-col gap-4">
+                    
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-3xl shadow-md">
+                                🎁
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-lg sm:text-xl font-bold font-racing text-amber-300">寶箱開啟！數學挑戰</h3>
+                                    <span id="quiz-modal-category-tag" class="px-2 py-0.5 rounded-full bg-blue-900/60 border border-blue-600/40 text-blue-300 text-[10px]">最簡整數比</span>
+                                </div>
+                                <p class="text-xs text-slate-400">選出正確答案解鎖道具！累積 5 題啟動 5 秒極速衝刺！</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 題目比展示 (不顯示比值) -->
+                    <div class="bg-slate-950/90 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+                        <div>
+                            <div id="modal-target-title" class="text-xs text-slate-400 font-bold">請將此比化為「最簡整數比」</div>
+                            <div class="text-2xl sm:text-3xl font-black text-amber-300 flex items-center justify-center sm:justify-start gap-2 mt-1">
+                                <span id="modal-target-ratio" class="font-racing">18 : 24</span>
+                            </div>
+                        </div>
+                        <div id="modal-instruction-box" class="text-xs sm:text-sm text-emerald-400 font-bold bg-emerald-950/40 border border-emerald-500/40 px-3 py-2 rounded-xl">
+                            🎯 選出<strong id="modal-instruction-keyword" class="text-yellow-300 underline underline-offset-2">最簡整數比</strong>的選項！
+                        </div>
+                    </div>
+
+                    <!-- 四個選項卡牌 -->
+                    <div id="modal-options-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <button class="option-card rounded-xl p-3 text-left flex items-center justify-between gap-3 group relative cursor-pointer" data-index="0">
+                            <div class="flex items-center gap-3">
+                                <span class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 font-racing font-bold text-sm flex items-center justify-center group-hover:border-blue-400 group-hover:text-blue-300">1</span>
+                                <span class="option-text text-base sm:text-lg font-bold text-white tracking-wide font-racing">8 : 6</span>
+                            </div>
+                            <span class="text-xs text-slate-500 font-mono">[按鍵 1]</span>
+                        </button>
+                        <button class="option-card rounded-xl p-3 text-left flex items-center justify-between gap-3 group relative cursor-pointer" data-index="1">
+                            <div class="flex items-center gap-3">
+                                <span class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 font-racing font-bold text-sm flex items-center justify-center group-hover:border-blue-400 group-hover:text-blue-300">2</span>
+                                <span class="option-text text-base sm:text-lg font-bold text-white tracking-wide font-racing">12 : 9</span>
+                            </div>
+                            <span class="text-xs text-slate-500 font-mono">[按鍵 2]</span>
+                        </button>
+                        <button class="option-card rounded-xl p-3 text-left flex items-center justify-between gap-3 group relative cursor-pointer" data-index="2">
+                            <div class="flex items-center gap-3">
+                                <span class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 font-racing font-bold text-sm flex items-center justify-center group-hover:border-blue-400 group-hover:text-blue-300">3</span>
+                                <span class="option-text text-base sm:text-lg font-bold text-white tracking-wide font-racing">5 : 4</span>
+                            </div>
+                            <span class="text-xs text-slate-500 font-mono">[按鍵 3]</span>
+                        </button>
+                        <button class="option-card rounded-xl p-3 text-left flex items-center justify-between gap-3 group relative cursor-pointer" data-index="3">
+                            <div class="flex items-center gap-3">
+                                <span class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 font-racing font-bold text-sm flex items-center justify-center group-hover:border-blue-400 group-hover:text-blue-300">4</span>
+                                <span class="option-text text-base sm:text-lg font-bold text-white tracking-wide font-racing">3 : 4</span>
+                            </div>
+                            <span class="text-xs text-slate-500 font-mono">[按鍵 4]</span>
+                        </button>
+                    </div>
+
+                    <!-- 即時解析面板 (不出現比值) -->
+                    <div id="modal-feedback-panel" class="rounded-xl p-3 border transition-all duration-200 hidden flex flex-col gap-2">
+                        <div class="flex items-start gap-2.5">
+                            <span id="modal-feedback-icon" class="text-2xl shrink-0">🚀</span>
+                            <div>
+                                <div id="modal-feedback-title" class="font-bold text-sm sm:text-base">正確加速！</div>
+                                <div id="modal-feedback-explanation" class="text-xs text-slate-300 mt-0.5 leading-relaxed"></div>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-end mt-1">
+                            <button id="btn-modal-continue" class="px-5 py-2 rounded-xl bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-xs sm:text-sm font-bold text-white shadow-lg flex items-center gap-1.5 cursor-pointer">
+                                <span>踩下油門繼續狂飆</span> <span>➡️</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- ============================================== -->
+            <!-- 賽道下方：觸控方向鍵與道具快捷面板 -->
+            <!-- ============================================== -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-xl flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">🎮</span>
+                    <div>
+                        <div class="text-xs text-slate-300 font-bold">賽車駕駛控制指南</div>
+                        <div class="text-[11px] text-slate-400">
+                            按鍵盤方向鍵 <kbd class="px-1.5 py-0.5 bg-slate-800 border rounded text-white">←</kbd> <kbd class="px-1.5 py-0.5 bg-slate-800 border rounded text-white">→</kbd> 進行大範圍甩尾轉向避開對手，<kbd class="px-1.5 py-0.5 bg-slate-800 border rounded text-white">↑</kbd> 加速，<kbd class="px-1.5 py-0.5 bg-slate-800 border rounded text-white">↓</kbd> 煞車；按 <kbd class="px-2 py-0.5 bg-slate-800 border rounded text-yellow-300 font-bold">Space 空白鍵</kbd> 發射道具！
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 螢幕虛擬按鈕組 -->
+                <div class="flex items-center gap-2">
+                    <button id="vbtn-left" class="ctrl-btn w-11 h-11 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-blue-600 text-lg font-bold border border-slate-700 flex items-center justify-center text-white shadow cursor-pointer">
+                        ◀
+                    </button>
+                    <div class="flex flex-col gap-1">
+                        <button id="vbtn-up" class="ctrl-btn w-12 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-emerald-600 text-xs font-bold border border-slate-700 flex items-center justify-center text-emerald-300 shadow cursor-pointer">
+                            ▲ 加速
+                        </button>
+                        <button id="vbtn-down" class="ctrl-btn w-12 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-amber-600 text-xs font-bold border border-slate-700 flex items-center justify-center text-amber-300 shadow cursor-pointer">
+                            ▼ 煞車
+                        </button>
+                    </div>
+                    <button id="vbtn-right" class="ctrl-btn w-11 h-11 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-blue-600 text-lg font-bold border border-slate-700 flex items-center justify-center text-white shadow cursor-pointer">
+                        ▶
+                    </button>
+                    <button id="vbtn-space" class="ctrl-btn px-3 h-11 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-500 hover:from-amber-500 hover:to-yellow-400 active:scale-95 text-xs font-bold border border-amber-400 text-white shadow flex items-center gap-1 cursor-pointer">
+                        <span>🚀 發射道具</span>
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- ============================================== -->
+        <!-- 畫面 3: 頒獎與結算 (RESULTS SCREEN) -->
+        <!-- ============================================== -->
+        <section id="screen-result" class="w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur flex flex-col items-center text-center relative overflow-hidden hidden">
+            <div id="confetti-container" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
+
+            <div class="text-5xl sm:text-6xl mb-3 animate-bounce">
+                <span id="result-podium-icon">🏆</span>
+            </div>
+
+            <h2 id="result-title" class="text-3xl sm:text-4xl font-black font-racing text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-red-500 mb-2">
+                FINAL LAP VICTORY!
+            </h2>
+            <p id="result-subtitle" class="text-slate-300 text-sm sm:text-base mb-6">
+                太厲害了！你以精準的等比計算率先衝過終點線！
+            </p>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-2xl mb-6">
+                <div class="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 shadow">
+                    <div class="text-xs text-slate-400 font-bold">最終名次</div>
+                    <div id="result-final-rank" class="text-2xl font-racing font-black text-yellow-400 mt-1">1st 冠軍</div>
+                </div>
+                <div class="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 shadow">
+                    <div class="text-xs text-slate-400 font-bold">答題正確率</div>
+                    <div id="result-accuracy" class="text-2xl font-racing font-black text-emerald-400 mt-1">100%</div>
+                </div>
+                <div class="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 shadow">
+                    <div class="text-xs text-slate-400 font-bold">最高車速紀錄</div>
+                    <div id="result-top-speed" class="text-2xl font-racing font-black text-red-400 mt-1">220 km/h</div>
+                </div>
+                <div class="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 shadow">
+                    <div class="text-xs text-slate-400 font-bold">獲得道具數</div>
+                    <div id="result-items-used" class="text-2xl font-racing font-black text-amber-400 mt-1">2 個</div>
+                </div>
+            </div>
+
+            <!-- 等比觀念總評與學習診斷 (不出現比值) -->
+            <div class="w-full max-w-2xl bg-slate-950/90 border border-slate-800 rounded-2xl p-4 text-left mb-6">
+                <div class="text-sm font-bold text-amber-400 flex items-center gap-1.5 mb-2">
+                    <span>💡</span> 數學概念精進解析
+                </div>
+                <p id="result-pedagogy-review" class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                    在本次賽車大賽中，你成功掌握了「比的前項與後項同乘以或同除以相同的數（0除外），兩比相等」的重要等比性質！
+                </p>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-center gap-4">
+                <button id="btn-play-again" class="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-red-600 to-yellow-500 hover:from-red-500 hover:to-yellow-400 text-white font-racing font-bold text-lg shadow-xl shadow-red-600/30 transform transition hover:-translate-y-0.5 active:translate-y-0.5 flex items-center gap-2 cursor-pointer">
+                    <span>🏁 再戰一場 (Play Again)</span>
+                </button>
+                <button id="btn-review-questions" class="px-6 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm border border-slate-700 transition flex items-center gap-1.5 shadow cursor-pointer">
+                    <span>📝 查看完整題目覆盤</span>
+                </button>
+            </div>
+
+            <div id="review-list-container" class="w-full max-w-2xl mt-6 text-left hidden">
+                <div class="border-t border-slate-800 pt-4 mb-3">
+                    <h3 class="text-sm font-bold text-slate-300">本場賽事全部題目與等比解析</h3>
+                </div>
+                <div id="review-list" class="flex flex-col gap-2 max-h-64 overflow-y-auto pr-1"></div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- ============================================== -->
+    <!-- 規則說明彈窗 (MODAL) -->
+    <!-- ============================================== -->
+    <div id="modal-help" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button id="btn-close-help" class="absolute top-5 right-5 text-slate-400 hover:text-white text-2xl font-bold cursor-pointer">
+                ✕
+            </button>
+
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-12 h-12 rounded-2xl bg-red-600/20 border border-red-500/40 flex items-center justify-center text-2xl">
+                    🏎️
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold font-racing text-white">相等的比賽車：遊戲玩法與教學重點</h3>
+                    <p class="text-xs text-slate-400">數學概念：最簡整數比・找等比</p>
+                </div>
+            </div>
+
+            <div class="space-y-4 text-xs sm:text-sm text-slate-300">
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <h4 class="font-bold text-amber-400 text-sm mb-1">🎯 什麼是「等比」？</h4>
+                    <p class="leading-relaxed">
+                        當比的前項與後項同乘以或同除以相同的數（0除外）時，這兩個比就是<strong>「相等的比」（等比）</strong>。<br>
+                        例如：比 <code class="text-emerald-300">4 : 3</code>，若將前項與後項同乘以 2，得到 <code class="text-emerald-300">8 : 6</code>，這兩個比就是<strong>「等比」</strong>（記作 4 : 3 = 8 : 6）！
+                    </p>
+                </div>
+
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <h4 class="font-bold text-blue-400 text-sm mb-1">🎮 賽車駕駛與道具系統</h4>
+                    <ul class="list-disc list-inside space-y-1.5 leading-relaxed">
+                        <li><strong>真實排位起跑：</strong>開局四車車距大幅拉開，在立體 3D 賽道上清楚看見前方對手！</li>
+                        <li><strong>跑道一排 5 個旋轉寶箱：</strong>賽道上定期出現橫跨賽道的 5 個立體旋轉問號寶箱，撞擊任意一個開啟等比解題獲取道具！</li>
+                        <li><strong>真實彈道發射：</strong>按下 <kbd class="px-2 py-0.5 bg-slate-800 border rounded text-yellow-300">Space 空白鍵</kbd> 發射道具，紅龜殼追蹤擊飛前車、向後放置香蕉皮、引爆炸彈！</li>
+                        <li><strong>大範圍甩尾轉向：</strong>方向鍵 <kbd class="px-1.5 py-0.5 bg-slate-800 border rounded">←</kbd> <kbd class="px-1.5 py-0.5 bg-slate-800 border rounded">→</kbd> 大幅甩尾轉向，車身同步傾斜並噴出胎煙！</li>
+                        <li><strong>賽道加速跳板：</strong>賽道鋪設有黃色箭頭加速帶，衝上去立即獲得噴射推進！</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="mt-6 text-center">
+                <button id="btn-close-help-confirm" class="px-8 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm border border-slate-700 transition cursor-pointer">
+                    我知道了，開始比賽！
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- JAVASCRIPT GAME LOGIC & AUDIO SYNTHESIZER -->
+    <!-- ============================================== -->
+    <script>
+    (function() {
+        'use strict';
+
+        // -------------------------------------------------------------
+        // 1. 全原生 Web Audio API 音效合成引擎
+        // -------------------------------------------------------------
+        let audioCtx = null;
+        let isMuted = false;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) {
+                    audioCtx = new AudioContextClass();
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        const Sound = {
+            // 背景配樂 (Coin Rush.mp3)
+            bgmAudio: null,
+            bgmBaseVolume: 0.55,
+            bgmDuckVolume: 0.20,
+
+            initBGM() {
+                if (!this.bgmAudio) {
+                    this.bgmAudio = document.getElementById('bgm-audio');
+                    if (!this.bgmAudio) {
+                        this.bgmAudio = new Audio('Coin%20Rush.mp3');
+                        this.bgmAudio.loop = true;
+                    }
+                    this.bgmAudio.volume = this.bgmBaseVolume;
+                }
+            },
+
+            playBGM() {
+                if (isMuted) return;
+                this.initBGM();
+                if (this.bgmAudio) {
+                    this.bgmAudio.volume = this.bgmBaseVolume;
+                    const p = this.bgmAudio.play();
+                    if (p !== undefined) p.catch(() => {});
+                }
+            },
+
+            pauseBGM() {
+                if (this.bgmAudio) {
+                    this.bgmAudio.pause();
+                }
+            },
+
+            stopBGM() {
+                if (this.bgmAudio) {
+                    this.bgmAudio.pause();
+                    this.bgmAudio.currentTime = 0;
+                }
+            },
+
+            duckBGM(duck = true) {
+                if (this.bgmAudio && !isMuted) {
+                    this.bgmAudio.volume = duck ? this.bgmDuckVolume : this.bgmBaseVolume;
+                }
+            },
+
+            toggleMute(muted) {
+                if (this.bgmAudio) {
+                    this.bgmAudio.muted = muted;
+                    if (!muted && State.currentScreen === 'race') {
+                        this.playBGM();
+                    }
+                }
+            },
+
+            // 擬真高亢超跑引擎聲浪合成器 (雙諧波多汽缸排氣 + 渦輪增壓 Turbo Spool 嘯叫)
+            engineOsc: null,
+            engineHarmonicOsc: null,
+            engineTurboOsc: null,
+            engineGain: null,
+            engineTurboGain: null,
+            engineFilter: null,
+            engineInited: false,
+            lastScreechTime: 0,
+
+            initEngine() {
+                if (this.engineInited || isMuted) return;
+                try {
+                    const ctx = getAudioContext();
+                    if (!ctx) return;
+                    this.engineOsc = ctx.createOscillator();
+                    this.engineHarmonicOsc = ctx.createOscillator();
+                    this.engineTurboOsc = ctx.createOscillator();
+                    this.engineFilter = ctx.createBiquadFilter();
+                    this.engineGain = ctx.createGain();
+                    this.engineTurboGain = ctx.createGain();
+
+                    // 主引擎聲波 (賽車多汽缸排氣高轉速基頻)
+                    this.engineOsc.type = 'sawtooth';
+                    this.engineOsc.frequency.setValueAtTime(120, ctx.currentTime);
+
+                    // 諧波副震盪器 (V8/V10 雙汽缸排氣渾厚聲浪，五度音程 1.5 倍頻)
+                    this.engineHarmonicOsc.type = 'triangle';
+                    this.engineHarmonicOsc.frequency.setValueAtTime(180, ctx.currentTime);
+
+                    // 渦輪增壓 Turbo 嘯叫增益層
+                    this.engineTurboOsc.type = 'sine';
+                    this.engineTurboOsc.frequency.setValueAtTime(1300, ctx.currentTime);
+                    this.engineTurboGain.gain.setValueAtTime(0, ctx.currentTime);
+
+                    // 賽車排氣管共振濾波器 (帶共鳴 Q 值)
+                    this.engineFilter.type = 'lowpass';
+                    this.engineFilter.frequency.setValueAtTime(480, ctx.currentTime);
+                    this.engineFilter.Q.setValueAtTime(2.4, ctx.currentTime);
+
+                    this.engineGain.gain.setValueAtTime(0, ctx.currentTime);
+
+                    this.engineOsc.connect(this.engineFilter);
+                    this.engineHarmonicOsc.connect(this.engineFilter);
+                    this.engineFilter.connect(this.engineGain);
+                    this.engineGain.connect(ctx.destination);
+
+                    // 渦輪單獨經過專屬增益旋鈕
+                    this.engineTurboOsc.connect(this.engineTurboGain);
+                    this.engineTurboGain.connect(ctx.destination);
+
+                    this.engineOsc.start();
+                    this.engineHarmonicOsc.start();
+                    this.engineTurboOsc.start();
+                    this.engineInited = true;
+                } catch (e) {}
+            },
+
+            updateEngine(speed, isThrottling, isBraking) {
+                if (!this.engineInited) {
+                    this.initEngine();
+                }
+                if (isMuted || !this.engineGain) return;
+                try {
+                    const ctx = getAudioContext();
+                    if (!ctx) return;
+                    if (State.currentScreen !== 'race' || State.isQuizModalOpen || State.isRaceFinished || State.isCountingDown) {
+                        this.engineGain.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
+                        if (this.engineTurboGain) this.engineTurboGain.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
+                        return;
+                    }
+
+                    const speedRatio = Math.max(0, Math.min(1.0, speed / 500));
+                    // 怠速 120Hz，高轉速時拉升至 380Hz
+                    let baseFreq = 120 + speedRatio * 180;
+                    let targetFilter = 450 + speedRatio * 750;
+                    let targetVol = 0.06 + speedRatio * 0.06;
+                    let turboVol = 0;
+                    let turboFreq = 1200 + speedRatio * 900;
+
+                    if (isThrottling) {
+                        baseFreq += 85; // 踩油門時轉速即刻狂暴拉升咆哮
+                        targetFilter += 950; // 開啟排氣閥，高亢跑車聲浪奔騰
+                        targetVol = Math.min(0.20, targetVol + 0.08);
+                        turboVol = 0.05 + speedRatio * 0.04; // 渦輪增壓閥高速加壓哨音
+                        turboFreq += 450;
+                    } else if (isBraking) {
+                        baseFreq = Math.max(90, baseFreq - 30);
+                        targetFilter = Math.max(300, targetFilter - 220);
+                        targetVol = 0.04;
+                        turboVol = 0;
+                    }
+
+                    this.engineOsc.frequency.setTargetAtTime(baseFreq, ctx.currentTime, 0.05);
+                    this.engineHarmonicOsc.frequency.setTargetAtTime(baseFreq * 1.5, ctx.currentTime, 0.05);
+                    this.engineFilter.frequency.setTargetAtTime(targetFilter, ctx.currentTime, 0.06);
+                    this.engineGain.gain.setTargetAtTime(targetVol, ctx.currentTime, 0.05);
+
+                    if (this.engineTurboGain && this.engineTurboOsc) {
+                        this.engineTurboOsc.frequency.setTargetAtTime(turboFreq, ctx.currentTime, 0.06);
+                        this.engineTurboGain.gain.setTargetAtTime(turboVol, ctx.currentTime, 0.08);
+                    }
+                } catch (e) {}
+            },
+
+            tireScreech() {
+                if (isMuted) return;
+                const now = Date.now();
+                if (now - this.lastScreechTime < 320) return;
+                this.lastScreechTime = now;
+                try {
+                    const ctx = getAudioContext();
+                    if (!ctx) return;
+                    const osc = ctx.createOscillator();
+                    const filter = ctx.createBiquadFilter();
+                    const gain = ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(800 + Math.random() * 200, ctx.currentTime);
+                    filter.type = 'bandpass';
+                    filter.frequency.setValueAtTime(1400, ctx.currentTime);
+                    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
+                    osc.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.22);
+                } catch (e) {}
+            },
+
+            silenceEngine() {
+                try {
+                    const ctx = getAudioContext();
+                    if (ctx) {
+                        if (this.engineGain) this.engineGain.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+                        if (this.engineTurboGain) this.engineTurboGain.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+                    }
+                } catch (e) {}
+            },
+
+            beep(freq, type = 'sine', duration = 0.15, volume = 0.15) {
+                if (isMuted) return;
+                try {
+                    const ctx = getAudioContext();
+                    if (!ctx) return;
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+                    gain.gain.setValueAtTime(volume, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + duration);
+                } catch (e) {}
+            },
+
+            countdownPing(isGo = false) {
+                if (isMuted) return;
+                try {
+                    const ctx = getAudioContext();
+                    if (!ctx) return;
+                    if (isGo) {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(880, ctx.currentTime);
+                        osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.35);
+                        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start();
+                        osc.stop(ctx.currentTime + 0.5);
+                    } else {
+                        this.beep(440, 'sine', 0.18, 0.25);
+                    }
+                } catch (e) {}
+            },
+
+            // 愉悅科技感加速帶與噴射音效 (替換原本刺耳驚悚的鋸齒波)
+            boostPadSound() {
+                if (isMuted) return;
+                try {
+                    const ctx = getAudioContext();
+                    if (!ctx) return;
+                    // 1. 輕快未來感水晶琶音 (C5-E5-G5-C6)
+                    const notes = [523.25, 659.25, 783.99, 1046.5];
+                    notes.forEach((f, idx) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(f, ctx.currentTime + idx * 0.04);
+                        gain.gain.setValueAtTime(0.18, ctx.currentTime + idx * 0.04);
+                        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.04 + 0.22);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(ctx.currentTime + idx * 0.04);
+                        osc.stop(ctx.currentTime + idx * 0.04 + 0.22);
+                    });
+
+                    // 2. 順滑清爽的空氣噴射推進音
+                    const whoosh = ctx.createOscillator();
+                    const whooshGain = ctx.createGain();
+                    whoosh.type = 'sine';
+                    whoosh.frequency.setValueAtTime(320, ctx.currentTime);
+                    whoosh.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.3);
+                    whooshGain.gain.setValueAtTime(0.14, ctx.currentTime);
+                    whooshGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+                    whoosh.connect(whooshGain);
+                    whooshGain.connect(ctx.destination);
+                    whoosh.start();
+                    whoosh.stop(ctx.currentTime + 0.35);
+                } catch (e) {}
+            },
+
+            turbo() {
+                this.boostPadSound();
+            },
+
+            megaDash() {
+                if (isMuted) return;
+                try {
+                    const ctx = getAudioContext();
+                    if (!ctx) return;
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(320, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.45);
+                    gain.gain.setValueAtTime(0.22, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.5);
+                    setTimeout(() => this.beep(1320, 'triangle', 0.35, 0.22), 120);
+                } catch (e) {}
+            },
+
+            crash() {
+                if (isMuted) return;
+                try {
+                    const ctx = getAudioContext();
+                    if (!ctx) return;
+                    const bufferSize = ctx.sampleRate * 0.3;
+                    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.08));
+                    }
+                    const noise = ctx.createBufferSource();
+                    noise.buffer = buffer;
+                    const noiseGain = ctx.createGain();
+                    noiseGain.gain.setValueAtTime(0.35, ctx.currentTime);
+                    noiseGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                    noise.connect(noiseGain);
+                    noiseGain.connect(ctx.destination);
+                    noise.start();
+
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(240, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(60, ctx.currentTime + 0.25);
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.25);
+                } catch (e) {}
+            },
+
+            itemGet() {
+                if (isMuted) return;
+                const notes = [523.25, 659.25, 783.99, 1046.5];
+                notes.forEach((f, idx) => {
+                    setTimeout(() => this.beep(f, 'triangle', 0.12, 0.25), idx * 60);
+                });
+            },
+
+            banana() {
+                if (isMuted) return;
+                try {
+                    const ctx = getAudioContext();
+                    if (!ctx) return;
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.25);
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.25);
+                } catch (e) {}
+            },
+
+            explosion() {
+                if (isMuted) return;
+                try {
+                    const ctx = getAudioContext();
+                    if (!ctx) return;
+                    const bufferSize = ctx.sampleRate * 0.55;
+                    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.15));
+                    }
+                    const noise = ctx.createBufferSource();
+                    noise.buffer = buffer;
+                    const gain = ctx.createGain();
+                    gain.gain.setValueAtTime(0.5, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.55);
+                    noise.connect(gain);
+                    gain.connect(ctx.destination);
+                    noise.start();
+                } catch (e) {}
+            },
+
+            shoot() {
+                if (isMuted) return;
+                try {
+                    const ctx = getAudioContext();
+                    if (!ctx) return;
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(600, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.2);
+                } catch (e) {}
+            },
+
+            victory() {
+                if (isMuted) return;
+                const fanfare = [
+                    { f: 523.25, d: 0.15, t: 0 },
+                    { f: 659.25, d: 0.15, t: 150 },
+                    { f: 783.99, d: 0.15, t: 300 },
+                    { f: 1046.5, d: 0.45, t: 450 }
+                ];
+                fanfare.forEach(n => {
+                    setTimeout(() => this.beep(n.f, 'triangle', n.d, 0.3), n.t);
+                });
+            }
+        };
+
+        // -------------------------------------------------------------
+        // 數學格式轉換器：將分數格式化為台灣國小標準上下直立形式 (分子在上、橫線、分母在下)
+        // -------------------------------------------------------------
+        function formatMathRatio(str) {
+            if (!str) return '';
+            // 處理帶分數：例如 1又1/2, 2又1/3, 1又3/4
+            let res = String(str).replace(/(\d+)\s*又\s*(\d+)\/(\d+)/g, (_, whole, num, den) => {
+                return `<span class="inline-flex items-center align-middle mx-1 font-bold"><span class="text-base mr-0.5">${whole}</span><span class="inline-flex flex-col text-center text-[0.68em] leading-tight"><span class="border-b-[1.5px] border-current pb-[1px] px-0.5">${num}</span><span class="pt-[1px] px-0.5">${den}</span></span></span>`;
+            });
+            // 處理真分數與假分數：例如 1/2, 3/4, 9/10, 5/8
+            res = res.replace(/(\d+)\/(\d+)/g, (_, num, den) => {
+                return `<span class="inline-flex items-center align-middle mx-1 font-bold"><span class="inline-flex flex-col text-center text-[0.68em] leading-tight"><span class="border-b-[1.5px] border-current pb-[1px] px-0.5">${num}</span><span class="pt-[1px] px-0.5">${den}</span></span></span>`;
+            });
+            return res;
+        }
+
+        // -------------------------------------------------------------
+        // 2. 題目與數學邏輯生成器 (新增最簡整數比題型，不顯示比值)
+        // -------------------------------------------------------------
+        const QuestionGenerator = {
+            generate50cc() {
+                const templates = [
+                    // 題型 1：【最簡整數比】整數比化簡
+                    () => {
+                        const pairs = [
+                            { a: 18, b: 24, sa: 3, sb: 4, g: 6, unsimp: '9 : 12' },
+                            { a: 20, b: 25, sa: 4, sb: 5, g: 5, unsimp: '8 : 10' },
+                            { a: 14, b: 21, sa: 2, sb: 3, g: 7, unsimp: '4 : 6' },
+                            { a: 24, b: 36, sa: 2, sb: 3, g: 12, unsimp: '6 : 9' },
+                            { a: 35, b: 49, sa: 5, sb: 7, g: 7, unsimp: '10 : 14' },
+                            { a: 48, b: 32, sa: 3, sb: 2, g: 16, unsimp: '12 : 8' },
+                            { a: 60, b: 45, sa: 4, sb: 3, g: 15, unsimp: '12 : 9' },
+                            { a: 42, b: 56, sa: 3, sb: 4, g: 14, unsimp: '6 : 8' },
+                            { a: 16, b: 24, sa: 2, sb: 3, g: 8, unsimp: '8 : 12' },
+                            { a: 28, b: 35, sa: 4, sb: 5, g: 7, unsimp: '8 : 10' },
+                            { a: 30, b: 45, sa: 2, sb: 3, g: 15, unsimp: '6 : 9' },
+                            { a: 36, b: 48, sa: 3, sb: 4, g: 12, unsimp: '9 : 12' },
+                            { a: 40, b: 50, sa: 4, sb: 5, g: 10, unsimp: '8 : 10' },
+                            { a: 32, b: 40, sa: 4, sb: 5, g: 8, unsimp: '8 : 10' },
+                            { a: 54, b: 36, sa: 3, sb: 2, g: 18, unsimp: '9 : 6' }
+                        ];
+                        const p = pairs[Math.floor(Math.random() * pairs.length)];
+                        const targetStr = `${p.a} : ${p.b}`;
+                        const correctStr = `${p.sa} : ${p.sb}`;
+                        const explanation = `${targetStr} 的前項與後項最大公因數是 ${p.g}，兩項同除以 ${p.g}，化簡為最簡整數比 ${p.sa} : ${p.sb}！`;
+
+                        const distractors = [
+                            p.unsimp,
+                            `${p.sb} : ${p.sa}`,
+                            `${p.sa} : ${p.sb + 1}`
+                        ];
+
+                        return {
+                            categoryTag: '最簡整數比',
+                            targetTitle: '請將此比化為「最簡整數比」',
+                            instructionKeyword: '最簡整數比',
+                            targetRatio: targetStr,
+                            correctOption: correctStr,
+                            distractors,
+                            explanation
+                        };
+                    },
+                    // 題型 2：整數擴分等比
+                    () => {
+                        const basePairs = [
+                            [4, 3], [3, 4], [2, 3], [3, 2], [3, 5], [5, 3],
+                            [4, 5], [5, 4], [2, 5], [5, 2], [1, 2], [2, 1],
+                            [1, 3], [3, 1], [5, 6], [6, 5], [3, 7], [7, 3]
+                        ];
+                        const pair = basePairs[Math.floor(Math.random() * basePairs.length)];
+                        const a = pair[0];
+                        const b = pair[1];
+                        const mult = Math.floor(Math.random() * 4) + 2;
+
+                        const targetStr = `${a} : ${b}`;
+                        const correctStr = `${a * mult} : ${b * mult}`;
+                        const explanation = `${targetStr} 的前項與後項同乘以 ${mult} 得到 ${correctStr}，兩者是相等的比（等比）！`;
+
+                        const distractors = [
+                            `${a + mult} : ${b + mult}`,
+                            `${b * mult} : ${a * mult}`,
+                            `${a * mult} : ${b * (mult + 1)}`
+                        ];
+
+                        return {
+                            categoryTag: '整數擴分等比',
+                            targetTitle: '目前賽車動力比',
+                            instructionKeyword: '相等的等比',
+                            targetRatio: targetStr,
+                            correctOption: correctStr,
+                            distractors,
+                            explanation
+                        };
+                    },
+                    // 題型 3：整數縮分等比
+                    () => {
+                        const basePairs = [
+                            [4, 3], [3, 4], [2, 3], [3, 2], [3, 5], [5, 3],
+                            [4, 5], [5, 4], [2, 5], [5, 2], [1, 2], [2, 1]
+                        ];
+                        const pair = basePairs[Math.floor(Math.random() * basePairs.length)];
+                        const a = pair[0];
+                        const b = pair[1];
+                        const m1 = Math.floor(Math.random() * 3) + 3;
+                        const m2 = Math.random() < 0.5 ? 1 : 2;
+
+                        const targetStr = `${a * m1} : ${b * m1}`;
+                        const correctStr = `${a * m2} : ${b * m2}`;
+                        const explanation = `${targetStr} 的前項與後項同除以公因數化簡為最簡整數比 ${a} : ${b}。選項 ${correctStr} 是它的相等的比（等比）！`;
+
+                        const distractors = [
+                            `${b * m2} : ${a * m2}`,
+                            `${a * m1 - 1} : ${b * m1 - 1}`,
+                            `${a * m2} : ${b * m2 + 1}`
+                        ];
+
+                        return {
+                            categoryTag: '整數縮分等比',
+                            targetTitle: '目前賽車動力比',
+                            instructionKeyword: '相等的等比',
+                            targetRatio: targetStr,
+                            correctOption: correctStr,
+                            distractors,
+                            explanation
+                        };
+                    }
+                ];
+
+                const fn = templates[Math.floor(Math.random() * templates.length)];
+                return fn();
+            },
+
+            generate100cc() {
+                const templates = [
+                    // 題型 1：【最簡整數比】小數比化簡
+                    () => {
+                        const pairs = [
+                            { a: 0.8, b: 1.2, sa: 2, sb: 3, unsimp: '8 : 12' },
+                            { a: 1.5, b: 2.5, sa: 3, sb: 5, unsimp: '15 : 25' },
+                            { a: 0.6, b: 0.9, sa: 2, sb: 3, unsimp: '6 : 9' },
+                            { a: 2.4, b: 1.8, sa: 4, sb: 3, unsimp: '24 : 18' },
+                            { a: 0.4, b: 1.6, sa: 1, sb: 4, unsimp: '4 : 16' },
+                            { a: 0.36, b: 0.48, sa: 3, sb: 4, unsimp: '36 : 48' },
+                            { a: 0.75, b: 1.25, sa: 3, sb: 5, unsimp: '75 : 125' },
+                            { a: 1.6, b: 2.4, sa: 2, sb: 3, unsimp: '16 : 24' },
+                            { a: 0.9, b: 1.5, sa: 3, sb: 5, unsimp: '9 : 15' },
+                            { a: 0.6, b: 0.8, sa: 3, sb: 4, unsimp: '6 : 8' },
+                            { a: 2.5, b: 1.5, sa: 5, sb: 3, unsimp: '25 : 15' }
+                        ];
+                        const p = pairs[Math.floor(Math.random() * pairs.length)];
+                        const targetStr = `${p.a} : ${p.b}`;
+                        const correctStr = `${p.sa} : ${p.sb}`;
+                        const explanation = `${targetStr} 前項與後項先同乘以適當倍數化為整數比，再同除以最大公因數，化為最簡整數比 ${p.sa} : ${p.sb}！`;
+
+                        const distractors = [
+                            p.unsimp,
+                            `${p.sb} : ${p.sa}`,
+                            `${p.sa} : ${p.sb + 1}`
+                        ];
+
+                        return {
+                            categoryTag: '最簡整數比 (小數)',
+                            targetTitle: '請將小數比化為「最簡整數比」',
+                            instructionKeyword: '最簡整數比',
+                            targetRatio: targetStr,
+                            correctOption: correctStr,
+                            distractors,
+                            explanation
+                        };
+                    },
+                    // 題型 2：【最簡整數比】分數比化簡
+                    () => {
+                        const fractionPairs = [
+                            { label: '1/2 : 3/4', sa: 2, sb: 3, unsimp: '4 : 6', fake: '1 : 3' },
+                            { label: '2/3 : 4/5', sa: 5, sb: 6, unsimp: '10 : 12', fake: '2 : 4' },
+                            { label: '3/4 : 5/6', sa: 9, sb: 10, unsimp: '18 : 20', fake: '3 : 5' },
+                            { label: '3/5 : 9/10', sa: 2, sb: 3, unsimp: '6 : 9', fake: '3 : 9' },
+                            { label: '5/8 : 3/4', sa: 5, sb: 6, unsimp: '10 : 12', fake: '5 : 3' },
+                            { label: '1/4 : 3/8', sa: 2, sb: 3, unsimp: '8 : 12', fake: '1 : 3' },
+                            { label: '4/5 : 2/3', sa: 6, sb: 5, unsimp: '12 : 10', fake: '4 : 2' },
+                            { label: '2/5 : 3/5', sa: 2, sb: 3, unsimp: '4 : 6', fake: '5 : 5' },
+                            { label: '3/4 : 1/2', sa: 3, sb: 2, unsimp: '6 : 4', fake: '3 : 1' }
+                        ];
+                        const f = fractionPairs[Math.floor(Math.random() * fractionPairs.length)];
+                        const targetStr = f.label;
+                        const correctStr = `${f.sa} : ${f.sb}`;
+                        const explanation = `分數比 ${targetStr} 前項與後項同乘以分母的最小公倍數，化簡為最簡整數比 ${f.sa} : ${f.sb}！`;
+
+                        const distractors = [
+                            f.unsimp,
+                            `${f.sb} : ${f.sa}`,
+                            f.fake
+                        ];
+
+                        return {
+                            categoryTag: '最簡整數比 (分數)',
+                            targetTitle: '請將分數比化為「最簡整數比」',
+                            instructionKeyword: '最簡整數比',
+                            targetRatio: targetStr,
+                            correctOption: correctStr,
+                            distractors,
+                            explanation
+                        };
+                    },
+                    // 題型 3：小數/分數找相等的等比
+                    () => {
+                        const pairs = [
+                            { a: 1.2, b: 1.8, sa: 2, sb: 3 },
+                            { a: 0.8, b: 1.2, sa: 2, sb: 3 },
+                            { a: 0.6, b: 0.8, sa: 3, sb: 4 },
+                            { a: 2.4, b: 3.6, sa: 2, sb: 3 },
+                            { a: 0.9, b: 1.2, sa: 3, sb: 4 }
+                        ];
+                        const p = pairs[Math.floor(Math.random() * pairs.length)];
+                        const mult = 2;
+                        const targetStr = `${p.a} : ${p.b}`;
+                        const correctStr = `${p.sa * mult} : ${p.sb * mult}`;
+                        const explanation = `${targetStr} 前後項同乘以 10 得到整數比，再化簡為 ${p.sa} : ${p.sb}。選項 ${correctStr} 與它相等，是相等的比（等比）！`;
+                        const distractors = [
+                            `${p.sb * mult} : ${p.sa * mult}`,
+                            `${Math.round(p.a * 10)} : ${p.b}`,
+                            `${p.sa * mult} : ${p.sb * mult + 1}`
+                        ];
+
+                        return {
+                            categoryTag: '小數等比化簡',
+                            targetTitle: '目前賽車動力比',
+                            instructionKeyword: '相等的等比',
+                            targetRatio: targetStr,
+                            correctOption: correctStr,
+                            distractors,
+                            explanation
+                        };
+                    }
+                ];
+
+                const fn = templates[Math.floor(Math.random() * templates.length)];
+                return fn();
+            },
+
+            generate150cc() {
+                const templates = [
+                    // 題型 1：【最簡整數比】大數比化簡
+                    () => {
+                        const bigPairs = [
+                            { a: 72, b: 48, sa: 3, sb: 2, g: 24, unsimp: '9 : 6' },
+                            { a: 84, b: 56, sa: 3, sb: 2, g: 28, unsimp: '12 : 8' },
+                            { a: 108, b: 72, sa: 3, sb: 2, g: 36, unsimp: '18 : 12' },
+                            { a: 96, b: 64, sa: 3, sb: 2, g: 32, unsimp: '12 : 8' },
+                            { a: 75, b: 125, sa: 3, sb: 5, g: 25, unsimp: '15 : 25' },
+                            { a: 80, b: 120, sa: 2, sb: 3, g: 40, unsimp: '8 : 12' },
+                            { a: 120, b: 150, sa: 4, sb: 5, g: 30, unsimp: '12 : 15' },
+                            { a: 63, b: 84, sa: 3, sb: 4, g: 21, unsimp: '9 : 12' },
+                            { a: 90, b: 126, sa: 5, sb: 7, g: 18, unsimp: '15 : 21' },
+                            { a: 54, b: 90, sa: 3, sb: 5, g: 18, unsimp: '9 : 15' }
+                        ];
+                        const bp = bigPairs[Math.floor(Math.random() * bigPairs.length)];
+                        const targetStr = `${bp.a} : ${bp.b}`;
+                        const correctStr = `${bp.sa} : ${bp.sb}`;
+                        const explanation = `${targetStr} 的前項與後項最大公因數是 ${bp.g}，兩項同除以 ${bp.g}，化簡為最簡整數比 ${bp.sa} : ${bp.sb}！`;
+
+                        const distractors = [
+                            bp.unsimp,
+                            `${bp.sb} : ${bp.sa}`,
+                            `${bp.sa} : ${bp.sb + 1}`
+                        ];
+
+                        return {
+                            categoryTag: '最簡整數比 (大數)',
+                            targetTitle: '請將大數比化為「最簡整數比」',
+                            instructionKeyword: '最簡整數比',
+                            targetRatio: targetStr,
+                            correctOption: correctStr,
+                            distractors,
+                            explanation
+                        };
+                    },
+                    // 題型 2：【最簡整數比】混合比與帶分數比化簡
+                    () => {
+                        const mixPairs = [
+                            { label: '0.75 : 1/2', sa: 3, sb: 2, unsimp: '6 : 4', desc: '小數與分數混合比' },
+                            { label: '1.2 : 3/5', sa: 2, sb: 1, unsimp: '4 : 2', desc: '小數與分數混合比' },
+                            { label: '0.6 : 3/4', sa: 4, sb: 5, unsimp: '8 : 10', desc: '小數與分數混合比' },
+                            { label: '2/5 : 0.8', sa: 1, sb: 2, unsimp: '2 : 4', desc: '小數與分數混合比' },
+                            { label: '1.5 : 2/3', sa: 9, sb: 4, unsimp: '18 : 8', desc: '小數與分數混合比' },
+                            { label: '1又1/2 : 3/4', sa: 2, sb: 1, unsimp: '6 : 3', desc: '帶分數比化簡' },
+                            { label: '2又1/3 : 1又1/6', sa: 2, sb: 1, unsimp: '14 : 7', desc: '帶分數比化簡' },
+                            { label: '1又3/4 : 7/8', sa: 2, sb: 1, unsimp: '14 : 7', desc: '帶分數比化簡' },
+                            { label: '1又2/5 : 2又1/10', sa: 2, sb: 3, unsimp: '14 : 21', desc: '帶分數比化簡' },
+                            { label: '2又1/2 : 1又1/4', sa: 2, sb: 1, unsimp: '10 : 5', desc: '帶分數比化簡' }
+                        ];
+                        const mp = mixPairs[Math.floor(Math.random() * mixPairs.length)];
+                        const targetStr = mp.label;
+                        const correctStr = `${mp.sa} : ${mp.sb}`;
+                        const explanation = `${mp.desc} ${targetStr} 先統一化為分數並通分，前後項同乘以分母公倍數，化簡為最簡整數比 ${mp.sa} : ${mp.sb}！`;
+
+                        const distractors = [
+                            mp.unsimp,
+                            `${mp.sb} : ${mp.sa}`,
+                            `${mp.sa} : ${mp.sb + 1}`
+                        ];
+
+                        return {
+                            categoryTag: '最簡整數比 (綜合)',
+                            targetTitle: '請將比化為「最簡整數比」',
+                            instructionKeyword: '最簡整數比',
+                            targetRatio: targetStr,
+                            correctOption: correctStr,
+                            distractors,
+                            explanation
+                        };
+                    },
+                    // 題型 3：大數等比
+                    () => {
+                        const bigPairs = [
+                            { a: 36, b: 48, sa: 3, sb: 4, g: 12 },
+                            { a: 48, b: 72, sa: 2, sb: 3, g: 24 },
+                            { a: 45, b: 60, sa: 3, sb: 4, g: 15 },
+                            { a: 42, b: 56, sa: 3, sb: 4, g: 14 }
+                        ];
+                        const bp = bigPairs[Math.floor(Math.random() * bigPairs.length)];
+                        const mult = 2;
+                        const targetStr = `${bp.a} : ${bp.b}`;
+                        const correctStr = `${bp.sa * mult} : ${bp.sb * mult}`;
+                        const explanation = `${targetStr} 前後項同除以最大公因數 ${bp.g} 化簡為最簡整數比 ${bp.sa} : ${bp.sb}。選項 ${correctStr} 與它相等，是相等的比（等比）！`;
+                        const distractors = [
+                            `${bp.sb * mult} : ${bp.sa * mult}`,
+                            `${bp.a - 5} : ${bp.b - 5}`,
+                            `${bp.sa * mult} : ${bp.sb * mult + 1}`
+                        ];
+
+                        return {
+                            categoryTag: '大數化簡等比',
+                            targetTitle: '目前賽車動力比',
+                            instructionKeyword: '相等的等比',
+                            targetRatio: targetStr,
+                            correctOption: correctStr,
+                            distractors,
+                            explanation
+                        };
+                    }
+                ];
+
+                const fn = templates[Math.floor(Math.random() * templates.length)];
+                return fn();
+            },
+
+            createQuestion(mode) {
+                let qData;
+                if (mode === '50cc') {
+                    qData = this.generate50cc();
+                } else if (mode === '100cc') {
+                    qData = this.generate100cc();
+                } else {
+                    qData = this.generate150cc();
+                }
+
+                const rawOptions = [
+                    { text: qData.correctOption, isCorrect: true },
+                    { text: qData.distractors[0], isCorrect: false },
+                    { text: qData.distractors[1], isCorrect: false },
+                    { text: qData.distractors[2], isCorrect: false }
+                ];
+
+                for (let i = rawOptions.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [rawOptions[i], rawOptions[j]] = [rawOptions[j], rawOptions[i]];
+                }
+
+                const correctIndex = rawOptions.findIndex(o => o.isCorrect);
+
+                return {
+                    categoryTag: qData.categoryTag,
+                    targetTitle: qData.targetTitle,
+                    instructionKeyword: qData.instructionKeyword,
+                    targetRatio: qData.targetRatio,
+                    options: rawOptions.map(o => o.text),
+                    correctIndex: correctIndex,
+                    explanation: qData.explanation
+                };
+            }
+        };
+
+        // -------------------------------------------------------------
+        // 3. 遊戲狀態控制機 (State Machine)
+        // -------------------------------------------------------------
+        const State = {
+            currentScreen: 'start',
+            currentMode: '50cc',
+            targetWins: 8,
+
+            isCountingDown: false,
+            countdownStep: 3,
+
+            totalAnswered: 0,
+            totalCorrect: 0,
+            dashProgress: 0,
+            dashTimer: 0,
+            streak: 0,
+            maxStreak: 0,
+            topSpeed: 60,
+            itemsUsedCount: 0,
+            historyLog: [],
+
+            inventory: null,
+            isStarActive: false,
+            starRemainingMs: 0,
+
+            isQuizModalOpen: false,
+            currentQuestion: null,
+            isAnsweringLocked: false,
+            autoResumeTimeout: null,
+
+            // 【需求 2】：跑道上一排 5 個立體旋轉問號寶箱系統 (每 8 秒出現一次)
+            itemBoxRows: [], // 賽道上的立體問號寶箱排
+            boxRowSpawnTimer: 8.0, // 8 秒出現一次寶箱排計時器
+
+            // 【需求 3】：真實彈道飛行道具系統
+            projectiles: [],
+
+            // 【需求 5】：賽道加速跳板系統 (Boost Pads)
+            boostPads: [],
+
+            // 賽道兩側實體景物與彎道導向指示牌 (Chevron Signs & Markers)
+            trackScenery: [],
+
+            // 【需求 1 & 4】：真實 3D 遠近排位車距，左右大範圍轉向與車體傾斜
+            player: {
+                x: -0.3,            // -1.15 到 1.15 (大範圍轉向)
+                tilt: 0,            // 車體轉向傾斜角 (rad)
+                distance: 0,
+                speed: 0,
+                targetSpeed: 85,
+                rank: 4,
+                spinTimer: 0,
+                boostTimer: 0,
+                bumpCooldown: 0,
+                wobbleTimer: 0
+            },
+            opponents: [
+                // 【需求 1】：四台車開局車距大幅拉開 (65m, 150m, 240m)
+                { id: 1, color: '#10b981', distance: 65, speed: 0, targetSpeed: 78, x: 0.35, targetX: 0.35, spinTimer: 0, bumpCooldown: 0, laneTimer: 2.5 },
+                { id: 2, color: '#3b82f6', distance: 150, speed: 0, targetSpeed: 84, x: -0.4, targetX: -0.4, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.5 },
+                { id: 3, color: '#eab308', distance: 240, speed: 0, targetSpeed: 90, x: 0.3, targetX: 0.3, spinTimer: 0, bumpCooldown: 0, laneTimer: 4.5 }
+            ],
+
+            finishDistance: 1800,
+            isRaceFinished: false
+        };
+
+        const Input = {
+            left: false,
+            right: false,
+            up: false,
+            down: false
+        };
+
+        let screenShakeTime = 0;
+        function triggerScreenShake(duration = 0.25) {
+            screenShakeTime = duration;
+        }
+
+        // -------------------------------------------------------------
+        // 4. 動態 3D Canvas 賽道渲染器 (真實深度透視 & 複雜彎道)
+        // -------------------------------------------------------------
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        let animationFrameId = null;
+        let lastTimestamp = 0;
+
+        if (!ctx.roundRect) {
+            ctx.roundRect = function(x, y, w, h, r) {
+                if (typeof r === 'undefined') r = 0;
+                if (typeof r === 'number') r = { tl: r, tr: r, br: r, bl: r };
+                else {
+                    const defaultR = { tl: 0, tr: 0, br: 0, bl: r };
+                    for (let p in defaultR) r[p] = r[p] || defaultR[p];
+                }
+                this.beginPath();
+                this.moveTo(x + r.tl, y);
+                this.lineTo(x + w - r.tr, y);
+                this.quadraticCurveTo(x + w, y, x + w, y + r.tr);
+                this.lineTo(x + w, y + h - r.br);
+                this.quadraticCurveTo(x + w, y + h, x + w - r.br, y + h);
+                this.lineTo(x + r.bl, y + h);
+                this.quadraticCurveTo(x, y + h, x, y + h - r.bl);
+                this.lineTo(x, y + r.tl);
+                this.quadraticCurveTo(x, y, x + r.tl, y);
+                this.closePath();
+                return this;
+            };
+        }
+
+        function resizeCanvas() {
+            const container = document.getElementById('game-canvas-container');
+            if (!container) return;
+            const rect = container.getBoundingClientRect();
+            canvas.width = rect.width * (window.devicePixelRatio || 1);
+            canvas.height = rect.height * (window.devicePixelRatio || 1);
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        let roadOffset = 0;
+        let particles = [];
+        let bgScrollOffset = 0;
+
+        // 賽道每層切片之 3D 透視深度與累積曲率橫向偏移緩存 (真實賽車路況視距透視)
+        const FOCAL = 42;
+        const PLAYER_CAM_DIST = 18; // 自車在虛擬攝影機前方的距離基準面 (投射於 playerY = h * 0.82)
+        const PLAYER_SCALE = FOCAL / (FOCAL + PLAYER_CAM_DIST); // 42 / (42 + 18) = 0.70
+        const CAR_BASE_W = 118; // 統一車輛寬度基準
+        const CAR_BASE_H = 72;  // 統一車輛高度基準
+        const MAX_VIEW_DIST = 380;
+        const ROAD_LINES = 120;
+        const roadSliceOffsets = new Float32Array(ROAD_LINES);
+        const roadSliceDists = new Float32Array(ROAD_LINES);
+        const roadSliceAngles = new Float32Array(ROAD_LINES);
+
+        // 【等比皇家格蘭披治 3600m 國際大獎賽賽道】連續平滑曲率計算 (單圈約 1分半 / 90秒)
+        function getTrackCurvature(distance) {
+            const lapDist = 3600; // 3600 米單圈 (標準 1 分半 90 秒國際規格賽道)
+            const prog = ((distance % lapDist) + lapDist) % lapDist / lapDist; // 0 ~ 1
+
+            // Sector 1 (0 ~ 1200m)
+            // 0.000 ~ 0.153 (0 ~ 550m): 起跑大看台衝刺直線 -> k = 0
+            if (prog < 0.153) {
+                return 0;
+            }
+            // 0.153 ~ 0.236 (550 ~ 850m): 聖德芙右高速大掃彎 (T1 & T2)
+            else if (prog < 0.236) {
+                const t = (prog - 0.153) / 0.083;
+                return 0.75 * Math.sin(t * Math.PI);
+            }
+            // 0.236 ~ 0.306 (850 ~ 1100m): 山谷加速平原直道 -> k = 0
+            else if (prog < 0.306) {
+                return 0;
+            }
+            // 0.306 ~ 0.389 (1100 ~ 1400m): 皇家 180° 深切右髮夾急彎 (T4)
+            else if (prog < 0.389) {
+                const t = (prog - 0.306) / 0.083;
+                return 1.40 * Math.sin(t * Math.PI);
+            }
+
+            // Sector 2 (1200 ~ 2400m)
+            // 0.389 ~ 0.458 (1400 ~ 1650m): 羅斯山脊高速過渡直道 -> k = 0
+            else if (prog < 0.458) {
+                return 0;
+            }
+            // 0.458 ~ 0.597 (1650 ~ 2150m): 連續 S 型鐘擺急彎 (The Esses: 先左後右 T6 & T7)
+            else if (prog < 0.597) {
+                const t = (prog - 0.458) / 0.139;
+                return -1.15 * Math.sin(t * Math.PI * 2);
+            }
+            // 0.597 ~ 0.667 (2150 ~ 2400m): 湖畔高架直道 -> k = 0
+            else if (prog < 0.667) {
+                return 0;
+            }
+
+            // Sector 3 (2400 ~ 3600m)
+            // 0.667 ~ 0.819 (2400 ~ 2950m): 帕拉波利卡超寬大左迴旋 (T11)
+            else if (prog < 0.819) {
+                const t = (prog - 0.667) / 0.152;
+                return -1.25 * Math.sin(t * Math.PI);
+            }
+            // 0.819 ~ 0.889 (2950 ~ 3200m): 終點前減速 S 組合彎 (Variante Chicane T12: 先右後左)
+            else if (prog < 0.889) {
+                const t = (prog - 0.819) / 0.070;
+                return 0.95 * Math.sin(t * Math.PI * 2);
+            }
+            // 0.889 ~ 1.000 (3200 ~ 3600m): 凱旋終點大衝刺直線 (Home Straight) -> k = 0
+            else {
+                return 0;
+            }
+        }
+
+        // 統一 3D 透視幾何投影：計算任一距離 relDist 與車道位置 laneX 的精確像素座標 (跑道與所有物件 100% 絕對共用)
+        function projectRoadPoint(relDist, laneX, w, h, horizonY) {
+            const roadBottomW = w * 0.96;
+            const camDist = relDist + PLAYER_CAM_DIST;
+
+            if (camDist <= 0.2) {
+                // 在攝影機身後，不可見
+                return { x: w * 0.5, y: h + 150, scale: 0, roadW: 0, roadCenter: w * 0.5, angle: 0 };
+            }
+
+            const clampedDist = Math.min(MAX_VIEW_DIST, Math.max(0, relDist));
+            const scale = FOCAL / (FOCAL + camDist);
+            const y = horizonY + (h - horizonY) * scale;
+            const roadW = roadBottomW * scale;
+
+            // 插值計算該距離處之連續跑道彎曲橫向位移與道路切線角度
+            let offset = 0;
+            let angle = 0;
+            if (clampedDist >= roadSliceDists[ROAD_LINES - 1]) {
+                offset = roadSliceOffsets[ROAD_LINES - 1];
+                angle = roadSliceAngles[ROAD_LINES - 1];
+            } else {
+                for (let i = 0; i < ROAD_LINES - 1; i++) {
+                    if (clampedDist >= roadSliceDists[i] && clampedDist <= roadSliceDists[i + 1]) {
+                        const span = roadSliceDists[i + 1] - roadSliceDists[i];
+                        const t = span > 0 ? (clampedDist - roadSliceDists[i]) / span : 0;
+                        offset = roadSliceOffsets[i] + t * (roadSliceOffsets[i + 1] - roadSliceOffsets[i]);
+                        angle = roadSliceAngles[i] + t * (roadSliceAngles[i + 1] - roadSliceAngles[i]);
+                        break;
+                    }
+                }
+            }
+
+            const roadCenter = (w * 0.5) + offset;
+            const x = roadCenter + (laneX * roadW * 0.5);
+            return { x, y, scale, roadW, roadCenter, angle };
+        }
+
+        // 初始化 3600m 賽道兩側景物與彎道箭頭警示板 (Chevron Signs & Markers)
+        function initTrackScenery() {
+            const lapDist = 3600;
+            const signs = [];
+
+            // 1. T1 聖德芙右掃彎指示牌 (Outer left shoulder: side = -1.18)
+            // 550m ~ 850m (prog 0.153 ~ 0.236)
+            [0.165, 0.190, 0.215].forEach(prog => {
+                signs.push({ lapProg: prog, side: -1.18, type: 'chevron_right' });
+            });
+
+            // 2. T4 皇家 180° 深切右髮夾急彎 (Outer left shoulder: side = -1.18)
+            // 1100m ~ 1400m (prog 0.306 ~ 0.389)
+            [0.315, 0.330, 0.345, 0.360, 0.375].forEach(prog => {
+                signs.push({ lapProg: prog, side: -1.18, type: 'chevron_right' });
+            });
+
+            // 3. T6 & T7 S 型連續急彎 (prog 0.458 ~ 0.597)
+            // 第一折左彎外側 (右路肩 side = 1.18)
+            [0.475, 0.505, 0.525].forEach(prog => {
+                signs.push({ lapProg: prog, side: 1.18, type: 'chevron_left' });
+            });
+            // 第二折右彎外側 (左路肩 side = -1.18)
+            [0.545, 0.565, 0.585].forEach(prog => {
+                signs.push({ lapProg: prog, side: -1.18, type: 'chevron_right' });
+            });
+
+            // 4. T11 帕拉波利卡大左迴旋 (Outer right shoulder: side = 1.18)
+            // 2400m ~ 2950m (prog 0.667 ~ 0.819)
+            [0.685, 0.715, 0.745, 0.775, 0.805].forEach(prog => {
+                signs.push({ lapProg: prog, side: 1.18, type: 'chevron_left' });
+            });
+
+            // 5. T12 終點前減速 S 彎 (prog 0.819 ~ 0.889)
+            signs.push({ lapProg: 0.830, side: -1.18, type: 'chevron_right' });
+            signs.push({ lapProg: 0.865, side: 1.18, type: 'chevron_left' });
+
+            // 6. 全圈紅白導航立柱 (直接錨定於紅白路肩 side = -1.0 與 1.0)
+            const markerCount = Math.floor(lapDist / 35);
+            for (let m = 0; m < markerCount; m++) {
+                const prog = m / markerCount;
+                signs.push({ lapProg: prog, side: -1.0, type: 'marker' });
+                signs.push({ lapProg: prog, side: 1.0, type: 'marker' });
+            }
+
+            State.trackScenery = signs;
+        }
+
+
+        function gameLoop(timestamp) {
+            if (!lastTimestamp) lastTimestamp = timestamp;
+            const dt = Math.min((timestamp - lastTimestamp) / 1000, 0.08);
+            lastTimestamp = timestamp;
+
+            if (State.currentScreen === 'race') {
+                updatePhysics(dt);
+                renderScene();
+                updateCircuitMinimap();
+            }
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function updatePhysics(dt) {
+            const p = State.player;
+
+            if (State.isCountingDown) {
+                p.speed = 0;
+                State.opponents.forEach(ai => ai.speed = 0);
+                updateHudSpeed(0);
+                return;
+            }
+
+            // 【需求 1】：答題時遊戲完全暫停，所有車子停止，等待答題完成後恢復
+            if (State.isQuizModalOpen) {
+                return;
+            }
+
+            if (screenShakeTime > 0) {
+                screenShakeTime -= dt;
+                const container = document.getElementById('game-canvas-container');
+                if (screenShakeTime > 0) {
+                    const sx = (Math.random() - 0.5) * 10;
+                    const sy = (Math.random() - 0.5) * 10;
+                    container.style.transform = `translate(${sx}px, ${sy}px)`;
+                } else {
+                    container.style.transform = 'none';
+                }
+            }
+
+            if (State.dashTimer > 0) {
+                State.dashTimer -= dt;
+                const sec = Math.max(0, State.dashTimer).toFixed(1);
+                document.getElementById('hud-dash-time').innerText = `${sec}s`;
+                if (State.dashTimer <= 0) {
+                    State.dashTimer = 0;
+                    document.getElementById('hud-dash-banner').classList.add('hidden');
+                }
+            }
+
+            if (State.isStarActive) {
+                State.starRemainingMs -= dt * 1000;
+                const sec = Math.max(0, (State.starRemainingMs / 1000)).toFixed(1);
+                document.getElementById('hud-star-time').innerText = `${sec}s`;
+                if (State.starRemainingMs <= 0) {
+                    State.isStarActive = false;
+                    document.getElementById('hud-star-banner').classList.add('hidden');
+                }
+            }
+
+            if (p.spinTimer > 0) p.spinTimer -= dt;
+            if (p.wobbleTimer > 0) p.wobbleTimer -= dt;
+            if (p.bumpCooldown > 0) p.bumpCooldown -= dt;
+            if (p.boostTimer > 0) p.boostTimer -= dt;
+
+            // 【需求 1 & 3】：真實賽車遊戲平穩流暢轉向幅度與踩油門加速推背感
+            if (!State.isQuizModalOpen && !State.isRaceFinished) {
+                // 【需求 1】：真實賽車遊戲平穩流暢轉向速度 (1.55 units/s)，告別 4.2 的瞬移過大幅度
+                const steerSpeed = 1.55;
+                let targetSteer = 0;
+                if (Input.left) targetSteer = -1.0;
+                else if (Input.right) targetSteer = 1.0;
+
+                // 平滑轉向慣性加速度與自然回正
+                p.steerVel = p.steerVel || 0;
+                p.steerVel += (targetSteer * steerSpeed - p.steerVel) * dt * 9.0;
+                p.x += p.steerVel * dt;
+
+                // 賽車車道邊界限制：在路面 [-0.85, 0.85] 內流暢行駛，可觸碰紅白路肩 [-0.95, 0.95]
+                p.x = Math.max(-0.95, Math.min(0.95, p.x));
+
+                // 車體動態傾角 (真實跑車約 6° 懸吊傾側)
+                const targetTilt = (p.steerVel / steerSpeed) * 0.11;
+                p.tilt += (targetTilt - p.tilt) * dt * 10;
+
+                // 【需求 4】：真實賽車踩油門實體推背感與強烈加速 (視覺體感速度再全面提升 50%)
+                let baseCruise = 240;
+                let maxThrottle = 330;
+                if (State.currentMode === '100cc') {
+                    baseCruise = 290;
+                    maxThrottle = 400;
+                } else if (State.currentMode === '150cc') {
+                    baseCruise = 350;
+                    maxThrottle = 480;
+                }
+
+                if (State.dashTimer > 0) {
+                    p.targetSpeed = 520; // 5題連續正確衝刺噴射
+                } else if (State.isStarActive) {
+                    p.targetSpeed = 480; // 無敵星星
+                } else if (p.boostTimer > 0) {
+                    p.targetSpeed = 450; // 加速跳板噴射
+                } else if (Input.up) {
+                    p.targetSpeed = maxThrottle; // 踩下油門極速
+                } else if (Input.down) {
+                    p.targetSpeed = 90; // 踩煞車減速
+                } else {
+                    p.targetSpeed = baseCruise; // 鬆開油門時的高速巡航
+                }
+
+                // 踩油門與煞車時的車身懸吊俯仰 (踩油門時車尾下沉 4px 營造推背感，踩煞車時車頭下潛 -3px)
+                p.suspensionY = p.suspensionY || 0;
+                if (Input.up || p.boostTimer > 0 || State.dashTimer > 0) {
+                    p.suspensionY += (4.0 - p.suspensionY) * dt * 10;
+                } else if (Input.down) {
+                    p.suspensionY += (-3.0 - p.suspensionY) * dt * 10;
+                } else {
+                    p.suspensionY += (0.0 - p.suspensionY) * dt * 8;
+                }
+            }
+
+            // 自車碰撞平順彈跳衰減
+            if (p.bumpVel) {
+                p.x += p.bumpVel * dt;
+                p.bumpVel *= Math.max(0, 1 - dt * 10);
+                p.x = Math.max(-0.95, Math.min(0.95, p.x));
+            }
+
+            // 草地摩擦
+            const isOffroad = Math.abs(p.x) > 0.88;
+            if (isOffroad && State.dashTimer <= 0 && !State.isStarActive) {
+                p.targetSpeed = Math.min(p.targetSpeed, 90);
+                if (Math.random() < 0.4) {
+                    addParticle(canvas.width * 0.5 + p.x * 220, canvas.height * 0.85, 'dust');
+                }
+            }
+
+            // 速度演變 (【需求 4】：視覺體感速度再提升 50%，極限推力加速度)
+            if (p.spinTimer > 0) {
+                p.speed = Math.max(50, p.speed - 180 * dt);
+            } else if (State.dashTimer > 0) {
+                p.speed = Math.min(520, p.speed + 420 * dt);
+            } else if (State.isStarActive) {
+                p.speed = Math.min(480, p.speed + 350 * dt);
+            } else if (p.boostTimer > 0) {
+                p.speed = Math.min(450, p.speed + 360 * dt);
+            } else if (Input.up) {
+                // 踩油門狂飆加速
+                const diff = p.targetSpeed - p.speed;
+                p.speed += Math.max(diff * 9.5, 180) * dt;
+                p.speed = Math.min(p.targetSpeed, p.speed);
+            } else if (Input.down) {
+                // 踩煞車制動減速
+                p.speed = Math.max(p.targetSpeed, p.speed - 260 * dt);
+            } else {
+                // 鬆開油門巡航平緩調整
+                const diff = p.targetSpeed - p.speed;
+                p.speed += diff * 5.0 * dt;
+            }
+
+            if (p.speed > State.topSpeed) {
+                State.topSpeed = Math.round(p.speed);
+            }
+
+            const playerMps = (p.speed * 1000) / 3600;
+            p.distance += playerMps * dt;
+            // 【需求 4】：道路格紋滾動速率大幅增加 54% (6.8 -> 10.5)，營造極限風馳電掣快感
+            roadOffset = (roadOffset + playerMps * dt * 10.5) % 400;
+
+            // 擬真賽車離心力與循跡過彎物理
+            const carCurvature = getTrackCurvature(p.distance);
+            if (Math.abs(carCurvature) > 0.05) {
+                let effectiveCentrifugal = carCurvature * (p.speed / 160) * 0.42;
+                if ((carCurvature > 0 && Input.right) || (carCurvature < 0 && Input.left)) {
+                    effectiveCentrifugal = 0; // 順向切入彎道時，享受 100% 循跡手感
+                }
+                p.x -= effectiveCentrifugal * dt;
+
+                // 若在高速下入彎打方向盤，觸發輪胎漂移煙霧與輪胎摩擦音
+                if (p.speed > 105 && ((carCurvature > 0 && Input.right) || (carCurvature < 0 && Input.left))) {
+                    if (Math.random() < 0.65) {
+                        const carX = canvas.width * 0.5 + (p.x * canvas.width * 0.42);
+                        addParticle(carX - 25, canvas.height * 0.88, 'dust');
+                        addParticle(carX + 25, canvas.height * 0.88, 'dust');
+                        Sound.tireScreech();
+                    }
+                }
+            }
+
+            // G-Force 鏡頭動態水平傾角 (轉彎與甩尾時視角微幅傾斜 1.5° ~ 2° 模擬重力體感)
+            p.cameraRoll = p.cameraRoll || 0;
+            const targetRoll = -(carCurvature * 0.026 + (p.steerVel || 0) * 0.016);
+            p.cameraRoll += (targetRoll - p.cameraRoll) * dt * 5.5;
+
+            // 即時同步 Web Audio 引擎聲浪 (踩油門拉升轉速咆哮，鬆油門降轉)
+            Sound.updateEngine(p.speed, Input.up && !State.isQuizModalOpen, Input.down && !State.isQuizModalOpen);
+
+            // 遠景山脈伴隨過彎進行真實視差平移
+            bgScrollOffset = (bgScrollOffset + carCurvature * playerMps * dt * 0.4) % 1000;
+
+            // AI 競賽物理 (平穩平滑轉向，絕無突發劇烈橫移，與我方物理完全相同)
+            State.opponents.forEach((ai) => {
+                if (ai.spinTimer > 0) {
+                    ai.spinTimer -= dt;
+                    ai.speed = Math.max(50, ai.speed - 150 * dt);
+                } else {
+                    const baseAiSpeed = State.currentMode === '150cc' ? 400 : (State.currentMode === '100cc' ? 320 : 255);
+                    ai.targetSpeed = baseAiSpeed + Math.sin(timestampSec() + ai.id * 2) * 20;
+                    ai.speed += (ai.targetSpeed - ai.speed) * dt * 4.0;
+                }
+                if (ai.bumpCooldown > 0) ai.bumpCooldown -= dt;
+
+                // AI 車道選擇：長週期 (4.5~8.0s) 平緩變道，維持真實競賽穩定度
+                ai.laneTimer = (ai.laneTimer || 0) - dt;
+                if (ai.laneTimer <= 0) {
+                    ai.laneTimer = Math.random() * 3.5 + 4.5;
+                    const lanes = [-0.6, -0.3, 0.0, 0.3, 0.6];
+                    ai.targetX = lanes[Math.floor(Math.random() * lanes.length)];
+                }
+
+                // 避開前車溫和微調
+                const distToPlayer = ai.distance - p.distance;
+                if (Math.abs(distToPlayer) < 18 && Math.abs(ai.x - p.x) < 0.24) {
+                    const nudge = (ai.x >= p.x) ? 0.22 : -0.22;
+                    ai.targetX = Math.max(-0.75, Math.min(0.75, ai.targetX + nudge));
+                }
+
+                // 轉向物理與自車完全相同：使用平滑轉向慣性 steerVel (速率上限 1.45 units/s)
+                ai.steerVel = ai.steerVel || 0;
+                ai.bumpVel = ai.bumpVel || 0;
+                const steerDiff = ai.targetX - ai.x;
+                const desiredSteer = Math.max(-1.45, Math.min(1.45, steerDiff * 2.2));
+                ai.steerVel += (desiredSteer - ai.steerVel) * dt * 7.5;
+
+                // 碰撞反彈力平滑衰減
+                ai.bumpVel *= Math.max(0, 1 - dt * 10);
+
+                ai.x += (ai.steerVel + ai.bumpVel) * dt;
+                ai.x = Math.max(-0.95, Math.min(0.95, ai.x));
+
+                const aiMps = (ai.speed * 1000) / 3600;
+                ai.distance += aiMps * dt;
+            });
+
+            // 碰撞檢測
+            if (!State.isQuizModalOpen) {
+                State.opponents.forEach((ai) => {
+                    const distDiff = Math.abs(ai.distance - p.distance);
+                    const xDiff = Math.abs(ai.x - p.x);
+
+                    if (distDiff < 7.0 && xDiff < 0.28) {
+                        handleCarCollision(ai);
+                    }
+                });
+
+                for (let i = 0; i < State.opponents.length; i++) {
+                    for (let j = i + 1; j < State.opponents.length; j++) {
+                        const a1 = State.opponents[i];
+                        const a2 = State.opponents[j];
+                        if (Math.abs(a1.distance - a2.distance) < 6.0 && Math.abs(a1.x - a2.x) < 0.24) {
+                            const bumpForce = (a1.x < a2.x) ? -1.2 : 1.2;
+                            a1.bumpVel = (a1.bumpVel || 0) + bumpForce;
+                            a2.bumpVel = (a2.bumpVel || 0) - bumpForce;
+                        }
+                    }
+                }
+            }
+
+            // 【需求 2】：跑道上一排 5 個立體問號寶箱碰撞檢測
+            updateItemBoxRows(dt);
+
+            // 【需求 3】：真實彈道飛行道具更新
+            updateProjectiles(dt);
+
+            // 【需求 5】：賽道加速跳板檢測
+            updateBoostPads(dt);
+
+            // 即時排名
+            const allCars = [
+                { id: 0, distance: p.distance },
+                ...State.opponents.map(o => ({ id: o.id, distance: o.distance }))
+            ];
+            allCars.sort((a, b) => b.distance - a.distance);
+            const playerRank = allCars.findIndex(c => c.id === 0) + 1;
+
+            if (playerRank !== p.rank) {
+                if (playerRank < p.rank) {
+                    triggerFloatingAlert('OVERTAKE! ⚡ 超車啦！');
+                    Sound.beep(680, 'triangle', 0.15, 0.25);
+                }
+                p.rank = playerRank;
+                updateRankBadge(playerRank);
+            }
+
+            updateHudSpeed(p.speed, Input.up && !State.isQuizModalOpen, Input.down && !State.isQuizModalOpen);
+            updateParticles(dt);
+
+            if (p.distance >= State.finishDistance && !State.isRaceFinished) {
+                finishRace(true);
+            }
+        }
+
+        // 碰撞反彈處理
+        function handleCarCollision(ai) {
+            const p = State.player;
+            if (p.bumpCooldown > 0 || ai.bumpCooldown > 0) return;
+            p.bumpCooldown = 0.35;
+            ai.bumpCooldown = 0.35;
+
+            if (State.isStarActive || State.dashTimer > 0) {
+                Sound.explosion();
+                triggerFloatingAlert('⚡ 撞飛對手！衝刺無阻！');
+                ai.spinTimer = 2.8;
+                ai.speed = 15;
+                ai.x += (ai.x >= p.x ? 0.45 : -0.45);
+                ai.x = Math.max(-0.9, Math.min(0.9, ai.x));
+                for (let i = 0; i < 14; i++) {
+                    addParticle(canvas.width * 0.5 + p.x * 200, canvas.height * 0.8, 'spark');
+                }
+                return;
+            }
+
+            Sound.crash();
+            triggerScreenShake(0.3);
+
+            // 擬真衝擊力平滑回彈 (不瞬移座標，車輛自然回彈)
+            const bumpForce = (p.x <= ai.x) ? -1.6 : 1.6;
+            p.bumpVel = (p.bumpVel || 0) + bumpForce;
+            ai.bumpVel = (ai.bumpVel || 0) - bumpForce;
+
+            if (p.speed > ai.speed) {
+                p.speed = Math.max(30, p.speed * 0.65);
+                ai.speed = Math.min(140, ai.speed + 25);
+                triggerFloatingAlert('💥 追撞前車！嚴重失速！');
+            } else if (ai.speed > p.speed) {
+                p.speed += 15;
+                ai.speed = Math.max(30, ai.speed * 0.65);
+                triggerFloatingAlert('💥 被後車追撞！');
+            } else {
+                p.speed = Math.max(35, p.speed * 0.8);
+                ai.speed = Math.max(35, ai.speed * 0.8);
+                triggerFloatingAlert('💥 車側擦撞！減速打滑！');
+            }
+
+            p.wobbleTimer = 0.35;
+            ai.spinTimer = 0.4;
+
+            for (let i = 0; i < 8; i++) {
+                addParticle(canvas.width * 0.5 + ((p.x + ai.x) / 2) * 200, canvas.height * 0.82, 'spark');
+            }
+        }
+
+        // 【需求 2】：一排 5 個立體旋轉問號寶箱管理與碰撞 (8 秒出現一次，嚴格跟隨跑道)
+        function updateItemBoxRows(dt) {
+            if (State.isQuizModalOpen || State.isCountingDown) return;
+            const p = State.player;
+
+            // 當賽道上沒有寶箱排時，倒數 8 秒生成新的一排
+            if (State.itemBoxRows.length === 0) {
+                State.boxRowSpawnTimer -= dt;
+                if (State.boxRowSpawnTimer <= 0) {
+                    // 8 秒倒數結束，在前方賽道 (140 米處) 產生一排 5 個立體旋轉問號寶箱
+                    const lanes = [-0.72, -0.36, 0.0, 0.36, 0.72];
+                    const boxes = lanes.map(lx => ({
+                        id: Math.random(),
+                        x: lx,
+                        collected: false
+                    }));
+                    State.itemBoxRows.push({
+                        distance: p.distance + 140,
+                        boxes: boxes
+                    });
+                    State.boxRowSpawnTimer = 8.0;
+                }
+            }
+
+            // 檢測是否撞擊或已通過寶箱排
+            for (let i = State.itemBoxRows.length - 1; i >= 0; i--) {
+                const row = State.itemBoxRows[i];
+                const relDist = row.distance - p.distance;
+
+                // 已經過去 20 米則移除該排，並重置 8 秒冷卻
+                if (relDist < -20) {
+                    State.itemBoxRows.splice(i, 1);
+                    State.boxRowSpawnTimer = 8.0;
+                    continue;
+                }
+
+                // 碰撞判定：距離行小於 6.0 米
+                if (Math.abs(relDist) < 6.0) {
+                    for (let b = 0; b < row.boxes.length; b++) {
+                        const box = row.boxes[b];
+                        // 檢測橫向車道位置是否重合
+                        if (!box.collected && Math.abs(box.x - p.x) < 0.24) {
+                            box.collected = true;
+                            Sound.itemGet();
+
+                            // 碎裂星星金色粒子
+                            for (let s = 0; s < 18; s++) {
+                                addParticle(canvas.width * 0.5 + box.x * 240, canvas.height * 0.78, 'star');
+                            }
+
+                            // 吃到寶箱後移除該排，並重置 8 秒計時器
+                            State.itemBoxRows.splice(i, 1);
+                            State.boxRowSpawnTimer = 8.0;
+
+                            openQuizModal();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 【需求 5】：賽道加速跳板檢測 (Boost Pads)
+        function updateBoostPads(dt) {
+            const p = State.player;
+        // 維護賽道加速帶 (每 650 米左右於直道處出現)
+            while (State.boostPads.length < 3) {
+                const lastDist = State.boostPads.length > 0
+                    ? State.boostPads[State.boostPads.length - 1].distance
+                    : p.distance + 250;
+                State.boostPads.push({
+                    distance: lastDist + 650,
+                    x: (Math.random() * 0.6 - 0.3) // 在中間車道
+                });
+            }
+
+            for (let i = State.boostPads.length - 1; i >= 0; i--) {
+                const pad = State.boostPads[i];
+                if (p.distance - pad.distance > 25) {
+                    State.boostPads.splice(i, 1);
+                    continue;
+                }
+                if (Math.abs(pad.distance - p.distance) < 5.0 && Math.abs(pad.x - p.x) < 0.3) {
+                    Sound.boostPadSound();
+                    p.boostTimer = 2.2;
+                    p.targetSpeed = 450;
+                    triggerFloatingAlert('⚡ BOOST PAD! 加速帶噴射！');
+                }
+            }
+        }
+
+        // 【需求 2】：道具發射主動追蹤導航系統 (紅龜殼與導航炸彈均具備超強追蹤性)
+        function updateProjectiles(dt) {
+            for (let i = State.projectiles.length - 1; i >= 0; i--) {
+                const proj = State.projectiles[i];
+
+                if (proj.type === 'red_shell') {
+                    // 紅龜殼極速向前飛行並強力自動導航追蹤最近前車
+                    proj.speed = Math.max(520, State.player.speed + 190);
+                    const mps = (proj.speed * 1000) / 3600;
+                    proj.distance += mps * dt;
+
+                    // 尋找最近前車目標
+                    let target = State.opponents.find(o => o.id === proj.targetId);
+                    if (!target || target.distance <= proj.distance) {
+                        target = State.opponents.filter(o => o.distance > proj.distance)
+                            .sort((a, b) => a.distance - b.distance)[0];
+                        if (target) proj.targetId = target.id;
+                    }
+
+                    if (target) {
+                        // 強力追蹤變道
+                        proj.x += (target.x - proj.x) * dt * 8.5;
+                    }
+
+                    // 產生火焰尾跡
+                    if (Math.random() < 0.6) {
+                        addParticle(canvas.width * 0.5 + proj.x * 200, canvas.height * 0.75, 'flame');
+                    }
+
+                    // 命中前車判定
+                    if (target && Math.abs(target.distance - proj.distance) < 8.0 && Math.abs(target.x - proj.x) < 0.35) {
+                        Sound.explosion();
+                        target.spinTimer = 3.5;
+                        target.speed = 15;
+                        triggerFloatingAlert('🐢 紅龜殼追蹤命中！擊飛前車！');
+                        for (let k = 0; k < 18; k++) {
+                            addParticle(canvas.width * 0.5 + target.x * 200, canvas.height * 0.6, 'spark');
+                        }
+                        State.projectiles.splice(i, 1);
+                        continue;
+                    }
+
+                    // 超過 450 米自然消失
+                    if (proj.distance - State.player.distance > 450) {
+                        State.projectiles.splice(i, 1);
+                        continue;
+                    }
+
+                } else if (proj.type === 'banana') {
+                    // 香蕉皮靜止在賽道上
+                    // 檢測 AI 對手踩中
+                    for (let a = 0; a < State.opponents.length; a++) {
+                        const ai = State.opponents[a];
+                        if (Math.abs(ai.distance - proj.distance) < 5.0 && Math.abs(ai.x - proj.x) < 0.25) {
+                            Sound.banana();
+                            ai.spinTimer = 3.0;
+                            ai.speed = 20;
+                            triggerFloatingAlert('🍌 對手踩中香蕉皮！大打滑！');
+                            State.projectiles.splice(i, 1);
+                            break;
+                        }
+                    }
+
+                    // 距離身後 60 米則銷毀
+                    if (State.player.distance - proj.distance > 60) {
+                        State.projectiles.splice(i, 1);
+                    }
+
+                } else if (proj.type === 'bomb') {
+                    // 導航炸彈極速前衝並主動導航追蹤前車
+                    proj.speed = Math.max(450, State.player.speed + 150);
+                    const mps = (proj.speed * 1000) / 3600;
+                    proj.distance += mps * dt;
+                    proj.life -= dt;
+
+                    // 鎖定前方對手進行導引
+                    let target = State.opponents.filter(o => o.distance > proj.distance)
+                        .sort((a, b) => a.distance - b.distance)[0];
+                    if (target) {
+                        proj.x += (target.x - proj.x) * dt * 6.5;
+                    }
+
+                    if (Math.random() < 0.6) {
+                        addParticle(canvas.width * 0.5 + proj.x * 200, canvas.height * 0.75, 'flame');
+                    }
+
+                    const isDirectHit = target && (Math.abs(target.distance - proj.distance) < 7.0) && (Math.abs(target.x - proj.x) < 0.35);
+
+                    if (proj.life <= 0 || isDirectHit) {
+                        Sound.explosion();
+                        triggerScreenShake(0.35);
+                        triggerFloatingAlert('💣 導航炸彈精準引爆！轟飛對手！');
+
+                        // 範圍轟炸
+                        State.opponents.forEach(ai => {
+                            if (Math.abs(ai.distance - proj.distance) < 28) {
+                                ai.spinTimer = 3.5;
+                                ai.speed = 15;
+                            }
+                        });
+
+                        for (let k = 0; k < 20; k++) {
+                            addParticle(canvas.width * 0.5 + proj.x * 200, canvas.height * 0.65, 'flame');
+                        }
+                        State.projectiles.splice(i, 1);
+                    }
+                }
+            }
+        }
+
+        function timestampSec() {
+            return Date.now() / 1000;
+        }
+
+        // 渲染 3D 擬真賽道 (具有真實 3D 深度透視投影與統一弧度對齊)
+        function renderScene() {
+            const w = canvas.width;
+            const h = canvas.height;
+            if (w === 0 || h === 0) return;
+
+            ctx.clearRect(0, 0, w, h);
+
+            const horizonY = h * 0.40;
+            const playerY = h * 0.82;
+            const p = State.player;
+
+            // 【需求 1 & 3】：高速微震 + G-Force 視角動態傾斜 (轉彎與甩尾時全畫面微幅傾側 1.5° ~ 2° 模擬競速重力感)
+            const speedShake = p.speed > 170 ? (Math.random() - 0.5) * Math.min(3.5, (p.speed - 170) / 45) : 0;
+            ctx.save();
+            ctx.translate(w * 0.5 + speedShake, horizonY + speedShake * 0.5);
+            ctx.rotate(p.cameraRoll || 0);
+            ctx.translate(-w * 0.5, -horizonY);
+
+            // 1. 天空
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, horizonY);
+            if (State.isStarActive) {
+                skyGrad.addColorStop(0, '#311042');
+                skyGrad.addColorStop(1, '#6b21a8');
+            } else if (State.dashTimer > 0) {
+                skyGrad.addColorStop(0, '#450a0a');
+                skyGrad.addColorStop(1, '#9a3412');
+            } else {
+                skyGrad.addColorStop(0, '#091e3a');
+                skyGrad.addColorStop(0.7, '#1e3a8a');
+                skyGrad.addColorStop(1, '#f97316');
+            }
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, w, horizonY);
+
+            // 2. 遠景山脈 (伴隨賽道彎道進行真實視差平移)
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.moveTo(0, horizonY);
+            for (let i = 0; i <= 14; i++) {
+                const mx = (w / 14) * i;
+                const my = horizonY - 18 - Math.sin((i * 1.1) + (bgScrollOffset * 0.015)) * 26;
+                ctx.lineTo(mx, my);
+            }
+            ctx.lineTo(w, horizonY);
+            ctx.closePath();
+            ctx.fill();
+
+            // 3. 草地
+            const grassGrad = ctx.createLinearGradient(0, horizonY, 0, h);
+            grassGrad.addColorStop(0, '#064e3b');
+            grassGrad.addColorStop(1, '#022c22');
+            ctx.fillStyle = grassGrad;
+            ctx.fillRect(0, horizonY, w, h - horizonY);
+
+            // 4. 【需求 2】：預先計算各切片深度與累積曲率 (統一 3D 透視系統，自車攝影機基準面自然過渡)
+            const lines = ROAD_LINES;
+            let currentAngle = 0;
+            let currentOffset = 0;
+            let lastSliceDist = -PLAYER_CAM_DIST;
+
+            for (let i = 0; i < lines; i++) {
+                const progress = i / lines;
+                const distAhead = Math.pow(progress, 1.85) * (MAX_VIEW_DIST + PLAYER_CAM_DIST) - PLAYER_CAM_DIST;
+                roadSliceDists[i] = distAhead;
+
+                const deltaM = (i === 0) ? 0 : (distAhead - lastSliceDist);
+                lastSliceDist = distAhead;
+
+                const k = getTrackCurvature(p.distance + Math.max(0, distAhead));
+                currentAngle += k * deltaM * 0.022;
+                currentOffset += currentAngle * deltaM * 0.72;
+                roadSliceOffsets[i] = currentOffset * (w / 800);
+                roadSliceAngles[i] = currentAngle;
+            }
+
+            // 繪製連續光滑跑道梯形多邊形 (徹底告別矩形鋸齒階梯，100% 完美貼合格紋路肩)
+            for (let i = lines - 1; i >= 1; i--) {
+                const topD = roadSliceDists[i];
+                const botD = roadSliceDists[i - 1];
+
+                const topProj = projectRoadPoint(topD, 0, w, h, horizonY);
+                const botProj = projectRoadPoint(botD, 0, w, h, horizonY);
+
+                const topY = topProj.y;
+                const botY = botProj.y;
+                const topW = topProj.roadW * 0.5;
+                const botW = botProj.roadW * 0.5;
+                const topCX = topProj.roadCenter;
+                const botCX = botProj.roadCenter;
+
+                // 紅白路肩與柏油路面隨速度高頻密集滾動 (頻率提升 50%，0.35 -> 0.52)
+                const stripe = Math.floor((roadOffset * 0.52 + topD * 0.52)) % 2 === 0;
+
+                // 紅白立體路肩 (Rumble Kerbs)
+                const topKerbW = topW * 0.16;
+                const botKerbW = botW * 0.16;
+
+                // 左路肩
+                ctx.fillStyle = stripe ? '#ef4444' : '#ffffff';
+                ctx.beginPath();
+                ctx.moveTo(topCX - topW - topKerbW, topY);
+                ctx.lineTo(topCX - topW, topY);
+                ctx.lineTo(botCX - botW, botY);
+                ctx.lineTo(botCX - botW - botKerbW, botY);
+                ctx.closePath();
+                ctx.fill();
+
+                // 右路肩
+                ctx.fillStyle = stripe ? '#ef4444' : '#ffffff';
+                ctx.beginPath();
+                ctx.moveTo(topCX + topW, topY);
+                ctx.lineTo(topCX + topW + topKerbW, topY);
+                ctx.lineTo(botCX + botW + botKerbW, botY);
+                ctx.lineTo(botCX + botW, botY);
+                ctx.closePath();
+                ctx.fill();
+
+                // 柏油賽道
+                ctx.fillStyle = stripe ? '#1e293b' : '#0f172a';
+                ctx.beginPath();
+                ctx.moveTo(topCX - topW, topY);
+                ctx.lineTo(topCX + topW, topY);
+                ctx.lineTo(botCX + botW, botY);
+                ctx.lineTo(botCX - botW, botY);
+                ctx.closePath();
+                ctx.fill();
+
+                // 白色中央分隔線
+                if (stripe) {
+                    const topLaneW = Math.max(1.5, topW * 0.035);
+                    const botLaneW = Math.max(2, botW * 0.035);
+                    ctx.fillStyle = '#f8fafc';
+                    ctx.beginPath();
+                    ctx.moveTo(topCX - topLaneW, topY);
+                    ctx.lineTo(topCX + topLaneW, topY);
+                    ctx.lineTo(botCX + botLaneW, botY);
+                    ctx.lineTo(botCX - botLaneW, botY);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            }
+
+            // 起跑線與大看台鋼構門架
+            renderStartLine(w, h, horizonY);
+
+            // 5. 【需求 2】：賽道加速跳板 (完全貼合格道弧度)
+            State.boostPads.forEach(pad => {
+                renderBoostPad(pad, horizonY, playerY, h, w);
+            });
+
+            // 6. 【需求 2】：賽道兩側紅白立柱與彎道指示看板 (精準錨定於路肩與外側護欄)
+            renderRoadsideScenery(horizonY, playerY, h, w);
+
+            // 7. 【需求 2】：跑道上一排 5 個立體旋轉問號寶箱 (完全對齊跑道弧度，貼地陰影)
+            State.itemBoxRows.forEach(row => {
+                renderItemBoxRow(row, horizonY, playerY, h, w);
+            });
+
+            // 8. 跑道上飛行之真實道具
+            State.projectiles.forEach(proj => {
+                renderProjectile(proj, horizonY, playerY, h, w);
+            });
+
+            // 9. AI 賽車 (統一 3D 透視座標，平穩行駛於路面)
+            const opponentsToRender = State.opponents.map(ai => {
+                const relDist = ai.distance - p.distance;
+                return { ...ai, relDist };
+            });
+            opponentsToRender.sort((a, b) => b.relDist - a.relDist);
+
+            opponentsToRender.forEach(ai => {
+                if (ai.relDist > -30 && ai.relDist < 450) {
+                    renderOpponentCar(ai, horizonY, playerY, h, w);
+                }
+            });
+
+            // 結束 G-Force 視角傾斜
+            ctx.restore();
+
+            // 10. 【需求 3 & 4】：繪製自車 (具備車身傾斜、懸吊俯仰、排氣火焰、煞車燈)
+            renderPlayerCar(w, h);
+
+            // 【需求 3】：踩油門或高速飛馳時之兩側動態速度線風線特效
+            if (Input.up || p.speed > 135 || State.dashTimer > 0) {
+                renderSpeedLines(w, h, p.speed);
+            }
+
+            renderParticles();
+        }
+
+        // 繪製起跑線與拱門架
+        function renderStartLine(w, h, horizonY) {
+            const lapDist = 3600;
+            const pDist = State.player.distance;
+            const distInLap = ((pDist % lapDist) + lapDist) % lapDist;
+            let relDist = 0;
+            if (distInLap < 150) {
+                relDist = 0 - distInLap;
+            } else if (distInLap > lapDist - 150) {
+                relDist = lapDist - distInLap;
+            } else {
+                return;
+            }
+            if (relDist < -30 || relDist > 300) return;
+
+            const proj = projectRoadPoint(relDist, 0, w, h, horizonY);
+            if (proj.scale < 0.05) return;
+
+            const roadW = proj.roadW;
+            const y = proj.y;
+            const cx = proj.roadCenter;
+            const gridCount = 16;
+            const blockW = roadW / gridCount;
+            const blockH = Math.max(5, 14 * proj.scale);
+
+            // 1. 格紋起跑線 (Checkered line)
+            for (let i = 0; i < gridCount; i++) {
+                ctx.fillStyle = (i % 2 === 0) ? '#ffffff' : '#000000';
+                ctx.fillRect(cx - roadW * 0.5 + i * blockW, y, blockW, blockH);
+            }
+
+            // 2. 終點/起跑大型鋼構門架 (Overhead Gantry Arch)
+            if (relDist >= -10 && relDist <= 280) {
+                const gantryScale = proj.scale;
+                const pillarH = Math.max(25, 140 * gantryScale);
+                const pillarW = Math.max(4, 16 * gantryScale);
+                const leftProj = projectRoadPoint(relDist, -1.18, w, h, horizonY);
+                const rightProj = projectRoadPoint(relDist, 1.18, w, h, horizonY);
+
+                ctx.save();
+                // 左立柱
+                ctx.fillStyle = '#334155';
+                ctx.fillRect(leftProj.x - pillarW * 0.5, leftProj.y - pillarH, pillarW, pillarH);
+                // 右立柱
+                ctx.fillRect(rightProj.x - pillarW * 0.5, rightProj.y - pillarH, pillarW, pillarH);
+
+                // 橫樑
+                const beamY = Math.min(leftProj.y, rightProj.y) - pillarH;
+                const beamH = Math.max(10, 36 * gantryScale);
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(leftProj.x, beamY, rightProj.x - leftProj.x, beamH);
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = Math.max(1.5, 3 * gantryScale);
+                ctx.strokeRect(leftProj.x, beamY, rightProj.x - leftProj.x, beamH);
+
+                // 門架文字
+                ctx.fillStyle = '#fef08a';
+                ctx.font = `900 ${Math.max(8, Math.round(18 * gantryScale))}px 'Orbitron', monospace`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('ROYAL GRAND PRIX 🏁', (leftProj.x + rightProj.x) * 0.5, beamY + beamH * 0.5);
+
+                ctx.restore();
+            }
+        }
+
+        // 【需求 2】：繪製賽道加速帶 (嚴格與路面貼合)
+        function renderBoostPad(pad, horizonY, playerY, h, w) {
+            const relDist = pad.distance - State.player.distance;
+            if (relDist < -10 || relDist > 380) return;
+
+            const pNear = projectRoadPoint(relDist - 5, pad.x, w, h, horizonY);
+            const pFar = projectRoadPoint(relDist + 5, pad.x, w, h, horizonY);
+            if (pFar.scale < 0.05) return;
+
+            const padW_near = Math.max(14, 110 * pNear.scale);
+            const padW_far = Math.max(10, 110 * pFar.scale);
+
+            // 繪製與路面 100% 貼合的立體梯形加速帶
+            ctx.save();
+            ctx.fillStyle = '#0284c7';
+            ctx.beginPath();
+            ctx.moveTo(pFar.x - padW_far * 0.5, pFar.y);
+            ctx.lineTo(pFar.x + padW_far * 0.5, pFar.y);
+            ctx.lineTo(pNear.x + padW_near * 0.5, pNear.y);
+            ctx.lineTo(pNear.x - padW_near * 0.5, pNear.y);
+            ctx.closePath();
+            ctx.fill();
+
+            // 霓虹亮邊
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = Math.max(1.5, 3 * pNear.scale);
+            ctx.stroke();
+
+            // 閃爍黃色衝刺箭頭 >>>
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            const midX = (pNear.x + pFar.x) * 0.5;
+            const midY = (pNear.y + pFar.y) * 0.5;
+            const arrowW = padW_near * 0.35;
+            const arrowH = Math.max(4, 16 * pNear.scale);
+            ctx.moveTo(midX - arrowW, midY + arrowH * 0.5);
+            ctx.lineTo(midX, midY - arrowH * 0.5);
+            ctx.lineTo(midX + arrowW, midY + arrowH * 0.5);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // 【需求 2】：繪製賽道兩側景物與彎道箭頭導引指示牌 (精準錨定於路肩與外側護欄)
+        function renderRoadsideScenery(horizonY, playerY, h, w) {
+            if (!State.trackScenery || State.trackScenery.length === 0) return;
+            const lapDist = 3600;
+            const pDist = State.player.distance;
+            const currentLap = Math.floor(pDist / lapDist);
+
+            const visibleItems = [];
+            for (let lapOffset = 0; lapOffset <= 1; lapOffset++) {
+                const lap = currentLap + lapOffset;
+                State.trackScenery.forEach(sign => {
+                    const signDist = lap * lapDist + sign.lapProg * lapDist;
+                    const relDist = signDist - pDist;
+                    if (relDist >= -5 && relDist <= 360) {
+                        visibleItems.push({ ...sign, relDist });
+                    }
+                });
+            }
+
+            visibleItems.sort((a, b) => b.relDist - a.relDist);
+
+            visibleItems.forEach(item => {
+                const proj = projectRoadPoint(item.relDist, item.side, w, h, horizonY);
+                if (proj.scale < 0.05) return;
+
+                const scale = proj.scale;
+                const x = proj.x;
+                const y = proj.y;
+
+                ctx.save();
+                ctx.translate(x, y);
+
+                if (item.type === 'chevron_right' || item.type === 'chevron_left') {
+                    // 大型彎道發光箭頭看板 (◄◄◄ / ►►►)
+                    const postH = Math.max(14, 60 * scale);
+                    const postW = Math.max(2, 6 * scale);
+                    ctx.fillStyle = '#475569';
+                    ctx.fillRect(-postW / 2, -postH, postW, postH);
+
+                    const boardW = Math.max(22, 90 * scale);
+                    const boardH = Math.max(12, 48 * scale);
+                    const boardY = -postH - boardH * 0.5;
+
+                    ctx.fillStyle = '#0f172a';
+                    const isRight = item.type === 'chevron_right';
+                    ctx.shadowColor = isRight ? '#f59e0b' : '#38bdf8';
+                    ctx.shadowBlur = Math.min(20, 16 * scale);
+
+                    ctx.beginPath();
+                    if (ctx.roundRect) ctx.roundRect(-boardW / 2, boardY - boardH / 2, boardW, boardH, 4 * scale);
+                    else ctx.rect(-boardW / 2, boardY - boardH / 2, boardW, boardH);
+                    ctx.fill();
+
+                    ctx.strokeStyle = isRight ? '#fbbf24' : '#38bdf8';
+                    ctx.lineWidth = Math.max(1.5, 3.2 * scale);
+                    ctx.stroke();
+
+                    ctx.shadowBlur = 0;
+                    ctx.fillStyle = isRight ? '#fef08a' : '#e0f2fe';
+                    ctx.font = `900 ${Math.round(boardH * 0.62)}px 'Orbitron', monospace`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(isRight ? '►►►' : '◄◄◄', 0, boardY);
+
+                } else if (item.type === 'marker') {
+                    // 紅白路肩立柱 (嚴格坐落在紅白路肩上)
+                    const poleH = Math.max(8, 34 * scale);
+                    const poleW = Math.max(2, 6 * scale);
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(-poleW / 2, -poleH, poleW, poleH);
+                    ctx.fillStyle = '#ef4444';
+                    ctx.fillRect(-poleW / 2, -poleH + poleH * 0.3, poleW, poleH * 0.35);
+
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.beginPath();
+                    ctx.arc(0, -poleH, Math.max(1.5, 3.2 * scale), 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            });
+        }
+
+        // 【需求 2】：繪製跑道上一整排 5 個立體旋轉問號寶箱 (完全對齊跑道弧度，貼地陰影)
+        function renderItemBoxRow(row, horizonY, playerY, h, w) {
+            const relDist = row.distance - State.player.distance;
+            if (relDist < -20 || relDist > 400) return;
+
+            const projCenter = projectRoadPoint(relDist, 0, w, h, horizonY);
+            if (projCenter.scale < 0.05) return;
+
+            const scale = projCenter.scale;
+            const size = Math.max(14, 86 * scale);
+            const bob = Math.sin(Date.now() / 150) * (6 * scale);
+            const spin = Date.now() / 240;
+
+            row.boxes.forEach((box, idx) => {
+                if (box.collected) return;
+
+                // 嚴格共用同一 3D 透視座標，完美對齊跑道弧度！
+                const proj = projectRoadPoint(relDist, box.x, w, h, horizonY);
+
+                ctx.save();
+                ctx.translate(proj.x, proj.y);
+
+                // 1. 柏油路面接觸陰影 (旋轉角隨道路角度 proj.angle 微調)
+                ctx.rotate(proj.angle * 0.5);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+                ctx.beginPath();
+                ctx.ellipse(0, 0, size * 0.65, size * 0.22, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 2. 懸浮於陰影上方的 3D 旋轉金色問號方塊
+                const hoverY = - (size * 0.58) - bob;
+                ctx.translate(0, hoverY);
+
+                const boxSpin = spin + idx * 0.7;
+                const cosSpin = Math.cos(boxSpin);
+                ctx.scale(Math.abs(cosSpin) * 0.65 + 0.35, 1);
+
+                ctx.shadowColor = '#f59e0b';
+                ctx.shadowBlur = Math.min(25, 20 * scale);
+
+                const radius = Math.max(3, 8 * scale);
+                const half = size / 2;
+
+                const grad = ctx.createLinearGradient(-half, -half, half, half);
+                grad.addColorStop(0, '#fef08a');
+                grad.addColorStop(0.35, '#f59e0b');
+                grad.addColorStop(0.8, '#d97706');
+                grad.addColorStop(1, '#92400e');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(-half, -half, size, size, radius);
+                else ctx.rect(-half, -half, size, size);
+                ctx.fill();
+
+                // 斜切高光
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.beginPath();
+                ctx.moveTo(-half, -half);
+                ctx.lineTo(half, -half);
+                ctx.lineTo(-half, half);
+                ctx.closePath();
+                ctx.fill();
+
+                // 外框
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = Math.max(1.8, 3.2 * scale);
+                ctx.stroke();
+
+                // 旋轉問號 '?'
+                ctx.shadowBlur = 0;
+                ctx.font = `900 ${Math.round(size * 0.60)}px 'Orbitron', 'Noto Sans TC', sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+                ctx.fillText('?', 1.5 * scale, 1.5 * scale);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText('?', 0, 0);
+
+                ctx.restore();
+            });
+        }
+
+        // 【需求 2】：繪製跑道上的真實飛行道具
+        function renderProjectile(proj, horizonY, playerY, h, w) {
+            const relDist = proj.distance - State.player.distance;
+            if (relDist < -30 || relDist > 450) return;
+
+            const projCoord = projectRoadPoint(relDist, proj.x, w, h, horizonY);
+            if (projCoord.scale < 0.05) return;
+
+            const scale = projCoord.scale;
+            ctx.save();
+            ctx.translate(projCoord.x, projCoord.y);
+
+            if (proj.type === 'red_shell') {
+                const size = Math.max(16, 50 * scale);
+                ctx.rotate(timestampSec() * 25);
+                ctx.fillStyle = '#dc2626';
+                ctx.beginPath();
+                ctx.arc(0, 0, size * 0.45, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3 * scale;
+                ctx.stroke();
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(-size * 0.3, -2 * scale, size * 0.6, 4 * scale);
+                ctx.fillRect(-2 * scale, -size * 0.3, 4 * scale, size * 0.6);
+            } else if (proj.type === 'banana') {
+                const size = Math.max(14, 45 * scale);
+                ctx.font = `${Math.round(size)}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('🍌', 0, 0);
+            } else if (proj.type === 'bomb') {
+                const size = Math.max(16, 48 * scale);
+                ctx.font = `${Math.round(size)}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('💣', 0, 0);
+            }
+            ctx.restore();
+        }
+
+        // 【需求 3】：繪製 AI 賽車 (統一與自車完全相同尺寸標準，平穩行駛於路面)
+        function renderOpponentCar(ai, horizonY, playerY, h, w) {
+            const proj = projectRoadPoint(ai.relDist, ai.x, w, h, horizonY);
+            if (proj.scale < 0.04 || proj.y > h + 50) return;
+
+            const relativeScale = proj.scale / PLAYER_SCALE;
+            const carW = CAR_BASE_W * relativeScale;
+            const carH = CAR_BASE_H * relativeScale;
+            if (carW < 6) return;
+
+            ctx.save();
+            ctx.translate(proj.x, proj.y);
+
+            if (ai.spinTimer > 0) {
+                ctx.rotate(timestampSec() * 20);
+            } else {
+                ctx.rotate((ai.steerVel || 0) * 0.06);
+            }
+
+            // 車底接觸陰影
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+            ctx.beginPath();
+            ctx.ellipse(0, carH * 0.38, carW * 0.6, carH * 0.22, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 寬體輪胎
+            ctx.fillStyle = '#090d16';
+            ctx.beginPath();
+            ctx.roundRect(-carW * 0.53, -carH * 0.12, carW * 0.17, carH * 0.45, Math.max(1, 4 * relativeScale));
+            ctx.roundRect(carW * 0.36, -carH * 0.12, carW * 0.17, carH * 0.45, Math.max(1, 4 * relativeScale));
+            ctx.fill();
+
+            // 車體漸層烤漆 (依對手代表色)
+            const bodyGrad = ctx.createLinearGradient(0, -carH * 0.45, 0, carH * 0.4);
+            bodyGrad.addColorStop(0, '#ffffff');
+            bodyGrad.addColorStop(0.35, ai.color);
+            bodyGrad.addColorStop(1, '#0f172a');
+            ctx.fillStyle = bodyGrad;
+            ctx.beginPath();
+            ctx.roundRect(-carW * 0.44, -carH * 0.45, carW * 0.88, carH * 0.72, Math.max(2, 8 * relativeScale));
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = Math.max(1, 2.5 * relativeScale);
+            ctx.stroke();
+
+            // 尾翼
+            ctx.fillStyle = '#111827';
+            ctx.beginPath();
+            ctx.roundRect(-carW * 0.50, -carH * 0.58, carW * 1.0, carH * 0.16, Math.max(1, 3 * relativeScale));
+            ctx.fill();
+            ctx.fillStyle = ai.color;
+            ctx.fillRect(-carW * 0.46, -carH * 0.55, carW * 0.92, Math.max(1, 3 * relativeScale));
+
+            // 賽車號碼白圓標籤
+            if (carW > 25) {
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(0, -carH * 0.1, carW * 0.14, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#0f172a';
+                ctx.font = `bold ${Math.max(8, Math.round(11 * relativeScale))}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(ai.id.toString(), 0, -carH * 0.08);
+            }
+
+            // 尾燈
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(-carW * 0.34, carH * 0.05, carW * 0.16, carH * 0.12);
+            ctx.fillRect(carW * 0.18, carH * 0.05, carW * 0.16, carH * 0.12);
+
+            ctx.restore();
+        }
+
+        // 【需求 3】：繪製自車 (統一尺寸標準，大角度轉向懸吊傾側、懸吊俯仰、踩油門噴焰與煞車燈)
+        function renderPlayerCar(w, h) {
+            const p = State.player;
+            const horizonY = h * 0.40;
+            const proj = projectRoadPoint(0, p.x, w, h, horizonY);
+            const carX = proj.x;
+            const carY = proj.y + (p.suspensionY || 0);
+            const carW = CAR_BASE_W;
+            const carH = CAR_BASE_H;
+
+            ctx.save();
+            ctx.translate(carX, carY);
+
+            // 車身轉向傾斜與打滑
+            if (p.spinTimer > 0) {
+                ctx.rotate(timestampSec() * 20);
+            } else if (p.wobbleTimer > 0) {
+                ctx.rotate(Math.sin(timestampSec() * 40) * 0.12);
+            } else {
+                ctx.rotate(p.tilt); // 擬真車身懸吊傾角
+            }
+
+            // 轉向或甩尾時產生輪胎煙霧
+            if (Math.abs(p.tilt) > 0.06 && Math.random() < 0.45) {
+                addParticle(carX - carW * 0.3, carY + carH * 0.3, 'dust');
+                addParticle(carX + carW * 0.3, carY + carH * 0.3, 'dust');
+            }
+
+            // 衝刺 / 無敵星星光暈
+            if (State.dashTimer > 0) {
+                ctx.strokeStyle = '#fbbf24';
+                ctx.lineWidth = 10;
+                ctx.shadowColor = '#f59e0b';
+                ctx.shadowBlur = 35;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, carW * 0.78, carH * 0.78, 0, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            } else if (State.isStarActive) {
+                const hue = (Date.now() / 3) % 360;
+                ctx.strokeStyle = `hsl(${hue}, 100%, 65%)`;
+                ctx.lineWidth = 8;
+                ctx.shadowColor = `hsl(${hue}, 100%, 50%)`;
+                ctx.shadowBlur = 30;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, carW * 0.75, carH * 0.75, 0, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // 車底接觸陰影
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.beginPath();
+            ctx.ellipse(0, carH * 0.38, carW * 0.6, carH * 0.25, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 寬體輪胎
+            ctx.fillStyle = '#090d16';
+            ctx.beginPath();
+            ctx.roundRect(-carW * 0.55, -carH * 0.1, carW * 0.18, carH * 0.45, 6);
+            ctx.roundRect(carW * 0.37, -carH * 0.1, carW * 0.18, carH * 0.45, 6);
+            ctx.fill();
+
+            // 車體漸層烤漆
+            const bodyGrad = ctx.createLinearGradient(0, -carH * 0.5, 0, carH * 0.4);
+            if (State.dashTimer > 0) {
+                bodyGrad.addColorStop(0, '#fef08a');
+                bodyGrad.addColorStop(0.5, '#ea580c');
+                bodyGrad.addColorStop(1, '#991b1b');
+            } else if (State.isStarActive) {
+                const hue = (Date.now() / 4) % 360;
+                bodyGrad.addColorStop(0, `hsl(${hue}, 90%, 60%)`);
+                bodyGrad.addColorStop(1, `hsl(${(hue + 60) % 360}, 90%, 40%)`);
+            } else {
+                bodyGrad.addColorStop(0, '#ef4444');
+                bodyGrad.addColorStop(0.5, '#dc2626');
+                bodyGrad.addColorStop(1, '#991b1b');
+            }
+            ctx.fillStyle = bodyGrad;
+            ctx.beginPath();
+            ctx.roundRect(-carW * 0.45, -carH * 0.45, carW * 0.9, carH * 0.75, 12);
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // 擾流板
+            ctx.fillStyle = '#111827';
+            ctx.beginPath();
+            ctx.roundRect(-carW * 0.52, -carH * 0.58, carW * 1.04, carH * 0.18, 4);
+            ctx.fill();
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(-carW * 0.48, -carH * 0.55, carW * 0.96, 4);
+
+            // 擋風玻璃
+            const glassGrad = ctx.createLinearGradient(0, -carH * 0.35, 0, 0);
+            glassGrad.addColorStop(0, '#38bdf8');
+            glassGrad.addColorStop(1, '#0369a1');
+            ctx.fillStyle = glassGrad;
+            ctx.beginPath();
+            ctx.roundRect(-carW * 0.28, -carH * 0.35, carW * 0.56, carH * 0.35, 8);
+            ctx.fill();
+
+            // 雙排氣尾管
+            ctx.fillStyle = '#374151';
+            ctx.beginPath();
+            ctx.arc(-carW * 0.24, carH * 0.28, 9, 0, Math.PI * 2);
+            ctx.arc(carW * 0.24, carH * 0.28, 9, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 【需求 3】：踩煞車時的高亮尾燈
+            if (Input.down) {
+                ctx.fillStyle = '#ff0000';
+                ctx.shadowColor = '#ff2222';
+                ctx.shadowBlur = 18;
+                ctx.fillRect(-carW * 0.42, carH * 0.08, carW * 0.18, carH * 0.15);
+                ctx.fillRect(carW * 0.24, carH * 0.08, carW * 0.18, carH * 0.15);
+                ctx.shadowBlur = 0;
+            }
+
+            // 【需求 3】：踩油門即刻噴射出烈焰噴射雙火舌 (推背感視覺震撼)
+            if (Input.up || p.boostTimer > 0 || State.dashTimer > 0 || State.isStarActive || p.speed > 135) {
+                const baseFlame = Input.up ? 42 : 22;
+                const flameH = baseFlame + (p.speed / 200) * 45 + Math.random() * 20;
+                const flameGrad = ctx.createLinearGradient(0, carH * 0.28, 0, carH * 0.28 + flameH);
+                flameGrad.addColorStop(0, '#ffffff');
+                flameGrad.addColorStop(0.2, '#38bdf8');
+                flameGrad.addColorStop(0.65, '#f59e0b');
+                flameGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+
+                ctx.fillStyle = flameGrad;
+                // 左噴射管
+                ctx.beginPath();
+                ctx.moveTo(-carW * 0.28, carH * 0.28);
+                ctx.lineTo(-carW * 0.20, carH * 0.28);
+                ctx.lineTo(-carW * 0.24, carH * 0.28 + flameH);
+                ctx.closePath();
+                ctx.fill();
+
+                // 右噴射管
+                ctx.beginPath();
+                ctx.moveTo(carW * 0.20, carH * 0.28);
+                ctx.lineTo(carW * 0.28, carH * 0.28);
+                ctx.lineTo(carW * 0.24, carH * 0.28 + flameH);
+                ctx.closePath();
+                ctx.fill();
+
+                if (Math.random() < 0.65) {
+                    addParticle(carX - carW * 0.24, carY + carH * 0.28, 'flame');
+                    addParticle(carX + carW * 0.24, carY + carH * 0.28, 'flame');
+                }
+            }
+
+            ctx.restore();
+        }
+
+        // 【需求 4】：兩側動態速度風線 (隨油門與時速加乘，密集度與流速再提升 50%)
+        function renderSpeedLines(w, h, speed = 200) {
+            const count = Math.min(36, Math.floor(10 + (speed / 300) * 26));
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+            ctx.lineWidth = 2.2;
+            for (let i = 0; i < count; i++) {
+                const isLeft = Math.random() < 0.5;
+                const sx = isLeft ? Math.random() * (w * 0.24) : w - Math.random() * (w * 0.24);
+                const sy = h * 0.32 + Math.random() * (h * 0.68);
+                const len = 50 + Math.random() * 120;
+                ctx.beginPath();
+                ctx.moveTo(sx, sy);
+                ctx.lineTo(sx + (isLeft ? -18 : 18), sy + len);
+                ctx.stroke();
+            }
+        }
+
+        function addParticle(x, y, type) {
+            particles.push({
+                x,
+                y,
+                vx: (Math.random() - 0.5) * (type === 'spark' ? 160 : 70),
+                vy: type === 'spark' ? (Math.random() - 0.5) * 140 : (Math.random() * 80) + 120,
+                size: Math.random() * (type === 'spark' ? 5 : 8) + 3,
+                alpha: 1,
+                life: type === 'spark' ? 0.3 : 0.45,
+                type
+            });
+        }
+
+        function updateParticles(dt) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const pt = particles[i];
+                pt.x += pt.vx * dt;
+                pt.y += pt.vy * dt;
+                pt.life -= dt;
+                pt.alpha = pt.life / 0.45;
+                if (pt.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        function renderParticles() {
+            particles.forEach(pt => {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, pt.alpha);
+                if (pt.type === 'flame') {
+                    ctx.fillStyle = '#f59e0b';
+                } else if (pt.type === 'star') {
+                    ctx.fillStyle = '#fde047';
+                } else if (pt.type === 'spark') {
+                    ctx.fillStyle = '#facc15';
+                } else {
+                    ctx.fillStyle = 'rgba(200, 200, 200, 0.8)';
+                }
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+        }
+
+        // -------------------------------------------------------------
+        // 5. 瑪利歐賽車完整賽道俯瞰地圖 (Circuit Minimap)
+        // -------------------------------------------------------------
+        let trackPathElement = null;
+        let trackTotalLength = 0;
+
+        function getCircuitPoint(progressRatio) {
+            if (!trackPathElement) {
+                trackPathElement = document.getElementById('track-path-main');
+            }
+            if (trackPathElement && !trackTotalLength) {
+                trackTotalLength = trackPathElement.getTotalLength();
+            }
+            if (!trackPathElement || !trackTotalLength) {
+                return { x: 63, y: 113 };
+            }
+            const normalized = ((progressRatio % 1) + 1) % 1;
+            return trackPathElement.getPointAtLength(normalized * trackTotalLength);
+        }
+
+        function updateCircuitMinimap() {
+            const lapDistance = 3600; // 3600 米單圈標準 (~1分30秒)
+            const totalDistance = State.finishDistance;
+            const totalLaps = Math.max(1, Math.round(totalDistance / lapDistance));
+
+            const pDist = State.player.distance;
+            const currentLap = Math.min(totalLaps, Math.floor(pDist / lapDistance) + 1);
+            const totalPct = Math.min(100, Math.round((pDist / totalDistance) * 100));
+
+            const lapBadgeText = document.getElementById('hud-lap-text');
+            if (currentLap === totalLaps) {
+                lapBadgeText.innerText = 'FINAL LAP! 🏆';
+                document.getElementById('hud-lap-badge').className = 'text-red-400 font-extrabold flex items-center gap-1 animate-pulse';
+            } else {
+                lapBadgeText.innerText = `LAP ${currentLap}/${totalLaps}`;
+                document.getElementById('hud-lap-badge').className = 'text-amber-400 font-extrabold flex items-center gap-1';
+            }
+            document.getElementById('hud-map-dist').innerText = `${totalPct}%`;
+
+            const playerLapProg = (pDist % lapDistance) / lapDistance;
+            const ptPlayer = getCircuitPoint(playerLapProg);
+            const mapP = document.getElementById('map-player');
+            const mapPHalo = document.getElementById('map-player-halo');
+            if (mapP) {
+                mapP.setAttribute('cx', ptPlayer.x);
+                mapP.setAttribute('cy', ptPlayer.y);
+            }
+            if (mapPHalo) {
+                mapPHalo.setAttribute('cx', ptPlayer.x);
+                mapPHalo.setAttribute('cy', ptPlayer.y);
+            }
+
+            State.opponents.forEach((ai, idx) => {
+                const aiLapProg = (ai.distance % lapDistance) / lapDistance;
+                const ptAi = getCircuitPoint(aiLapProg);
+                const elAi = document.getElementById(`map-ai${idx + 1}`);
+                if (elAi) {
+                    elAi.setAttribute('cx', ptAi.x);
+                    elAi.setAttribute('cy', ptAi.y);
+                }
+            });
+
+            // 地圖上的寶箱排標記
+            const boxesGroup = document.getElementById('map-boxes-group');
+            if (boxesGroup) {
+                let boxesSvg = '';
+                State.itemBoxRows.forEach(row => {
+                    const rowProg = (row.distance % lapDistance) / lapDistance;
+                    const ptRow = getCircuitPoint(rowProg);
+                    boxesSvg += `<circle cx="${ptRow.x}" cy="${ptRow.y}" r="2.8" fill="#f59e0b" stroke="#ffffff" stroke-width="0.8" />`;
+                });
+                boxesGroup.innerHTML = boxesSvg;
+            }
+        }
+
+        function updateRankBadge(rank) {
+            const badge = document.getElementById('hud-rank-badge');
+            const icon = document.getElementById('hud-rank-icon');
+            const text = document.getElementById('hud-rank-text');
+
+            const rankData = {
+                1: { icon: '🥇', text: '1st', color: 'border-yellow-400 text-yellow-300' },
+                2: { icon: '🥈', text: '2nd', color: 'border-slate-300 text-slate-200' },
+                3: { icon: '🥉', text: '3rd', color: 'border-amber-600 text-amber-500' },
+                4: { icon: '🏎️', text: '4th', color: 'border-slate-600 text-slate-400' }
+            }[rank] || { icon: '🏎️', text: `${rank}th`, color: 'border-slate-600 text-slate-400' };
+
+            icon.innerText = rankData.icon;
+            text.innerText = rankData.text;
+            badge.className = `px-3 py-1.5 rounded-xl bg-slate-900/90 border-2 ${rankData.color} font-racing font-black text-base sm:text-lg flex items-center gap-1.5 shadow-lg backdrop-blur`;
+        }
+
+        function updateHudSpeed(speed, isThrottling = false, isBraking = false) {
+            const spdEl = document.getElementById('hud-speed');
+            const barEl = document.getElementById('hud-speed-bar');
+            const throttleTag = document.getElementById('hud-throttle-tag');
+            const displaySpeed = Math.round(speed);
+            spdEl.innerText = displaySpeed.toString().padStart(3, '0');
+
+            const pct = Math.min(100, Math.max(5, (speed / 520) * 100));
+            barEl.style.width = `${pct}%`;
+
+            if (throttleTag) {
+                if (isThrottling) {
+                    throttleTag.innerText = 'ACCEL ⚡';
+                    throttleTag.className = 'text-[9px] px-1.5 py-0.5 bg-gradient-to-r from-amber-500 to-red-500 text-white font-black rounded-sm font-racing shadow-sm animate-pulse';
+                    spdEl.className = 'text-2xl sm:text-3xl font-racing font-black text-amber-300 tracking-wider drop-shadow-[0_0_10px_rgba(251,191,36,0.85)]';
+                } else if (isBraking) {
+                    throttleTag.innerText = 'BRAKE 🛑';
+                    throttleTag.className = 'text-[9px] px-1.5 py-0.5 bg-red-600 text-white font-black rounded-sm font-racing shadow-sm';
+                    spdEl.className = 'text-2xl sm:text-3xl font-racing font-black text-red-400 tracking-wider';
+                } else {
+                    throttleTag.className = 'hidden';
+                    spdEl.className = 'text-2xl sm:text-3xl font-racing font-black text-emerald-400 tracking-wider';
+                }
+            }
+        }
+
+        function triggerFloatingAlert(msg) {
+            const el = document.getElementById('hud-floating-alert');
+            const txt = document.getElementById('hud-floating-alert-text');
+            txt.innerText = msg;
+            el.classList.remove('opacity-0', 'scale-50');
+            el.classList.add('opacity-100', 'scale-100');
+            setTimeout(() => {
+                el.classList.remove('opacity-100', 'scale-100');
+                el.classList.add('opacity-0', 'scale-50');
+            }, 1200);
+        }
+
+        function updateDashGaugeUI() {
+            const count = State.dashProgress;
+            for (let i = 1; i <= 5; i++) {
+                const el = document.getElementById(`dash-gauge-${i}`);
+                if (i <= count) {
+                    el.className = 'w-3 h-3 rounded-full bg-amber-400 border border-yellow-200 shadow-sm shadow-amber-400';
+                } else {
+                    el.className = 'w-3 h-3 rounded-full bg-slate-700 border border-slate-600';
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // 6. 瑪利歐賽車道具與真實彈道發射系統
+        // -------------------------------------------------------------
+        const Items = {
+            banana: {
+                name: '香蕉皮',
+                icon: '🍌',
+                use() {
+                    Sound.shoot();
+                    triggerFloatingAlert('🍌 向後放置香蕉皮！');
+                    // 【需求 3】：真實生成在賽道跑道上
+                    State.projectiles.push({
+                        id: Math.random(),
+                        type: 'banana',
+                        distance: State.player.distance - 4,
+                        x: State.player.x,
+                        speed: 0
+                    });
+                }
+            },
+            bomb: {
+                name: '導航炸彈',
+                icon: '💣',
+                use() {
+                    Sound.shoot();
+                    triggerFloatingAlert('💣 導航炸彈發射！自動追蹤引爆！');
+                    State.projectiles.push({
+                        id: Math.random(),
+                        type: 'bomb',
+                        distance: State.player.distance + 6,
+                        x: State.player.x,
+                        speed: Math.max(280, State.player.speed + 120),
+                        life: 2.2
+                    });
+                }
+            },
+            mushroom: {
+                name: '衝刺蘑菇',
+                icon: '🍄',
+                use() {
+                    Sound.turbo();
+                    triggerFloatingAlert('🍄 MEGA BOOST! 蘑菇爆衝！');
+                    State.player.boostTimer = 3.5;
+                    State.player.targetSpeed = 450;
+                }
+            },
+            red_shell: {
+                name: '極速追蹤紅龜殼',
+                icon: '🐢',
+                use() {
+                    Sound.shoot();
+                    triggerFloatingAlert('🐢 紅龜殼發射！強力鎖定前方對手！');
+                    State.projectiles.push({
+                        id: Math.random(),
+                        type: 'red_shell',
+                        distance: State.player.distance + 6,
+                        x: State.player.x,
+                        speed: Math.max(520, State.player.speed + 190),
+                        targetId: null
+                    });
+                }
+            }
+        };
+
+        function awardRandomItem() {
+            Sound.itemGet();
+            const itemKeys = ['banana', 'bomb', 'mushroom', 'red_shell'];
+            const boxEl = document.getElementById('hud-item-box');
+            const nameEl = document.getElementById('hud-item-name');
+
+            boxEl.classList.add('item-roulette');
+            let counter = 0;
+            const spinInterval = setInterval(() => {
+                const tempKey = itemKeys[counter % itemKeys.length];
+                boxEl.innerText = Items[tempKey].icon;
+                counter++;
+            }, 80);
+
+            setTimeout(() => {
+                clearInterval(spinInterval);
+                boxEl.classList.remove('item-roulette');
+                const picked = itemKeys[Math.floor(Math.random() * itemKeys.length)];
+                State.inventory = picked;
+                boxEl.innerText = Items[picked].icon;
+                nameEl.innerText = Items[picked].name;
+                document.getElementById('btn-use-item').disabled = false;
+                triggerFloatingAlert(`🎁 獲得道具: ${Items[picked].name}！[按Space發射]`);
+            }, 900);
+        }
+
+        function useCurrentItem() {
+            if (!State.inventory) {
+                triggerFloatingAlert('⚠️ 目前沒有道具！請去撞擊跑道上的旋轉問號寶箱！');
+                return;
+            }
+            const itemKey = State.inventory;
+            State.inventory = null;
+            State.itemsUsedCount++;
+
+            document.getElementById('hud-item-box').innerText = '❓';
+            document.getElementById('hud-item-name').innerText = '無道具';
+            document.getElementById('btn-use-item').disabled = true;
+
+            Items[itemKey].use();
+        }
+
+        function triggerFiveStreakDash() {
+            State.dashTimer = 5.0;
+            State.player.speed = Math.max(State.player.speed, 360);
+            State.player.targetSpeed = 520;
+            Sound.megaDash();
+
+            const banner = document.getElementById('hud-dash-banner');
+            banner.classList.remove('hidden');
+            document.getElementById('hud-dash-time').innerText = '5.0s';
+
+            triggerFloatingAlert('⚡ 累積 5 題達成！極速衝刺 5 秒發動！ ⚡');
+        }
+
+        // -------------------------------------------------------------
+        // 7. 寶箱解題挑戰彈窗機制
+        // -------------------------------------------------------------
+        function openQuizModal() {
+            State.isQuizModalOpen = true;
+            State.isAnsweringLocked = false;
+            Sound.silenceEngine();
+            Sound.duckBGM(true);
+            if (State.autoResumeTimeout) {
+                clearTimeout(State.autoResumeTimeout);
+                State.autoResumeTimeout = null;
+            }
+
+            const q = QuestionGenerator.createQuestion(State.currentMode);
+            State.currentQuestion = q;
+
+            document.getElementById('quiz-modal-category-tag').innerText = q.categoryTag;
+            document.getElementById('modal-target-ratio').innerHTML = formatMathRatio(q.targetRatio);
+            const targetTitleEl = document.getElementById('modal-target-title');
+            if (targetTitleEl) targetTitleEl.innerText = q.targetTitle || '目前題目';
+            const instructionKeywordEl = document.getElementById('modal-instruction-keyword');
+            if (instructionKeywordEl) instructionKeywordEl.innerText = q.instructionKeyword || '相等的等比';
+
+            const optionCards = document.querySelectorAll('#modal-options-grid .option-card');
+            optionCards.forEach((card, idx) => {
+                card.disabled = false;
+                card.className = 'option-card rounded-xl p-3 text-left flex items-center justify-between gap-3 group relative cursor-pointer';
+                const textEl = card.querySelector('.option-text');
+                textEl.innerHTML = formatMathRatio(q.options[idx]);
+            });
+
+            document.getElementById('modal-feedback-panel').classList.add('hidden');
+            document.getElementById('modal-quiz').classList.remove('hidden');
+        }
+
+        function closeQuizModal() {
+            State.isQuizModalOpen = false;
+            document.getElementById('modal-quiz').classList.add('hidden');
+            Sound.duckBGM(false);
+        }
+
+        function handleModalAnswer(selectedIndex) {
+            if (State.isAnsweringLocked) return;
+            State.isAnsweringLocked = true;
+
+            const q = State.currentQuestion;
+            const isCorrect = selectedIndex === q.correctIndex;
+            const card = document.querySelectorAll('#modal-options-grid .option-card')[selectedIndex];
+
+            State.totalAnswered++;
+
+            State.historyLog.push({
+                target: q.targetRatio,
+                chosen: q.options[selectedIndex],
+                isCorrect: isCorrect,
+                correctOpt: q.options[q.correctIndex],
+                explanation: q.explanation
+            });
+
+            if (isCorrect) {
+                State.totalCorrect++;
+                State.dashProgress++;
+                State.streak++;
+                if (State.streak > State.maxStreak) State.maxStreak = State.streak;
+
+                card.classList.add('correct-ans');
+                Sound.turbo();
+
+                awardRandomItem();
+
+                document.getElementById('hud-streak').innerText = State.streak;
+                document.getElementById('hud-correct-count').innerText = State.totalCorrect;
+                updateDashGaugeUI();
+
+                showModalFeedback(true, '🎉 答對了！成功獲得道具！', q.explanation);
+
+                if (State.dashProgress >= 5) {
+                    State.dashProgress = 0;
+                    setTimeout(() => triggerFiveStreakDash(), 600);
+                }
+
+                if (State.totalCorrect >= State.targetWins) {
+                    setTimeout(() => {
+                        closeQuizModal();
+                        finishRace(true);
+                    }, 1500);
+                    return;
+                }
+
+                State.autoResumeTimeout = setTimeout(() => {
+                    closeQuizModal();
+                }, 1600);
+
+            } else {
+                State.streak = 0;
+                document.getElementById('hud-streak').innerText = '0';
+                card.classList.add('wrong-ans');
+
+                const correctCard = document.querySelectorAll('#modal-options-grid .option-card')[q.correctIndex];
+                correctCard.classList.add('correct-ans');
+
+                Sound.crash();
+                showModalFeedback(false, '❌ 答案不正確！未能獲得道具！', `正確解答是【${q.options[q.correctIndex]}】。${q.explanation}`);
+
+                State.autoResumeTimeout = setTimeout(() => {
+                    closeQuizModal();
+                }, 3800);
+            }
+        }
+
+        function showModalFeedback(isSuccess, title, explanation) {
+            const panel = document.getElementById('modal-feedback-panel');
+            const icon = document.getElementById('modal-feedback-icon');
+            const titleEl = document.getElementById('modal-feedback-title');
+            const expEl = document.getElementById('modal-feedback-explanation');
+
+            panel.className = isSuccess
+                ? 'rounded-xl p-3 border border-emerald-500/60 bg-emerald-950/80 text-emerald-200 flex flex-col gap-2 shadow-lg'
+                : 'rounded-xl p-3 border border-red-500/60 bg-red-950/80 text-red-200 flex flex-col gap-2 shadow-lg';
+
+            icon.innerText = isSuccess ? '🚀' : '⚠️';
+            titleEl.innerText = title;
+            expEl.innerHTML = formatMathRatio(explanation);
+
+            panel.classList.remove('hidden');
+        }
+
+        // -------------------------------------------------------------
+        // 8. 倒數計時 3 秒啟動流程
+        // -------------------------------------------------------------
+        function startCountdown() {
+            State.isCountingDown = true;
+            State.countdownStep = 3;
+
+            const overlay = document.getElementById('countdown-overlay');
+            const numEl = document.getElementById('countdown-number');
+            const subEl = document.getElementById('countdown-subtitle');
+
+            overlay.classList.remove('hidden');
+            numEl.innerText = '3';
+            numEl.className = 'text-8xl sm:text-9xl font-black font-racing text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 via-amber-400 to-red-500 drop-shadow-[0_10px_25px_rgba(0,0,0,0.9)] animate-countdown';
+            subEl.innerText = 'GET READY!';
+            Sound.countdownPing(false);
+
+            let current = 3;
+            const timer = setInterval(() => {
+                current--;
+                if (current === 2) {
+                    numEl.innerText = '2';
+                    numEl.className = 'text-8xl sm:text-9xl font-black font-racing text-transparent bg-clip-text bg-gradient-to-b from-amber-400 via-orange-400 to-red-500 drop-shadow-[0_10px_25px_rgba(0,0,0,0.9)] animate-countdown';
+                    Sound.countdownPing(false);
+                } else if (current === 1) {
+                    numEl.innerText = '1';
+                    numEl.className = 'text-8xl sm:text-9xl font-black font-racing text-transparent bg-clip-text bg-gradient-to-b from-orange-400 via-red-500 to-red-600 drop-shadow-[0_10px_25px_rgba(0,0,0,0.9)] animate-countdown';
+                    Sound.countdownPing(false);
+                } else if (current === 0) {
+                    numEl.innerText = 'GO!';
+                    numEl.className = 'text-8xl sm:text-9xl font-black font-racing text-transparent bg-clip-text bg-gradient-to-b from-emerald-300 via-emerald-400 to-teal-500 drop-shadow-[0_10px_30px_rgba(52,211,153,0.9)] animate-countdown';
+                    subEl.innerText = 'START! 🏁';
+                    Sound.countdownPing(true);
+                    State.isCountingDown = false;
+                    State.player.targetSpeed = 240;
+                    State.player.speed = 220;
+                    State.opponents.forEach(ai => {
+                        ai.speed = 220 + ai.id * 10;
+                    });
+                } else {
+                    clearInterval(timer);
+                    overlay.classList.add('hidden');
+                }
+            }, 1000);
+        }
+
+        // -------------------------------------------------------------
+        // 9. 比賽結算與頒獎
+        // -------------------------------------------------------------
+        function finishRace(isWin) {
+            State.currentScreen = 'result';
+            State.isRaceFinished = true;
+            Sound.silenceEngine();
+            Sound.pauseBGM();
+
+            document.getElementById('screen-race').classList.add('hidden');
+            document.getElementById('screen-result').classList.remove('hidden');
+
+            Sound.victory();
+            spawnConfetti();
+
+            const rank = State.player.rank;
+            const rankStr = rank === 1 ? '1st 冠軍 🏆' : (rank === 2 ? '2nd 亞軍 🥈' : (rank === 3 ? '3rd 季軍 🥉' : '4th 殿軍 🏎️'));
+            document.getElementById('result-final-rank').innerText = rankStr;
+
+            const accuracy = State.totalAnswered > 0 ? Math.round((State.totalCorrect / State.totalAnswered) * 100) : 0;
+            document.getElementById('result-accuracy').innerText = `${accuracy}%`;
+            document.getElementById('result-top-speed').innerText = `${State.topSpeed} km/h`;
+            document.getElementById('result-items-used').innerText = `${State.itemsUsedCount} 次`;
+
+            const reviewEl = document.getElementById('result-pedagogy-review');
+            if (rank === 1 && accuracy >= 90) {
+                reviewEl.innerHTML = `🌟 <strong>極致完美！等比神車手！</strong> 你不僅賽車技巧高超，靈活避開碰撞，更對「等比擴分、縮分以及化簡比」具備了極高敏銳度！已完全掌握等比的核心素養！`;
+            } else if (rank <= 2) {
+                reviewEl.innerHTML = `👏 <strong>表現傑出！</strong> 你順利完成了 ${State.currentMode} 難度大獎賽，在避開碰撞的同時精準答出相等的比，請繼續保持這股極速超車的氣勢！`;
+            } else {
+                reviewEl.innerHTML = `💪 <strong>再接再厲！</strong> 記住「找等比時，前項與後項要同乘以或同除以同一個不為0的數」，千萬不要用加法或減法喔！善用方向鍵避開對手碰撞，多練習一定能奪得冠軍！`;
+            }
+
+            renderReviewList();
+        }
+
+        function spawnConfetti() {
+            const container = document.getElementById('confetti-container');
+            container.innerHTML = '';
+            const colors = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#fde047'];
+            for (let i = 0; i < 45; i++) {
+                const conf = document.createElement('div');
+                conf.className = 'confetti';
+                conf.style.left = `${Math.random() * 100}%`;
+                conf.style.top = `${-10 - Math.random() * 20}px`;
+                conf.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                conf.style.animationDuration = `${1.8 + Math.random() * 2}s`;
+                conf.style.animationDelay = `${Math.random() * 1.5}s`;
+                container.appendChild(conf);
+            }
+        }
+
+        function renderReviewList() {
+            const listEl = document.getElementById('review-list');
+            listEl.innerHTML = '';
+            State.historyLog.forEach((item, idx) => {
+                const row = document.createElement('div');
+                row.className = `p-3 rounded-xl border ${item.isCorrect ? 'bg-slate-950/80 border-emerald-900/60' : 'bg-red-950/30 border-red-900/60'} text-xs`;
+                row.innerHTML = `
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="font-bold text-slate-300">第 ${idx + 1} 題：題目 <span class="text-amber-400 font-racing inline-flex items-center">${formatMathRatio(item.target)}</span></span>
+                        <span class="font-bold ${item.isCorrect ? 'text-emerald-400' : 'text-red-400'}">${item.isCorrect ? '✔️ 答對' : '❌ 答錯'}</span>
+                    </div>
+                    <div class="text-slate-400 flex flex-wrap items-center gap-2"><span>你的選擇：<span class="text-white font-mono inline-flex items-center">${formatMathRatio(item.chosen)}</span></span> <span>| 正確解答：<span class="text-emerald-300 font-mono font-bold inline-flex items-center">${formatMathRatio(item.correctOpt)}</span></span></div>
+                    <div class="text-slate-400 mt-1 text-[11px] bg-slate-900 p-2 rounded leading-relaxed">${formatMathRatio(item.explanation)}</div>
+                `;
+                listEl.appendChild(row);
+            });
+        }
+
+        // -------------------------------------------------------------
+        // 10. 事件監聽與流程啟動
+        // -------------------------------------------------------------
+        function initEvents() {
+            const modeBtns = document.querySelectorAll('.mode-select-btn');
+            modeBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    modeBtns.forEach(b => {
+                        b.classList.remove('active', 'border-emerald-500', 'bg-emerald-950/40');
+                        b.classList.add('border-slate-700', 'bg-slate-800/40');
+                    });
+                    btn.classList.add('active', 'border-emerald-500', 'bg-emerald-950/40');
+                    btn.classList.remove('border-slate-700', 'bg-slate-800/40');
+                    State.currentMode = btn.dataset.mode;
+                });
+            });
+
+            document.getElementById('btn-start-race').addEventListener('click', () => {
+                startNewRace();
+            });
+
+            const modalCards = document.querySelectorAll('#modal-options-grid .option-card');
+            modalCards.forEach(card => {
+                card.addEventListener('click', () => {
+                    const idx = parseInt(card.dataset.index, 10);
+                    handleModalAnswer(idx);
+                });
+            });
+
+            document.getElementById('btn-modal-continue').addEventListener('click', () => {
+                closeQuizModal();
+            });
+
+            document.getElementById('btn-use-item').addEventListener('click', () => {
+                useCurrentItem();
+            });
+
+            document.getElementById('btn-sound').addEventListener('click', () => {
+                isMuted = !isMuted;
+                const icon = document.getElementById('sound-icon');
+                const text = document.getElementById('sound-text');
+                if (isMuted) {
+                    icon.innerText = '🔇';
+                    text.innerText = '音效: 關';
+                    Sound.silenceEngine();
+                    Sound.toggleMute(true);
+                } else {
+                    icon.innerText = '🔊';
+                    text.innerText = '音效: 開';
+                    Sound.initEngine();
+                    Sound.toggleMute(false);
+                    Sound.beep(600, 'sine', 0.1);
+                }
+            });
+
+            document.getElementById('btn-restart').addEventListener('click', () => {
+                if (confirm('確定要重新開始比賽嗎？')) {
+                    startNewRace();
+                }
+            });
+
+            document.getElementById('btn-play-again').addEventListener('click', () => {
+                startNewRace();
+            });
+
+            document.getElementById('btn-review-questions').addEventListener('click', () => {
+                const list = document.getElementById('review-list-container');
+                list.classList.toggle('hidden');
+            });
+
+            const modal = document.getElementById('modal-help');
+            document.getElementById('btn-help').addEventListener('click', () => modal.classList.remove('hidden'));
+            document.getElementById('btn-close-help').addEventListener('click', () => modal.classList.add('hidden'));
+            document.getElementById('btn-close-help-confirm').addEventListener('click', () => modal.classList.add('hidden'));
+
+            // 鍵盤操控監聽
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                    Input.left = true;
+                } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                    Input.right = true;
+                } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+                    Input.up = true;
+                } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+                    Input.down = true;
+                }
+
+                if (e.code === 'Space' || e.key === ' ') {
+                    e.preventDefault();
+                    if (!State.isQuizModalOpen) {
+                        useCurrentItem();
+                    }
+                }
+
+                if (State.isQuizModalOpen && !State.isAnsweringLocked) {
+                    if (['1', '2', '3', '4'].includes(e.key)) {
+                        const idx = parseInt(e.key, 10) - 1;
+                        handleModalAnswer(idx);
+                    }
+                }
+
+                if (State.isQuizModalOpen && State.isAnsweringLocked && (e.key === 'Enter' || e.code === 'Space')) {
+                    closeQuizModal();
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                    Input.left = false;
+                } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                    Input.right = false;
+                } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+                    Input.up = false;
+                } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+                    Input.down = false;
+                }
+            });
+
+            // 觸控虛擬按鍵
+            const vLeft = document.getElementById('vbtn-left');
+            const vRight = document.getElementById('vbtn-right');
+            const vUp = document.getElementById('vbtn-up');
+            const vDown = document.getElementById('vbtn-down');
+            const vSpace = document.getElementById('vbtn-space');
+
+            const bindButton = (btn, keyProp) => {
+                const press = (ev) => { ev.preventDefault(); Input[keyProp] = true; };
+                const release = (ev) => { ev.preventDefault(); Input[keyProp] = false; };
+                btn.addEventListener('mousedown', press);
+                btn.addEventListener('mouseup', release);
+                btn.addEventListener('mouseleave', release);
+                btn.addEventListener('touchstart', press, { passive: false });
+                btn.addEventListener('touchend', release, { passive: false });
+            };
+
+            bindButton(vLeft, 'left');
+            bindButton(vRight, 'right');
+            bindButton(vUp, 'up');
+            bindButton(vDown, 'down');
+
+            vSpace.addEventListener('click', (e) => {
+                e.preventDefault();
+                useCurrentItem();
+            });
+
+            // 首次使用者互動時解鎖音效與背景配樂 (繞過瀏覽器 Autoplay 限制)
+            const unlockAudio = () => {
+                Sound.initEngine();
+                Sound.initBGM();
+                if (!isMuted && State.currentScreen === 'race') {
+                    Sound.playBGM();
+                }
+            };
+            window.addEventListener('click', unlockAudio, { once: true });
+            window.addEventListener('keydown', unlockAudio, { once: true });
+            window.addEventListener('touchstart', unlockAudio, { once: true });
+        }
+
+        // 開始新賽事
+        function startNewRace() {
+            State.currentScreen = 'race';
+            State.isRaceFinished = false;
+            State.totalAnswered = 0;
+            State.totalCorrect = 0;
+            State.dashProgress = 0;
+            State.dashTimer = 0;
+            State.streak = 0;
+            State.maxStreak = 0;
+            State.topSpeed = 60;
+            State.itemsUsedCount = 0;
+            State.historyLog = [];
+            State.inventory = null;
+            State.isStarActive = false;
+            State.starRemainingMs = 0;
+            State.isQuizModalOpen = false;
+            State.projectiles = [];
+
+            State.lapDistance = 3600; // 單圈 3600 米（約 1 分 30 秒）
+            if (State.currentMode === '50cc') {
+                State.targetWins = 6;
+                State.finishDistance = 7200; // 2 圈 (~3 分鐘)
+            } else if (State.currentMode === '100cc') {
+                State.targetWins = 10;
+                State.finishDistance = 10800; // 3 圈 (~4.5 分鐘)
+            } else {
+                State.targetWins = 14;
+                State.finishDistance = 10800; // 3 圈 (~4.5 分鐘)
+            }
+
+            document.getElementById('hud-target-count').innerText = State.targetWins;
+            document.getElementById('hud-correct-count').innerText = '0';
+            document.getElementById('hud-streak').innerText = '0';
+            document.getElementById('hud-dash-banner').classList.add('hidden');
+            document.getElementById('hud-star-banner').classList.add('hidden');
+            document.getElementById('hud-item-box').innerText = '❓';
+            document.getElementById('hud-item-name').innerText = '無道具';
+            document.getElementById('btn-use-item').disabled = true;
+            document.getElementById('modal-quiz').classList.add('hidden');
+            updateDashGaugeUI();
+
+            Sound.initEngine();
+            Sound.playBGM();
+            // 【精密賽道規劃】：550米主起跑大直道 (Main Straight)，4台車起跑距全面拉開
+            // 玩家 0m，AI 1 於 100m，AI 2 於 220m，AI 3 於 360m，完全解除擠在小賽道的壓迫感！
+            State.player = {
+                x: -0.3,
+                tilt: 0,
+                steerVel: 0,
+                suspensionY: 0,
+                cameraRoll: 0,
+                distance: 0,
+                speed: 0,
+                targetSpeed: 240,
+                rank: 4,
+                spinTimer: 0,
+                boostTimer: 0,
+                bumpCooldown: 0,
+                wobbleTimer: 0
+            };
+
+            State.opponents = [
+                { id: 1, color: '#10b981', distance: 100, speed: 0, targetSpeed: 255, x: 0.35, targetX: 0.35, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.5 },
+                { id: 2, color: '#3b82f6', distance: 220, speed: 0, targetSpeed: 280, x: -0.35, targetX: -0.35, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 4.5 },
+                { id: 3, color: '#eab308', distance: 360, speed: 0, targetSpeed: 305, x: 0.3, targetX: 0.3, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 5.5 }
+            ];
+
+            // 【需求 2】：跑道上一排 5 個立體旋轉問號寶箱初始重置 (8 秒後出現第一排)
+            State.itemBoxRows = [];
+            State.boxRowSpawnTimer = 8.0;
+
+            // 【需求 5】：賽道加速跳板初始排位 (分布於各直道區段)
+            State.boostPads = [
+                { distance: 420, x: 0.0 },   // 起跑大直道衝刺板
+                { distance: 1650, x: -0.2 }, // S2 後直道加速板
+                { distance: 2950, x: 0.2 }   // S3 終點前大直道加速板
+            ];
+
+            // 初始化真實賽車賽道景物與彎道導向指示板 (Chevron Signs & Markers)
+            initTrackScenery();
+            bgScrollOffset = 0;
+
+            document.getElementById('screen-start').classList.add('hidden');
+            document.getElementById('screen-result').classList.add('hidden');
+            document.getElementById('screen-race').classList.remove('hidden');
+
+            resizeCanvas();
+            updateCircuitMinimap();
+
+            startCountdown();
+        }
+
+        function init() {
+            resizeCanvas();
+            initEvents();
+            requestAnimationFrame(gameLoop);
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+
+    })();
+    </script>
+</body>
+</html>
