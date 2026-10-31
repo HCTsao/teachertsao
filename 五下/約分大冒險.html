@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>約分大冒險</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -18,12 +18,18 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     
     <style>
+        html {
+            overflow-x: hidden;
+            -webkit-text-size-adjust: 100%;
+        }
         body {
             font-family: 'Outfit', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
             background: radial-gradient(circle at center, #1e1b4b 0%, #0f172a 100%);
             color: #f1f5f9;
             overflow-x: hidden;
             min-height: 100vh;
+            min-height: 100dvh;
+            touch-action: manipulation;
         }
 
         /* 遊戲化玻璃面板 */
@@ -429,16 +435,28 @@
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.6; transform: scale(1.08); }
         }
-</style>
+
+        /* 防止行動端輸入框聚焦時自動縮放放大造成畫面跳動 */
+        input, select, textarea {
+            font-size: 16px !important;
+        }
+        /* 保留算式卡片與數字輸入框的大字級 */
+        #ansNum, #ansDen, .number-box-3d input, [id^="flipInput_"] {
+            font-size: 30px !important;
+        }
+        #joinRoomCodeInput {
+            font-size: 24px !important;
+        }
+    </style>
 </head>
-<body class="flex flex-col items-center justify-center p-4 relative">
+<body class="flex flex-col items-center justify-center p-3 sm:p-4 pt-16 sm:pt-20 relative">
     
     <!-- 頂部返回入口網站按鈕 -->
     <!-- HOME_BUTTON_START -->
     <a href="../index.html" style="position: fixed; top: 16px; left: 16px; z-index: 999999; background: rgba(15, 23, 42, 0.85); color: #ffffff; padding: 10px 20px; border-radius: 30px; text-decoration: none; font-family: system-ui, -apple-system, sans-serif; font-size: 15px; font-weight: bold; backdrop-filter: blur(8px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,0.1); transition: all 0.3s ease;" onmouseover="this.style.background='linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%)'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='rgba(15, 23, 42, 0.85)'; this.style.transform='scale(1)'">
         <i class="fa-solid fa-house"></i> 回首頁選單
     </a>
-    <script>(function() { function adjustViewport() { var targetWidth = 1024; var screenWidth = window.innerWidth || document.documentElement.clientWidth || window.screen.width; if (screenWidth > 0 && screenWidth < targetWidth) { var scale = screenWidth / targetWidth; var meta = document.querySelector('meta[name="viewport"]'); if (!meta) { meta = document.createElement('meta'); meta.setAttribute('name', 'viewport'); document.head.appendChild(meta); } meta.setAttribute('content', 'width=' + targetWidth + ', initial-scale=' + scale + ', minimum-scale=' + scale + ', maximum-scale=2.0, user-scalable=yes'); } else { var meta = document.querySelector('meta[name="viewport"]'); if (meta) { meta.setAttribute('content', 'width=device-width, initial-scale=1.0'); } } } adjustViewport(); var timer = null; window.addEventListener('resize', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); window.addEventListener('orientationchange', function() { clearTimeout(timer); timer = setTimeout(adjustViewport, 300); }); })();</script>
+    
     <!-- HOME_BUTTON_END -->
 
     <!-- 音量控制 -->
@@ -791,7 +809,7 @@
                         <div id="vsTimerText" class="vs-timer-text">120</div>
                     </div>
                     <div id="vsRoundBadge" class="text-xs font-black text-yellow-300 mt-1">第 1 題搶答中</div>
-                    <div class="text-[10px] text-slate-400 font-bold hidden sm:block">答對越快 · 加乘越高 (最高 2.0 倍)</div>
+                    <div class="text-[10px] text-slate-400 font-bold hidden sm:block">答題越快 · 加乘越高 (5秒內 2.0倍 · 最高 200分)</div>
                 </div>
 
                 <!-- 右側欄：紅隊 (對手/客端) -->
@@ -2814,7 +2832,7 @@
             // 倒數計時
             countdownSec: VS_TOTAL_TIME,
             timerInterval: null,
-            questionStartSec: VS_TOTAL_TIME, // 本題開始時剩餘秒數
+            questionStartTime: Date.now(), // 本題開始時的時間戳記
         };
 
         // 隨機難度抽取函式
@@ -2823,17 +2841,22 @@
             return diffs[Math.floor(Math.random() * diffs.length)];
         }
 
-        // 計算時間加乘分數
-        // 剩餘時間 >= 100s → ×2.0, >= 80s → ×1.8, >= 60s → ×1.5, >= 40s → ×1.3, >= 20s → ×1.1, else → ×1.0
-        function calcVsScore(remainSec) {
+        // 計算單題答題時間加乘分數（本題作答越快，加乘越高！）
+        // <= 5秒 -> 2.0x, <= 10秒 -> 1.8x, <= 15秒 -> 1.5x, <= 25秒 -> 1.3x, <= 35秒 -> 1.1x, > 35秒 -> 1.0x
+        function calcVsScore(elapsedSec) {
+            const sec = Math.max(0, elapsedSec || 0);
             let mult;
-            if (remainSec >= 100)     mult = 2.0;
-            else if (remainSec >= 80) mult = 1.8;
-            else if (remainSec >= 60) mult = 1.5;
-            else if (remainSec >= 40) mult = 1.3;
-            else if (remainSec >= 20) mult = 1.1;
-            else                       mult = 1.0;
-            return Math.round(VS_BASE_SCORE * mult);
+            if (sec <= 5)       mult = 2.0;
+            else if (sec <= 10) mult = 1.8;
+            else if (sec <= 15) mult = 1.5;
+            else if (sec <= 25) mult = 1.3;
+            else if (sec <= 35) mult = 1.1;
+            else                mult = 1.0;
+            return {
+                earned: Math.round(VS_BASE_SCORE * mult),
+                mult: mult,
+                sec: Math.round(sec * 10) / 10
+            };
         }
 
         // 更新得分側欄長條圖與分數
@@ -2906,9 +2929,11 @@
             }
             // 線上：通知對方時間結束
             if (vsState.roomRef) {
+                const hostScore = vsState.isHost ? vsState.p1Score : vsState.p2Score;
+                const guestScore = vsState.isHost ? vsState.p2Score : vsState.p1Score;
                 vsState.roomRef.update({
                     status: 'finished',
-                    finalWinner: vsState.p1Score >= vsState.p2Score ? 'host' : 'guest',
+                    finalWinner: hostScore > guestScore ? 'host' : (guestScore > hostScore ? 'guest' : 'tie'),
                 });
             }
         }
@@ -3157,30 +3182,23 @@
                         enterVersusBattleScreen(data, q1);
                     }
 
-                    // 同步比分
-                    const p1 = (data.host && data.host.score) || 0;
-                    const p2 = (data.guest && data.guest.score) || 0;
-                    vsState.p1Score = p1;
-                    vsState.p2Score = p2;
-                    updateScoreBar(p1, p2);
+                    // 同步比分：左側藍隊始終是我方，右側紅隊始終是對手
+                    const myRawScore = (vsState.isHost ? (data.host && data.host.score) : (data.guest && data.guest.score)) || 0;
+                    const oppRawScore = (vsState.isHost ? (data.guest && data.guest.score) : (data.host && data.host.score)) || 0;
+                    vsState.p1Score = myRawScore;
+                    vsState.p2Score = oppRawScore;
+                    updateScoreBar(vsState.p1Score, vsState.p2Score);
 
-                    // 檢查對方是否得分 (對方得分時：拉繩 + 音效 + 提示，但我方題目完全不換！)
-                    const oppScore = vsState.isHost ? p2 : p1;
-                    const oppPrevScore = vsState.isHost ? vsState.p2PrevScore : vsState.p1PrevScore;
-
-                    if (oppScore > oppPrevScore) {
-                        if (vsState.isHost) vsState.p2PrevScore = p2;
-                        else vsState.p1PrevScore = p1;
-
+                    // 檢查對方是否得分
+                    if (vsState.p2Score > vsState.p2PrevScore) {
+                        const diff = vsState.p2Score - vsState.p2PrevScore;
+                        vsState.p2PrevScore = vsState.p2Score;
                         synth.playTug();
                         const oppName = vsState.isHost ? ((data.guest && data.guest.name) || '對手') : ((data.host && data.host.name) || '對手');
-                        setVersusBanner("⚡ " + oppName + " 答對了！趕快加速！", "#f87171");
-                        // 提示：我方題目與輸入框完全不變，繼續解題直到答對！
+                        setVersusBanner("⚡ " + oppName + " 答對了！(+" + diff + " 分) 趕快加速！", "#f87171");
+                        spawnVsFloatScore('vsScore2', '+' + diff, '#f87171');
                     }
-
-                    // 若自己得分更新已由自己觸發，同步自己 prevScore
-                    if (vsState.isHost) vsState.p1PrevScore = p1;
-                    else vsState.p2PrevScore = p2;
+                    vsState.p1PrevScore = vsState.p1Score;
                 }
 
                 // 戰鬥結束
@@ -3241,13 +3259,15 @@
             vsState.botTimer = setTimeout(() => {
                 if (!vsState.active) return;
 
-                // 電腦答對，依剩餘時間計分
-                const earned = calcVsScore(vsState.countdownSec);
-                vsState.p2Score += earned;
+                // 電腦答對，依耗時 (delay/1000) 計分
+                const botElapsed = delay / 1000;
+                const scoreInfo = calcVsScore(botElapsed);
+                vsState.p2Score += scoreInfo.earned;
+                vsState.p2PrevScore = vsState.p2Score;
                 updateScoreBar(vsState.p1Score, vsState.p2Score);
                 synth.playTug();
-                setVersusBanner("⚡ " + vsState.opponentName + " 答對了！+" + earned + " 分！趕快加速！", "#f87171");
-                spawnVsFloatScore('vsScore2', '+' + earned, '#f87171');
+                setVersusBanner("⚡ " + vsState.opponentName + " 答對了！+" + scoreInfo.earned + " 分 (" + scoreInfo.sec + "秒)，趕快加速！", "#f87171");
+                spawnVsFloatScore('vsScore2', '+' + scoreInfo.earned, '#f87171');
 
                 // 繼續答下一題
                 startBotTimer();
@@ -3266,14 +3286,14 @@
             vsState.myRound = 1;
             vsState.isAnswering = false;
             vsState.countdownSec = VS_TOTAL_TIME;
-            vsState.questionStartSec = VS_TOTAL_TIME;
+            vsState.questionStartTime = Date.now();
 
-            // 選手名稱顯示
-            const hostName = (data && data.host && data.host.name) || (vsState.isHost ? vsState.myName : '對手');
-            const guestName = (data && data.guest && data.guest.name) || (!vsState.isHost ? vsState.myName : '對手');
+            // 選手名稱顯示：左側藍隊一律為我方，右側紅隊一律為對手
+            const myDisplayName = vsState.myName || '我方';
+            const oppDisplayName = (vsState.isHost ? (data && data.guest && data.guest.name) : (data && data.host && data.host.name)) || vsState.opponentName || '對手';
 
-            document.getElementById('vsPlayer1Name').innerText = hostName;
-            document.getElementById('vsPlayer2Name').innerText = guestName;
+            document.getElementById('vsPlayer1Name').innerText = myDisplayName;
+            document.getElementById('vsPlayer2Name').innerText = oppDisplayName;
 
             // 設定頂部 HUD
             const titleEl = document.getElementById('gameTitleDisplay');
@@ -3323,7 +3343,7 @@
             document.getElementById('successOverlay').classList.add('hidden');
             document.getElementById('vsRoundBadge').innerText = "第 " + roundNum + " 題";
             document.getElementById('roundDisplay').innerText = "連線對戰 (第 " + roundNum + " 題)";
-            vsState.questionStartSec = vsState.countdownSec; // 記錄本題開始時剩餘秒數
+            vsState.questionStartTime = Date.now(); // 記錄本題開始的時間戳記
 
             // 防禦性檢查：若傳入題目不完整，立即動態生成合法題目，絕不讓卡牌顯示 0
             if (!prob || !prob.n1 || !prob.d1 || !prob.n2 || !prob.d2) {
@@ -3424,11 +3444,14 @@
                 triggerParticles('ansNum', '#4ade80');
                 triggerParticles('ansDen', '#4ade80');
 
-                // 依剩餘時間計算加乘分數
-                const earned = calcVsScore(vsState.countdownSec);
+                // 依本題答題耗時計算加乘分數（答得越快，分數越高！）
+                const elapsedSec = (Date.now() - (vsState.questionStartTime || Date.now())) / 1000;
+                const scoreInfo = calcVsScore(elapsedSec);
+                const earned = scoreInfo.earned;
                 vsState.p1Score += earned;
+                vsState.p1PrevScore = vsState.p1Score;
                 updateScoreBar(vsState.p1Score, vsState.p2Score);
-                setVersusBanner('🎯 答對！+' + earned + ' 分！(剩 ' + vsState.countdownSec + '秒)', '#4ade80');
+                setVersusBanner('🎯 答對！+' + earned + ' 分 (用時 ' + scoreInfo.sec + '秒 · ' + scoreInfo.mult + '倍加乘)！', '#4ade80');
                 spawnVsFloatScore('vsScore1', '+' + earned, '#4ade80');
 
                 // 下一題
@@ -3442,7 +3465,7 @@
                 // 單機機器人模式：不需 Firebase 同步
                 if (vsState.isBot) return;
 
-                // 線上模式：同步我方積分到 Firebase
+                // 線上模式：同步我方積分到 Firebase (注意客端寫入 guest/score，主端寫入 host/score)
                 if (vsState.roomRef) {
                     const myRole = vsState.isHost ? 'host' : 'guest';
                     vsState.roomRef.child(myRole + '/score').set(vsState.p1Score);
@@ -3467,11 +3490,9 @@
             clearTimeout(vsState.botTimer);
             clearInterval(vsState.timerInterval);
 
-            // 判斷我方是否勝出（積分比較）
-            const myScoreIsFinal = vsState.isHost ? vsState.p1Score : vsState.p2Score;
-            const oppScoreFinal  = vsState.isHost ? vsState.p2Score : vsState.p1Score;
-            const isMeWinner = myScoreIsFinal > oppScoreFinal;
-            const isTie      = myScoreIsFinal === oppScoreFinal;
+            // 判斷我方是否勝出（vsState.p1Score 始終是我方，vsState.p2Score 始終是對手）
+            const isMeWinner = vsState.p1Score > vsState.p2Score;
+            const isTie      = vsState.p1Score === vsState.p2Score;
 
             const iconEl     = document.getElementById('vsWinnerIcon');
             const titleEl    = document.getElementById('vsWinnerTitle');
@@ -3497,17 +3518,17 @@
                 }
             }
 
-            // 填入結算積分
+            // 填入結算積分（左側永遠為我方，右側永遠為對手）
             const endP1Score = document.getElementById('vsEndP1Score');
             const endP2Score = document.getElementById('vsEndP2Score');
             const endP1Name  = document.getElementById('vsEndP1Name');
             const endP2Name  = document.getElementById('vsEndP2Name');
 
-            const hostName  = document.getElementById('vsPlayer1Name')?.innerText || '藍隊';
-            const guestName = document.getElementById('vsPlayer2Name')?.innerText || '紅隊';
+            const myName  = document.getElementById('vsPlayer1Name')?.innerText || '我方';
+            const oppName = document.getElementById('vsPlayer2Name')?.innerText || '對手';
 
-            if (endP1Name) endP1Name.innerText = hostName;
-            if (endP2Name) endP2Name.innerText = guestName;
+            if (endP1Name) endP1Name.innerText = myName;
+            if (endP2Name) endP2Name.innerText = oppName;
             if (endP1Score) endP1Score.innerText = vsState.p1Score;
             if (endP2Score) endP2Score.innerText = vsState.p2Score;
 
