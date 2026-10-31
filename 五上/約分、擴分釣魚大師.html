@@ -485,6 +485,10 @@
         // 2. 數學問題生成器 (Fraction Math Generator)
         // ==========================================
         const MathGenerator = {
+            recentExpansionKeys: [],
+            recentReductionKeys: [],
+            recentCommonDenominatorKeys: [],
+
             // 取得針對約分的分子誘答選項 (排除相鄰整數與無效選項)
             getReductionNumeratorDistractors(baseN, div, targetN) {
                 let errors = [];
@@ -612,28 +616,39 @@
                     { n: 1, d: 8 }, { n: 3, d: 8 }, { n: 5, d: 8 }, { n: 7, d: 8 }
                 ];
 
-                const target = forcedTarget || baseFractions[this.randomInt(0, baseFractions.length - 1)]; // e.g. 2/5 (simplest form)
-                
-                // 確保約分乘數必為有公因數的可約數：4、6、8、12
                 const reductionMultipliers = [4, 6, 8, 12];
-                const multiplier = forcedMultiplier || reductionMultipliers[this.randomInt(0, reductionMultipliers.length - 1)];
-                const baseNumerator = target.n * multiplier; // e.g. 12
-                const baseDenominator = target.d * multiplier; // e.g. 32
-                
-                // divisor 是此回合要約分的因數，例如 2、3 或 4
-                let div = divisor;
-                if (!div) {
-                    if (multiplier === 4) div = [2, 4][this.randomInt(0, 1)];
-                    else if (multiplier === 6) div = [2, 3, 6][this.randomInt(0, 2)];
-                    else if (multiplier === 8) div = [2, 4, 8][this.randomInt(0, 2)];
-                    else div = [2, 6, 12][this.randomInt(0, 2)];
+                let target, multiplier, baseNumerator, baseDenominator, div, targetDenominator, targetNumerator, qType, key;
+                let attempts = 0;
+
+                do {
+                    target = forcedTarget || baseFractions[this.randomInt(0, baseFractions.length - 1)]; // e.g. 2/5 (simplest form)
+                    multiplier = forcedMultiplier || reductionMultipliers[this.randomInt(0, reductionMultipliers.length - 1)];
+                    baseNumerator = target.n * multiplier; // e.g. 12
+                    baseDenominator = target.d * multiplier; // e.g. 32
+                    
+                    div = divisor;
+                    if (!div) {
+                        if (multiplier === 4) div = [2, 4][this.randomInt(0, 1)];
+                        else if (multiplier === 6) div = [2, 3, 6][this.randomInt(0, 2)];
+                        else if (multiplier === 8) div = [2, 4, 8][this.randomInt(0, 2)];
+                        else div = [2, 6, 12][this.randomInt(0, 2)];
+                    }
+
+                    targetDenominator = baseDenominator / div;
+                    targetNumerator = baseNumerator / div;
+                    qType = Math.random() < 0.5 ? 'numerator' : 'denominator';
+                    key = `${baseNumerator}/${baseDenominator}->${targetNumerator}/${targetDenominator}`;
+                    attempts++;
+                } while (!forcedTarget && !forcedMultiplier && attempts < 40 && (
+                    this.recentReductionKeys.includes(key) ||
+                    (this.recentReductionKeys.length > 0 && this.recentReductionKeys[this.recentReductionKeys.length - 1].split('->')[0] === `${baseNumerator}/${baseDenominator}`)
+                ));
+
+                if (!forcedTarget && !forcedMultiplier) {
+                    this.recentReductionKeys.push(key);
+                    if (this.recentReductionKeys.length > 6) this.recentReductionKeys.shift();
                 }
 
-                // 約分後的目標分母與分子
-                const targetDenominator = baseDenominator / div;
-                const targetNumerator = baseNumerator / div;
-
-                const qType = Math.random() < 0.5 ? 'numerator' : 'denominator';
                 const pool = [];
                 // 正確答案魚
                 pool.push({
@@ -798,15 +813,32 @@
                 const baseFractions = [
                     { n: 1, d: 2 }, { n: 1, d: 3 }, { n: 2, d: 3 },
                     { n: 1, d: 4 }, { n: 3, d: 4 }, { n: 1, d: 5 },
-                    { n: 2, d: 5 }, { n: 3, d: 5 }, { n: 4, d: 5 }
+                    { n: 2, d: 5 }, { n: 3, d: 5 }, { n: 4, d: 5 },
+                    { n: 1, d: 6 }, { n: 5, d: 6 }, { n: 1, d: 8 },
+                    { n: 3, d: 8 }, { n: 5, d: 8 }, { n: 7, d: 8 }
                 ];
 
-                const target = forcedTarget || baseFractions[this.randomInt(0, baseFractions.length - 1)];
-                const multiplier = forcedMultiplier || this.randomInt(3, 7); // 擴分乘數
-                const expandedDenominator = target.d * multiplier;
-                const expandedNumerator = target.n * multiplier;
-                
-                const qType = Math.random() < 0.5 ? 'numerator' : 'denominator';
+                let target, multiplier, expandedDenominator, expandedNumerator, qType, key;
+                let attempts = 0;
+
+                do {
+                    target = forcedTarget || baseFractions[this.randomInt(0, baseFractions.length - 1)];
+                    multiplier = forcedMultiplier || this.randomInt(2, 6); // 擴分乘數
+                    expandedDenominator = target.d * multiplier;
+                    expandedNumerator = target.n * multiplier;
+                    qType = Math.random() < 0.5 ? 'numerator' : 'denominator';
+                    key = `${target.n}/${target.d}*${multiplier}`;
+                    attempts++;
+                } while (!forcedTarget && !forcedMultiplier && attempts < 40 && (
+                    this.recentExpansionKeys.includes(key) ||
+                    (this.recentExpansionKeys.length > 0 && this.recentExpansionKeys[this.recentExpansionKeys.length - 1].split('*')[0] === `${target.n}/${target.d}`)
+                ));
+
+                if (!forcedTarget && !forcedMultiplier) {
+                    this.recentExpansionKeys.push(key);
+                    if (this.recentExpansionKeys.length > 6) this.recentExpansionKeys.shift();
+                }
+
                 const pool = [];
                 // 正確答案魚
                 pool.push({
@@ -980,7 +1012,17 @@
                     { f1: { n: 2, d: 3 }, f2: { n: 4, d: 9 } }  // LCM = 9 (9是3的倍數)
                 ];
 
-                const selected = pairs[this.randomInt(0, pairs.length - 1)];
+                let selected, key;
+                let attempts = 0;
+                do {
+                    selected = pairs[this.randomInt(0, pairs.length - 1)];
+                    key = `${selected.f1.n}/${selected.f1.d}&${selected.f2.n}/${selected.f2.d}`;
+                    attempts++;
+                } while (attempts < 40 && this.recentCommonDenominatorKeys.includes(key));
+
+                this.recentCommonDenominatorKeys.push(key);
+                if (this.recentCommonDenominatorKeys.length > 6) this.recentCommonDenominatorKeys.shift();
+
                 const lcmVal = this.lcm(selected.f1.d, selected.f2.d);
                 
                 // 第一階段：找最適合公分母
@@ -1223,13 +1265,29 @@
             return Math.floor(Math.random() * 6);
         }
 
+        // 豐富亮麗的海底魚隻調色盤 (金黃、青藍、紫羅蘭、翡翠綠、珊瑚橘、甜心粉、湛藍、青檸綠)
+        const FISH_COLORS = [
+            'hsl(42, 95%, 55%)',  // 耀眼金黃
+            'hsl(185, 90%, 48%)', // 亮麗青藍
+            'hsl(275, 85%, 60%)', // 夢幻紫羅蘭
+            'hsl(145, 80%, 48%)', // 鮮艷翡翠綠
+            'hsl(20, 95%, 58%)',  // 活力珊瑚橘
+            'hsl(330, 85%, 60%)', // 甜心桃粉
+            'hsl(210, 95%, 60%)', // 湛藍海寶石
+            'hsl(85, 80%, 46%)'   // 亮青檸綠
+        ];
+
+        function getRandomFishColor() {
+            return FISH_COLORS[Math.floor(Math.random() * FISH_COLORS.length)];
+        }
+
         // 魚隻類別
         class Fish {
-            constructor(fraction, isCorrect, x = null, isL3Denominator = false, yBand = null, forcedDir = null, optionGroup = 0) {
+            constructor(fraction, isCorrect, x = null, isL3Denominator = false, yBand = null, forcedDir = null, optionGroup = null, customColor = null) {
                 this.fraction = fraction; // 約分/擴分用分數對象 {n, d}
                 this.isL3Denominator = isL3Denominator; // 是否為第三關第1階段分母數字
                 this.isCorrect = isCorrect;
-                this.optionGroup = optionGroup; // 0=金黃(中速), 1=青藍(高速), 2=紫羅蘭(慢速), 3=翡翠綠
+                this.optionGroup = optionGroup;
                 this.width = isL3Denominator ? 70 : 90;
                 this.height = isL3Denominator ? 50 : 60;
                 
@@ -1254,39 +1312,21 @@
                 this.yBand = (yBand !== null && yBand >= 0) ? yBand : Math.floor(Math.random() * 6);
                 this.y = 240 + this.yBand * 55;
                 
-                // 依據魚的選項組別 (optionGroup / 顏色) 賦予明確的速度層級：
-                // Group 1 (青藍魚)：高速 (0.95 px/frame)
-                // Group 0 (金黃魚)：中速 (0.62 px/frame)
-                // Group 2 (紫羅蘭魚)：慢速 (0.38 px/frame)
-                // Group 3 (翡翠綠魚)：中慢速 (0.50 px/frame)
+                // 巡航速度：隨機分佈在不同速度層次，並隨分數難度提升，避免單憑游速破梗
                 const difficultyBonus = Math.floor(score / 100) * 0.08;
-                let baseSpeed = 0.62;
-                if (this.optionGroup === 1) {
-                    baseSpeed = 0.95; // 快速魚
-                } else if (this.optionGroup === 2) {
-                    baseSpeed = 0.38; // 慢速魚
-                } else if (this.optionGroup === 3) {
-                    baseSpeed = 0.50; // 中慢速魚
-                } else {
-                    baseSpeed = 0.62; // 中速魚
-                }
+                const speedTiers = [0.42, 0.55, 0.68, 0.85, 0.95];
+                const baseSpeed = speedTiers[Math.floor(Math.random() * speedTiers.length)] + (Math.random() * 0.06 - 0.03);
                 this.cruiseSpeed = baseSpeed + difficultyBonus;
 
                 // 剛從畫面外登場時的「進場滑行」速度 (適中速 3.5 ~ 4.5 px/frame)
                 this.entranceSpeed = Math.max(3.5, this.cruiseSpeed * 2.2);
                 this.speed = this.isEntering ? this.entranceSpeed : this.cruiseSpeed;
 
-                // 依組別與顏色明確區隔
-                if (this.optionGroup === 0) {
-                    this.color = 'hsl(42, 95%, 55%)';  // 耀眼金黃
-                } else if (this.optionGroup === 1) {
-                    this.color = 'hsl(185, 90%, 48%)'; // 亮麗青藍
-                } else if (this.optionGroup === 2) {
-                    this.color = 'hsl(275, 85%, 60%)'; // 夢幻紫羅蘭
-                } else if (this.optionGroup === 3) {
-                    this.color = 'hsl(145, 80%, 48%)'; // 鮮艷翡翠綠
+                // 魚隻顏色：完全隨機指定或由外部傳入隨機顏色，徹底打破「正確答案固定為黃色魚」的現象
+                if (customColor) {
+                    this.color = customColor;
                 } else {
-                    this.color = this.isCorrect ? 'hsl(42, 95%, 55%)' : 'hsl(185, 90%, 48%)';
+                    this.color = getRandomFishColor();
                 }
                 
                 this.bobPhase = Math.random() * Math.PI * 2;
@@ -1680,12 +1720,12 @@
                 const equiv = { n: baseF.n * k, d: baseF.d * k };
                 const isCorrect = (equiv.d === lcm);
                 // 每個選項皆生成兩隻魚：一隻由左邊 (dir=1) 登場，一隻由右邊 (dir=-1) 登場
-                const fishLeft = new Fish(equiv, isCorrect, spawnX, false, yBands[bandIdx % yBands.length], 1);
+                const fishLeft = new Fish(equiv, isCorrect, spawnX, false, yBands[bandIdx % yBands.length], 1, null, getRandomFishColor());
                 fishLeft.fractionGroup = group;
                 list.push(fishLeft);
                 bandIdx++;
 
-                const fishRight = new Fish(equiv, isCorrect, spawnX, false, yBands[bandIdx % yBands.length], -1);
+                const fishRight = new Fish(equiv, isCorrect, spawnX, false, yBands[bandIdx % yBands.length], -1, null, getRandomFishColor());
                 fishRight.fractionGroup = group;
                 list.push(fishRight);
                 bandIdx++;
@@ -1782,9 +1822,11 @@
                 updateRemainingFishesCorrectness(correctVal, false);
 
                 const yBands = [0, 1, 2, 3, 4, 5].sort(() => 0.5 - Math.random());
-                // 正確答案選項 (Group 0: 耀眼金黃 / 中速)
-                fishes.push(new Fish(correctItem, true, spawnX, false, yBands[0], 1, 0));
-                fishes.push(new Fish(correctItem, true, spawnX, false, yBands[1], -1, 0));
+                const shuffledColors = [...FISH_COLORS].sort(() => 0.5 - Math.random());
+
+                // 正確答案選項 (顏色隨機分配)
+                fishes.push(new Fish(correctItem, true, spawnX, false, yBands[0], 1, null, shuffledColors[0]));
+                fishes.push(new Fish(correctItem, true, spawnX, false, yBands[1], -1, null, shuffledColors[1]));
 
                 const selectedIncorrect = incorrectList.sort(() => 0.5 - Math.random()).slice(0, 2);
                 while (selectedIncorrect.length < 2) {
@@ -1798,13 +1840,13 @@
                     fallbackFrac.val = fallbackFrac.n / fallbackFrac.d;
                     selectedIncorrect.push(fallbackFrac);
                 }
-                // 誘答選項 1 (Group 1: 亮麗青藍 / 快速)
-                fishes.push(new Fish(selectedIncorrect[0], false, spawnX, false, yBands[2], 1, 1));
-                fishes.push(new Fish(selectedIncorrect[0], false, spawnX, false, yBands[3], -1, 1));
+                // 誘答選項 1 (顏色隨機分配)
+                fishes.push(new Fish(selectedIncorrect[0], false, spawnX, false, yBands[2], 1, null, shuffledColors[2]));
+                fishes.push(new Fish(selectedIncorrect[0], false, spawnX, false, yBands[3], -1, null, shuffledColors[3]));
 
-                // 誘答選項 2 (Group 2: 夢幻紫羅蘭 / 慢速)
-                fishes.push(new Fish(selectedIncorrect[1], false, spawnX, false, yBands[4], 1, 2));
-                fishes.push(new Fish(selectedIncorrect[1], false, spawnX, false, yBands[5], -1, 2));
+                // 誘答選項 2 (顏色隨機分配)
+                fishes.push(new Fish(selectedIncorrect[1], false, spawnX, false, yBands[4], 1, null, shuffledColors[4]));
+                fishes.push(new Fish(selectedIncorrect[1], false, spawnX, false, yBands[5], -1, null, shuffledColors[5]));
 
             } else if (currentLevel === 2) {
                 if (changeStem || !mathData) {
@@ -1818,9 +1860,11 @@
                 updateRemainingFishesCorrectness(correctVal, false);
 
                 const yBands = [0, 1, 2, 3, 4, 5].sort(() => 0.5 - Math.random());
-                // 正確答案選項 (Group 0: 耀眼金黃 / 中速)
-                fishes.push(new Fish(correctItem, true, spawnX, false, yBands[0], 1, 0));
-                fishes.push(new Fish(correctItem, true, spawnX, false, yBands[1], -1, 0));
+                const shuffledColors = [...FISH_COLORS].sort(() => 0.5 - Math.random());
+
+                // 正確答案選項 (顏色隨機分配)
+                fishes.push(new Fish(correctItem, true, spawnX, false, yBands[0], 1, null, shuffledColors[0]));
+                fishes.push(new Fish(correctItem, true, spawnX, false, yBands[1], -1, null, shuffledColors[1]));
 
                 const selectedIncorrect = incorrectList.sort(() => 0.5 - Math.random()).slice(0, 2);
                 while (selectedIncorrect.length < 2) {
@@ -1834,13 +1878,13 @@
                     fallbackFrac.val = fallbackFrac.n / fallbackFrac.d;
                     selectedIncorrect.push(fallbackFrac);
                 }
-                // 誘答選項 1 (Group 1: 亮麗青藍 / 快速)
-                fishes.push(new Fish(selectedIncorrect[0], false, spawnX, false, yBands[2], 1, 1));
-                fishes.push(new Fish(selectedIncorrect[0], false, spawnX, false, yBands[3], -1, 1));
+                // 誘答選項 1 (顏色隨機分配)
+                fishes.push(new Fish(selectedIncorrect[0], false, spawnX, false, yBands[2], 1, null, shuffledColors[2]));
+                fishes.push(new Fish(selectedIncorrect[0], false, spawnX, false, yBands[3], -1, null, shuffledColors[3]));
 
-                // 誘答選項 2 (Group 2: 夢幻紫羅蘭 / 慢速)
-                fishes.push(new Fish(selectedIncorrect[1], false, spawnX, false, yBands[4], 1, 2));
-                fishes.push(new Fish(selectedIncorrect[1], false, spawnX, false, yBands[5], -1, 2));
+                // 誘答選項 2 (顏色隨機分配)
+                fishes.push(new Fish(selectedIncorrect[1], false, spawnX, false, yBands[4], 1, null, shuffledColors[4]));
+                fishes.push(new Fish(selectedIncorrect[1], false, spawnX, false, yBands[5], -1, null, shuffledColors[5]));
 
             } else if (currentLevel === 3) {
                 if (changeStem || !mathData) {
@@ -1856,22 +1900,23 @@
 
                 renderStemForStage();
                 const yBands = [0, 1, 2, 3, 4, 5].sort(() => 0.5 - Math.random());
+                const shuffledColors = [...FISH_COLORS].sort(() => 0.5 - Math.random());
 
                 if (level3Stage === 1) {
                     // 階段 1：通分階段 (海裡同時放入 tf1 魚(2隻)、tf2 魚(2隻)與干擾魚(2隻))
-                    const fishF1_L = new Fish(mathData.tf1, true, spawnX, false, yBands[0], 1, 1);
+                    const fishF1_L = new Fish(mathData.tf1, true, spawnX, false, yBands[0], 1, null, shuffledColors[0]);
                     fishF1_L.fractionGroup = 1;
-                    const fishF1_R = new Fish(mathData.tf1, true, spawnX, false, yBands[1], -1, 1);
+                    const fishF1_R = new Fish(mathData.tf1, true, spawnX, false, yBands[1], -1, null, shuffledColors[1]);
                     fishF1_R.fractionGroup = 1;
 
-                    const fishF2_L = new Fish(mathData.tf2, true, spawnX, false, yBands[2], 1, 0);
+                    const fishF2_L = new Fish(mathData.tf2, true, spawnX, false, yBands[2], 1, null, shuffledColors[2]);
                     fishF2_L.fractionGroup = 2;
-                    const fishF2_R = new Fish(mathData.tf2, true, spawnX, false, yBands[3], -1, 0);
+                    const fishF2_R = new Fish(mathData.tf2, true, spawnX, false, yBands[3], -1, null, shuffledColors[3]);
                     fishF2_R.fractionGroup = 2;
 
                     const d1 = getDistractorFraction(mathData);
-                    const fishD1_L = new Fish(d1, false, spawnX, false, yBands[4], 1, 2);
-                    const fishD1_R = new Fish(d1, false, spawnX, false, yBands[5], -1, 2);
+                    const fishD1_L = new Fish(d1, false, spawnX, false, yBands[4], 1, null, shuffledColors[4]);
+                    const fishD1_R = new Fish(d1, false, spawnX, false, yBands[5], -1, null, shuffledColors[5]);
 
                     fishes.push(fishF1_L, fishF1_R, fishF2_L, fishF2_R, fishD1_L, fishD1_R);
 
@@ -1881,14 +1926,14 @@
                     const v2 = mathData.tf2.n / mathData.tf2.d;
                     const correctSymbol = (v1 > v2) ? '>' : ((v1 < v2) ? '<' : '=');
 
-                    const symLT_L = new Fish('<', correctSymbol === '<', spawnX, false, yBands[0], 1, 1);
-                    const symLT_R = new Fish('<', correctSymbol === '<', spawnX, false, yBands[1], -1, 1);
+                    const symLT_L = new Fish('<', correctSymbol === '<', spawnX, false, yBands[0], 1, null, shuffledColors[0]);
+                    const symLT_R = new Fish('<', correctSymbol === '<', spawnX, false, yBands[1], -1, null, shuffledColors[1]);
 
-                    const symGT_L = new Fish('>', correctSymbol === '>', spawnX, false, yBands[2], 1, 0);
-                    const symGT_R = new Fish('>', correctSymbol === '>', spawnX, false, yBands[3], -1, 0);
+                    const symGT_L = new Fish('>', correctSymbol === '>', spawnX, false, yBands[2], 1, null, shuffledColors[2]);
+                    const symGT_R = new Fish('>', correctSymbol === '>', spawnX, false, yBands[3], -1, null, shuffledColors[3]);
 
-                    const symEQ_L = new Fish('=', correctSymbol === '=', spawnX, false, yBands[4], 1, 2);
-                    const symEQ_R = new Fish('=', correctSymbol === '=', spawnX, false, yBands[5], -1, 2);
+                    const symEQ_L = new Fish('=', correctSymbol === '=', spawnX, false, yBands[4], 1, null, shuffledColors[4]);
+                    const symEQ_R = new Fish('=', correctSymbol === '=', spawnX, false, yBands[5], -1, null, shuffledColors[5]);
 
                     fishes.push(symLT_L, symLT_R, symGT_L, symGT_R, symEQ_L, symEQ_R);
                 }
@@ -2290,7 +2335,7 @@
                             // 還有一隻要通分：魚群不游走，繼續在海中釣魚，補充一隻干擾魚
                             const freeBand = getAvailableYBand(fishes);
                             const d = getDistractorFraction(mathData);
-                            fishes.push(new Fish(d, false, 'side', false, freeBand, null, 2));
+                            fishes.push(new Fish(d, false, 'side', false, freeBand, null, null, getRandomFishColor()));
                         }
                     } else {
                         // 釣到干擾魚或已通分類型的魚 -> 算答錯
@@ -2301,7 +2346,7 @@
                         fishes = fishes.filter(fish => fish !== caughtFish);
                         const freeBand = getAvailableYBand(fishes);
                         const d = getDistractorFraction(mathData);
-                        fishes.push(new Fish(d, false, 'side', false, freeBand, null, 2));
+                        fishes.push(new Fish(d, false, 'side', false, freeBand, null, null, getRandomFishColor()));
                     }
 
                     hook.caughtFish = null;
@@ -2327,7 +2372,7 @@
                         addFloatingText('❌ 符號錯誤！請重新比較', fx, fy, '#f43f5e', 20);
                         fishes = fishes.filter(fish => fish !== caughtFish);
                         const freeBand = getAvailableYBand(fishes);
-                        fishes.push(new Fish(caughtFish.fraction, false, 'side', false, freeBand, null, caughtFish.optionGroup || 1));
+                        fishes.push(new Fish(caughtFish.fraction, false, 'side', false, freeBand, null, null, getRandomFishColor()));
                         
                         hook.caughtFish = null;
                         hook.state = 'idle';
@@ -2374,7 +2419,7 @@
                 const freeBand = getAvailableYBand(fishes);
                 const incorrectList = mathData.optionsPool.filter(p => !p.isCorrect);
                 const randIncorrect = incorrectList.length > 0 ? incorrectList[Math.floor(Math.random() * incorrectList.length)] : { n: 1, d: 5 };
-                fishes.push(new Fish(randIncorrect, false, 'side', false, freeBand, null, 2));
+                fishes.push(new Fish(randIncorrect, false, 'side', false, freeBand, null, null, getRandomFishColor()));
 
                 hook.caughtFish = null;
                 hook.state = 'idle';
@@ -2756,11 +2801,14 @@
             particles = [];
             floatingTexts = [];
 
-            // 重置關卡 3 狀態
+            // 重置關卡 3 狀態與歷史題目防重複記錄
             level3Stage = 1;
             level3ConvertedGroup = 0;
             mathData = null;
             nextMathData = null;
+            MathGenerator.recentExpansionKeys = [];
+            MathGenerator.recentReductionKeys = [];
+            MathGenerator.recentCommonDenominatorKeys = [];
             
             // 介面初始化
             hudScore.innerText = '000';
