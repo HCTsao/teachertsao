@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>相等的比賽車 - 瑪利歐賽車競速學數學</title>
+    <title>相等的比賽車 - 3D 競速數學遊戲</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts -->
@@ -326,7 +326,7 @@
                     </div>
                 </div>
 
-                <!-- HUD 右上：瑪利歐賽車完整賽道地圖 -->
+                <!-- HUD 右上：3D 完整賽道地圖 -->
                 <div id="hud-minimap-container" class="absolute top-2.5 right-2.5 bg-slate-950/85 border border-slate-700/80 rounded-2xl p-2 shadow-2xl backdrop-blur z-20 flex flex-col items-center">
                     <div class="flex items-center justify-between w-full text-[10px] font-racing font-bold text-slate-300 mb-1 px-1 gap-2">
                         <span id="hud-lap-badge" class="text-amber-400 font-extrabold flex items-center gap-1">
@@ -522,35 +522,41 @@
             <!-- ============================================== -->
             <!-- 賽道下方：觸控方向鍵與道具快捷面板 -->
             <!-- ============================================== -->
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-xl flex flex-wrap items-center justify-between gap-3">
+            <div class="bg-slate-900/95 border border-slate-800 rounded-3xl p-3 sm:p-4 shadow-2xl flex items-center justify-between gap-3 select-none touch-none">
+                <!-- 左側：全方位圓形操控搖桿 (控制左右、加速、煞車) -->
                 <div class="flex items-center gap-3">
-                    <span class="text-2xl">🎮</span>
-                    <div>
-                        <div class="text-xs text-slate-300 font-bold">賽車駕駛控制指南</div>
-                        <div class="text-[11px] text-slate-400">
-                            按鍵盤方向鍵 <kbd class="px-1.5 py-0.5 bg-slate-800 border rounded text-white">←</kbd> <kbd class="px-1.5 py-0.5 bg-slate-800 border rounded text-white">→</kbd> 進行大範圍甩尾轉向避開對手，<kbd class="px-1.5 py-0.5 bg-slate-800 border rounded text-white">↑</kbd> 加速，<kbd class="px-1.5 py-0.5 bg-slate-800 border rounded text-white">↓</kbd> 煞車；按 <kbd class="px-2 py-0.5 bg-slate-800 border rounded text-yellow-300 font-bold">Space 空白鍵</kbd> 發射道具！
+                    <div id="joystick-base" class="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-slate-950/90 border-2 border-slate-700/80 shadow-[inset_0_4px_14px_rgba(0,0,0,0.85)] flex items-center justify-center touch-none select-none cursor-pointer group">
+                        <!-- 方向標記 -->
+                        <span class="absolute top-1.5 text-[10px] font-black text-emerald-400 font-racing pointer-events-none tracking-wider">▲ 加速</span>
+                        <span class="absolute bottom-1.5 text-[10px] font-black text-amber-400 font-racing pointer-events-none tracking-wider">▼ 煞車</span>
+                        <span class="absolute left-2 text-xs font-black text-blue-400 pointer-events-none">◀</span>
+                        <span class="absolute right-2 text-xs font-black text-blue-400 pointer-events-none">▶</span>
+                        <div class="absolute inset-2 rounded-full border border-dashed border-slate-600/30 pointer-events-none"></div>
+
+                        <!-- 搖桿中心可拖曳旋鈕 -->
+                        <div id="joystick-knob" class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-b from-slate-600 via-slate-700 to-slate-900 border-2 border-slate-400/90 shadow-[0_4px_12px_rgba(0,0,0,0.7)] flex items-center justify-center text-slate-100 text-base font-black transition-transform duration-75 pointer-events-none">
+                            🕹️
                         </div>
+                    </div>
+                    <div class="hidden sm:flex flex-col text-xs text-slate-400 leading-relaxed">
+                        <span class="font-bold text-slate-200">全方位圓形搖桿</span>
+                        <span>推上：加速 ⚡ / 推下：煞車 🛑</span>
+                        <span>推左右：循跡過彎 🏎️</span>
                     </div>
                 </div>
 
-                <!-- 螢幕虛擬按鈕組 -->
-                <div class="flex items-center gap-2">
-                    <button id="vbtn-left" class="ctrl-btn w-11 h-11 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-blue-600 text-lg font-bold border border-slate-700 flex items-center justify-center text-white shadow cursor-pointer">
-                        ◀
-                    </button>
-                    <div class="flex flex-col gap-1">
-                        <button id="vbtn-up" class="ctrl-btn w-12 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-emerald-600 text-xs font-bold border border-slate-700 flex items-center justify-center text-emerald-300 shadow cursor-pointer">
-                            ▲ 加速
-                        </button>
-                        <button id="vbtn-down" class="ctrl-btn w-12 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-amber-600 text-xs font-bold border border-slate-700 flex items-center justify-center text-amber-300 shadow cursor-pointer">
-                            ▼ 煞車
-                        </button>
-                    </div>
-                    <button id="vbtn-right" class="ctrl-btn w-11 h-11 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-blue-600 text-lg font-bold border border-slate-700 flex items-center justify-center text-white shadow cursor-pointer">
-                        ▶
-                    </button>
-                    <button id="vbtn-space" class="ctrl-btn px-3 h-11 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-500 hover:from-amber-500 hover:to-yellow-400 active:scale-95 text-xs font-bold border border-amber-400 text-white shadow flex items-center gap-1 cursor-pointer">
-                        <span>🚀 發射道具</span>
+                <!-- 中間：桌機鍵盤提示 (在手機版自動隱藏，維持最簡潔一排) -->
+                <div class="hidden lg:flex flex-col items-center text-center text-[11px] text-slate-400">
+                    <div class="text-xs text-slate-300 font-bold mb-0.5">鍵盤 / 搖桿 雙模操作</div>
+                    <div>方向鍵 <kbd class="px-1.5 py-0.5 bg-slate-800 border rounded text-white text-[10px]">←</kbd> <kbd class="px-1.5 py-0.5 bg-slate-800 border rounded text-white text-[10px]">→</kbd> 轉彎 / <kbd class="px-1.5 py-0.5 bg-slate-800 border rounded text-white text-[10px]">↑</kbd> 加速 / <kbd class="px-1.5 py-0.5 bg-slate-800 border rounded text-white text-[10px]">↓</kbd> 煞車</div>
+                </div>
+
+                <!-- 右側：發射道具單一按鈕 -->
+                <div class="flex items-center">
+                    <button id="vbtn-space" class="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-tr from-amber-600 via-orange-500 to-yellow-400 hover:from-amber-500 hover:to-yellow-300 active:scale-90 border-2 border-yellow-300/80 shadow-[0_0_22px_rgba(245,158,11,0.55)] flex flex-col items-center justify-center text-white cursor-pointer transition select-none touch-none">
+                        <span class="text-2xl sm:text-3xl">🚀</span>
+                        <span class="text-xs sm:text-sm font-black font-racing tracking-wide drop-shadow">發射道具</span>
+                        <span class="hidden sm:inline text-[9px] text-yellow-100 opacity-90 font-mono mt-0.5">(Space)</span>
                     </button>
                 </div>
             </div>
@@ -1970,15 +1976,35 @@
             // 遠景山脈伴隨過彎進行真實視差平移
             bgScrollOffset = (bgScrollOffset + carCurvature * playerMps * dt * 0.4) % 1000;
 
-            // AI 競賽物理 (平穩平滑轉向，絕無突發劇烈橫移，與我方物理完全相同)
+            // AI 競賽物理 (強度隨模式難度大幅提升，具備極限衝刺與橡皮筋追擊，絕不輕易讓玩家得第一！)
             State.opponents.forEach((ai) => {
                 if (ai.spinTimer > 0) {
                     ai.spinTimer -= dt;
                     ai.speed = Math.max(50, ai.speed - 150 * dt);
                 } else {
-                    const baseAiSpeed = State.currentMode === '150cc' ? 400 : (State.currentMode === '100cc' ? 320 : 255);
-                    ai.targetSpeed = baseAiSpeed + Math.sin(timestampSec() + ai.id * 2) * 20;
-                    ai.speed += (ai.targetSpeed - ai.speed) * dt * 4.0;
+                    let baseAiSpeed = 270;
+                    let draftingBoost = 0;
+                    if (State.currentMode === '150cc') {
+                        // 150cc 專家級：冠軍級神車手 (445~495 km/h，單純踩油門無法獲勝，必須解題施放道具與連續COMBO)
+                        baseAiSpeed = 435 + ai.id * 20;
+                    } else if (State.currentMode === '100cc') {
+                        // 100cc 中級：強烈競爭對手 (375~408 km/h)
+                        baseAiSpeed = 360 + ai.id * 16;
+                    } else {
+                        // 50cc 初級：平穩競爭 (270~312 km/h)
+                        baseAiSpeed = 270 + ai.id * 14;
+                    }
+
+                    // 橡皮筋動態競速系統 (Rubber Banding)：
+                    // 當玩家領先時，對手利用吸尾流 (Drafting) 強勢逼近，帶來無比緊湊的冠軍爭奪感
+                    const distBehind = p.distance - ai.distance;
+                    if (distBehind > 25) {
+                        const catchupRate = State.currentMode === '150cc' ? 45 : (State.currentMode === '100cc' ? 30 : 15);
+                        draftingBoost = Math.min(catchupRate, (distBehind - 25) * 0.35);
+                    }
+
+                    ai.targetSpeed = baseAiSpeed + draftingBoost + Math.sin(timestampSec() * 2.5 + ai.id * 2) * 12;
+                    ai.speed += (ai.targetSpeed - ai.speed) * dt * (State.currentMode === '150cc' ? 5.5 : 4.0);
                 }
                 if (ai.bumpCooldown > 0) ai.bumpCooldown -= dt;
 
@@ -2066,6 +2092,8 @@
 
             updateHudSpeed(p.speed, Input.up && !State.isQuizModalOpen, Input.down && !State.isQuizModalOpen);
             updateParticles(dt);
+            const isBoosting = p.boostTimer > 0 || State.dashTimer > 0 || State.isStarActive;
+            WindEffect.update(dt, p.speed, Input.up && !State.isQuizModalOpen, isBoosting);
 
             if (p.distance >= State.finishDistance && !State.isRaceFinished) {
                 finishRace(true);
@@ -2184,17 +2212,19 @@
             }
         }
 
-        // 【需求 5】：賽道加速跳板檢測 (Boost Pads)
+        // 【需求 5】：賽道加速跳板檢測 (Boost Pads - 隨機分佈於左道、中道、右道，無額外音效僅觸發引擎高轉速)
         function updateBoostPads(dt) {
             const p = State.player;
-        // 維護賽道加速帶 (每 650 米左右於直道處出現)
+            // 維護賽道加速帶 (每 650 米左右於直道處隨機出現在左邊、中間或右邊)
             while (State.boostPads.length < 3) {
                 const lastDist = State.boostPads.length > 0
                     ? State.boostPads[State.boostPads.length - 1].distance
                     : p.distance + 250;
+                const lanes = [-0.55, -0.35, 0.0, 0.35, 0.55];
+                const randomX = lanes[Math.floor(Math.random() * lanes.length)];
                 State.boostPads.push({
                     distance: lastDist + 650,
-                    x: (Math.random() * 0.6 - 0.3) // 在中間車道
+                    x: randomX
                 });
             }
 
@@ -2204,11 +2234,11 @@
                     State.boostPads.splice(i, 1);
                     continue;
                 }
-                if (Math.abs(pad.distance - p.distance) < 5.0 && Math.abs(pad.x - p.x) < 0.3) {
-                    Sound.boostPadSound();
-                    p.boostTimer = 2.2;
+                if (Math.abs(pad.distance - p.distance) < 5.0 && Math.abs(pad.x - p.x) < 0.32) {
+                    // 通過加速帶不播放額外音效，純粹以極限推速讓引擎聲浪瞬間咆哮拉升
+                    p.boostTimer = 2.4;
                     p.targetSpeed = 450;
-                    triggerFloatingAlert('⚡ BOOST PAD! 加速帶噴射！');
+                    triggerFloatingAlert('⚡ BOOST PAD! 極速噴射！');
                 }
             }
         }
@@ -2339,10 +2369,9 @@
             const playerY = h * 0.82;
             const p = State.player;
 
-            // 【需求 1 & 3】：高速微震 + G-Force 視角動態傾斜 (轉彎與甩尾時全畫面微幅傾側 1.5° ~ 2° 模擬競速重力感)
-            const speedShake = p.speed > 170 ? (Math.random() - 0.5) * Math.min(3.5, (p.speed - 170) / 45) : 0;
+            // 攝影機視角動態旋轉 (過彎時畫面平滑傾側，平穩流暢，加速絕無畫面震動抖動)
             ctx.save();
-            ctx.translate(w * 0.5 + speedShake, horizonY + speedShake * 0.5);
+            ctx.translate(w * 0.5, horizonY);
             ctx.rotate(p.cameraRoll || 0);
             ctx.translate(-w * 0.5, -horizonY);
 
@@ -2510,10 +2539,9 @@
             // 10. 【需求 3 & 4】：繪製自車 (具備車身傾斜、懸吊俯仰、排氣火焰、煞車燈)
             renderPlayerCar(w, h);
 
-            // 【需求 3】：踩油門或高速飛馳時之兩側動態速度線風線特效
-            if (Input.up || p.speed > 135 || State.dashTimer > 0) {
-                renderSpeedLines(w, h, p.speed);
-            }
+            // 迎面撲來之真實弧形氣流風效 (曲線氣流，迎向玩家面孔吹拂)
+            const isBoosting = p.boostTimer > 0 || State.dashTimer > 0 || State.isStarActive;
+            WindEffect.render(w, h, horizonY, p.speed, Input.up && !State.isQuizModalOpen, isBoosting);
 
             renderParticles();
         }
@@ -3065,22 +3093,143 @@
             ctx.restore();
         }
 
-        // 【需求 4】：兩側動態速度風線 (隨油門與時速加乘，密集度與流速再提升 50%)
-        function renderSpeedLines(w, h, speed = 200) {
-            const count = Math.min(36, Math.floor(10 + (speed / 300) * 26));
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
-            ctx.lineWidth = 2.2;
-            for (let i = 0; i < count; i++) {
-                const isLeft = Math.random() < 0.5;
-                const sx = isLeft ? Math.random() * (w * 0.24) : w - Math.random() * (w * 0.24);
-                const sy = h * 0.32 + Math.random() * (h * 0.68);
-                const len = 50 + Math.random() * 120;
-                ctx.beginPath();
-                ctx.moveTo(sx, sy);
-                ctx.lineTo(sx + (isLeft ? -18 : 18), sy + len);
-                ctx.stroke();
+        // -------------------------------------------------------------
+        // 迎面撲來之真實弧形氣流風效系統 (Curved Wind Streamlines)
+        // 迎向玩家面孔吹拂，具有優美流線弧度與非線性透視展開感
+        // -------------------------------------------------------------
+        const WindEffect = {
+            streaks: [],
+            maxStreaks: 48,
+
+            init() {
+                this.streaks = [];
+                for (let i = 0; i < this.maxStreaks; i++) {
+                    this.streaks.push(this.createStreak(Math.random()));
+                }
+            },
+
+            createStreak(initialZ = 0) {
+                const side = Math.random() < 0.5 ? -1 : 1;
+                // 分布在兩側與上方 (角度 0 為右側，PI 為左側，-PI/2 為上方)
+                const baseAngle = side > 0
+                    ? (Math.random() * 1.6 - 0.8) // 右側與右上方
+                    : (Math.PI + Math.random() * 1.6 - 0.8); // 左側與左上方
+
+                return {
+                    angle: baseAngle,
+                    z: initialZ, // 0 (遠處地平線消失點) -> 1.25 (迎面吹拂至玩家眼前掠過)
+                    speed: 0.75 + Math.random() * 0.75,
+                    length: 0.18 + Math.random() * 0.16,
+                    // 依左右側自然外彎的弧形氣流 (曲線風效)
+                    curl: (0.45 + Math.random() * 0.45) * (Math.random() < 0.5 ? 1 : -1),
+                    thickness: 1.5 + Math.random() * 2.2,
+                    colorType: Math.random() < 0.4 ? 'cyan' : 'white'
+                };
+            },
+
+            update(dt, speed, isThrottling, isBoosting) {
+                if (this.streaks.length === 0) this.init();
+
+                let speedFactor = 1.0;
+                if (isBoosting) speedFactor = 2.5;
+                else if (isThrottling) speedFactor = 1.9;
+                else speedFactor = Math.max(0.6, speed / 220);
+
+                const zAdvance = dt * speedFactor * 1.7;
+
+                for (let i = 0; i < this.streaks.length; i++) {
+                    const st = this.streaks[i];
+                    st.z += zAdvance * st.speed;
+                    if (st.z > 1.25) {
+                        Object.assign(st, this.createStreak(0.02 + Math.random() * 0.08));
+                    }
+                }
+            },
+
+            render(w, h, horizonY, speed, isThrottling, isBoosting) {
+                if (speed < 60 && !isThrottling && !isBoosting) return;
+
+                const cx = w * 0.5;
+                const cy = horizonY + 15;
+                const maxRadius = Math.max(w, h) * 0.82;
+
+                let activeCount = Math.floor(16 + (speed / 480) * 22);
+                if (isThrottling) activeCount += 10;
+                if (isBoosting) activeCount = this.maxStreaks;
+                activeCount = Math.min(this.maxStreaks, activeCount);
+
+                ctx.save();
+                ctx.lineCap = 'round';
+
+                for (let i = 0; i < activeCount; i++) {
+                    const st = this.streaks[i];
+                    const zHead = st.z;
+                    const zTail = Math.max(0.01, zHead - st.length);
+
+                    // 透視展開：迎面非線性加速放大 (z^1.85)
+                    const rHead = maxRadius * Math.pow(zHead, 1.85);
+                    const rTail = maxRadius * Math.pow(zTail, 1.85);
+
+                    // 弧形氣流：隨距離自然外彎彎曲 (氣流沿著弧度往玩家臉龐外掠過)
+                    const angleHead = st.angle + st.curl * Math.pow(zHead, 1.2);
+                    const angleTail = st.angle + st.curl * Math.pow(zTail, 1.2);
+
+                    // Bézier 曲線控制點
+                    const zMid = (zHead + zTail) * 0.5;
+                    const rMid = maxRadius * Math.pow(zMid, 1.85);
+                    const angleMid = st.angle + st.curl * Math.pow(zMid, 1.2) + st.curl * 0.18;
+
+                    const hX = cx + Math.cos(angleHead) * rHead;
+                    const hY = cy + Math.sin(angleHead) * (rHead * 0.68);
+
+                    const tX = cx + Math.cos(angleTail) * rTail;
+                    const tY = cy + Math.sin(angleTail) * (rTail * 0.68);
+
+                    const cpX = cx + Math.cos(angleMid) * rMid;
+                    const cpY = cy + Math.sin(angleMid) * (rMid * 0.68);
+
+                    // 透明度計算
+                    let alpha = 0;
+                    if (zHead < 0.2) {
+                        alpha = (zHead / 0.2) * 0.45;
+                    } else if (zHead <= 0.95) {
+                        alpha = 0.5 + (zHead - 0.2) * 0.35;
+                    } else {
+                        alpha = Math.max(0, 0.85 * (1.25 - zHead) / 0.3);
+                    }
+
+                    if (isThrottling || isBoosting) {
+                        alpha = Math.min(0.95, alpha * 1.35);
+                    }
+
+                    const lineWidth = st.thickness * (0.8 + zHead * 2.4);
+
+                    try {
+                        const grad = ctx.createLinearGradient(tX, tY, hX, hY);
+                        if (st.colorType === 'cyan' || isBoosting) {
+                            grad.addColorStop(0, 'rgba(186, 230, 253, 0)');
+                            grad.addColorStop(0.4, `rgba(186, 230, 253, ${alpha * 0.55})`);
+                            grad.addColorStop(1, `rgba(240, 249, 255, ${alpha})`);
+                        } else {
+                            grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+                            grad.addColorStop(0.4, `rgba(241, 245, 249, ${alpha * 0.5})`);
+                            grad.addColorStop(1, `rgba(255, 255, 255, ${alpha * 0.9})`);
+                        }
+                        ctx.strokeStyle = grad;
+                    } catch (e) {
+                        ctx.strokeStyle = `rgba(224, 242, 254, ${alpha})`;
+                    }
+
+                    ctx.lineWidth = lineWidth;
+                    ctx.beginPath();
+                    ctx.moveTo(tX, tY);
+                    ctx.quadraticCurveTo(cpX, cpY, hX, hY);
+                    ctx.stroke();
+                }
+
+                ctx.restore();
             }
-        }
+        };
 
         function addParticle(x, y, type) {
             particles.push({
@@ -3129,7 +3278,7 @@
         }
 
         // -------------------------------------------------------------
-        // 5. 瑪利歐賽車完整賽道俯瞰地圖 (Circuit Minimap)
+        // 5. 賽車完整賽道俯瞰地圖 (Circuit Minimap)
         // -------------------------------------------------------------
         let trackPathElement = null;
         let trackTotalLength = 0;
@@ -3271,7 +3420,7 @@
         }
 
         // -------------------------------------------------------------
-        // 6. 瑪利歐賽車道具與真實彈道發射系統
+        // 6. 競速道具與真實彈道發射系統
         // -------------------------------------------------------------
         const Items = {
             banana: {
@@ -3750,32 +3899,155 @@
                 }
             });
 
-            // 觸控虛擬按鍵
-            const vLeft = document.getElementById('vbtn-left');
-            const vRight = document.getElementById('vbtn-right');
-            const vUp = document.getElementById('vbtn-up');
-            const vDown = document.getElementById('vbtn-down');
+            // ---------------------------------------------------------
+            // 全方位圓形虛擬搖桿 (控制左右轉向、加速、煞車)
+            // ---------------------------------------------------------
+            const joystickBase = document.getElementById('joystick-base');
+            const joystickKnob = document.getElementById('joystick-knob');
+            let activeJoyTouchId = null;
+            let joyCenter = { x: 0, y: 0 };
+            const joyMaxRadius = 42; // 搖桿最大位移半徑
+
+            function updateJoystickCenter() {
+                if (!joystickBase) return;
+                const rect = joystickBase.getBoundingClientRect();
+                joyCenter = {
+                    x: rect.left + rect.width / 2,
+                    y: rect.top + rect.height / 2
+                };
+            }
+
+            function handleJoyMove(clientX, clientY) {
+                const dx = clientX - joyCenter.x;
+                const dy = clientY - joyCenter.y;
+                const dist = Math.hypot(dx, dy);
+
+                const clampedDist = Math.min(joyMaxRadius, dist);
+                const angle = Math.atan2(dy, dx);
+
+                const clampedX = Math.cos(angle) * clampedDist;
+                const clampedY = Math.sin(angle) * clampedDist;
+
+                if (joystickKnob) {
+                    joystickKnob.style.transform = `translate(${clampedX}px, ${clampedY}px)`;
+                }
+
+                // 計算正規化向量 (-1.0 ~ 1.0)
+                const normX = clampedX / joyMaxRadius;
+                const normY = clampedY / joyMaxRadius;
+
+                // 左右轉向 (Deadzone: 0.18)
+                if (normX < -0.18) {
+                    Input.left = true;
+                    Input.right = false;
+                } else if (normX > 0.18) {
+                    Input.right = true;
+                    Input.left = false;
+                } else {
+                    Input.left = false;
+                    Input.right = false;
+                }
+
+                // 加速與煞車 (Deadzone: 0.18)
+                if (normY < -0.18) {
+                    Input.up = true; // 向上推 = 加速
+                    Input.down = false;
+                } else if (normY > 0.18) {
+                    Input.down = true; // 向下推 = 煞車
+                    Input.up = false;
+                } else {
+                    Input.up = false;
+                    Input.down = false;
+                }
+            }
+
+            function resetJoystick() {
+                activeJoyTouchId = null;
+                if (joystickKnob) {
+                    joystickKnob.style.transform = 'translate(0px, 0px)';
+                }
+                Input.left = false;
+                Input.right = false;
+                Input.up = false;
+                Input.down = false;
+            }
+
+            if (joystickBase) {
+                // 觸控監聽 (支援多點觸控，左手推搖桿同時右手發射道具)
+                joystickBase.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    updateJoystickCenter();
+                    const touch = e.changedTouches[0];
+                    activeJoyTouchId = touch.identifier;
+                    handleJoyMove(touch.clientX, touch.clientY);
+                }, { passive: false });
+
+                window.addEventListener('touchmove', (e) => {
+                    if (activeJoyTouchId === null) return;
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        const t = e.changedTouches[i];
+                        if (t.identifier === activeJoyTouchId) {
+                            e.preventDefault();
+                            handleJoyMove(t.clientX, t.clientY);
+                            break;
+                        }
+                    }
+                }, { passive: false });
+
+                window.addEventListener('touchend', (e) => {
+                    if (activeJoyTouchId === null) return;
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        if (e.changedTouches[i].identifier === activeJoyTouchId) {
+                            resetJoystick();
+                            break;
+                        }
+                    }
+                });
+
+                window.addEventListener('touchcancel', (e) => {
+                    if (activeJoyTouchId === null) return;
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        if (e.changedTouches[i].identifier === activeJoyTouchId) {
+                            resetJoystick();
+                            break;
+                        }
+                    }
+                });
+
+                // 滑鼠拖曳支援 (桌機測試與除錯)
+                let isMouseDragging = false;
+                joystickBase.addEventListener('mousedown', (e) => {
+                    isMouseDragging = true;
+                    updateJoystickCenter();
+                    handleJoyMove(e.clientX, e.clientY);
+                });
+
+                window.addEventListener('mousemove', (e) => {
+                    if (!isMouseDragging) return;
+                    handleJoyMove(e.clientX, e.clientY);
+                });
+
+                window.addEventListener('mouseup', () => {
+                    if (isMouseDragging) {
+                        isMouseDragging = false;
+                        resetJoystick();
+                    }
+                });
+            }
+
+            // 發射道具按鈕 (多點觸控瞬間發射)
             const vSpace = document.getElementById('vbtn-space');
+            if (vSpace) {
+                vSpace.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    useCurrentItem();
+                }, { passive: false });
 
-            const bindButton = (btn, keyProp) => {
-                const press = (ev) => { ev.preventDefault(); Input[keyProp] = true; };
-                const release = (ev) => { ev.preventDefault(); Input[keyProp] = false; };
-                btn.addEventListener('mousedown', press);
-                btn.addEventListener('mouseup', release);
-                btn.addEventListener('mouseleave', release);
-                btn.addEventListener('touchstart', press, { passive: false });
-                btn.addEventListener('touchend', release, { passive: false });
-            };
-
-            bindButton(vLeft, 'left');
-            bindButton(vRight, 'right');
-            bindButton(vUp, 'up');
-            bindButton(vDown, 'down');
-
-            vSpace.addEventListener('click', (e) => {
-                e.preventDefault();
-                useCurrentItem();
-            });
+                vSpace.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    useCurrentItem();
+                });
+            }
 
             // 首次使用者互動時解鎖音效與背景配樂 (繞過瀏覽器 Autoplay 限制)
             const unlockAudio = () => {
@@ -3852,21 +4124,23 @@
                 wobbleTimer: 0
             };
 
+            // 對手依據難度設定初始領先距離與強度
+            const distMulti = State.currentMode === '150cc' ? 1.5 : (State.currentMode === '100cc' ? 1.25 : 1.0);
             State.opponents = [
-                { id: 1, color: '#10b981', distance: 100, speed: 0, targetSpeed: 255, x: 0.35, targetX: 0.35, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.5 },
-                { id: 2, color: '#3b82f6', distance: 220, speed: 0, targetSpeed: 280, x: -0.35, targetX: -0.35, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 4.5 },
-                { id: 3, color: '#eab308', distance: 360, speed: 0, targetSpeed: 305, x: 0.3, targetX: 0.3, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 5.5 }
+                { id: 1, color: '#10b981', distance: Math.round(110 * distMulti), speed: 0, targetSpeed: 280, x: 0.35, targetX: 0.35, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.5 },
+                { id: 2, color: '#3b82f6', distance: Math.round(240 * distMulti), speed: 0, targetSpeed: 320, x: -0.35, targetX: -0.35, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 4.5 },
+                { id: 3, color: '#eab308', distance: Math.round(400 * distMulti), speed: 0, targetSpeed: 380, x: 0.3, targetX: 0.3, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 5.5 }
             ];
 
             // 【需求 2】：跑道上一排 5 個立體旋轉問號寶箱初始重置 (8 秒後出現第一排)
             State.itemBoxRows = [];
             State.boxRowSpawnTimer = 8.0;
 
-            // 【需求 5】：賽道加速跳板初始排位 (分布於各直道區段)
+            // 【需求 5】：賽道加速跳板初始排位 (隨機分布於左道與右道)
             State.boostPads = [
-                { distance: 420, x: 0.0 },   // 起跑大直道衝刺板
-                { distance: 1650, x: -0.2 }, // S2 後直道加速板
-                { distance: 2950, x: 0.2 }   // S3 終點前大直道加速板
+                { distance: 420, x: -0.5 },   // 起跑大直道 左側衝刺板
+                { distance: 1650, x: 0.5 },   // S2 後直道 右側加速板
+                { distance: 2950, x: -0.4 }   // S3 終點前大直道 左側加速板
             ];
 
             // 初始化真實賽車賽道景物與彎道導向指示板 (Chevron Signs & Markers)
