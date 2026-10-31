@@ -35,16 +35,28 @@
             font-family: 'Fredoka', 'Noto Sans TC', sans-serif;
         }
 
-        /* 擬真賽道 Canvas 容器 */
+        /* 擬真賽道 Canvas 容器：長度自適應調短，確保手機與平板下方按鈕與搖桿完整呈現 */
         #game-canvas-container {
             position: relative;
             width: 100%;
-            height: 440px;
+            height: 280px;
             background: #000;
             overflow: hidden;
             border-radius: 1.25rem;
             box-shadow: 0 10px 35px rgba(0, 0, 0, 0.7), inset 0 0 15px rgba(255, 255, 255, 0.1);
             transition: transform 0.05s ease-out;
+        }
+
+        @media (min-width: 640px) {
+            #game-canvas-container {
+                height: 320px;
+            }
+        }
+
+        @media (min-width: 1025px) {
+            #game-canvas-container {
+                height: 380px;
+            }
         }
 
         #game-canvas {
@@ -326,8 +338,8 @@
                     </div>
                 </div>
 
-                <!-- HUD 右上：3D 完整賽道地圖 -->
-                <div id="hud-minimap-container" class="absolute top-2.5 right-2.5 bg-slate-950/85 border border-slate-700/80 rounded-2xl p-2 shadow-2xl backdrop-blur z-20 flex flex-col items-center">
+                <!-- HUD 右上：3D 完整賽道地圖 (桌機顯示，手機/平板隱藏以保持純淨視野) -->
+                <div id="hud-minimap-container" class="absolute top-2.5 right-2.5 bg-slate-950/85 border border-slate-700/80 rounded-2xl p-2 shadow-2xl backdrop-blur z-20 flex-col items-center hidden lg:flex">
                     <div class="flex items-center justify-between w-full text-[10px] font-racing font-bold text-slate-300 mb-1 px-1 gap-2">
                         <span id="hud-lap-badge" class="text-amber-400 font-extrabold flex items-center gap-1">
                             <span>🏁</span> <span id="hud-lap-text">LAP 1/3</span>
@@ -362,10 +374,11 @@
                             <circle id="map-player" cx="63" cy="113" r="4.5" fill="#ef4444" stroke="#ffffff" stroke-width="1.5" />
                         </svg>
                     </div>
-                            <circle id="map-player-halo" cx="45" cy="100" r="6.5" fill="none" stroke="#ef4444" stroke-width="1.5" class="map-pulse" />
-                            <circle id="map-player" cx="45" cy="100" r="4.5" fill="#ef4444" stroke="#ffffff" stroke-width="1.5" />
-                        </svg>
-                    </div>
+                </div>
+
+                <!-- 手機與平板專用：右上輕量圈數標籤 (極簡設計，不佔畫面視野) -->
+                <div id="hud-mobile-lap-container" class="absolute top-2.5 right-2.5 px-3 py-1.5 rounded-xl bg-slate-900/85 border border-slate-700/80 text-amber-400 font-racing font-bold text-xs shadow-lg backdrop-blur z-20 flex items-center gap-1.5 lg:hidden">
+                    <span>🏁</span> <span id="hud-mobile-lap-text">LAP 1/3</span>
                 </div>
 
                 <!-- 連對3題加速衝刺5秒狀態光條 -->
@@ -382,13 +395,6 @@
                     <span>無敵星星發動！免碰撞傷害！</span>
                     <span id="hud-star-time" class="bg-black text-yellow-300 px-2 py-0.5 rounded-lg text-xs font-mono font-bold">3.0s</span>
                     <span>⭐</span>
-                </div>
-
-                <!-- 浮動文字彈窗 -->
-                <div id="hud-floating-alert" class="absolute inset-0 flex items-center justify-center pointer-events-none z-30 transition-all duration-300 opacity-0 scale-50">
-                    <div id="hud-floating-alert-text" class="px-6 py-2.5 rounded-2xl bg-red-600/90 border-2 border-yellow-300 text-yellow-200 font-racing font-black text-xl sm:text-2xl shadow-2xl drop-shadow-md text-center">
-                        OVERTAKE!
-                    </div>
                 </div>
 
                 <!-- 底部時速儀表看板 (左下) -->
@@ -408,27 +414,21 @@
                     </div>
                 </div>
 
-                <!-- 答對進度與3題衝刺能量槽 (右下) -->
+                <!-- 衝刺能量槽 (右下，已去除答對題數顯示) -->
                 <div class="absolute bottom-2.5 right-2.5 bg-slate-950/85 border border-slate-800 rounded-xl px-3 py-1.5 shadow-lg backdrop-blur z-10 text-right pointer-events-none">
-                    <div class="flex items-center justify-end gap-1.5 mb-0.5">
-                        <span class="text-[10px] text-slate-400 font-bold">衝刺能量:</span>
+                    <div class="flex items-center justify-end gap-1.5">
+                        <span class="text-[10px] text-slate-400 font-bold">⚡ 衝刺能量:</span>
                         <div class="flex gap-1.5">
                             <span id="dash-gauge-1" class="w-3.5 h-3.5 rounded-full bg-slate-700 border border-slate-600 transition-all"></span>
                             <span id="dash-gauge-2" class="w-3.5 h-3.5 rounded-full bg-slate-700 border border-slate-600 transition-all"></span>
                             <span id="dash-gauge-3" class="w-3.5 h-3.5 rounded-full bg-slate-700 border border-slate-600 transition-all"></span>
                         </div>
                     </div>
-                    <div class="text-xs sm:text-sm font-bold text-slate-200">
-                        已答對: <span id="hud-correct-count" class="text-yellow-400 font-racing font-bold text-base">0</span> / <span id="hud-target-count">8</span>
+                    <div class="text-[10px] text-amber-400 mt-0.5">
+                        連對3題衝刺5秒
                     </div>
-                    <div class="text-[10px] text-amber-400">
-                        🎁 撞擊跑道上的旋轉問號寶箱 | ⚡ 連對3題衝刺5秒
-                    </div>
-                </div>
-
-                <!-- 操作提示懸浮指示 (中下方) -->
-                <div id="hud-controls-hint" class="absolute bottom-3 left-1/2 -translate-x-1/2 bg-slate-900/80 border border-slate-700 rounded-full px-3 py-1 text-[11px] text-slate-300 font-bold backdrop-blur pointer-events-none hidden sm:block">
-                    🎮 方向鍵 <kbd class="px-1 bg-slate-800 rounded">←</kbd><kbd class="px-1 bg-slate-800 rounded">→</kbd> 大幅轉向 | <kbd class="px-1 bg-slate-800 rounded">↑</kbd> 加速 | <kbd class="px-1 bg-slate-800 rounded">↓</kbd> 煞車 | <kbd class="px-1.5 bg-slate-800 rounded">Space</kbd> 發射道具
+                    <span id="hud-correct-count" class="hidden">0</span>
+                    <span id="hud-target-count" class="hidden">8</span>
                 </div>
             </div>
 
@@ -3315,14 +3315,26 @@
             const totalPct = Math.min(100, Math.round((pDist / totalDistance) * 100));
 
             const lapBadgeText = document.getElementById('hud-lap-text');
+            const mobileLapText = document.getElementById('hud-mobile-lap-text');
+            let lapStr = '';
             if (currentLap === totalLaps) {
-                lapBadgeText.innerText = 'FINAL LAP! 🏆';
-                document.getElementById('hud-lap-badge').className = 'text-red-400 font-extrabold flex items-center gap-1 animate-pulse';
+                lapStr = 'FINAL LAP! 🏆';
+                if (lapBadgeText) {
+                    lapBadgeText.innerText = lapStr;
+                    const badgeEl = document.getElementById('hud-lap-badge');
+                    if (badgeEl) badgeEl.className = 'text-red-400 font-extrabold flex items-center gap-1 animate-pulse';
+                }
             } else {
-                lapBadgeText.innerText = `LAP ${currentLap}/${totalLaps}`;
-                document.getElementById('hud-lap-badge').className = 'text-amber-400 font-extrabold flex items-center gap-1';
+                lapStr = `LAP ${currentLap}/${totalLaps}`;
+                if (lapBadgeText) {
+                    lapBadgeText.innerText = lapStr;
+                    const badgeEl = document.getElementById('hud-lap-badge');
+                    if (badgeEl) badgeEl.className = 'text-amber-400 font-extrabold flex items-center gap-1';
+                }
             }
-            document.getElementById('hud-map-dist').innerText = `${totalPct}%`;
+            if (mobileLapText) mobileLapText.innerText = lapStr;
+            const mapDist = document.getElementById('hud-map-dist');
+            if (mapDist) mapDist.innerText = `${totalPct}%`;
 
             const playerLapProg = (pDist % lapDistance) / lapDistance;
             const ptPlayer = getCircuitPoint(playerLapProg);
@@ -3409,15 +3421,8 @@
         }
 
         function triggerFloatingAlert(msg) {
-            const el = document.getElementById('hud-floating-alert');
-            const txt = document.getElementById('hud-floating-alert-text');
-            txt.innerText = msg;
-            el.classList.remove('opacity-0', 'scale-50');
-            el.classList.add('opacity-100', 'scale-100');
-            setTimeout(() => {
-                el.classList.remove('opacity-100', 'scale-100');
-                el.classList.add('opacity-0', 'scale-50');
-            }, 1200);
+            // 依需求：全面關閉畫面中央的紅色賽車提示彈窗 (如超車啦、極速噴射等)
+            return;
         }
 
         function updateDashGaugeUI() {
@@ -4103,7 +4108,7 @@
             window.addEventListener('touchstart', updateDeviceControls, { once: true, passive: true });
         }
 
-        // 偵測裝置並動態切換操作台顯示
+        // 偵測裝置並動態切換操作台顯示與小地圖
         function updateDeviceControls() {
             const isTouch = ('ontouchstart' in window) ||
                             (navigator.maxTouchPoints > 0) ||
@@ -4111,6 +4116,9 @@
                             (window.innerWidth <= 1024);
             const mobilePanel = document.getElementById('mobile-controls-panel');
             const desktopPanel = document.getElementById('desktop-controls-guide');
+            const minimapContainer = document.getElementById('hud-minimap-container');
+            const mobileLapContainer = document.getElementById('hud-mobile-lap-container');
+
             if (mobilePanel && desktopPanel) {
                 if (isTouch) {
                     mobilePanel.classList.remove('hidden');
@@ -4118,6 +4126,16 @@
                 } else {
                     mobilePanel.classList.add('hidden');
                     desktopPanel.classList.remove('hidden');
+                }
+            }
+
+            if (minimapContainer && mobileLapContainer) {
+                if (isTouch) {
+                    minimapContainer.classList.add('hidden');
+                    mobileLapContainer.classList.remove('hidden');
+                } else {
+                    minimapContainer.classList.remove('hidden');
+                    mobileLapContainer.classList.add('hidden');
                 }
             }
         }
