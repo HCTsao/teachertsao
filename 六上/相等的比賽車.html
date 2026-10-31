@@ -232,8 +232,8 @@
                 <button id="btn-sound" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs sm:text-sm font-medium text-slate-200 border border-slate-700 transition flex items-center gap-1 shadow cursor-pointer">
                     <span id="sound-icon">🔊</span> <span id="sound-text">音效: 開</span>
                 </button>
-                <button id="btn-restart" class="px-3 py-1.5 rounded-xl bg-red-900/40 hover:bg-red-800/60 text-xs sm:text-sm font-medium text-red-200 border border-red-700/50 transition flex items-center gap-1 shadow cursor-pointer">
-                    <span>🔄</span> 重新挑戰
+                <button id="btn-restart" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs sm:text-sm font-medium text-slate-200 border border-slate-700 transition flex items-center gap-1 shadow cursor-pointer" title="返回主選單重新選擇難度">
+                    <span>🏠</span> 回主選單
                 </button>
             </div>
         </header>
@@ -580,7 +580,7 @@
                 </div>
                 <div class="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 shadow">
                     <div class="text-xs text-slate-400 font-bold">最高車速紀錄</div>
-                    <div id="result-top-speed" class="text-2xl font-racing font-black text-red-400 mt-1">220 km/h</div>
+                    <div id="result-top-speed" class="text-2xl font-racing font-black text-red-400 mt-1">0 km/h</div>
                 </div>
                 <div class="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 shadow">
                     <div class="text-xs text-slate-400 font-bold">獲得道具數</div>
@@ -600,7 +600,7 @@
 
             <div class="flex flex-wrap items-center justify-center gap-4">
                 <button id="btn-play-again" class="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-red-600 to-yellow-500 hover:from-red-500 hover:to-yellow-400 text-white font-racing font-bold text-lg shadow-xl shadow-red-600/30 transform transition hover:-translate-y-0.5 active:translate-y-0.5 flex items-center gap-2 cursor-pointer">
-                    <span>🏁 再戰一場 (Play Again)</span>
+                    <span>🏠 回主選單 (重新選擇難度)</span>
                 </button>
                 <button id="btn-review-questions" class="px-6 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm border border-slate-700 transition flex items-center gap-1.5 shadow cursor-pointer">
                     <span>📝 查看完整題目覆盤</span>
@@ -1528,7 +1528,7 @@
             dashTimer: 0,
             streak: 0,
             maxStreak: 0,
-            topSpeed: 60,
+            topSpeed: 0,
             itemsUsedCount: 0,
             historyLog: [],
 
@@ -3377,14 +3377,19 @@
             badge.className = `px-3 py-1.5 rounded-xl bg-slate-900/90 border-2 ${rankData.color} font-racing font-black text-base sm:text-lg flex items-center gap-1.5 shadow-lg backdrop-blur`;
         }
 
+        function toDisplaySpeed(speed) {
+            if (!speed || speed <= 0) return 0;
+            return Math.min(300, Math.round(speed * (300 / 520)));
+        }
+
         function updateHudSpeed(speed, isThrottling = false, isBraking = false) {
             const spdEl = document.getElementById('hud-speed');
             const barEl = document.getElementById('hud-speed-bar');
             const throttleTag = document.getElementById('hud-throttle-tag');
-            const displaySpeed = Math.round(speed);
+            const displaySpeed = toDisplaySpeed(speed);
             spdEl.innerText = displaySpeed.toString().padStart(3, '0');
 
-            const pct = Math.min(100, Math.max(5, (speed / 520) * 100));
+            const pct = Math.min(100, Math.max(5, (displaySpeed / 300) * 100));
             barEl.style.width = `${pct}%`;
 
             if (throttleTag) {
@@ -3759,7 +3764,7 @@
 
             const accuracy = State.totalAnswered > 0 ? Math.round((State.totalCorrect / State.totalAnswered) * 100) : 0;
             document.getElementById('result-accuracy').innerText = `${accuracy}%`;
-            document.getElementById('result-top-speed').innerText = `${State.topSpeed} km/h`;
+            document.getElementById('result-top-speed').innerText = `${toDisplaySpeed(State.topSpeed)} km/h`;
             document.getElementById('result-items-used').innerText = `${State.itemsUsedCount} 次`;
 
             const reviewEl = document.getElementById('result-pedagogy-review');
@@ -3864,13 +3869,17 @@
             });
 
             document.getElementById('btn-restart').addEventListener('click', () => {
-                if (confirm('確定要重新開始比賽嗎？')) {
-                    startNewRace();
+                if (State.currentScreen === 'race' && !State.isRaceFinished) {
+                    if (confirm('確定要返回主選單重新選擇難度嗎？')) {
+                        goToMainMenu();
+                    }
+                } else {
+                    goToMainMenu();
                 }
             });
 
             document.getElementById('btn-play-again').addEventListener('click', () => {
-                startNewRace();
+                goToMainMenu();
             });
 
             document.getElementById('btn-review-questions').addEventListener('click', () => {
@@ -4113,6 +4122,39 @@
             }
         }
 
+        // 返回主選單 (重新選擇難度)
+        function goToMainMenu() {
+            State.currentScreen = 'start';
+            State.isRaceFinished = true;
+            State.isCountingDown = false;
+            State.isQuizModalOpen = false;
+
+            if (State.autoResumeTimeout) {
+                clearTimeout(State.autoResumeTimeout);
+                State.autoResumeTimeout = null;
+            }
+
+            Sound.silenceEngine();
+            Sound.pauseBGM();
+
+            document.getElementById('modal-quiz').classList.add('hidden');
+            document.getElementById('screen-race').classList.add('hidden');
+            document.getElementById('screen-result').classList.add('hidden');
+            document.getElementById('screen-start').classList.remove('hidden');
+
+            // 同步難度按鈕選取狀態
+            const modeBtns = document.querySelectorAll('.mode-select-btn');
+            modeBtns.forEach(btn => {
+                if (btn.dataset.mode === State.currentMode) {
+                    btn.classList.add('active', 'border-emerald-500', 'bg-emerald-950/40');
+                    btn.classList.remove('border-slate-700', 'bg-slate-800/40');
+                } else {
+                    btn.classList.remove('active', 'border-emerald-500', 'bg-emerald-950/40');
+                    btn.classList.add('border-slate-700', 'bg-slate-800/40');
+                }
+            });
+        }
+
         // 開始新賽事
         function startNewRace() {
             State.currentScreen = 'race';
@@ -4123,7 +4165,7 @@
             State.dashTimer = 0;
             State.streak = 0;
             State.maxStreak = 0;
-            State.topSpeed = 60;
+            State.topSpeed = 0;
             State.itemsUsedCount = 0;
             State.historyLog = [];
             State.inventory = null;
