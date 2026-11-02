@@ -541,7 +541,7 @@
                             <div>
                                 <div class="flex items-center gap-2">
                                     <h3 class="text-lg sm:text-xl font-bold font-racing text-amber-300">寶箱開啟！數學挑戰</h3>
-                                    <span id="quiz-modal-category-tag" class="px-2 py-0.5 rounded-full bg-blue-900/60 border border-blue-600/40 text-blue-300 text-[10px]">最簡整數比</span>
+                                    <span id="quiz-modal-category-tag" class="px-2 py-0.5 rounded-full bg-blue-900/60 border border-blue-600/40 text-blue-300 text-[10px] hidden">最簡整數比</span>
                                 </div>
                                 <div id="quiz-timer-badge" class="px-3 py-1 rounded-xl bg-slate-800 border border-amber-500/50 flex items-center gap-1.5 font-racing font-bold text-amber-300 text-sm shadow ml-auto">
                                     <span>⏱️</span> <span id="quiz-timer-text">90s</span>
@@ -2546,8 +2546,9 @@
             // 遠景山脈伴隨過彎進行真實視差平移
             bgScrollOffset = (bgScrollOffset + carCurvature * playerMps * dt * 0.4) % 1000;
 
-            // AI 競賽物理 (強化對手強度，具備極限衝刺、超車企圖心與主動尋找加速帶功能！)
-            State.opponents.forEach((ai) => {
+            if (!State.isMultiplayer) {
+                // 單人模式：AI 競賽物理 (強化對手強度，具備極限衝刺、超車企圖心與主動尋找加速帶功能！)
+                State.opponents.forEach((ai) => {
                 if (ai.spinTimer > 0) {
                     ai.spinTimer -= dt;
                     ai.speed = Math.max(50, ai.speed - 150 * dt);
@@ -2661,27 +2662,41 @@
                 ai.distance += aiMps * dt;
             });
 
-            // 碰撞檢測
-            if (!State.isQuizModalOpen) {
-                State.opponents.forEach((ai) => {
-                    const distDiff = Math.abs(ai.distance - p.distance);
-                    const xDiff = Math.abs(ai.x - p.x);
+            // 碰撞檢測 (單人模式檢測 AI，多人模式只檢測真人對手)
+                if (!State.isQuizModalOpen) {
+                    State.opponents.forEach((ai) => {
+                        const distDiff = Math.abs(ai.distance - p.distance);
+                        const xDiff = Math.abs(ai.x - p.x);
 
-                    if (distDiff < 7.0 && xDiff < 0.28) {
-                        handleCarCollision(ai);
-                    }
-                });
+                        if (distDiff < 7.0 && xDiff < 0.28) {
+                            handleCarCollision(ai);
+                        }
+                    });
 
-                for (let i = 0; i < State.opponents.length; i++) {
-                    for (let j = i + 1; j < State.opponents.length; j++) {
-                        const a1 = State.opponents[i];
-                        const a2 = State.opponents[j];
-                        if (Math.abs(a1.distance - a2.distance) < 6.0 && Math.abs(a1.x - a2.x) < 0.24) {
-                            const bumpForce = (a1.x < a2.x) ? -1.2 : 1.2;
-                            a1.bumpVel = (a1.bumpVel || 0) + bumpForce;
-                            a2.bumpVel = (a2.bumpVel || 0) - bumpForce;
+                    for (let i = 0; i < State.opponents.length; i++) {
+                        for (let j = i + 1; j < State.opponents.length; j++) {
+                            const a1 = State.opponents[i];
+                            const a2 = State.opponents[j];
+                            if (Math.abs(a1.distance - a2.distance) < 6.0 && Math.abs(a1.x - a2.x) < 0.24) {
+                                const bumpForce = (a1.x < a2.x) ? -1.2 : 1.2;
+                                a1.bumpVel = (a1.bumpVel || 0) + bumpForce;
+                                a2.bumpVel = (a2.bumpVel || 0) - bumpForce;
+                            }
                         }
                     }
+                }
+            } else {
+                // 連線對戰模式：完全清空 AI，絕無電腦車！
+                State.opponents = [];
+                if (!State.isQuizModalOpen && typeof getMultiplayerOpponentsToRender === 'function') {
+                    const mpOpponents = getMultiplayerOpponentsToRender(p.distance);
+                    mpOpponents.forEach(otherPlayer => {
+                        const distDiff = Math.abs(otherPlayer.distance - p.distance);
+                        const xDiff = Math.abs(otherPlayer.x - p.x);
+                        if (distDiff < 7.0 && xDiff < 0.28) {
+                            handleCarCollision(otherPlayer);
+                        }
+                    });
                 }
             }
 
@@ -3205,9 +3220,9 @@
                 renderProjectile(proj, horizonY, playerY, h, w);
             });
 
-            // 10. 對手賽車 (單人 AI 或多人連線真人玩家，由遠至近排序繪製)
-            const opponentsToRender = (State.isMultiplayer && typeof getMultiplayerOpponentsToRender === 'function')
-                ? getMultiplayerOpponentsToRender(p.distance)
+            // 10. 對手賽車 (連線對戰 100% 只繪製在線真人玩家；單人模式才繪製 AI 對手)
+            const opponentsToRender = State.isMultiplayer
+                ? (typeof getMultiplayerOpponentsToRender === 'function' ? getMultiplayerOpponentsToRender(p.distance) : [])
                 : State.opponents.map(ai => ({ ...ai, relDist: ai.distance - p.distance }));
             opponentsToRender.sort((a, b) => b.relDist - a.relDist);
 
@@ -3904,6 +3919,26 @@
             ctx.fillStyle = '#ef4444';
             ctx.fillRect(-carW * 0.34, carH * 0.05, carW * 0.16, carH * 0.12);
             ctx.fillRect(carW * 0.18, carH * 0.05, carW * 0.16, carH * 0.12);
+
+            // 若為連線對戰真人玩家，繪製頭頂姓名浮標 (讓玩家清楚辨識對手同學)
+            if (ai.isPlayer && ai.playerName) {
+                const tagFontSize = Math.max(10, Math.min(18, 13 * relativeScale));
+                ctx.font = `bold ${tagFontSize}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+
+                const textW = ctx.measureText(ai.playerName).width;
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+                ctx.strokeStyle = ai.color || '#38bdf8';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.roundRect(-textW * 0.5 - 6, -carH * 0.65 - tagFontSize - 4, textW + 12, tagFontSize + 6, 4);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(ai.playerName, 0, -carH * 0.65);
+            }
 
             ctx.restore();
         }
@@ -4605,7 +4640,11 @@
             const q = QuestionGenerator.createQuestion(State.currentMode);
             State.currentQuestion = q;
 
-            document.getElementById('quiz-modal-category-tag').innerText = q.categoryTag;
+            const tagEl = document.getElementById('quiz-modal-category-tag');
+            if (tagEl) {
+                tagEl.innerText = '';
+                tagEl.classList.add('hidden'); // 學生介面絕對不顯示題型標籤
+            }
             document.getElementById('modal-target-ratio').innerHTML = formatMathRatio(q.targetRatio);
             const targetTitleEl = document.getElementById('modal-target-title');
             if (targetTitleEl) targetTitleEl.innerText = q.targetTitle || '請選出相等的比';
@@ -4790,9 +4829,11 @@
                     State.isCountingDown = false;
                     State.player.targetSpeed = 240;
                     State.player.speed = 220;
-                    State.opponents.forEach(ai => {
-                        ai.speed = 220 + ai.id * 10;
-                    });
+                    if (!State.isMultiplayer) {
+                        State.opponents.forEach(ai => {
+                            ai.speed = 220 + ai.id * 10;
+                        });
+                    }
                 } else {
                     clearInterval(timer);
                     overlay.classList.add('hidden');
@@ -5195,6 +5236,8 @@
                 lastSyncTime: 0
             };
 
+            State.isMultiplayer = true;
+            State.opponents = []; // 連線對戰完全清空 AI 車輛
             mpRoomRef = firebase.database().ref(`EqualRatioRacing/rooms/${roomId}`);
             mpProjectilesRef = firebase.database().ref(`EqualRatioRacing/rooms/${roomId}/projectiles`);
 
@@ -5290,6 +5333,8 @@
                     players: {},
                     lastSyncTime: 0
                 };
+                State.isMultiplayer = true;
+                State.opponents = []; // 連線對戰完全清空 AI 車輛
                 State.currentMode = room.mode || '50cc';
 
                 const slotX = (assignedSlot % 2 === 0) ? 0.35 : -0.35;
@@ -5491,6 +5536,11 @@
             if (State.currentScreen === 'race') {
                 if (!confirm('確定要結束目前比賽返回主選單嗎？本局競賽進度將不會保留。')) return;
             }
+            if (State.isMultiplayer) {
+                leaveMultiplayerRoom();
+            }
+            State.isMultiplayer = false;
+            State.opponents = [];
             State.currentScreen = 'start';
             State.isRaceFinished = false;
             State.isQuizModalOpen = false;
@@ -5596,7 +5646,8 @@
             }
 
             document.getElementById('btn-start-race').addEventListener('click', () => {
-                startNewRace();
+                State.isMultiplayer = false;
+                startNewRace(false);
             });
 
             const modalCards = document.querySelectorAll('#modal-options-grid .option-card');
@@ -5967,8 +6018,11 @@
             updateModeInfoHighlight(State.currentMode);
         }
 
-        // 開始新賽事
-        function startNewRace() {
+        // 開始新賽事 (單人模式 isMp=false，連線對戰 isMp=true)
+        function startNewRace(isMp = false) {
+            if (isMp || (State.multiplayer && State.multiplayer.roomId)) {
+                State.isMultiplayer = true;
+            }
             State.currentScreen = 'race';
             State.isRaceFinished = false;
             State.totalAnswered = 0;
@@ -6012,6 +6066,12 @@
             Sound.playBGM();
             // 【精密賽道規劃】：550米主起跑大直道 (Main Straight)，4台車起跑距全面拉開
             // 玩家 0m，AI 1 於 100m，AI 2 於 220m，AI 3 於 360m，完全解除擠在小賽道的壓迫感！
+            const totalRacers = State.isMultiplayer
+                ? Math.max(2, Object.keys(State.multiplayer.players || {}).length)
+                : 7;
+            const initialRank = State.isMultiplayer
+                ? (State.multiplayer.mySlot || totalRacers)
+                : 7;
             State.player = {
                 x: -0.3,
                 tilt: 0,
@@ -6021,13 +6081,14 @@
                 distance: 0,
                 speed: 0,
                 targetSpeed: 240,
-                rank: 7,
+                rank: initialRank,
                 spinTimer: 0,
                 boostTimer: 0,
                 bumpCooldown: 0,
-                wobbleTimer: 0
+                wobbleTimer: 0,
+                stopPenaltyTimer: 0
             };
-            updateRankBadge(7);
+            updateRankBadge(initialRank);
 
             // 對手依據難度設定初始領先距離與強度 (6 名對手依序排在前方)
             const distMulti = State.currentMode === '150cc' ? 1.4 : (State.currentMode === '100cc' ? 1.2 : 1.0);
