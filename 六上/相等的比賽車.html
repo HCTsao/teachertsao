@@ -1333,6 +1333,7 @@
                     };
                 } else {
                     // 題型 2：【相等的比】前後項皆為整數，直接乘以或除以 2, 3, 5, 10
+                    // 且四個選項皆使用相同的前項，或相同的後項（前項或後項固定）
                     const isMultiply = Math.random() < 0.5;
                     const k = sample([2, 3, 5, 10]);
 
@@ -1353,15 +1354,14 @@
                         // 直接乘以 2, 3, 5, 10
                         const a = base[0];
                         const b = base[1];
+                        const ca = a * k;
+                        const cb = b * k;
                         targetStr = `${a} : ${b}`;
-                        correctStr = `${a * k} : ${b * k}`;
+                        correctStr = `${ca} : ${cb}`;
                         explanation = `${targetStr} = (${a} × ${k}) : (${b} × ${k}) = ${correctStr}`;
 
-                        const flipped = `${b * k} : ${a * k}`;
-                        const unequal = `${a * k} : ${b * (k === 2 ? 3 : k - 1)}`;
-                        const addTrap = `${a + k} : ${b + k}`;
-
-                        distractors = [flipped, unequal, addTrap];
+                        const optPack = this.buildEqualRatioOptions(a, b, ca, cb, k, true);
+                        distractors = optPack.distractors;
                     } else {
                         // 直接除以 2, 3, 5, 10
                         const sa = base[0];
@@ -1372,11 +1372,8 @@
                         correctStr = `${sa} : ${sb}`;
                         explanation = `${targetStr} = (${a} ÷ ${k}) : (${b} ÷ ${k}) = ${correctStr}`;
 
-                        const flipped = `${sb} : ${sa}`;
-                        const unequal = `${sa} : ${sb * 2}`;
-                        const subTrap = (a - k > 0 && b - k > 0) ? `${a - k} : ${b - k}` : `${sa + 1} : ${sb + 1}`;
-
-                        distractors = [flipped, unequal, subTrap];
+                        const optPack = this.buildEqualRatioOptions(a, b, sa, sb, k, false);
+                        distractors = optPack.distractors;
                     }
 
                     return {
@@ -1398,6 +1395,7 @@
 
                 if (subType === 'int_equal') {
                     // 題型：【相等的比】前後項皆為整數，直接乘以或除以 4, 6, 7, 8, 9
+                    // 且四個選項皆使用相同的前項，或相同的後項（前項或後項固定）
                     const isMultiply = Math.random() < 0.5;
                     const k = sample([4, 6, 7, 8, 9]);
 
@@ -1418,15 +1416,14 @@
                         // 直接乘以 4, 6, 7, 8, 9
                         const a = base[0];
                         const b = base[1];
+                        const ca = a * k;
+                        const cb = b * k;
                         targetStr = `${a} : ${b}`;
-                        correctStr = `${a * k} : ${b * k}`;
+                        correctStr = `${ca} : ${cb}`;
                         explanation = `${targetStr} = (${a} × ${k}) : (${b} × ${k}) = ${correctStr}`;
 
-                        const flipped = `${b * k} : ${a * k}`;
-                        const unequal = `${a * k} : ${b * (k - 1)}`;
-                        const addTrap = `${a + k} : ${b + k}`;
-
-                        distractors = [flipped, unequal, addTrap];
+                        const optPack = this.buildEqualRatioOptions(a, b, ca, cb, k, true);
+                        distractors = optPack.distractors;
                     } else {
                         // 直接除以 4, 6, 7, 8, 9
                         const sa = base[0];
@@ -1437,11 +1434,8 @@
                         correctStr = `${sa} : ${sb}`;
                         explanation = `${targetStr} = (${a} ÷ ${k}) : (${b} ÷ ${k}) = ${correctStr}`;
 
-                        const flipped = `${sb} : ${sa}`;
-                        const unequal = `${sa} : ${sb * 2}`;
-                        const subTrap = (a - k > 0 && b - k > 0) ? `${a - k} : ${b - k}` : `${sa + 1} : ${sb + 1}`;
-
-                        distractors = [flipped, unequal, subTrap];
+                        const optPack = this.buildEqualRatioOptions(a, b, sa, sb, k, false);
+                        distractors = optPack.distractors;
                     }
 
                     return {
@@ -1690,6 +1684,108 @@
                 }
             },
 
+            // 專用演算法：產生四個選項固定前項或固定後項的「相等的比」誘答選項
+            buildEqualRatioOptions(targetA, targetB, correctA, correctB, kFactor, isMultiply) {
+                const fixAntecedent = Math.random() < 0.5;
+                const C = correctA;
+                const D = correctB;
+                const correctOption = `${C} : ${D}`;
+
+                if (fixAntecedent) {
+                    const used_d = new Set([D]);
+                    const distractor_d = [];
+
+                    // 1. 加法迷思 (以差值直接相加，如題幹 2:3 答案 8:12，迷思前項加 6 後項也加 6 得到 8:9)
+                    const diff = C - targetA;
+                    const add_d = targetB + diff;
+                    if (add_d > 0 && !used_d.has(add_d)) {
+                        distractor_d.push(add_d);
+                        used_d.add(add_d);
+                    }
+
+                    // 2. 乘/除錯倍數 (如 8:6 或 8:15)
+                    if (kFactor) {
+                        const kVars = [kFactor - 1, kFactor + 1, kFactor - 2, kFactor + 2];
+                        for (const kv of kVars) {
+                            if (kv > 0) {
+                                const cand = isMultiply ? (targetB * kv) : Math.round(targetB / kv);
+                                if (cand > 0 && !used_d.has(cand)) {
+                                    distractor_d.push(cand);
+                                    used_d.add(cand);
+                                }
+                            }
+                        }
+                    }
+
+                    // 3. 鄰近偏移干擾
+                    for (const delta of [-1, 1, -2, 2, -3, 3, -4, 4, -5, 5]) {
+                        const cand = D + delta;
+                        if (cand > 0 && !used_d.has(cand)) {
+                            distractor_d.push(cand);
+                            used_d.add(cand);
+                        }
+                    }
+
+                    const distractors = distractor_d.slice(0, 3).map(d => `${C} : ${d}`);
+                    let fillDelta = 6;
+                    while (distractors.length < 3) {
+                        const cand = D + fillDelta++;
+                        if (!used_d.has(cand)) {
+                            distractors.push(`${C} : ${cand}`);
+                            used_d.add(cand);
+                        }
+                    }
+
+                    return { correctOption, distractors, fixedSide: 'antecedent' };
+                } else {
+                    const used_c = new Set([C]);
+                    const distractor_c = [];
+
+                    // 1. 加法迷思
+                    const diff = D - targetB;
+                    const add_c = targetA + diff;
+                    if (add_c > 0 && !used_c.has(add_c)) {
+                        distractor_c.push(add_c);
+                        used_c.add(add_c);
+                    }
+
+                    // 2. 乘/除錯倍數
+                    if (kFactor) {
+                        const kVars = [kFactor - 1, kFactor + 1, kFactor - 2, kFactor + 2];
+                        for (const kv of kVars) {
+                            if (kv > 0) {
+                                const cand = isMultiply ? (targetA * kv) : Math.round(targetA / kv);
+                                if (cand > 0 && !used_c.has(cand)) {
+                                    distractor_c.push(cand);
+                                    used_c.add(cand);
+                                }
+                            }
+                        }
+                    }
+
+                    // 3. 鄰近偏移干擾
+                    for (const delta of [-1, 1, -2, 2, -3, 3, -4, 4, -5, 5]) {
+                        const cand = C + delta;
+                        if (cand > 0 && !used_c.has(cand)) {
+                            distractor_c.push(cand);
+                            used_c.add(cand);
+                        }
+                    }
+
+                    const distractors = distractor_c.slice(0, 3).map(c => `${c} : ${D}`);
+                    let fillDelta = 6;
+                    while (distractors.length < 3) {
+                        const cand = C + fillDelta++;
+                        if (!used_c.has(cand)) {
+                            distractors.push(`${cand} : ${D}`);
+                            used_c.add(cand);
+                        }
+                    }
+
+                    return { correctOption, distractors, fixedSide: 'consequent' };
+                }
+            },
+
             // 確保 4 個選項皆不重複、且誘答選項不等於題目的強健演算法
             ensureDistinctOptions(correctOption, initialDistractors, targetRatio) {
                 const optionsSet = new Set();
@@ -1712,9 +1808,49 @@
                     }
                 }
 
-                // 3. 若選項不足 4 個，動態補足高辨識度、不重複之誘答選項
+                // 判斷是否為固定前項或固定後項題型
+                const correctParts = cleanCorrect.split(':').map(s => s.trim());
+                let fixedSide = null;
+                let fixedVal = null;
+                if (correctParts.length === 2) {
+                    const cA = correctParts[0];
+                    const cB = correctParts[1];
+                    let allSameAnte = true;
+                    let allSameConse = true;
+                    for (const o of finalOptions) {
+                        const p = o.text.split(':').map(s => s.trim());
+                        if (p.length !== 2) {
+                            allSameAnte = false;
+                            allSameConse = false;
+                            break;
+                        }
+                        if (p[0] !== cA) allSameAnte = false;
+                        if (p[1] !== cB) allSameConse = false;
+                    }
+                    if (allSameAnte) {
+                        fixedSide = 'antecedent';
+                        fixedVal = cA;
+                    } else if (allSameConse) {
+                        fixedSide = 'consequent';
+                        fixedVal = cB;
+                    }
+                }
+
+                // 3. 若選項不足 4 個，動態補足高辨識度、不重複之誘答選項 (嚴格遵守固定前項或後項)
                 let fallbackCounter = 2;
                 const generateCandidate = () => {
+                    if (fixedSide === 'antecedent') {
+                        const baseB = parseInt(correctParts[1], 10) || 5;
+                        const candD = baseB + fallbackCounter;
+                        fallbackCounter++;
+                        return `${fixedVal} : ${candD}`;
+                    } else if (fixedSide === 'consequent') {
+                        const baseA = parseInt(correctParts[0], 10) || 5;
+                        const candC = baseA + fallbackCounter;
+                        fallbackCounter++;
+                        return `${candC} : ${fixedVal}`;
+                    }
+
                     const parts = cleanCorrect.split(':').map(s => s.trim());
                     if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
                         const numA = parseInt(parts[0], 10);
@@ -2140,7 +2276,7 @@
             // 且以「等加速度」平穩上升，不暴衝、不瞬間突變！
             // 道具 (衝刺蘑菇/加速帶/無敵星星/3連對衝刺) 則可瞬間飆升至最高速 300 km/h (內部速度 520)
             const MAX_NORMAL_SPEED = 433.33; // 250 km/h: 433.33 * 300 / 520 = 250
-            const NORMAL_ACCEL = 100;        // 等加速度：約 100 units/s^2，平穩均勻爬升
+            const NORMAL_ACCEL = 70;         // 等加速度調降 30%：約 70 units/s^2，平穩均勻爬升
 
             let baseCruise = 220;
             if (State.currentMode === '100cc') {
@@ -2185,11 +2321,16 @@
 
             // 【需求 1 & 3】：真實賽車遊戲平穩流暢轉向幅度與踩油門加速推背感
             if (!State.isQuizModalOpen && !State.isRaceFinished) {
-                // 【需求 1】：真實賽車遊戲平穩流暢轉向速度 (1.55 units/s)，告別 4.2 的瞬移過大幅度
-                const steerSpeed = 1.55;
+                // 左右轉向速度調降 30% (原 1.55 * 0.7 = 1.085)，操控更細緻平穩
+                const steerSpeed = 1.085;
                 let targetSteer = 0;
-                if (Input.left) targetSteer = -1.0;
-                else if (Input.right) targetSteer = 1.0;
+                if (Input.steerValue !== undefined && Math.abs(Input.steerValue) > 0.05) {
+                    targetSteer = Math.max(-1.0, Math.min(1.0, Input.steerValue));
+                } else if (Input.left) {
+                    targetSteer = -1.0;
+                } else if (Input.right) {
+                    targetSteer = 1.0;
+                }
 
                 // 平滑轉向慣性加速度與自然回正
                 p.steerVel = p.steerVel || 0;
@@ -2507,31 +2648,61 @@
             }
 
             Sound.crash();
-            triggerScreenShake(0.3);
 
-            // 擬真衝擊力平滑回彈 (不瞬移座標，車輛自然回彈)
-            const bumpForce = (p.x <= ai.x) ? -1.6 : 1.6;
-            p.bumpVel = (p.bumpVel || 0) + bumpForce;
-            ai.bumpVel = (ai.bumpVel || 0) - bumpForce;
+            // 判斷碰撞型態：玩家是否從後面追撞前車 (玩家在後方、或是玩家速度較快追上前車)
+            const isPlayerRearEnding = (p.distance <= ai.distance) || (p.speed > ai.speed + 15);
 
-            if (p.speed > ai.speed) {
-                p.speed = Math.max(30, p.speed * 0.65);
-                ai.speed = Math.min(140, ai.speed + 25);
-                triggerFloatingAlert('💥 追撞前車！嚴重失速！');
-            } else if (ai.speed > p.speed) {
-                p.speed += 15;
-                ai.speed = Math.max(30, ai.speed * 0.65);
-                triggerFloatingAlert('💥 被後車追撞！');
+            if (isPlayerRearEnding) {
+                // 【核心規則修正】：從後面追撞別人，是「自己會翻車」，不是對方翻車！
+                triggerScreenShake(0.42);
+                p.spinTimer = 1.0;                     // 玩家自己失控打滑翻車！
+                p.wobbleTimer = 0;
+                p.speed = Math.max(25, p.speed * 0.35); // 玩家車速驟降
+
+                // 對方被從後方推撞：對方「絕不翻車」，反而被向前推擠加速！
+                ai.spinTimer = 0;
+                ai.wobbleTimer = 0.25;
+                ai.speed = Math.min(220, ai.speed + 35);
+
+                const bumpForce = (p.x <= ai.x) ? -1.8 : 1.8;
+                p.bumpVel = (p.bumpVel || 0) + bumpForce;
+                ai.bumpVel = (ai.bumpVel || 0) - bumpForce * 0.5;
+
+                triggerFloatingAlert('💥 追撞前車！自己失控翻車！');
+            } else if (ai.distance < p.distance && ai.speed > p.speed + 15) {
+                // 對方從後方追撞玩家：對方失控打滑，玩家被往前推
+                triggerScreenShake(0.3);
+                p.speed = Math.min(MAX_NORMAL_SPEED, p.speed + 25);
+                p.wobbleTimer = 0.3;
+                p.spinTimer = 0;
+
+                ai.spinTimer = 0.8;
+                ai.speed = Math.max(30, ai.speed * 0.45);
+
+                const bumpForce = (p.x <= ai.x) ? 1.4 : -1.4;
+                p.bumpVel = (p.bumpVel || 0) + bumpForce;
+                ai.bumpVel = (ai.bumpVel || 0) - bumpForce;
+
+                triggerFloatingAlert('💥 被後車追撞！向前推進！');
             } else {
-                p.speed = Math.max(35, p.speed * 0.8);
-                ai.speed = Math.max(35, ai.speed * 0.8);
-                triggerFloatingAlert('💥 車側擦撞！減速打滑！');
+                // 車側擦撞
+                triggerScreenShake(0.25);
+                p.speed = Math.max(40, p.speed * 0.85);
+                ai.speed = Math.max(40, ai.speed * 0.85);
+
+                const bumpForce = (p.x <= ai.x) ? -1.5 : 1.5;
+                p.bumpVel = (p.bumpVel || 0) + bumpForce;
+                ai.bumpVel = (ai.bumpVel || 0) - bumpForce;
+
+                p.wobbleTimer = 0.35;
+                p.spinTimer = 0;
+                ai.wobbleTimer = 0.35;
+                ai.spinTimer = 0;
+
+                triggerFloatingAlert('💥 車側擦撞！減速回彈！');
             }
 
-            p.wobbleTimer = 0.35;
-            ai.spinTimer = 0.4;
-
-            for (let i = 0; i < 8; i++) {
+            for (let i = 0; i < 10; i++) {
                 addParticle(canvas.width * 0.5 + ((p.x + ai.x) / 2) * 200, canvas.height * 0.82, 'spark');
             }
         }
@@ -5231,15 +5402,15 @@
                 });
             });
 
-            // 詳解視窗「繼續」按鈕：玩家點擊後才繼續比賽
+            // 詳解視窗「繼續」按鈕：玩家點擊後繼續比賽，必須行駛至終點才結束
             document.getElementById('btn-modal-continue').addEventListener('click', () => {
-                const hadPendingWin = (State.totalCorrect >= State.targetWins);
                 const hadPendingDash = State.pendingStreakDash;
                 State.pendingStreakDash = false;
                 closeQuizModal();
-                if (hadPendingWin) {
-                    finishRace(true);
-                } else if (hadPendingDash) {
+                if (State.totalCorrect === State.targetWins) {
+                    triggerFloatingAlert('🎯 目標題數達成！全力衝刺通過終點線！');
+                }
+                if (hadPendingDash) {
                     triggerStreakDash();
                 }
             });
@@ -5312,13 +5483,13 @@
                 }
 
                 if (State.isQuizModalOpen && State.isAnsweringLocked && (e.key === 'Enter' || e.code === 'Space')) {
-                    const hadPendingWin = (State.totalCorrect >= State.targetWins);
                     const hadPendingDash = State.pendingStreakDash;
                     State.pendingStreakDash = false;
                     closeQuizModal();
-                    if (hadPendingWin) {
-                        finishRace(true);
-                    } else if (hadPendingDash) {
+                    if (State.totalCorrect === State.targetWins) {
+                        triggerFloatingAlert('🎯 目標題數達成！全力衝刺通過終點線！');
+                    }
+                    if (hadPendingDash) {
                         triggerStreakDash();
                     }
                 }
@@ -5343,7 +5514,9 @@
             const joystickKnob = document.getElementById('joystick-knob');
             let activeJoyTouchId = null;
             let joyCenter = { x: 0, y: 0 };
-            const joyMaxRadius = 42; // 搖桿最大位移半徑
+            // 滑桿位移半徑：左右移動範圍調降 30% (原 42 * 0.7 = 29.4)，上下維持 42
+            const joyMaxRadiusX = 29.4;
+            const joyMaxRadiusY = 42;
 
             function updateJoystickCenter() {
                 if (!joystickBase) return;
@@ -5357,21 +5530,26 @@
             function handleJoyMove(clientX, clientY) {
                 const dx = clientX - joyCenter.x;
                 const dy = clientY - joyCenter.y;
-                const dist = Math.hypot(dx, dy);
 
-                const clampedDist = Math.min(joyMaxRadius, dist);
-                const angle = Math.atan2(dy, dx);
+                // 橢圓夾取限制：左右滑桿移動範圍嚴格調降 30%
+                const normX_raw = dx / joyMaxRadiusX;
+                const normY_raw = dy / joyMaxRadiusY;
+                const distRatio = Math.hypot(normX_raw, normY_raw);
+                const scale = distRatio > 1.0 ? (1.0 / distRatio) : 1.0;
 
-                const clampedX = Math.cos(angle) * clampedDist;
-                const clampedY = Math.sin(angle) * clampedDist;
+                const clampedX = normX_raw * scale * joyMaxRadiusX;
+                const clampedY = normY_raw * scale * joyMaxRadiusY;
 
                 if (joystickKnob) {
                     joystickKnob.style.transform = `translate(${clampedX}px, ${clampedY}px)`;
                 }
 
                 // 計算正規化向量 (-1.0 ~ 1.0)
-                const normX = clampedX / joyMaxRadius;
-                const normY = clampedY / joyMaxRadius;
+                const normX = Math.max(-1.0, Math.min(1.0, clampedX / joyMaxRadiusX));
+                const normY = Math.max(-1.0, Math.min(1.0, clampedY / joyMaxRadiusY));
+
+                // 提供平滑微調連續轉向量
+                Input.steerValue = (Math.abs(normX) > 0.12) ? normX : 0;
 
                 // 左右轉向 (Deadzone: 0.18)
                 if (normX < -0.18) {
@@ -5403,6 +5581,7 @@
                 if (joystickKnob) {
                     joystickKnob.style.transform = 'translate(0px, 0px)';
                 }
+                Input.steerValue = 0;
                 Input.left = false;
                 Input.right = false;
                 Input.up = false;
