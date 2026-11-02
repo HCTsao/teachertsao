@@ -3433,40 +3433,41 @@
             }
         }
 
-        // 繪製起跑線地面黑白方格 (鋪設於柏油路面) 與發車格框線
+        // 【黑白起跑線位置】：黑白起跑線位於原本第一台車前方 (500m 處)，一開始玩家在 0m 處看不到起跑線
+        const START_LINE_POS = 500;
+
+        // 繪製起跑線地面雙排黑白方格 (鋪設於柏油路面) 與發車格框線
         function renderStartLineGround(w, h, horizonY) {
             const lapDist = 3600;
             const pDist = State.player.distance;
-            const distInLap = ((pDist % lapDist) + lapDist) % lapDist;
-            let relDist = 0;
-            if (distInLap < 240) {
-                relDist = 0 - distInLap;
-            } else if (distInLap > lapDist - 240) {
-                relDist = lapDist - distInLap;
-            } else {
-                return;
+
+            // 1. 繪製發車格框線 (各車位均勻拉開 70m 間距：0m, 70m, 140m, 210m, 280m, 350m, 420m)
+            if (pDist < 460) {
+                const gridPositions = [0, 70, 140, 210, 280, 350, 420];
+                const gridXs = [-0.32, 0.32, -0.32, 0.32, -0.32, 0.32, -0.32];
+                gridPositions.forEach((gPos, idx) => {
+                    const gRel = gPos - pDist;
+                    if (gRel > -20 && gRel < 280) {
+                        const gx = gridXs[idx];
+                        const gProj = projectRoadPoint(gRel, gx, w, h, horizonY);
+                        if (gProj.scale > 0.04) {
+                            const boxW = Math.max(10, 75 * gProj.scale);
+                            const boxH = Math.max(2.5, 7 * gProj.scale);
+                            ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+                            ctx.lineWidth = Math.max(1, 2 * gProj.scale);
+                            ctx.strokeRect(gProj.x - boxW * 0.5, gProj.y - boxH * 0.5, boxW, boxH);
+                        }
+                    }
+                });
             }
+
+            // 2. 雙排黑白交錯方格起跑線 (位於第一台車前方 500m 處，每 3600 米出現一次)
+            let diff = ((START_LINE_POS - pDist) % lapDist + lapDist) % lapDist;
+            if (diff > lapDist * 0.5) diff -= lapDist;
+            const relDist = diff;
+
             if (relDist < -30 || relDist > 320) return;
 
-            // 1. 繪製黑白線後方的發車格框線 (Starting Grids)
-            const gridDists = [-8, -16, -24, -32, -40, -48, -56];
-            const gridXs = [-0.32, 0.32, -0.32, 0.32, -0.32, 0.32, -0.32];
-            gridDists.forEach((gd, idx) => {
-                const gRel = relDist + gd;
-                if (gRel > -20 && gRel < 280) {
-                    const gx = gridXs[idx];
-                    const gProj = projectRoadPoint(gRel, gx, w, h, horizonY);
-                    if (gProj.scale > 0.04) {
-                        const boxW = Math.max(10, 75 * gProj.scale);
-                        const boxH = Math.max(2.5, 7 * gProj.scale);
-                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
-                        ctx.lineWidth = Math.max(1, 2 * gProj.scale);
-                        ctx.strokeRect(gProj.x - boxW * 0.5, gProj.y - boxH * 0.5, boxW, boxH);
-                    }
-                }
-            });
-
-            // 2. 雙排黑白交錯方格起跑線 (Checkered Finish/Start Line)
             const proj = projectRoadPoint(relDist, 0, w, h, horizonY);
             if (proj.scale < 0.05) return;
 
@@ -3486,19 +3487,15 @@
             }
         }
 
-        // 終點/起跑大型鋼構門架橫樑 (橫跨兩側護欄上空)
+        // 終點/起跑大型鋼構門架橫樑 (橫跨兩側護欄上空，位於 500m 處黑白起跑線上空)
         function renderStartLineGantry(w, h, horizonY) {
             const lapDist = 3600;
             const pDist = State.player.distance;
-            const distInLap = ((pDist % lapDist) + lapDist) % lapDist;
-            let relDist = 0;
-            if (distInLap < 240) {
-                relDist = 0 - distInLap;
-            } else if (distInLap > lapDist - 240) {
-                relDist = lapDist - distInLap;
-            } else {
-                return;
-            }
+
+            let diff = ((START_LINE_POS - pDist) % lapDist + lapDist) % lapDist;
+            if (diff > lapDist * 0.5) diff -= lapDist;
+            const relDist = diff;
+
             if (relDist < -10 || relDist > 280) return;
 
             const proj = projectRoadPoint(relDist, 0, w, h, horizonY);
@@ -4334,11 +4331,12 @@
         function updateCircuitMinimap() {
             const lapDistance = 3600; // 3600 米單圈標準 (~1分30秒)
             const totalDistance = State.finishDistance;
-            const totalLaps = Math.max(1, Math.round(totalDistance / lapDistance));
+            const totalLaps = Math.max(1, Math.round((totalDistance - START_LINE_POS) / lapDistance));
 
             const pDist = State.player.distance;
-            const currentLap = Math.min(totalLaps, Math.max(1, Math.floor(Math.max(0, pDist) / lapDistance) + 1));
-            const totalPct = Math.min(100, Math.round((pDist / totalDistance) * 100));
+            // 單圈計數：從 0m 發車，衝過 500m 起跑線前為第 1 圈，衝過 4100m 前為第 1 圈，過 4100m 為第 2 圈...
+            const currentLap = Math.min(totalLaps, Math.max(1, Math.floor((pDist - START_LINE_POS + lapDistance) / lapDistance)));
+            const totalPct = Math.min(100, Math.max(0, Math.round((pDist / totalDistance) * 100)));
 
             const lapBadgeText = document.getElementById('hud-lap-text');
             const mobileLapText = document.getElementById('hud-mobile-lap-text');
@@ -4362,7 +4360,7 @@
             const mapDist = document.getElementById('hud-map-dist');
             if (mapDist) mapDist.innerText = `${totalPct}%`;
 
-            const playerLapProg = (((pDist % lapDistance) + lapDistance) % lapDistance) / lapDistance;
+            const playerLapProg = (((pDist - START_LINE_POS) % lapDistance + lapDistance) % lapDistance) / lapDistance;
             const ptPlayer = getCircuitPoint(playerLapProg);
             const mapP = document.getElementById('map-player');
             const mapPHalo = document.getElementById('map-player-halo');
@@ -4376,7 +4374,7 @@
             }
 
             State.opponents.forEach((ai, idx) => {
-                const aiLapProg = (ai.distance % lapDistance) / lapDistance;
+                const aiLapProg = (((ai.distance - START_LINE_POS) % lapDistance + lapDistance) % lapDistance) / lapDistance;
                 const ptAi = getCircuitPoint(aiLapProg);
                 const elAi = document.getElementById(`map-ai${idx + 1}`);
                 if (elAi) {
@@ -6087,15 +6085,16 @@
             State.projectiles = [];
 
             State.lapDistance = 3600; // 單圈 3600 米（約 1 分 30 秒）
+            // 衝線終點距離 = 起跑線位置 (500m) + 圈數 * 3600m
             if (State.currentMode === '50cc') {
                 State.targetWins = 6;
-                State.finishDistance = 7200; // 2 圈 (~3 分鐘)
+                State.finishDistance = 7700; // 2 圈 (500 + 7200 = 7700m)
             } else if (State.currentMode === '100cc') {
                 State.targetWins = 10;
-                State.finishDistance = 10800; // 3 圈 (~4.5 分鐘)
+                State.finishDistance = 11300; // 3 圈 (500 + 10800 = 11300m)
             } else {
                 State.targetWins = 14;
-                State.finishDistance = 10800; // 3 圈 (~4.5 分鐘)
+                State.finishDistance = 11300; // 3 圈 (500 + 10800 = 11300m)
             }
 
             document.getElementById('hud-target-count').innerText = State.targetWins;
@@ -6136,27 +6135,29 @@
             };
             updateRankBadge(initialRank);
 
-            // 【核心要求 1】：確保黑白起跑線 (0m) 位於所有車輛前方，所有賽車一律於黑白線「後方發車格」就位待發！
+            // 【核心要求】：拉開車距！黑白起跑線位於原本第一台車的前方 (500m 處)，一開始玩家在 0m 處不用看到黑白線
             if (State.isMultiplayer) {
                 // 連線對戰：僅容納當前在線真人玩家 (2~4台)，絕無 AI 電腦車！
                 State.opponents = [];
-                // 起跑發車格全數座落於黑白起跑線 (0m) 後方：-8m, -16m, -24m, -32m
+                // 起跑車距充分拉開 (每台間距 140 米)：0m, 140m, 280m, 420m，全數在黑白起跑線 (500m) 後方
                 const mySlot = State.multiplayer.mySlot || 1;
-                const slotX = [-0.32, 0.32, -0.32, 0.32][mySlot - 1] || -0.32;
-                const slotDist = [-8, -16, -24, -32][mySlot - 1] || -8;
+                const slotX = [0.32, -0.32, 0.32, -0.32][mySlot - 1] || -0.32;
+                const slotDist = [420, 280, 140, 0][mySlot - 1] || 0; // Slot 1 在第一台車 (420m)
                 State.player.x = slotX;
                 State.player.distance = slotDist;
             } else {
-                // 單人模式：7 台賽車 (玩家第7發車位 + 6台AI) 全數整齊排列於黑白起跑線 (0m) 後方發車格！
+                // 單人模式：7 台賽車 (玩家自車在 0m + 6台AI對手) 車距均勻拉開 (每台間距 70 米)！
+                // 玩家自車在 0m，一開始視野看不到遠在 500m 的黑白起跑線
+                // 原本第一台車 (青嵐號) 位於 420m，黑白起跑線正座落於第一台車前方 500m 處！
                 State.player.x = -0.32;
-                State.player.distance = -56; // 玩家排在第 7 發車格 (-56m，起跑線後方)
+                State.player.distance = 0; // 玩家自車從 0m 發車
                 State.opponents = [
-                    { id: 1, name: '翠綠號', color: '#10b981', distance: -8, speed: 0, targetSpeed: 0, x: -0.32, targetX: -0.32, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.0 },
-                    { id: 2, name: '湛藍號', color: '#3b82f6', distance: -16, speed: 0, targetSpeed: 0, x: 0.32, targetX: 0.32, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.8 },
-                    { id: 3, name: '金黃號', color: '#eab308', distance: -24, speed: 0, targetSpeed: 0, x: -0.32, targetX: -0.32, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 4.5 },
-                    { id: 4, name: '紫電號', color: '#a855f7', distance: -32, speed: 0, targetSpeed: 0, x: 0.32, targetX: 0.32, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.5 },
-                    { id: 5, name: '粉櫻號', color: '#ec4899', distance: -40, speed: 0, targetSpeed: 0, x: -0.32, targetX: -0.32, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 4.2 },
-                    { id: 6, name: '青嵐號', color: '#06b6d4', distance: -48, speed: 0, targetSpeed: 0, x: 0.32, targetX: 0.32, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 5.0 }
+                    { id: 1, name: '翠綠號', color: '#10b981', distance: 70, speed: 0, targetSpeed: 0, x: 0.32, targetX: 0.32, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.0 },
+                    { id: 2, name: '湛藍號', color: '#3b82f6', distance: 140, speed: 0, targetSpeed: 0, x: -0.32, targetX: -0.32, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.8 },
+                    { id: 3, name: '金黃號', color: '#eab308', distance: 210, speed: 0, targetSpeed: 0, x: 0.32, targetX: 0.32, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 4.5 },
+                    { id: 4, name: '紫電號', color: '#a855f7', distance: 280, speed: 0, targetSpeed: 0, x: -0.32, targetX: -0.32, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.5 },
+                    { id: 5, name: '粉櫻號', color: '#ec4899', distance: 350, speed: 0, targetSpeed: 0, x: 0.32, targetX: 0.32, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 4.2 },
+                    { id: 6, name: '青嵐號', color: '#06b6d4', distance: 420, speed: 0, targetSpeed: 0, x: -0.32, targetX: -0.32, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 5.0 }
                 ];
             }
 
@@ -6166,7 +6167,7 @@
 
             // 【需求 5】：賽道加速跳板初始排位 (隨機分布於左道與右道)
             State.boostPads = [
-                { distance: 420, x: -0.5 },   // 起跑大直道 左側衝刺板
+                { distance: 680, x: -0.5 },   // 衝過黑白起跑線 (500m) 之後大直道末段衝刺板
                 { distance: 1650, x: 0.5 },   // S2 後直道 右側加速板
                 { distance: 2950, x: -0.4 }   // S3 終點前大直道 左側加速板
             ];
