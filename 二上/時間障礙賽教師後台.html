@@ -24,7 +24,6 @@
 <label>作答日期（預設今天，可清空）<input type="date" id="date-filter"></label>
 <label>作答開始時間<input type="datetime-local" id="time-start" step="1"></label>
 <label>作答結束時間<input type="datetime-local" id="time-end" step="1"></label>
-<label>題目時間<select id="question-filter"><option value="">全部題目</option></select></label>
 <label class="check"><input type="checkbox" checked disabled>只看錯題（目前僅記錄錯題）</label>
 <button class="secondary" id="reset-btn">清除全部篩選</button>
 </section>
@@ -98,7 +97,6 @@ function selectRecords(records, filters) {
     return records.filter(r =>
         (!filters.className || r.className === filters.className) &&
         (!filters.name || r.name.toLocaleLowerCase().includes(filters.name.toLocaleLowerCase())) &&
-        (!filters.question || r.question === filters.question) &&
         (!filters.date || (r.timestamp !== null && localDate(r.timestamp) === filters.date)) &&
         (from === null || (r.timestamp !== null && r.timestamp >= from)) &&
         (to === null || (r.timestamp !== null && r.timestamp <= to))
@@ -124,7 +122,7 @@ function formatTime(timestamp) {
 function renderTable() {
     if (!requireAccess()) return;
     const filters = {className:el('class-filter').value, name:el('name-filter').value.trim(), date:el('date-filter').value,
-        from:el('time-start').value, to:el('time-end').value, question:el('question-filter').value};
+        from:el('time-start').value, to:el('time-end').value};
     const invalid = filters.from && filters.to && new Date(filters.from) > new Date(filters.to);
     el('filter-error').textContent = invalid ? '開始時間不可晚於結束時間，請調整時間範圍。' : '';
     filteredRecords = invalid ? [] : selectRecords(allRecords, filters);
@@ -172,12 +170,12 @@ function exportExcel() {
 function initialize() {
     if (!authorize()) return;
     el('date-filter').value = localDate(Date.now());
-    ['class-filter','date-filter','time-start','time-end','question-filter'].forEach(id => el(id).addEventListener('change',renderTable));
+    ['class-filter','date-filter','time-start','time-end'].forEach(id => el(id).addEventListener('change',renderTable));
     el('name-filter').addEventListener('input',renderTable);
     el('export-btn').addEventListener('click',exportExcel);
     el('clear-btn').addEventListener('click',clearLogs);
     el('reset-btn').addEventListener('click', () => {
-        ['class-filter','date-filter','time-start','time-end','question-filter','name-filter'].forEach(id => { el(id).value = ''; }); renderTable();
+        ['class-filter','date-filter','time-start','time-end','name-filter'].forEach(id => { el(id).value = ''; }); renderTable();
     });
     try {
         firebase.initializeApp(firebaseConfig); db = firebase.database();
@@ -186,7 +184,6 @@ function initialize() {
             allRecords = normalizeRecords(snapshot.val());
             el('loading').hidden = true;
             updateOptions('class-filter',allRecords.map(r => r.className),'全部班級');
-            updateOptions('question-filter',allRecords.map(r => r.question),'全部題目');
             renderTable();
         }, () => {
             el('loading').hidden = false;

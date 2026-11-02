@@ -454,6 +454,14 @@
             </div>
         </div>
 
+        <div style="width:85%; max-width:320px; margin-bottom:16px; text-align:left;">
+            <label for="difficulty-select" style="color:#fff; font-weight:900;">選擇難度：</label>
+            <select id="difficulty-select" style="display:block; width:100%; padding:10px; margin-top:5px; border-radius:10px; border:none; font:inherit;">
+                <option value="easy">簡單｜整點與半點</option>
+                <option value="normal" selected>普通｜每 5 分鐘</option>
+                <option value="advanced">進階｜每 1 分鐘</option>
+            </select>
+        </div>
         <div style="color:#ffd166; font-weight:900; font-size:1rem;">選一隻動物選手：</div>
         <div class="char-grid">
             <div class="char-card selected" data-char="rabbit">
@@ -796,57 +804,48 @@ const ClockDraw = {
     }
 };
 
-// --- 題目生成 (只出整點、半點、5分倍數，適合二年級) ---
-function generateQuestion() {
-    const hour = Math.floor(Math.random() * 12) + 1;
-    const minuteChoices = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
-    const min = minuteChoices[Math.floor(Math.random() * minuteChoices.length)];
-    const correct = `${hour}時${min}分`;
-
-    const options = [correct];
-
-    // 錯誤選項1：時針看錯（時針靠近下一個小時的誤讀）
-    let wH1 = min >= 30 ? (hour === 12 ? 1 : hour + 1) : (hour === 1 ? 12 : hour - 1);
-    if (wH1 === hour) wH1 = (hour % 12) + 1; // 防止湊巧相同
-    options.push(`${wH1}時${min}分`);
-
-    // 錯誤選項2：如果是剛好5分5分且時針沒有快到下一個刻度(<=30分)，新增一個把時針分針讀顛倒的誘答選項
-    let reversedOption = null;
-    if (min % 5 === 0 && min <= 30) {
-        let revHour = min / 5;
-        if (revHour === 0) revHour = 12;
-        let revMin = hour * 5;
-        if (revMin === 60) revMin = 0;
-        
-        const revChoice = `${revHour}時${revMin}分`;
-        if (revChoice !== correct && revChoice !== `${wH1}時${min}分`) {
-            reversedOption = revChoice;
-        }
-    }
-
-    if (reversedOption) {
-        options.push(reversedOption);
-    } else {
-        // 如果不符條件，使用原有的「分針直接讀刻度數字」誘答
-        let wM2;
-        if (min === 0) {
-            wM2 = 12; 
-        } else {
-            wM2 = min / 5; 
-        }
-        if (`${hour}時${wM2}分` === correct || wM2 === min || `${hour}時${wM2}分` === `${wH1}時${min}分`) {
-            wM2 = (min + 15) % 60 || 5;
-        }
-        options.push(`${hour}時${wM2}分`);
-    }
-
-    // 打亂
-    for (let i = options.length - 1; i > 0; i--) {
+// --- 分級題庫：簡單 24 題、普通 144 題、進階 720 題 ---
+const DIFFICULTIES = {
+    easy: { step: 30, label: '簡單' },
+    normal: { step: 5, label: '普通' },
+    advanced: { step: 1, label: '進階' }
+};
+function shuffleQuestions(items) {
+    for (let i = items.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [options[i], options[j]] = [options[j], options[i]];
+        [items[i], items[j]] = [items[j], items[i]];
     }
-
-    return { h: hour, m: min, correct, options };
+    return items;
+}
+function createQuestionPool(difficulty = 'normal') {
+    const { step } = DIFFICULTIES[difficulty] || DIFFICULTIES.normal;
+    const pool = [];
+    for (let h = 1; h <= 12; h++) {
+        for (let m = 0; m < 60; m += step) pool.push({ h, m });
+    }
+    return shuffleQuestions(pool);
+}
+function generateQuestion(difficulty = 'normal', time) {
+    const { step } = DIFFICULTIES[difficulty] || DIFFICULTIES.normal;
+    if (!time) time = createQuestionPool(difficulty).pop();
+    const { h, m } = time;
+    const format = (hour, minute) => hour + '時' + minute + '分';
+    const correct = format(h, m);
+    const nextHour = h === 12 ? 1 : h + 1;
+    const wrongHour = m >= 30 ? nextHour : (h === 1 ? 12 : h - 1);
+    const options = [correct, format(wrongHour, m)];
+    // 誘答也遵守所選難度的分鐘單位，且不重複。
+    let wrongMinute = (m + step) % 60;
+    if (m % 5 === 0 && m <= 30) {
+        const reversedHour = m === 0 ? 12 : m / 5;
+        const reversedMinute = (h * 5) % 60;
+        const reversed = format(reversedHour, reversedMinute);
+        if (reversedMinute % step === 0 && !options.includes(reversed)) {
+            options.push(reversed);
+        }
+    }
+    if (options.length < 3) options.push(format(h, wrongMinute));
+    return { h, m, correct, options: shuffleQuestions(options) };
 }
 
 
@@ -1042,6 +1041,8 @@ const Game = {
     },
 
     start() {
+        this.difficulty = document.getElementById('difficulty-select').value;
+        this.questionPool = createQuestionPool(this.difficulty);
         this.state = 'RUNNING';
         this.score = 0; this.distance = 0; this.timeElapsed = 0;
         this.hearts = 3; this.lane = 1;
@@ -1350,7 +1351,7 @@ const Game = {
     // --- 障礙門 ---
 
     spawnBarrier() {
-        const q = generateQuestion();
+        const q = generateQuestion(this.difficulty, this.questionPool.pop());
         const b = {
             distance: this.distance,
             question: q,
@@ -1614,6 +1615,12 @@ showChoice(barrier) {
         if (m === 0) {
             minuteLine = `⏰ <b>分針（長針）</b>指向 12，整點
                           &nbsp;→&nbsp;所以是 <b style="color:#1d3557">0分</b>`;
+        } else if (m % 5 !== 0) {
+            const bigSteps = Math.floor(m / 5);
+            const extraSteps = m % 5;
+            minuteLine = `⏰ <b>分針（長針）</b>從 12 出發，走了 <b>${bigSteps}</b> 個大格，再走 <b>${extraSteps}</b> 個小格<br>
+                          每大格是 5 分鐘，每小格是 1 分鐘<br>
+                          &nbsp;→&nbsp;${bigSteps} × 5 ＋ ${extraSteps} ＝ <b style="color:#1d3557">${m}分</b>`;
         } else {
             const bigSteps = m / 5;   // 大格數
             const stepList = [];
@@ -1644,6 +1651,7 @@ showChoice(barrier) {
                 question: `${h}時${m}分`,
                 correctAnswer: `${h}時${m}分`,
                 isCorrect: false,
+                difficulty: this.difficulty,
                 wrongChoice: wrongChoice || '未填',
                 timestamp: firebase.database.ServerValue.TIMESTAMP
             }).catch(err => console.error("上傳錯誤紀錄失敗：", err));
