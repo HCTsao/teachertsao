@@ -543,7 +543,7 @@
                                     <h3 class="text-lg sm:text-xl font-bold font-racing text-amber-300">寶箱開啟！數學挑戰</h3>
                                     <span id="quiz-modal-category-tag" class="px-2 py-0.5 rounded-full bg-blue-900/60 border border-blue-600/40 text-blue-300 text-[10px] hidden">最簡整數比</span>
                                 </div>
-                                <div id="quiz-timer-badge" class="px-3 py-1 rounded-xl bg-slate-800 border border-amber-500/50 flex items-center gap-1.5 font-racing font-bold text-amber-300 text-sm shadow ml-auto">
+                                <div id="quiz-timer-badge" class="px-3 py-1 rounded-xl bg-slate-800 border border-amber-500/50 flex items-center gap-1.5 font-racing font-bold text-amber-300 text-sm shadow ml-auto hidden">
                                     <span>⏱️</span> <span id="quiz-timer-text">90s</span>
                                 </div>
                                 <p class="text-xs text-slate-400">答對解鎖道具！連續答對 3 題即可發動 5 秒極速衝刺！</p>
@@ -2316,6 +2316,20 @@
             const p = State.player;
             if (!p) return;
 
+            // 【核心要求 1】：倒數計時完成前，所有賽車必須保持靜止於黑白線後方發車格，絕對不可提前起跑出發！
+            if (State.isCountingDown) {
+                p.speed = 0;
+                p.targetSpeed = 0;
+                updateHudSpeed(0, false, false);
+                if (!State.isMultiplayer) {
+                    State.opponents.forEach(ai => {
+                        ai.speed = 0;
+                        ai.targetSpeed = 0;
+                    });
+                }
+                return; // 倒數計時未完成，完全不推進任何位移
+            }
+
             // 【連線對戰答錯 30 秒停留原地懲罰】
             if (p.stopPenaltyTimer > 0) {
                 p.stopPenaltyTimer -= dt;
@@ -3419,35 +3433,56 @@
             }
         }
 
-        // 繪製起跑線地面黑白方格 (鋪設於柏油路面)
+        // 繪製起跑線地面黑白方格 (鋪設於柏油路面) 與發車格框線
         function renderStartLineGround(w, h, horizonY) {
             const lapDist = 3600;
             const pDist = State.player.distance;
             const distInLap = ((pDist % lapDist) + lapDist) % lapDist;
             let relDist = 0;
-            if (distInLap < 150) {
+            if (distInLap < 240) {
                 relDist = 0 - distInLap;
-            } else if (distInLap > lapDist - 150) {
+            } else if (distInLap > lapDist - 240) {
                 relDist = lapDist - distInLap;
             } else {
                 return;
             }
-            if (relDist < -30 || relDist > 300) return;
+            if (relDist < -30 || relDist > 320) return;
 
+            // 1. 繪製黑白線後方的發車格框線 (Starting Grids)
+            const gridDists = [-8, -16, -24, -32, -40, -48, -56];
+            const gridXs = [-0.32, 0.32, -0.32, 0.32, -0.32, 0.32, -0.32];
+            gridDists.forEach((gd, idx) => {
+                const gRel = relDist + gd;
+                if (gRel > -20 && gRel < 280) {
+                    const gx = gridXs[idx];
+                    const gProj = projectRoadPoint(gRel, gx, w, h, horizonY);
+                    if (gProj.scale > 0.04) {
+                        const boxW = Math.max(10, 75 * gProj.scale);
+                        const boxH = Math.max(2.5, 7 * gProj.scale);
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+                        ctx.lineWidth = Math.max(1, 2 * gProj.scale);
+                        ctx.strokeRect(gProj.x - boxW * 0.5, gProj.y - boxH * 0.5, boxW, boxH);
+                    }
+                }
+            });
+
+            // 2. 雙排黑白交錯方格起跑線 (Checkered Finish/Start Line)
             const proj = projectRoadPoint(relDist, 0, w, h, horizonY);
             if (proj.scale < 0.05) return;
 
             const roadW = proj.roadW;
             const y = proj.y;
             const cx = proj.roadCenter;
-            const gridCount = 16;
+            const gridCount = 18;
             const blockW = roadW / gridCount;
             const blockH = Math.max(5, 14 * proj.scale);
 
-            // 格紋起跑線 (Checkered line)
-            for (let i = 0; i < gridCount; i++) {
-                ctx.fillStyle = (i % 2 === 0) ? '#ffffff' : '#000000';
-                ctx.fillRect(cx - roadW * 0.5 + i * blockW, y, blockW, blockH);
+            for (let row = 0; row < 2; row++) {
+                const rowY = y + (row === 0 ? 0 : -blockH * 0.8);
+                for (let i = 0; i < gridCount; i++) {
+                    ctx.fillStyle = ((i + row) % 2 === 0) ? '#ffffff' : '#0f172a';
+                    ctx.fillRect(cx - roadW * 0.5 + i * blockW, rowY, blockW, blockH);
+                }
             }
         }
 
@@ -3457,9 +3492,9 @@
             const pDist = State.player.distance;
             const distInLap = ((pDist % lapDist) + lapDist) % lapDist;
             let relDist = 0;
-            if (distInLap < 150) {
+            if (distInLap < 240) {
                 relDist = 0 - distInLap;
-            } else if (distInLap > lapDist - 150) {
+            } else if (distInLap > lapDist - 240) {
                 relDist = lapDist - distInLap;
             } else {
                 return;
@@ -4302,7 +4337,7 @@
             const totalLaps = Math.max(1, Math.round(totalDistance / lapDistance));
 
             const pDist = State.player.distance;
-            const currentLap = Math.min(totalLaps, Math.floor(pDist / lapDistance) + 1);
+            const currentLap = Math.min(totalLaps, Math.max(1, Math.floor(Math.max(0, pDist) / lapDistance) + 1));
             const totalPct = Math.min(100, Math.round((pDist / totalDistance) * 100));
 
             const lapBadgeText = document.getElementById('hud-lap-text');
@@ -4327,7 +4362,7 @@
             const mapDist = document.getElementById('hud-map-dist');
             if (mapDist) mapDist.innerText = `${totalPct}%`;
 
-            const playerLapProg = (pDist % lapDistance) / lapDistance;
+            const playerLapProg = (((pDist % lapDistance) + lapDistance) % lapDistance) / lapDistance;
             const ptPlayer = getCircuitPoint(playerLapProg);
             const mapP = document.getElementById('map-player');
             const mapPHalo = document.getElementById('map-player-halo');
@@ -4611,31 +4646,39 @@
             Sound.silenceEngine();
             Sound.duckBGM(true);
 
-            // 啟動 90 秒倒數計時器
+            // 【作答倒數計時】：單機遊戲時絕不計時；僅連線對戰時啟用 90 秒作答倒數計時
             if (quizCountdownTimer) clearInterval(quizCountdownTimer);
-            quizTimeRemaining = 90;
             const timerText = document.getElementById('quiz-timer-text');
             const timerBadge = document.getElementById('quiz-timer-badge');
-            if (timerText) timerText.innerText = '90s';
-            if (timerBadge) {
-                timerBadge.className = 'px-3 py-1 rounded-xl bg-slate-800 border border-amber-500/50 flex items-center gap-1.5 font-racing font-bold text-amber-300 text-sm shadow ml-auto';
-            }
 
-            quizCountdownTimer = setInterval(() => {
-                if (!State.isQuizModalOpen || State.isAnsweringLocked) {
-                    clearInterval(quizCountdownTimer);
-                    return;
+            if (State.isMultiplayer) {
+                // 連線對戰模式：顯示倒數徽章並啟動 90 秒計時器
+                if (timerBadge) timerBadge.classList.remove('hidden');
+                quizTimeRemaining = 90;
+                if (timerText) timerText.innerText = '90s';
+                if (timerBadge) {
+                    timerBadge.className = 'px-3 py-1 rounded-xl bg-slate-800 border border-amber-500/50 flex items-center gap-1.5 font-racing font-bold text-amber-300 text-sm shadow ml-auto';
                 }
-                quizTimeRemaining--;
-                if (timerText) timerText.innerText = `${quizTimeRemaining}s`;
-                if (quizTimeRemaining <= 15 && timerBadge) {
-                    timerBadge.className = 'px-3 py-1 rounded-xl bg-red-950 border border-red-500 flex items-center gap-1.5 font-racing font-bold text-red-400 text-sm shadow ml-auto animate-pulse';
-                }
-                if (quizTimeRemaining <= 0) {
-                    clearInterval(quizCountdownTimer);
-                    handleModalTimeout();
-                }
-            }, 1000);
+
+                quizCountdownTimer = setInterval(() => {
+                    if (!State.isQuizModalOpen || State.isAnsweringLocked) {
+                        clearInterval(quizCountdownTimer);
+                        return;
+                    }
+                    quizTimeRemaining--;
+                    if (timerText) timerText.innerText = `${quizTimeRemaining}s`;
+                    if (quizTimeRemaining <= 15 && timerBadge) {
+                        timerBadge.className = 'px-3 py-1 rounded-xl bg-red-950 border border-red-500 flex items-center gap-1.5 font-racing font-bold text-red-400 text-sm shadow ml-auto animate-pulse';
+                    }
+                    if (quizTimeRemaining <= 0) {
+                        clearInterval(quizCountdownTimer);
+                        handleModalTimeout();
+                    }
+                }, 1000);
+            } else {
+                // 單機遊戲模式：無作答倒數限制，隱藏計時徽章
+                if (timerBadge) timerBadge.classList.add('hidden');
+            }
 
             const q = QuestionGenerator.createQuestion(State.currentMode);
             State.currentQuestion = q;
@@ -4826,12 +4869,15 @@
                     numEl.className = 'text-8xl sm:text-9xl font-black font-racing text-transparent bg-clip-text bg-gradient-to-b from-emerald-300 via-emerald-400 to-teal-500 drop-shadow-[0_10px_30px_rgba(52,211,153,0.9)] animate-countdown';
                     subEl.innerText = 'START! 🏁';
                     Sound.countdownPing(true);
+                    // 倒數計時完成！解除靜止鎖定，所有賽車同時從黑白起跑線後方全速衝刺出發！
                     State.isCountingDown = false;
-                    State.player.targetSpeed = 240;
-                    State.player.speed = 220;
+                    const cruise = State.currentMode === '150cc' ? 280 : (State.currentMode === '100cc' ? 250 : 220);
+                    State.player.targetSpeed = cruise;
+                    State.player.speed = Math.round(cruise * 0.75); // 快速起步
                     if (!State.isMultiplayer) {
                         State.opponents.forEach(ai => {
-                            ai.speed = 220 + ai.id * 10;
+                            ai.speed = Math.round(cruise * 0.72 + ai.id * 5);
+                            ai.targetSpeed = cruise + ai.id * 8;
                         });
                     }
                 } else {
@@ -6090,26 +6136,27 @@
             };
             updateRankBadge(initialRank);
 
-            // 對手依據難度設定初始領先距離與強度 (6 名對手依序排在前方)
-            const distMulti = State.currentMode === '150cc' ? 1.4 : (State.currentMode === '100cc' ? 1.2 : 1.0);
+            // 【核心要求 1】：確保黑白起跑線 (0m) 位於所有車輛前方，所有賽車一律於黑白線「後方發車格」就位待發！
             if (State.isMultiplayer) {
-                // 【核心要求】：連線對戰時只有當下在連線的玩家的車 (2~4台)！絕對不生成 AI 電腦車！
+                // 連線對戰：僅容納當前在線真人玩家 (2~4台)，絕無 AI 電腦車！
                 State.opponents = [];
-                // 起跑線依據 Slot 排開位置
+                // 起跑發車格全數座落於黑白起跑線 (0m) 後方：-8m, -16m, -24m, -32m
                 const mySlot = State.multiplayer.mySlot || 1;
-                const slotX = [-0.35, 0.35, -0.55, 0.55][mySlot - 1] || -0.35;
-                const slotDist = [0, 0, -15, -15][mySlot - 1] || 0;
+                const slotX = [-0.32, 0.32, -0.32, 0.32][mySlot - 1] || -0.32;
+                const slotDist = [-8, -16, -24, -32][mySlot - 1] || -8;
                 State.player.x = slotX;
                 State.player.distance = slotDist;
             } else {
-                // 單人模式：維持 6 名 AI 對手
+                // 單人模式：7 台賽車 (玩家第7發車位 + 6台AI) 全數整齊排列於黑白起跑線 (0m) 後方發車格！
+                State.player.x = -0.32;
+                State.player.distance = -56; // 玩家排在第 7 發車格 (-56m，起跑線後方)
                 State.opponents = [
-                    { id: 1, name: '翠綠號', color: '#10b981', distance: Math.round(75 * distMulti), speed: 0, targetSpeed: 240, x: 0.35, targetX: 0.35, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.0 },
-                    { id: 2, name: '湛藍號', color: '#3b82f6', distance: Math.round(145 * distMulti), speed: 0, targetSpeed: 260, x: -0.35, targetX: -0.35, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.8 },
-                    { id: 3, name: '金黃號', color: '#eab308', distance: Math.round(215 * distMulti), speed: 0, targetSpeed: 280, x: 0.3, targetX: 0.3, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 4.5 },
-                    { id: 4, name: '紫電號', color: '#a855f7', distance: Math.round(285 * distMulti), speed: 0, targetSpeed: 300, x: -0.3, targetX: -0.3, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.5 },
-                    { id: 5, name: '粉櫻號', color: '#ec4899', distance: Math.round(355 * distMulti), speed: 0, targetSpeed: 320, x: 0.25, targetX: 0.25, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 4.2 },
-                    { id: 6, name: '青嵐號', color: '#06b6d4', distance: Math.round(425 * distMulti), speed: 0, targetSpeed: 340, x: -0.2, targetX: -0.2, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 5.0 }
+                    { id: 1, name: '翠綠號', color: '#10b981', distance: -8, speed: 0, targetSpeed: 0, x: -0.32, targetX: -0.32, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.0 },
+                    { id: 2, name: '湛藍號', color: '#3b82f6', distance: -16, speed: 0, targetSpeed: 0, x: 0.32, targetX: 0.32, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.8 },
+                    { id: 3, name: '金黃號', color: '#eab308', distance: -24, speed: 0, targetSpeed: 0, x: -0.32, targetX: -0.32, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 4.5 },
+                    { id: 4, name: '紫電號', color: '#a855f7', distance: -32, speed: 0, targetSpeed: 0, x: 0.32, targetX: 0.32, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.5 },
+                    { id: 5, name: '粉櫻號', color: '#ec4899', distance: -40, speed: 0, targetSpeed: 0, x: -0.32, targetX: -0.32, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 4.2 },
+                    { id: 6, name: '青嵐號', color: '#06b6d4', distance: -48, speed: 0, targetSpeed: 0, x: 0.32, targetX: 0.32, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 5.0 }
                 ];
             }
 
