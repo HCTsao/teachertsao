@@ -451,6 +451,15 @@
                     <span class="text-amber-300 font-mono font-black text-lg sm:text-xl">⏱️ <span id="hud-penalty-timer">0</span>s</span>
                 </div>
 
+                <!-- 連線對戰完賽等待其他車手衝線提示橫幅 -->
+                <div id="hud-mp-finished-waiting" class="absolute bottom-28 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl bg-slate-950/95 border-2 border-emerald-500 text-white font-racing font-bold text-sm sm:text-base flex items-center gap-3 shadow-2xl z-30 hidden animate-bounce">
+                    <span class="text-2xl">🏁</span>
+                    <div class="text-left">
+                        <div class="text-emerald-400 font-black">你已成功跑完三圈完賽！</div>
+                        <div id="hud-mp-finished-count" class="text-xs text-slate-300 font-sans mt-0.5">等待其他同學完賽中...</div>
+                    </div>
+                </div>
+
                 <!-- 無敵星星狀態光條 -->
                 <div id="hud-star-banner" class="absolute top-24 left-1/2 -translate-x-1/2 px-5 py-2 rounded-2xl bg-gradient-to-r from-pink-600 via-yellow-400 to-cyan-500 border-2 border-white text-black font-racing font-black text-xs sm:text-sm flex items-center gap-2 shadow-2xl z-20 hidden neon-star">
                     <span>⭐</span>
@@ -672,9 +681,18 @@
                 太厲害了！你以精準的等比計算率先衝過終點線！
             </p>
 
+            <!-- 連線對戰四人最終排名排行榜 (全體跑完三圈後呈現) -->
+            <div id="mp-result-rankings-box" class="w-full max-w-2xl bg-slate-950/90 border border-amber-500/50 rounded-2xl p-4 sm:p-5 mb-6 hidden shadow-2xl">
+                <div class="text-base sm:text-lg font-racing font-bold text-amber-300 flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+                    <span class="flex items-center gap-2">🏁 四人對戰 最終名次排行榜</span>
+                    <span class="text-xs text-slate-400 font-sans">全員跑滿 3 圈</span>
+                </div>
+                <div id="mp-result-rankings-list" class="flex flex-col gap-2.5"></div>
+            </div>
+
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-2xl mb-6">
                 <div class="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 shadow">
-                    <div class="text-xs text-slate-400 font-bold">最終名次</div>
+                    <div class="text-xs text-slate-400 font-bold">你的最終名次</div>
                     <div id="result-final-rank" class="text-2xl font-racing font-black text-yellow-400 mt-1">1st 冠軍</div>
                 </div>
                 <div class="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 shadow">
@@ -2739,8 +2757,45 @@
                 }
             }
 
-            if (p.distance >= State.finishDistance && !State.isRaceFinished) {
-                finishRace(true);
+            // 衝線完賽檢測
+            if (p.distance >= State.finishDistance) {
+                if (!State.playerFinishedSelf) {
+                    State.playerFinishedSelf = true;
+                    if (State.isMultiplayer) {
+                        // 連線對戰：自己衝過終點線，標記已完賽並上傳 Firebase
+                        Sound.victory();
+                        triggerFloatingAlert('🏁 你已衝過終點線！等待其他同學完賽...');
+                        p.speed = 100; // 衝線後自動減速平穩巡航
+                        p.targetSpeed = 100;
+
+                        if (mpRoomRef && State.multiplayer.myPlayerId) {
+                            try {
+                                mpRoomRef.child(`players/${State.multiplayer.myPlayerId}`).update({
+                                    finished: true,
+                                    finishTime: firebase.database.ServerValue.TIMESTAMP,
+                                    distance: Math.round(p.distance),
+                                    finalRank: p.rank
+                                });
+                            } catch (e) {}
+                        }
+
+                        // 顯示等待所有玩家完賽浮動提示
+                        const waitEl = document.getElementById('hud-mp-finished-waiting');
+                        if (waitEl) waitEl.classList.remove('hidden');
+
+                        // 檢查如果此時房間內所有玩家已經都完賽，直接結算
+                        if (State.multiplayer.players) {
+                            checkAllPlayersFinished(State.multiplayer.players);
+                        }
+                    } else {
+                        // 單人模式：直接結算跳轉
+                        finishRace(true);
+                    }
+                } else if (State.isMultiplayer) {
+                    // 已衝線在等待其他玩家時，維持平緩巡航，不繼續累加過多里程
+                    p.speed = 100;
+                    p.targetSpeed = 100;
+                }
             }
         }
 
@@ -4817,9 +4872,144 @@
         }
 
         // -------------------------------------------------------------
-        // 9. 比賽結算與頒獎
+        // 9. 比賽結算與頒獎 (支援單人模式與連線對戰全員完賽結算)
         // -------------------------------------------------------------
+        function checkAllPlayersFinished(playersMap) {
+            if (!State.isMultiplayer || State.currentScreen !== 'race' || State.isRaceFinished) return;
+            const playerList = Object.values(playersMap || {});
+            if (playerList.length < 2) return;
+
+            const finishedList = playerList.filter(p => p.finished);
+            const countEl = document.getElementById('hud-mp-finished-count');
+            if (countEl) {
+                countEl.innerText = `等待其他同學完賽中... (${finishedList.length}/${playerList.length} 人已衝線)`;
+            }
+
+            // 【核心要求】：等待所有玩家跑完三圈之後，全員同步跳到遊戲排名的畫面，不會重新開始遊戲
+            if (finishedList.length >= playerList.length) {
+                finishMultiplayerRace(playerList);
+            }
+        }
+
+        function finishMultiplayerRace(playerList) {
+            if (State.isRaceFinished) return;
+            State.isRaceFinished = true;
+            State.currentScreen = 'result';
+            Sound.silenceEngine();
+            Sound.pauseBGM();
+
+            document.getElementById('hud-mp-finished-waiting')?.classList.add('hidden');
+            document.getElementById('screen-race')?.classList.add('hidden');
+            document.getElementById('screen-result')?.classList.remove('hidden');
+
+            Sound.victory();
+            spawnConfetti();
+
+            // 依衝線時間 finishTime 排序 (先衝線者奪冠，未衝線者依距離排序)
+            const sorted = [...playerList].sort((a, b) => {
+                if (a.finished && b.finished) {
+                    return (a.finishTime || 0) - (b.finishTime || 0);
+                }
+                if (a.finished) return -1;
+                if (b.finished) return 1;
+                return (b.distance || 0) - (a.distance || 0);
+            });
+
+            const myId = State.multiplayer.myPlayerId;
+            const myRankIdx = sorted.findIndex(p => p.id === myId);
+            const myRank = myRankIdx >= 0 ? myRankIdx + 1 : 1;
+            State.player.rank = myRank;
+
+            const rankNames = {
+                1: '1st 冠軍 🏆',
+                2: '2nd 亞軍 🥈',
+                3: '3rd 季軍 🥉',
+                4: '4th 第四名 🏎️'
+            };
+            const rankStr = rankNames[myRank] || `${myRank}th 完賽 🏎️`;
+            document.getElementById('result-final-rank').innerText = rankStr;
+
+            const accuracy = State.totalAnswered > 0 ? Math.round((State.totalCorrect / State.totalAnswered) * 100) : 0;
+            document.getElementById('result-accuracy').innerText = `${accuracy}%`;
+            document.getElementById('result-top-speed').innerText = `${toDisplaySpeed(State.topSpeed)} km/h`;
+            document.getElementById('result-items-used').innerText = `${State.itemsUsedCount} 次`;
+
+            // 上傳個人賽事紀錄至 Firebase 教師後台 (EqualRatioRacing/records)
+            try {
+                const sInfo = getStudentInfo();
+                uploadRaceRecord({
+                    className: sInfo.className,
+                    seatNumber: sInfo.seatNumber,
+                    studentName: sInfo.studentName,
+                    mode: State.currentMode + ' (連線對戰)',
+                    rank: myRank,
+                    score: State.totalCorrect * 10,
+                    correctCount: State.totalCorrect,
+                    totalAnswered: State.totalAnswered,
+                    accuracy: accuracy,
+                    topSpeed: toDisplaySpeed(State.topSpeed),
+                    itemsUsed: State.itemsUsedCount,
+                    mistakes: State.historyLog.filter(h => !h.isCorrect).map(m => ({
+                        target: m.target || '',
+                        chosen: m.chosen || '',
+                        correct: m.correct || '',
+                        explanation: m.explanation || ''
+                    })),
+                    dateStr: new Date().toLocaleString('zh-TW', { hour12: false })
+                });
+            } catch (err) {
+                console.error('上傳紀錄失敗:', err);
+            }
+
+            // 渲染連線對戰四人最終排名排行榜
+            const mpBox = document.getElementById('mp-result-rankings-box');
+            const mpListEl = document.getElementById('mp-result-rankings-list');
+            if (mpBox && mpListEl) {
+                mpBox.classList.remove('hidden');
+                let html = '';
+                sorted.forEach((p, idx) => {
+                    const isMe = (p.id === myId);
+                    const rankMedal = ['🥇', '🥈', '🥉', '🏎️'][idx] || '🏁';
+                    const rankLabel = ['冠軍', '亞軍', '季軍', '殿軍'][idx] || `第 ${idx + 1} 名`;
+                    const pColor = p.color || '#38bdf8';
+                    html += `
+                        <div class="flex items-center justify-between p-3 sm:p-4 rounded-xl border ${isMe ? 'border-amber-400 bg-amber-950/40 shadow-lg neon-gold' : 'border-slate-800 bg-slate-900/80'} text-xs sm:text-sm">
+                            <div class="flex items-center gap-2.5">
+                                <span class="text-xl sm:text-2xl">${rankMedal}</span>
+                                <div class="w-4 h-4 rounded-full border border-white shadow" style="background-color: ${pColor};"></div>
+                                <div class="text-left">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="font-bold text-white text-sm sm:text-base">${p.name || '車手'}</span>
+                                        ${isMe ? '<span class="text-[10px] px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 font-black">你</span>' : ''}
+                                    </div>
+                                    <div class="text-slate-400 text-xs">${p.className || ''} ${p.seat ? p.seat + '號' : ''}</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs sm:text-sm text-emerald-400 font-mono font-bold">答對 ${p.correctCount || 0} 題</span>
+                                <span class="font-racing font-black text-sm sm:text-base ${idx === 0 ? 'text-amber-400' : 'text-slate-200'}">${rankLabel}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                mpListEl.innerHTML = html;
+            }
+
+            const reviewEl = document.getElementById('result-pedagogy-review');
+            if (myRank === 1 && accuracy >= 90) {
+                reviewEl.innerHTML = `🌟 <strong>極致完美！連線對戰總冠軍！</strong> 你在 3 圈激烈競速中脫穎而出，不僅駕駛技巧一流，更以精準神速的等比計算擊敗所有對手！`;
+            } else if (myRank <= 2) {
+                reviewEl.innerHTML = `👏 <strong>表現傑出！榮獲亞軍！</strong> 你順利完成 3 圈連線對戰大獎賽，在多位真人車手角逐中表現優異！`;
+            } else {
+                reviewEl.innerHTML = `💪 <strong>精彩完賽！</strong> 恭喜完成 3 圈連線對戰！「找等比時，前項與後項要同乘以或同除以同一個不為0的數」，多練習計算一定能再創佳績！`;
+            }
+
+            renderReviewList();
+        }
+
+        // 單人模式結算
         function finishRace(isWin) {
+            document.getElementById('mp-result-rankings-box')?.classList.add('hidden');
             State.currentScreen = 'result';
             State.isRaceFinished = true;
             Sound.silenceEngine();
@@ -5417,6 +5607,11 @@
                 if (room.status === 'countdown' && State.currentScreen !== 'race') {
                     closeMultiplayerModal();
                     startNewRace(true);
+                }
+
+                // 【核心要求】：連線對戰時檢查是否所有玩家都跑完三圈
+                if (State.isMultiplayer && State.currentScreen === 'race') {
+                    checkAllPlayersFinished(room.players || {});
                 }
             });
 
@@ -6035,16 +6230,25 @@
             State.projectiles = [];
 
             State.lapDistance = 3600; // 單圈 3600 米（約 1 分 30 秒）
-            // 衝線終點距離 = 起跑線位置 (500m) + 圈數 * 3600m
-            if (State.currentMode === '50cc') {
-                State.targetWins = 6;
-                State.finishDistance = 7700; // 2 圈 (500 + 7200 = 7700m)
-            } else if (State.currentMode === '100cc') {
+            State.playerFinishedSelf = false;
+            document.getElementById('hud-mp-finished-waiting')?.classList.add('hidden');
+            document.getElementById('mp-result-rankings-box')?.classList.add('hidden');
+
+            // 【核心要求】：連線對戰固定要跑三圈！(500m + 3600 * 3 = 11300m)
+            if (State.isMultiplayer) {
                 State.targetWins = 10;
-                State.finishDistance = 11300; // 3 圈 (500 + 10800 = 11300m)
+                State.finishDistance = 11300; // 連線對戰固定跑滿 3 圈！
             } else {
-                State.targetWins = 14;
-                State.finishDistance = 11300; // 3 圈 (500 + 10800 = 11300m)
+                if (State.currentMode === '50cc') {
+                    State.targetWins = 6;
+                    State.finishDistance = 7700; // 2 圈 (500 + 7200 = 7700m)
+                } else if (State.currentMode === '100cc') {
+                    State.targetWins = 10;
+                    State.finishDistance = 11300; // 3 圈 (500 + 10800 = 11300m)
+                } else {
+                    State.targetWins = 14;
+                    State.finishDistance = 11300; // 3 圈 (500 + 10800 = 11300m)
+                }
             }
 
             document.getElementById('hud-target-count').innerText = State.targetWins;
