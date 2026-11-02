@@ -872,6 +872,7 @@ const Game = {
     // 跳躍與特殊動作物理
     playerJumpY: 0,
     playerJumpVel: 0,
+    playerJumpAccumulator: 0,
     isJumping: false,
     isActionActive: false,
     actionTimer: 0,
@@ -1015,6 +1016,7 @@ const Game = {
             if (this.isJumping) return;
             this.isJumping = true;
             this.playerJumpVel = 14; // 初速度（向上）
+            this.playerJumpAccumulator = 0;
             playSound('jump');
             this.useEnergy();
         } else if (this.selectedChar === 'turtle') {
@@ -1057,6 +1059,7 @@ const Game = {
         this.nextWaveTime = 1500;   // 1.5秒後出第一波障礙物
         this.playerJumpY = 0;
         this.playerJumpVel = 0;
+        this.playerJumpAccumulator = 0;
         this.isJumping = false;
         this.isActionActive = false;
         this.actionTimer = 0;
@@ -1191,6 +1194,27 @@ const Game = {
         requestAnimationFrame(t => this.loop(t));
     },
 
+    updateJump(dt) {
+        if (!this.isJumping) return;
+        // 用實際毫秒累積固定的 60 Hz 物理步長，保留原本 60 FPS 的跳躍手感。
+        // 螢幕更新率不再決定跳躍速度；低更新率時同一畫面可補算多個步長。
+        const stepMs = 1000 / 60;
+        this.playerJumpAccumulator += dt;
+        while (this.isJumping && this.playerJumpAccumulator + 1e-7 >= stepMs) {
+            this.playerJumpAccumulator = Math.max(0, this.playerJumpAccumulator - stepMs);
+            const gravity = 0.6;
+            const jumpTimeScale = this.playerJumpVel < 0 ? 0.25 : 1;
+            this.playerJumpY += this.playerJumpVel * jumpTimeScale;
+            this.playerJumpVel -= gravity * jumpTimeScale;
+            if (this.playerJumpY <= 0) {
+                this.playerJumpY = 0;
+                this.playerJumpVel = 0;
+                this.playerJumpAccumulator = 0;
+                this.isJumping = false;
+            }
+        }
+    },
+
     update(dt) {
         this.timeElapsed += dt;
 
@@ -1208,19 +1232,8 @@ const Game = {
 
         this.playerX += (this.playerTargetX - this.playerX) * 0.25;
 
-        // 跳躍物理更新
-        if (this.isJumping) {
-            const gravity = 0.6;
-            // 兔寶下降時以原始四分之一速度更新，降落時間約為原本的四倍；上升速度維持原樣。
-            const jumpTimeScale = this.playerJumpVel < 0 ? 0.25 : 1;
-            this.playerJumpY += this.playerJumpVel * jumpTimeScale;
-            this.playerJumpVel -= gravity * jumpTimeScale;
-            if (this.playerJumpY <= 0) {
-                this.playerJumpY = 0;
-                this.playerJumpVel = 0;
-                this.isJumping = false;
-            }
-        }
+        // 下降維持原始四分之一速度，並以實際時間更新。
+        this.updateJump(dt);
 
         // 閃光效果淡出（每 ms 減少 0.003，約 0.33 秒消散）
         if (this.flashAlpha > 0) {
