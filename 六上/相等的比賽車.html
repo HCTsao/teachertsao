@@ -366,7 +366,7 @@
                             </div>
                             <ul class="list-disc list-inside text-slate-300 space-y-1 pl-1">
                                 <li>最簡整數比（小數、分數）。</li>
-                                <li>相等的比（小數、分數）。</li>
+                                <li>相等的比（整數、小數、分數）。</li>
                             </ul>
                         </div>
 
@@ -1287,7 +1287,7 @@
         const QuestionGenerator = {
             // 50cc 題型：
             // 1. 最簡整數比（整數）
-            // 2. 相等的比（整數）
+            // 2. 相等的比（整數：直接乘以或除以 2, 3, 5, 10）
             generate50cc() {
                 const isSimplifyType = Math.random() < 0.55;
 
@@ -1316,10 +1316,10 @@
                     const explanation = `${targetStr} = (${a} ÷ ${g}) : (${b} ÷ ${g}) = ${correctStr}`;
 
                     // 誘答選項
-                    const unsimpMult = g > 2 ? Math.floor(g / 2) : 2;
+                    const unsimpMult = (g > 3) ? Math.floor(g / 2) : (g + 1);
                     const unsimp = `${sa * unsimpMult} : ${sb * unsimpMult}`;
                     const flipped = `${sb} : ${sa}`;
-                    const subTrap = (a - g > 0 && b - g > 0) ? `${a - g} : ${b - g}` : `${sa + 1} : ${sb + 1}`;
+                    const subTrap = (a - g > 0 && b - g > 0 && (a - g) !== sa) ? `${a - g} : ${b - g}` : `${sa + 1} : ${sb + 1}`;
 
                     const distractors = [unsimp, flipped, subTrap];
 
@@ -1332,33 +1332,52 @@
                         explanation
                     };
                 } else {
-                    // 題型 2：【相等的比】整數擴分或縮分找相等的比
+                    // 題型 2：【相等的比】前後項皆為整數，直接乘以或除以 2, 3, 5, 10
+                    const isMultiply = Math.random() < 0.5;
+                    const k = sample([2, 3, 5, 10]);
+
                     const basePairs = [
-                        [2, 3], [3, 4], [4, 5], [3, 5], [2, 5], [5, 6],
-                        [3, 7], [5, 7], [3, 8], [5, 8], [7, 10], [1, 2],
-                        [1, 3], [2, 7], [4, 7], [4, 9], [5, 9]
+                        [1, 2], [1, 3], [1, 4], [1, 5],
+                        [2, 3], [3, 2], [3, 4], [4, 3], [2, 5], [5, 2],
+                        [3, 5], [5, 3], [4, 5], [5, 4], [5, 6], [6, 5],
+                        [3, 7], [4, 7], [5, 7], [3, 8], [5, 8], [2, 7],
+                        [4, 9], [5, 9], [7, 10], [9, 10]
                     ];
                     const base = sample(basePairs);
-                    const a = base[0];
-                    const b = base[1];
+                    let targetStr = '';
+                    let correctStr = '';
+                    let explanation = '';
+                    let distractors = [];
 
-                    // 起始比的倍數 m1
-                    const m1 = sample([1, 2, 3, 4, 5]);
-                    const targetStr = `${a * m1} : ${b * m1}`;
+                    if (isMultiply) {
+                        // 直接乘以 2, 3, 5, 10
+                        const a = base[0];
+                        const b = base[1];
+                        targetStr = `${a} : ${b}`;
+                        correctStr = `${a * k} : ${b * k}`;
+                        explanation = `${targetStr} = (${a} × ${k}) : (${b} × ${k}) = ${correctStr}`;
 
-                    // 正確選項等比倍數 m2
-                    let m2 = sample([2, 3, 4, 5, 6, 7, 8]);
-                    while (m2 === m1) m2 = sample([2, 3, 4, 5, 6, 7, 8]);
-                    const correctStr = `${a * m2} : ${b * m2}`;
+                        const flipped = `${b * k} : ${a * k}`;
+                        const unequal = `${a * k} : ${b * (k === 2 ? 3 : k - 1)}`;
+                        const addTrap = `${a + k} : ${b + k}`;
 
-                    const explanation = `${targetStr} = (${a * m1} ÷ ${m1}) : (${b * m1} ÷ ${m1}) = ${a} : ${b} = (${a} × ${m2}) : (${b} × ${m2}) = ${correctStr}`;
+                        distractors = [flipped, unequal, addTrap];
+                    } else {
+                        // 直接除以 2, 3, 5, 10
+                        const sa = base[0];
+                        const sb = base[1];
+                        const a = sa * k;
+                        const b = sb * k;
+                        targetStr = `${a} : ${b}`;
+                        correctStr = `${sa} : ${sb}`;
+                        explanation = `${targetStr} = (${a} ÷ ${k}) : (${b} ÷ ${k}) = ${correctStr}`;
 
-                    // 誘答項
-                    const addTrap = `${a * m1 + m2} : ${b * m1 + m2}`;
-                    const flipped = `${b * m2} : ${a * m2}`;
-                    const unequalTrap = `${a * m2} : ${b * (m2 + 1)}`;
+                        const flipped = `${sb} : ${sa}`;
+                        const unequal = `${sa} : ${sb * 2}`;
+                        const subTrap = (a - k > 0 && b - k > 0) ? `${a - k} : ${b - k}` : `${sa + 1} : ${sb + 1}`;
 
-                    const distractors = [addTrap, flipped, unequalTrap];
+                        distractors = [flipped, unequal, subTrap];
+                    }
 
                     return {
                         categoryTag: '相等的比',
@@ -1373,11 +1392,67 @@
 
             // 100cc 題型：
             // 1. 最簡整數比（小數、分數）
-            // 2. 相等的比（小數、分數）
+            // 2. 相等的比（整數：直接乘以或除以 4, 6, 7, 8, 9；小數、分數）
             generate100cc() {
-                const subType = sample(['dec_simplify', 'frac_simplify', 'dec_equal', 'frac_equal']);
+                const subType = sample(['int_equal', 'dec_simplify', 'frac_simplify', 'dec_equal', 'frac_equal']);
 
-                if (subType === 'dec_simplify') {
+                if (subType === 'int_equal') {
+                    // 題型：【相等的比】前後項皆為整數，直接乘以或除以 4, 6, 7, 8, 9
+                    const isMultiply = Math.random() < 0.5;
+                    const k = sample([4, 6, 7, 8, 9]);
+
+                    const basePairs = [
+                        [1, 2], [1, 3], [1, 4], [1, 5],
+                        [2, 3], [3, 2], [3, 4], [4, 3], [2, 5], [5, 2],
+                        [3, 5], [5, 3], [4, 5], [5, 4], [5, 6], [6, 5],
+                        [3, 7], [4, 7], [5, 7], [3, 8], [5, 8], [2, 7],
+                        [4, 9], [5, 9], [7, 10], [9, 10]
+                    ];
+                    const base = sample(basePairs);
+                    let targetStr = '';
+                    let correctStr = '';
+                    let explanation = '';
+                    let distractors = [];
+
+                    if (isMultiply) {
+                        // 直接乘以 4, 6, 7, 8, 9
+                        const a = base[0];
+                        const b = base[1];
+                        targetStr = `${a} : ${b}`;
+                        correctStr = `${a * k} : ${b * k}`;
+                        explanation = `${targetStr} = (${a} × ${k}) : (${b} × ${k}) = ${correctStr}`;
+
+                        const flipped = `${b * k} : ${a * k}`;
+                        const unequal = `${a * k} : ${b * (k - 1)}`;
+                        const addTrap = `${a + k} : ${b + k}`;
+
+                        distractors = [flipped, unequal, addTrap];
+                    } else {
+                        // 直接除以 4, 6, 7, 8, 9
+                        const sa = base[0];
+                        const sb = base[1];
+                        const a = sa * k;
+                        const b = sb * k;
+                        targetStr = `${a} : ${b}`;
+                        correctStr = `${sa} : ${sb}`;
+                        explanation = `${targetStr} = (${a} ÷ ${k}) : (${b} ÷ ${k}) = ${correctStr}`;
+
+                        const flipped = `${sb} : ${sa}`;
+                        const unequal = `${sa} : ${sb * 2}`;
+                        const subTrap = (a - k > 0 && b - k > 0) ? `${a - k} : ${b - k}` : `${sa + 1} : ${sb + 1}`;
+
+                        distractors = [flipped, unequal, subTrap];
+                    }
+
+                    return {
+                        categoryTag: '相等的比 (整數)',
+                        targetTitle: '請選出「相等的比」',
+                        targetRatio: targetStr,
+                        correctOption: correctStr,
+                        distractors,
+                        explanation
+                    };
+                } else if (subType === 'dec_simplify') {
                     // 最簡整數比 (小數)
                     const decTemplates = [
                         { a: 0.8, b: 1.2, sa: 2, sb: 3, mult: 10 },
@@ -1615,6 +1690,94 @@
                 }
             },
 
+            // 確保 4 個選項皆不重複、且誘答選項不等於題目的強健演算法
+            ensureDistinctOptions(correctOption, initialDistractors, targetRatio) {
+                const optionsSet = new Set();
+                const finalOptions = [];
+
+                const cleanTarget = (targetRatio || '').trim();
+                const cleanCorrect = (correctOption || '').trim();
+
+                // 1. 加入正確答案
+                optionsSet.add(cleanCorrect);
+                finalOptions.push({ text: cleanCorrect, isCorrect: true });
+
+                // 2. 依序加入有效且不重複、不等於題目的誘答選項
+                for (const d of (initialDistractors || [])) {
+                    if (!d) continue;
+                    const dt = String(d).trim();
+                    if (dt && dt !== cleanTarget && !optionsSet.has(dt)) {
+                        optionsSet.add(dt);
+                        finalOptions.push({ text: dt, isCorrect: false });
+                    }
+                }
+
+                // 3. 若選項不足 4 個，動態補足高辨識度、不重複之誘答選項
+                let fallbackCounter = 2;
+                const generateCandidate = () => {
+                    const parts = cleanCorrect.split(':').map(s => s.trim());
+                    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                        const numA = parseInt(parts[0], 10);
+                        const numB = parseInt(parts[1], 10);
+                        if (!isNaN(numA) && !isNaN(numB) && numA > 0 && numB > 0) {
+                            const candidates = [
+                                `${numB} : ${numA}`,
+                                `${numA * fallbackCounter} : ${numB * fallbackCounter}`,
+                                `${numA * fallbackCounter} : ${numB * (fallbackCounter + 1)}`,
+                                `${numA * (fallbackCounter + 1)} : ${numB * fallbackCounter}`,
+                                `${numA + fallbackCounter} : ${numB + fallbackCounter}`,
+                                `${numA + fallbackCounter} : ${numB}`,
+                                `${numA} : ${numB + fallbackCounter}`,
+                                `${numA * 2 + 1} : ${numB * 2}`,
+                                `${numA * 2} : ${numB * 2 + 1}`,
+                                `${numA * 3} : ${numB * 2}`
+                            ];
+                            fallbackCounter++;
+                            for (const c of candidates) {
+                                if (c !== cleanTarget && !optionsSet.has(c)) {
+                                    return c;
+                                }
+                            }
+                        }
+                    }
+
+                    // 常用基底比備用庫
+                    const standardRatios = [
+                        '2 : 3', '3 : 2', '3 : 4', '4 : 3', '4 : 5', '5 : 4',
+                        '3 : 5', '5 : 3', '2 : 5', '5 : 2', '5 : 6', '6 : 5',
+                        '3 : 7', '7 : 3', '4 : 7', '7 : 4', '5 : 7', '7 : 5',
+                        '3 : 8', '8 : 3', '5 : 8', '8 : 5', '1 : 2', '2 : 1',
+                        '1 : 3', '3 : 1', '1 : 4', '4 : 1', '6 : 8', '8 : 6',
+                        '6 : 9', '9 : 6', '8 : 10', '10 : 8', '9 : 12', '12 : 9',
+                        '10 : 15', '15 : 10', '12 : 16', '16 : 12'
+                    ];
+                    for (const r of standardRatios) {
+                        if (r !== cleanTarget && !optionsSet.has(r)) {
+                            return r;
+                        }
+                    }
+
+                    fallbackCounter++;
+                    return `${fallbackCounter} : ${fallbackCounter + 3}`;
+                };
+
+                while (finalOptions.length < 4) {
+                    const cand = generateCandidate();
+                    if (cand && !optionsSet.has(cand) && cand !== cleanTarget) {
+                        optionsSet.add(cand);
+                        finalOptions.push({ text: cand, isCorrect: false });
+                    }
+                }
+
+                // 隨機打亂 4 個選項的位置
+                for (let i = finalOptions.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [finalOptions[i], finalOptions[j]] = [finalOptions[j], finalOptions[i]];
+                }
+
+                return finalOptions;
+            },
+
             createQuestion(mode) {
                 let qData = null;
                 let attempts = 0;
@@ -1641,25 +1804,20 @@
                     recentQuestionHistory.shift();
                 }
 
-                const rawOptions = [
-                    { text: qData.correctOption, isCorrect: true },
-                    { text: qData.distractors[0], isCorrect: false },
-                    { text: qData.distractors[1], isCorrect: false },
-                    { text: qData.distractors[2], isCorrect: false }
-                ];
+                // 嚴格確保 4 個選項皆不重複、誘答項不等於題目的保證引擎
+                const finalOptions = this.ensureDistinctOptions(
+                    qData.correctOption,
+                    qData.distractors,
+                    qData.targetRatio
+                );
 
-                for (let i = rawOptions.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [rawOptions[i], rawOptions[j]] = [rawOptions[j], rawOptions[i]];
-                }
-
-                const correctIndex = rawOptions.findIndex(o => o.isCorrect);
+                const correctIndex = finalOptions.findIndex(o => o.isCorrect);
 
                 return {
                     categoryTag: qData.categoryTag,
                     targetTitle: qData.targetTitle,
                     targetRatio: qData.targetRatio,
-                    options: rawOptions.map(o => o.text),
+                    options: finalOptions.map(o => o.text),
                     correctIndex: correctIndex,
                     explanation: qData.explanation
                 };
