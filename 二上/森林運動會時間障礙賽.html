@@ -67,7 +67,12 @@
         #start-screen {
             background: linear-gradient(135deg, rgba(45,106,79,0.95), rgba(29,53,87,0.95));
             color: #fff;
+            overflow-y: auto;
+            justify-content: safe center;
+            touch-action: pan-y !important;
+            padding-top: 80px;
         }
+        #start-screen > * { flex-shrink: 0; }
 
         .game-title {
             font-family: 'Fredoka One', 'Noto Sans TC', sans-serif;
@@ -434,14 +439,18 @@
         </div>
 
         <!-- 學生資訊輸入 -->
+        <div style="width:85%; max-width:320px; margin-top:12px; text-align:left;">
+            <label for="student-class" style="color:#fff; font-weight:900; font-size:0.9rem;">班級（選填）：</label>
+            <input type="text" id="student-class" maxlength="30" placeholder="例如：二年一班" style="display:block; width:100%; padding:8px 12px; border-radius:10px; border:none; font-size:1rem; margin-top:4px;">
+        </div>
         <div style="display: flex; gap: 12px; margin: 15px 0; width: 85%; max-width: 320px; font-family:'Noto Sans TC', sans-serif;">
             <div style="flex: 1; text-align: left;">
-                <label style="color: #fff; font-weight: 900; font-size: 0.9rem; display: block; margin-bottom: 4px;">班級座號：</label>
-                <input type="number" id="student-seat" min="1" max="50" placeholder="班級座號" style="width: 100%; padding: 8px 10px; border-radius: 10px; border: none; font-size: 1rem; font-weight: bold; text-align: center; outline: none;">
+                <label style="color: #fff; font-weight: 900; font-size: 0.9rem; display: block; margin-bottom: 4px;">座號（選填）：</label>
+                <input type="number" id="student-seat" min="1" max="50" placeholder="座號" style="width: 100%; padding: 8px 10px; border-radius: 10px; border: none; font-size: 1rem; font-weight: bold; text-align: center; outline: none;">
             </div>
             <div style="flex: 2; text-align: left;">
-                <label style="color: #fff; font-weight: 900; font-size: 0.9rem; display: block; margin-bottom: 4px;">學生姓名：</label>
-                <input type="text" id="student-name" placeholder="請輸入姓名" style="width: 100%; padding: 8px 12px; border-radius: 10px; border: none; font-size: 1rem; font-weight: bold; outline: none;">
+                <label style="color: #fff; font-weight: 900; font-size: 0.9rem; display: block; margin-bottom: 4px;">學生姓名（選填）：</label>
+                <input type="text" id="student-name" placeholder="可留空，英雄榜將顯示訪客" style="width: 100%; padding: 8px 12px; border-radius: 10px; border: none; font-size: 1rem; font-weight: bold; outline: none;">
             </div>
         </div>
 
@@ -465,7 +474,7 @@
             <button class="btn" id="play-btn" style="flex: 1; margin: 0;">開始</button>
             <button class="btn" id="leaderboard-btn" style="background:#ffb703; color:var(--dark-blue); font-weight:900; margin: 0; padding: 0 16px;">🏆 英雄榜</button>
         </div>
-        <a href="時間障礙賽教師後台.html" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.7)'">⚙️ 教師管理後台</a>
+        <a href="時間障礙賽教師後台.html" target="_blank" onclick="if (authorizeTeacher()) window.open(this.href, '_blank'); return false;" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.7)'">⚙️ 教師管理後台</a>
         
         <!-- 音量控制 (移至選單避免上排過擠) -->
         <div style="display:flex; align-items:center; gap:8px; margin-top: 18px; color:#fff; font-size:0.9rem; font-family:'Noto Sans TC', sans-serif;">
@@ -548,6 +557,22 @@
 </div>
 
 <script>
+function authorizeTeacher() {
+    const key = 'time-race-teacher-access';
+    const now = Date.now();
+    try {
+        const expires = Number(sessionStorage.getItem(key));
+        if (expires > now && expires <= now + 12 * 60 * 60 * 1000) return true;
+    } catch (_) {}
+    const password = prompt('請輸入教師後台密碼：');
+    if (password !== '8888') {
+        if (password !== null) alert('密碼錯誤');
+        return false;
+    }
+    try { sessionStorage.setItem(key, String(now + 12 * 60 * 60 * 1000)); } catch (_) {}
+    return true;
+}
+
 // === Firebase 初始化 ===
 const firebaseConfig = {
     apiKey: "AIzaSyCfg0RqupJq1ZpUkZVJdVuUODQd2C-hGuw",
@@ -1017,13 +1042,6 @@ const Game = {
     },
 
     start() {
-        const nameInput = document.getElementById('student-name');
-        const name = nameInput ? nameInput.value.trim() : '';
-        if (!name) {
-            alert('請先輸入「學生姓名」喔！');
-            if (nameInput) nameInput.focus();
-            return;
-        }
         this.state = 'RUNNING';
         this.score = 0; this.distance = 0; this.timeElapsed = 0;
         this.hearts = 3; this.lane = 1;
@@ -1192,8 +1210,10 @@ const Game = {
         // 跳躍物理更新
         if (this.isJumping) {
             const gravity = 0.6;
-            this.playerJumpY += this.playerJumpVel;
-            this.playerJumpVel -= gravity;
+            // 兔寶下降時以原始四分之一速度更新，降落時間約為原本的四倍；上升速度維持原樣。
+            const jumpTimeScale = this.playerJumpVel < 0 ? 0.25 : 1;
+            this.playerJumpY += this.playerJumpVel * jumpTimeScale;
+            this.playerJumpVel -= gravity * jumpTimeScale;
             if (this.playerJumpY <= 0) {
                 this.playerJumpY = 0;
                 this.playerJumpVel = 0;
@@ -1612,16 +1632,24 @@ showChoice(barrier) {
         document.getElementById('hint-answer').textContent = `✅ 正確答案：${h}時${m}分`;
 
         // 4.5. 上傳錯誤紀錄到 Firebase
-        if (db) {
+        try {
+          if (db) {
+            const className = document.getElementById('student-class').value.trim() || '未填班級';
             const seat = document.getElementById('student-seat').value.trim() || '無';
-            const name = document.getElementById('student-name').value.trim() || '匿名';
+            const name = document.getElementById('student-name').value.trim() || '訪客';
             db.ref('time_race_errors').push({
+                className: className,
                 seat: seat,
                 name: name,
                 question: `${h}時${m}分`,
+                correctAnswer: `${h}時${m}分`,
+                isCorrect: false,
                 wrongChoice: wrongChoice || '未填',
                 timestamp: firebase.database.ServerValue.TIMESTAMP
             }).catch(err => console.error("上傳錯誤紀錄失敗：", err));
+          }
+        } catch (err) {
+            console.error('上傳錯誤紀錄失敗：', err);
         }
 
         // 5. 顯示覆蓋；學生按按鈕才繼續（不自動關閉）
@@ -2268,7 +2296,7 @@ drawBarriersBackground() {
     uploadLeaderboard(finalScore) {
         if (!db) return;
         const seat = document.getElementById('student-seat').value.trim() || '無';
-        const name = document.getElementById('student-name').value.trim() || '匿名';
+        const name = document.getElementById('student-name').value.trim() || '訪客';
         
         db.ref('time_race_leaderboard').push({
             seat: seat,
@@ -2324,7 +2352,7 @@ drawBarriersBackground() {
                         tr.innerHTML = `
                             <td style="padding: 10px 8px; text-align: center; font-size: 1.15rem;">${rankHtml}</td>
                             <td style="padding: 10px 8px;">${this.escapeHtml(item.seat || '無')}</td>
-                            <td style="padding: 10px 8px; font-weight: bold;">${this.escapeHtml(item.name || '匿名')}</td>
+                            <td style="padding: 10px 8px; font-weight: bold;">${this.escapeHtml(item.name || '訪客')}</td>
                             <td style="padding: 10px 8px; text-align: center; font-size: 1.25rem;">${charEmoji}</td>
                             <td style="padding: 10px 8px; text-align: right; font-weight: 900; color: #ffd166;">${item.score}</td>
                         `;
