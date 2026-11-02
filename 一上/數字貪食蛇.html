@@ -348,6 +348,28 @@
             color: var(--text-color);
         }
 
+        .counting-options {
+            display: flex;
+            gap: 6px;
+            width: 100%;
+            margin-top: 6px;
+        }
+        .counting-btn {
+            flex: 1;
+            padding: 5px 4px;
+            border: 1px solid var(--primary-btn);
+            border-radius: 8px;
+            background: #fff;
+            color: #287c2c;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .counting-btn:hover, .counting-btn:focus-visible {
+            background: var(--primary-btn);
+            color: #fff;
+        }
+
         /* 左上角固定導覽按鈕群組 */
         #pageNavBar {
             position: fixed;
@@ -538,7 +560,7 @@
                     <h2 style="color: var(--text-color)">遊戲規則</h2>
                     <div class="rules-content" style="max-height: 240px; overflow-y: auto;">
                         <ul>
-                            <li><strong>目標：</strong>依序吃掉紅色數字飼料（依各關卡順序或倒數規則）。</li>
+                            <li><strong>目標：</strong>依序吃掉紅色數字飼料；關卡1、2、3、4、5可選「正數」（由小到大）或「倒數」（由大到小）。</li>
                             <li><strong>操作：</strong>電腦使用方向鍵；行動裝置則直接<strong>點擊遊戲畫面的上、下、左、右側邊緣</strong>進行轉向。</li>
                             <li><strong>得分機制：</strong>吃對正確數字 <strong>+10 分</strong>；吃錯數字或咬到自己 <strong>扣 5 分</strong>。</li>
                             <li><strong>機制：</strong>畫面上會有 3 個紅色飼料，只有 1 個是正確順序的數字。</li>
@@ -711,26 +733,6 @@
                 eatsPerGrowth: 1,
             },
             4: {
-                name: "2個一數",
-                startNum: 0,
-                firstTarget: 2,
-                maxTarget: 50,
-                endTarget: 50,
-                step: 2,
-                growthPerEat: 1,
-                eatsPerGrowth: 1,
-            },
-            5: {
-                name: "5個一數",
-                startNum: 0,
-                firstTarget: 5,
-                maxTarget: 50,
-                endTarget: 50,
-                step: 5,
-                growthPerEat: 2,
-                eatsPerGrowth: 1,
-            },
-            6: {
                 name: "100以內的數",
                 startNum: 49,
                 firstTarget: 50,
@@ -740,17 +742,7 @@
                 growthPerEat: 1,
                 eatsPerGrowth: 3,
             },
-            7: {
-                name: "10個一數",
-                startNum: 0,
-                firstTarget: 10,
-                maxTarget: 100,
-                endTarget: 100,
-                step: 10,
-                growthPerEat: 2,
-                eatsPerGrowth: 1,
-            },
-            8: {
+            5: {
                 name: "200以內的數",
                 startNum: 99,
                 firstTarget: 100,
@@ -760,26 +752,36 @@
                 growthPerEat: 1,
                 eatsPerGrowth: 4,
             },
-            9: {
-                name: "100以內的數(倒數)",
-                startNum: 100,
-                firstTarget: 99,
+            6: {
+                name: "2個一數",
+                startNum: 0,
+                firstTarget: 2,
                 maxTarget: 50,
                 endTarget: 50,
-                step: -1,
+                step: 2,
                 growthPerEat: 1,
-                eatsPerGrowth: 3,
+                eatsPerGrowth: 1,
             },
-            10: {
-                name: "200以內的數(倒數)",
-                startNum: 200,
-                firstTarget: 199,
+            7: {
+                name: "5個一數",
+                startNum: 0,
+                firstTarget: 5,
+                maxTarget: 50,
+                endTarget: 50,
+                step: 5,
+                growthPerEat: 2,
+                eatsPerGrowth: 1,
+            },
+            8: {
+                name: "10個一數",
+                startNum: 0,
+                firstTarget: 10,
                 maxTarget: 100,
                 endTarget: 100,
-                step: -1,
-                growthPerEat: 1,
-                eatsPerGrowth: 4,
-            }
+                step: 10,
+                growthPerEat: 2,
+                eatsPerGrowth: 1,
+            },
         };
 
         // --- 遊戲邏輯變數 ---
@@ -789,6 +791,23 @@
         let tileSize = canvas.width / GRID_COUNT;
 
         let currentLevel = 1;
+        let countingMode = 'ascending';
+        const COUNTING_LEVELS = new Set([1, 2, 3, 4, 5]);
+
+        function getLevelConfig() {
+            const base = LEVELS[currentLevel];
+            if (!COUNTING_LEVELS.has(currentLevel)) return base;
+            const descending = countingMode === 'descending';
+            return {
+                ...base,
+                name: base.name + (descending ? '（倒數）' : '（正數）'),
+                startNum: descending ? base.endTarget : base.startNum,
+                firstTarget: descending ? base.endTarget - base.step : base.firstTarget,
+                endTarget: descending ? base.firstTarget : base.endTarget,
+                step: descending ? -base.step : base.step,
+            };
+        }
+
         let correctEatsInLevel = 0;
         let growthPending = 0;
 
@@ -894,7 +913,7 @@
         // --- 飼料生成邏輯 ---
         function generateFeeds() {
             feeds = [];
-            const levelConfig = LEVELS[currentLevel];
+            const levelConfig = getLevelConfig();
             const end = levelConfig.endTarget || levelConfig.maxTarget;
             const step = levelConfig.step;
 
@@ -1093,7 +1112,7 @@
 
             // 3. 碰撞檢測：吃飼料
             let ateFeed = false;
-            const levelConfig = LEVELS[currentLevel];
+            const levelConfig = getLevelConfig();
             const end = levelConfig.endTarget || levelConfig.maxTarget;
 
             for (let i = 0; i < feeds.length; i++) {
@@ -1389,14 +1408,36 @@
             
             Object.keys(LEVELS).forEach(key => {
                 const lvl = LEVELS[key];
-                const btn = document.createElement('button');
-                btn.className = 'level-btn';
-                btn.innerHTML = `<span class="lvl-name">關卡${key}：${lvl.name}</span>`;
-                btn.addEventListener('click', () => {
-                    currentLevel = parseInt(key);
+                const levelNumber = Number(key);
+                const launchLevel = (mode = 'ascending') => {
+                    currentLevel = levelNumber;
+                    countingMode = mode;
                     startGame();
-                });
-                grid.appendChild(btn);
+                };
+                const card = document.createElement(COUNTING_LEVELS.has(levelNumber) ? 'div' : 'button');
+                card.className = 'level-btn';
+                const title = document.createElement('span');
+                title.className = 'lvl-name';
+                title.textContent = `關卡${key}：${lvl.name}`;
+                card.appendChild(title);
+                if (COUNTING_LEVELS.has(levelNumber)) {
+                    const options = document.createElement('div');
+                    options.className = 'counting-options';
+                    [['ascending', '正數'], ['descending', '倒數']].forEach(([mode, label]) => {
+                        const option = document.createElement('button');
+                        option.type = 'button';
+                        option.className = 'counting-btn';
+                        option.textContent = label;
+                        option.setAttribute('aria-label', `關卡${key}：${lvl.name}（${label}）`);
+                        option.addEventListener('click', () => launchLevel(mode));
+                        options.appendChild(option);
+                    });
+                    card.appendChild(options);
+                } else {
+                    card.type = 'button';
+                    card.addEventListener('click', () => launchLevel());
+                }
+                grid.appendChild(card);
             });
         }
 
@@ -1411,7 +1452,7 @@
                 }
             } catch (e) {}
             
-            const levelConfig = LEVELS[currentLevel];
+            const levelConfig = getLevelConfig();
             
             // 初始化變數
             snake = [
@@ -1473,7 +1514,7 @@
             }, 1200);
 
             document.getElementById('abandonBtn').style.display = 'none';
-            const levelConfig = LEVELS[currentLevel];
+            const levelConfig = getLevelConfig();
             document.getElementById('victoryDesc').innerHTML = `你成功按順序完成了 <strong>${levelConfig.name}</strong> 的挑戰！<br><span style="font-size: 1.3rem; color: #e67e22; font-weight: bold; display: block; margin-top: 12px;">🏆 獲得總分：${score} 分</span>`;
             document.getElementById('victoryOverlay').classList.add('active');
         }
