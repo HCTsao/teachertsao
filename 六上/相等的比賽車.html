@@ -231,8 +231,8 @@
         <button id="btn-fixed-leaderboard" type="button" class="px-3 py-1.5 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-xs sm:text-sm font-bold text-yellow-300 border border-yellow-500/50 shadow-xl backdrop-blur transition flex items-center gap-1.5 cursor-pointer" title="查看全球排行">
             <span>🏆</span> 排行榜
         </button>
-        <button id="btn-fixed-multiplayer" type="button" class="px-3 py-1.5 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-xs sm:text-sm font-bold text-cyan-300 border border-cyan-500/50 shadow-xl backdrop-blur transition flex items-center gap-1.5 cursor-pointer" title="4人線上對戰">
-            <span>🌐</span> 4人對戰
+        <button id="btn-fixed-multiplayer" type="button" class="px-3 py-1.5 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-xs sm:text-sm font-bold text-cyan-300 border border-cyan-500/50 shadow-xl backdrop-blur transition flex items-center gap-1.5 cursor-pointer" title="4人線上對戰 (測試中)">
+            <span>🌐</span> 4人對戰(測試中)
         </button>
     </div>
 
@@ -302,7 +302,7 @@
                 <div class="grid grid-cols-3 gap-2">
                     <div>
                         <label class="block text-[10px] text-slate-400 font-bold mb-1">班級 Class</label>
-                        <input type="text" id="input-student-class" placeholder="如 601" class="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs text-center font-bold focus:border-amber-400 outline-none">
+                        <input type="text" id="input-student-class" placeholder="班級 (例 601)" class="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs text-center font-bold focus:border-amber-400 outline-none">
                     </div>
                     <div>
                         <label class="block text-[10px] text-slate-400 font-bold mb-1">座號 No.</label>
@@ -310,7 +310,7 @@
                     </div>
                     <div>
                         <label class="block text-[10px] text-slate-400 font-bold mb-1">姓名 Name</label>
-                        <input type="text" id="input-student-name" placeholder="車手姓名" class="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs text-center font-bold focus:border-amber-400 outline-none">
+                        <input type="text" id="input-student-name" placeholder="姓名 (未填為訪客)" class="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs text-center font-bold focus:border-amber-400 outline-none">
                     </div>
                 </div>
             </div>
@@ -389,7 +389,7 @@
                 <span>🏁</span>
             </button>
             <button id="btn-start-multiplayer" class="w-full mt-3 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-racing font-black text-lg tracking-wider shadow-xl shadow-blue-600/30 transform transition hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer">
-                <span>🌐 4人連線對戰 (多人即時房間)</span>
+                <span>🌐 4人連線對戰 (測試中)</span>
                 <span>⚡</span>
             </button>
         </section>
@@ -542,6 +542,9 @@
                                 <div class="flex items-center gap-2">
                                     <h3 class="text-lg sm:text-xl font-bold font-racing text-amber-300">寶箱開啟！數學挑戰</h3>
                                     <span id="quiz-modal-category-tag" class="px-2 py-0.5 rounded-full bg-blue-900/60 border border-blue-600/40 text-blue-300 text-[10px]">最簡整數比</span>
+                                </div>
+                                <div id="quiz-timer-badge" class="px-3 py-1 rounded-xl bg-slate-800 border border-amber-500/50 flex items-center gap-1.5 font-racing font-bold text-amber-300 text-sm shadow ml-auto">
+                                    <span>⏱️</span> <span id="quiz-timer-text">90s</span>
                                 </div>
                                 <p class="text-xs text-slate-400">答對解鎖道具！連續答對 3 題即可發動 5 秒極速衝刺！</p>
                             </div>
@@ -2311,15 +2314,36 @@
 
         function updatePhysics(dt) {
             const p = State.player;
+            if (!p) return;
 
-            if (State.isCountingDown) {
+            // 【連線對戰答錯 30 秒停留原地懲罰】
+            if (p.stopPenaltyTimer > 0) {
+                p.stopPenaltyTimer -= dt;
                 p.speed = 0;
-                State.opponents.forEach(ai => ai.speed = 0);
+                p.targetSpeed = 0;
+                const banner = document.getElementById('hud-penalty-banner');
+                const secEl = document.getElementById('hud-penalty-timer');
+                if (banner) banner.classList.remove('hidden');
+                if (secEl) secEl.innerText = Math.ceil(p.stopPenaltyTimer);
+
+                if (p.stopPenaltyTimer <= 0) {
+                    p.stopPenaltyTimer = 0;
+                    if (banner) banner.classList.add('hidden');
+                    triggerFloatingAlert('🏁 30秒懲罰結束！立即加速出發！');
+                    p.targetSpeed = (State.currentMode === '150cc' ? 280 : (State.currentMode === '100cc' ? 250 : 220));
+                }
                 updateHudSpeed(0);
+                // 原地受罰期間持續更新特效與多人同步，但不推進里程
+                updateParticles(dt);
+                if (State.isMultiplayer && State.multiplayer.roomId && isFirebaseActive) {
+                    syncMultiplayerState();
+                }
                 return;
+            } else {
+                const banner = document.getElementById('hud-penalty-banner');
+                if (banner && !banner.classList.contains('hidden')) banner.classList.add('hidden');
             }
 
-            // 【需求 1】：答題時遊戲完全暫停，所有車子停止，等待答題完成後恢復
             if (State.isQuizModalOpen) {
                 return;
             }
@@ -2671,19 +2695,38 @@
             updateBoostPads(dt);
 
             // 即時排名
-            const allCars = [
-                { id: 0, distance: p.distance },
-                ...State.opponents.map(o => ({ id: o.id, distance: o.distance }))
-            ];
-            allCars.sort((a, b) => b.distance - a.distance);
-            const playerRank = allCars.findIndex(c => c.id === 0) + 1;
-
-            if (playerRank !== p.rank) {
-                if (playerRank < p.rank) {
-                    Sound.beep(680, 'triangle', 0.15, 0.25);
+            if (State.isMultiplayer) {
+                // 連線對戰：排名只比較同一房間內真實在線的玩家 (2~4 人)
+                const roomPlayers = State.multiplayer.players || {};
+                const playerList = Object.values(roomPlayers);
+                const myId = State.multiplayer.myPlayerId;
+                const rankList = playerList.map(pl => ({
+                    id: pl.id,
+                    distance: (pl.id === myId) ? p.distance : (pl.distance || 0)
+                }));
+                rankList.sort((a, b) => b.distance - a.distance);
+                const myIdx = rankList.findIndex(item => item.id === myId);
+                const curRank = (myIdx >= 0) ? (myIdx + 1) : 1;
+                if (curRank !== p.rank) {
+                    p.rank = curRank;
+                    updateRankBadge(curRank);
                 }
-                p.rank = playerRank;
-                updateRankBadge(playerRank);
+            } else {
+                // 單人模式：7 台賽車排名
+                const allCars = [
+                    { id: 0, distance: p.distance },
+                    ...State.opponents.map(o => ({ id: o.id, distance: o.distance }))
+                ];
+                allCars.sort((a, b) => b.distance - a.distance);
+                const playerRank = allCars.findIndex(c => c.id === 0) + 1;
+
+                if (playerRank !== p.rank) {
+                    if (playerRank < p.rank) {
+                        Sound.beep(680, 'triangle', 0.15, 0.25);
+                    }
+                    p.rank = playerRank;
+                    updateRankBadge(playerRank);
+                }
             }
 
             updateHudSpeed(p.speed, Input.up && !State.isQuizModalOpen, Input.down && !State.isQuizModalOpen);
@@ -4524,11 +4567,40 @@
         // -------------------------------------------------------------
         // 7. 寶箱解題挑戰彈窗機制
         // -------------------------------------------------------------
+        let quizCountdownTimer = null;
+        let quizTimeRemaining = 90;
+
         function openQuizModal() {
             State.isQuizModalOpen = true;
             State.isAnsweringLocked = false;
             Sound.silenceEngine();
             Sound.duckBGM(true);
+
+            // 啟動 90 秒倒數計時器
+            if (quizCountdownTimer) clearInterval(quizCountdownTimer);
+            quizTimeRemaining = 90;
+            const timerText = document.getElementById('quiz-timer-text');
+            const timerBadge = document.getElementById('quiz-timer-badge');
+            if (timerText) timerText.innerText = '90s';
+            if (timerBadge) {
+                timerBadge.className = 'px-3 py-1 rounded-xl bg-slate-800 border border-amber-500/50 flex items-center gap-1.5 font-racing font-bold text-amber-300 text-sm shadow ml-auto';
+            }
+
+            quizCountdownTimer = setInterval(() => {
+                if (!State.isQuizModalOpen || State.isAnsweringLocked) {
+                    clearInterval(quizCountdownTimer);
+                    return;
+                }
+                quizTimeRemaining--;
+                if (timerText) timerText.innerText = `${quizTimeRemaining}s`;
+                if (quizTimeRemaining <= 15 && timerBadge) {
+                    timerBadge.className = 'px-3 py-1 rounded-xl bg-red-950 border border-red-500 flex items-center gap-1.5 font-racing font-bold text-red-400 text-sm shadow ml-auto animate-pulse';
+                }
+                if (quizTimeRemaining <= 0) {
+                    clearInterval(quizCountdownTimer);
+                    handleModalTimeout();
+                }
+            }, 1000);
 
             const q = QuestionGenerator.createQuestion(State.currentMode);
             State.currentQuestion = q;
@@ -4551,19 +4623,54 @@
         }
 
         function closeQuizModal() {
+            if (quizCountdownTimer) clearInterval(quizCountdownTimer);
             State.isQuizModalOpen = false;
             document.getElementById('modal-quiz').classList.add('hidden');
             Sound.duckBGM(false);
-            // 關閉彈窗時恢復起步巡航加速
-            if (State.player && State.player.targetSpeed === 0) {
+            // 若不在 30 秒受罰狀態中，恢復起步巡航加速
+            if (State.player && State.player.stopPenaltyTimer <= 0 && State.player.targetSpeed === 0) {
                 const cruise = State.currentMode === '150cc' ? 280 : (State.currentMode === '100cc' ? 250 : 220);
                 State.player.targetSpeed = cruise;
+            }
+        }
+
+        function handleModalTimeout() {
+            if (State.isAnsweringLocked) return;
+            State.isAnsweringLocked = true;
+            if (quizCountdownTimer) clearInterval(quizCountdownTimer);
+
+            const q = State.currentQuestion;
+            State.totalAnswered++;
+            State.streak = 0;
+            State.dashProgress = 0;
+            updateDashGaugeUI();
+            document.getElementById('hud-streak').innerText = '0';
+
+            const correctCard = document.querySelectorAll('#modal-options-grid .option-card')[q.correctIndex];
+            if (correctCard) correctCard.classList.add('correct-ans');
+
+            Sound.crash();
+
+            if (State.isMultiplayer) {
+                // 連線對戰超時答錯：30 秒停留在原地！
+                State.player.stopPenaltyTimer = 30.0;
+                State.player.speed = 0;
+                State.player.targetSpeed = 0;
+                updateHudSpeed(0);
+                showModalFeedback(false, '⏱️ 90秒答題超時！連線對戰重度懲罰：原地停留 30 秒！', q.explanation);
+            } else {
+                State.player.speed = 0;
+                State.player.targetSpeed = 0;
+                State.player.spinTimer = 0.8;
+                updateHudSpeed(0);
+                showModalFeedback(false, '⏱️ 90秒答題超時！車速歸零！', q.explanation);
             }
         }
 
         function handleModalAnswer(selectedIndex) {
             if (State.isAnsweringLocked) return;
             State.isAnsweringLocked = true;
+            if (quizCountdownTimer) clearInterval(quizCountdownTimer);
 
             const q = State.currentQuestion;
             const isCorrect = selectedIndex === q.correctIndex;
@@ -4594,36 +4701,38 @@
                 document.getElementById('hud-correct-count').innerText = State.totalCorrect;
                 updateDashGaugeUI();
 
-                // 詳解僅列純算式過程
                 showModalFeedback(true, '🎉 答對了！成功獲得道具！', q.explanation);
 
                 if (State.dashProgress >= 3) {
                     State.dashProgress = 0;
                     State.pendingStreakDash = true;
                 }
-
-                // 不再自動跳掉，由玩家點擊「踩下油門繼續狂飆」手動繼續
             } else {
                 State.streak = 0;
                 State.dashProgress = 0;
                 updateDashGaugeUI();
                 document.getElementById('hud-streak').innerText = '0';
-                card.classList.add('wrong-ans');
+                if (card) card.classList.add('wrong-ans');
 
                 const correctCard = document.querySelectorAll('#modal-options-grid .option-card')[q.correctIndex];
                 if (correctCard) correctCard.classList.add('correct-ans');
 
                 Sound.crash();
-                // 詳解僅列純算式過程
-                showModalFeedback(false, '❌ 答案不正確！受到懲罰：車速歸零！', q.explanation);
 
-                // 答錯懲罰：自車時速歸零
-                State.player.speed = 0;
-                State.player.targetSpeed = 0;
-                State.player.spinTimer = 0.8;
-                updateHudSpeed(0);
-
-                // 不再自動跳掉，由玩家點擊手動繼續
+                if (State.isMultiplayer) {
+                    // 連線對戰答錯：30 秒停留在原地重度懲罰！
+                    State.player.stopPenaltyTimer = 30.0;
+                    State.player.speed = 0;
+                    State.player.targetSpeed = 0;
+                    updateHudSpeed(0);
+                    showModalFeedback(false, '❌ 答案不正確！連線對戰重度懲罰：原地停留 30 秒！', q.explanation);
+                } else {
+                    State.player.speed = 0;
+                    State.player.targetSpeed = 0;
+                    State.player.spinTimer = 0.8;
+                    updateHudSpeed(0);
+                    showModalFeedback(false, '❌ 答案不正確！受到懲罰：車速歸零！', q.explanation);
+                }
             }
         }
 
@@ -4843,19 +4952,32 @@
             const classInput = document.getElementById('input-student-class');
             const seatInput = document.getElementById('input-student-seat');
             const nameInput = document.getElementById('input-student-name');
+            const cVal = (classInput ? classInput.value.trim() : '') || localStorage.getItem('equal_ratio_class') || '';
+            const sVal = (seatInput ? seatInput.value.trim() : '') || localStorage.getItem('equal_ratio_seat') || '';
+            const nVal = (nameInput ? nameInput.value.trim() : '') || localStorage.getItem('equal_ratio_name') || '';
             return {
-                className: (classInput && classInput.value.trim()) ? classInput.value.trim() : (localStorage.getItem('equal_ratio_class') || '6年1班'),
-                seatNumber: (seatInput && seatInput.value.trim()) ? seatInput.value.trim() : (localStorage.getItem('equal_ratio_seat') || '1'),
-                studentName: (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : (localStorage.getItem('equal_ratio_name') || '參賽車手')
+                className: cVal,
+                seatNumber: sVal,
+                studentName: nVal || '訪客'
             };
         }
 
         function saveStudentInfoToStorage() {
-            const info = getStudentInfo();
+            const classInput = document.getElementById('input-student-class');
+            const seatInput = document.getElementById('input-student-seat');
+            const nameInput = document.getElementById('input-student-name');
+            const cVal = classInput ? classInput.value.trim() : '';
+            const sVal = seatInput ? seatInput.value.trim() : '';
+            const nVal = nameInput ? nameInput.value.trim() : '';
             try {
-                localStorage.setItem('equal_ratio_class', info.className);
-                localStorage.setItem('equal_ratio_seat', info.seatNumber);
-                localStorage.setItem('equal_ratio_name', info.studentName);
+                if (cVal) localStorage.setItem('equal_ratio_class', cVal);
+                else localStorage.removeItem('equal_ratio_class');
+
+                if (sVal) localStorage.setItem('equal_ratio_seat', sVal);
+                else localStorage.removeItem('equal_ratio_seat');
+
+                if (nVal) localStorage.setItem('equal_ratio_name', nVal);
+                else localStorage.removeItem('equal_ratio_name');
             } catch (e) {}
         }
 
@@ -4864,7 +4986,7 @@
                 const classInput = document.getElementById('input-student-class');
                 const seatInput = document.getElementById('input-student-seat');
                 const nameInput = document.getElementById('input-student-name');
-                if (classInput) classInput.value = localStorage.getItem('equal_ratio_class') || '601';
+                if (classInput) classInput.value = localStorage.getItem('equal_ratio_class') || '';
                 if (seatInput) seatInput.value = localStorage.getItem('equal_ratio_seat') || '';
                 if (nameInput) nameInput.value = localStorage.getItem('equal_ratio_name') || '';
             } catch (e) {}
@@ -5909,14 +6031,26 @@
 
             // 對手依據難度設定初始領先距離與強度 (6 名對手依序排在前方)
             const distMulti = State.currentMode === '150cc' ? 1.4 : (State.currentMode === '100cc' ? 1.2 : 1.0);
-            State.opponents = [
-                { id: 1, name: '翠綠號', color: '#10b981', distance: Math.round(75 * distMulti), speed: 0, targetSpeed: 240, x: 0.35, targetX: 0.35, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.0 },
-                { id: 2, name: '湛藍號', color: '#3b82f6', distance: Math.round(145 * distMulti), speed: 0, targetSpeed: 260, x: -0.35, targetX: -0.35, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.8 },
-                { id: 3, name: '金黃號', color: '#eab308', distance: Math.round(215 * distMulti), speed: 0, targetSpeed: 280, x: 0.3, targetX: 0.3, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 4.5 },
-                { id: 4, name: '紫電號', color: '#a855f7', distance: Math.round(285 * distMulti), speed: 0, targetSpeed: 300, x: -0.3, targetX: -0.3, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.5 },
-                { id: 5, name: '粉櫻號', color: '#ec4899', distance: Math.round(355 * distMulti), speed: 0, targetSpeed: 320, x: 0.25, targetX: 0.25, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 4.2 },
-                { id: 6, name: '青嵐號', color: '#06b6d4', distance: Math.round(425 * distMulti), speed: 0, targetSpeed: 340, x: -0.2, targetX: -0.2, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 5.0 }
-            ];
+            if (State.isMultiplayer) {
+                // 【核心要求】：連線對戰時只有當下在連線的玩家的車 (2~4台)！絕對不生成 AI 電腦車！
+                State.opponents = [];
+                // 起跑線依據 Slot 排開位置
+                const mySlot = State.multiplayer.mySlot || 1;
+                const slotX = [-0.35, 0.35, -0.55, 0.55][mySlot - 1] || -0.35;
+                const slotDist = [0, 0, -15, -15][mySlot - 1] || 0;
+                State.player.x = slotX;
+                State.player.distance = slotDist;
+            } else {
+                // 單人模式：維持 6 名 AI 對手
+                State.opponents = [
+                    { id: 1, name: '翠綠號', color: '#10b981', distance: Math.round(75 * distMulti), speed: 0, targetSpeed: 240, x: 0.35, targetX: 0.35, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.0 },
+                    { id: 2, name: '湛藍號', color: '#3b82f6', distance: Math.round(145 * distMulti), speed: 0, targetSpeed: 260, x: -0.35, targetX: -0.35, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.8 },
+                    { id: 3, name: '金黃號', color: '#eab308', distance: Math.round(215 * distMulti), speed: 0, targetSpeed: 280, x: 0.3, targetX: 0.3, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 4.5 },
+                    { id: 4, name: '紫電號', color: '#a855f7', distance: Math.round(285 * distMulti), speed: 0, targetSpeed: 300, x: -0.3, targetX: -0.3, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 3.5 },
+                    { id: 5, name: '粉櫻號', color: '#ec4899', distance: Math.round(355 * distMulti), speed: 0, targetSpeed: 320, x: 0.25, targetX: 0.25, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 4.2 },
+                    { id: 6, name: '青嵐號', color: '#06b6d4', distance: Math.round(425 * distMulti), speed: 0, targetSpeed: 340, x: -0.2, targetX: -0.2, steerVel: 0, bumpVel: 0, spinTimer: 0, bumpCooldown: 0, laneTimer: 5.0 }
+                ];
+            }
 
             // 【需求 2】：跑道上一排 5 個立體旋轉問號寶箱初始重置 (8 秒後出現第一排)
             State.itemBoxRows = [];
@@ -6016,7 +6150,7 @@
                     <span class="text-3xl">🌐</span>
                     <div>
                         <h2 class="text-lg sm:text-xl font-racing font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400">
-                            4人線上即時連線對戰大廳
+                            4人線上即時連線對戰大廳 (測試中)
                         </h2>
                         <p class="text-xs text-slate-400">最多可支援 4 名車手同時在同一跑道即時競速競答！</p>
                     </div>
