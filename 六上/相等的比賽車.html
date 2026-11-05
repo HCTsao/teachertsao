@@ -2010,6 +2010,8 @@
 
             totalAnswered: 0,
             totalCorrect: 0,
+            raceStartTime: 0,
+            raceElapsedMs: 0,
             dashProgress: 0,
             dashTimer: 0,
             streak: 0,
@@ -4857,6 +4859,8 @@
                     Sound.countdownPing(true);
                     // 倒數計時完成！解除靜止鎖定，所有賽車同時從黑白起跑線後方全速衝刺出發！
                     State.isCountingDown = false;
+                    State.raceStartTime = Date.now();
+                    State.raceElapsedMs = 0;
                     const cruise = State.currentMode === '150cc' ? 280 : (State.currentMode === '100cc' ? 250 : 220);
                     State.player.targetSpeed = cruise;
                     State.player.speed = Math.round(cruise * 0.75); // 快速起步
@@ -4936,21 +4940,25 @@
             document.getElementById('result-top-speed').innerText = `${toDisplaySpeed(State.topSpeed)} km/h`;
             document.getElementById('result-items-used').innerText = `${State.itemsUsedCount} 次`;
 
-            // 上傳個人賽事紀錄至 Firebase 教師後台 (EqualRatioRacing/records)
+            // 上傳個人賽事紀錄至 Firebase 教師後台 (EqualRatioRacing/records) 與 全球排行榜
             try {
                 const sInfo = getStudentInfo();
+                const elapsedMs = State.raceStartTime ? Math.max(1000, Date.now() - State.raceStartTime) : (State.raceElapsedMs || 0);
+                const score = State.totalCorrect * 10;
+
                 uploadRaceRecord({
                     className: sInfo.className,
                     seatNumber: sInfo.seatNumber,
                     studentName: sInfo.studentName,
                     mode: State.currentMode + ' (連線對戰)',
                     rank: myRank,
-                    score: State.totalCorrect * 10,
+                    score: score,
                     correctCount: State.totalCorrect,
                     totalAnswered: State.totalAnswered,
                     accuracy: accuracy,
                     topSpeed: toDisplaySpeed(State.topSpeed),
                     itemsUsed: State.itemsUsedCount,
+                    elapsedMs: elapsedMs,
                     mistakes: State.historyLog.filter(h => !h.isCorrect).map(m => ({
                         target: m.target || '',
                         chosen: m.chosen || '',
@@ -4958,6 +4966,21 @@
                         explanation: m.explanation || ''
                     })),
                     dateStr: new Date().toLocaleString('zh-TW', { hour12: false })
+                });
+
+                // 同步寫入排行榜
+                uploadLeaderboardRecord({
+                    className: sInfo.className,
+                    seatNumber: sInfo.seatNumber,
+                    studentName: sInfo.studentName,
+                    mode: State.currentMode,
+                    score: score,
+                    correctCount: State.totalCorrect,
+                    totalQuestions: State.totalAnswered,
+                    accuracy: accuracy,
+                    elapsedMs: elapsedMs,
+                    elapsedFormatted: formatTimeMs(elapsedMs),
+                    isMultiplayer: true
                 });
             } catch (err) {
                 console.error('上傳紀錄失敗:', err);
@@ -5040,21 +5063,25 @@
             document.getElementById('result-accuracy').innerText = `${accuracy}%`;
             document.getElementById('result-top-speed').innerText = `${toDisplaySpeed(State.topSpeed)} km/h`;
             document.getElementById('result-items-used').innerText = `${State.itemsUsedCount} 次`;
-            // 【上傳賽事紀錄至 Firebase 教師後台 (EqualRatioRacing/records)】
+            // 【上傳賽事紀錄至 Firebase 教師後台 (EqualRatioRacing/records) 與 全球排行榜 (EqualRatioRacing/leaderboard)】
             try {
                 const sInfo = getStudentInfo();
+                const elapsedMs = State.raceStartTime ? Math.max(1000, Date.now() - State.raceStartTime) : (State.raceElapsedMs || 0);
+                const score = State.totalCorrect * 10;
+
                 uploadRaceRecord({
                     className: sInfo.className,
                     seatNumber: sInfo.seatNumber,
                     studentName: sInfo.studentName,
                     mode: State.currentMode,
                     rank: rank,
-                    score: State.totalCorrect * 10,
+                    score: score,
                     correctCount: State.totalCorrect,
                     totalAnswered: State.totalAnswered,
                     accuracy: accuracy,
                     topSpeed: toDisplaySpeed(State.topSpeed),
                     itemsUsed: State.itemsUsedCount,
+                    elapsedMs: elapsedMs,
                     mistakes: State.historyLog.filter(h => !h.isCorrect).map(m => ({
                         target: m.target || '',
                         chosen: m.chosen || '',
@@ -5062,6 +5089,21 @@
                         explanation: m.explanation || ''
                     })),
                     dateStr: new Date().toLocaleString('zh-TW', { hour12: false })
+                });
+
+                // 同步寫入排行榜
+                uploadLeaderboardRecord({
+                    className: sInfo.className,
+                    seatNumber: sInfo.seatNumber,
+                    studentName: sInfo.studentName,
+                    mode: State.currentMode,
+                    score: score,
+                    correctCount: State.totalCorrect,
+                    totalQuestions: State.totalAnswered,
+                    accuracy: accuracy,
+                    elapsedMs: elapsedMs,
+                    elapsedFormatted: formatTimeMs(elapsedMs),
+                    isMultiplayer: false
                 });
             } catch (err) {
                 console.error('上傳紀錄失敗:', err);
@@ -5239,23 +5281,51 @@
         }
 
         function uploadLeaderboardRecord(recordData) {
-            if (!isFirebaseActive || !firebase.database) return;
-            try {
-                firebase.database().ref(`EqualRatioRacing/leaderboard/${recordData.mode}`).push({
-                    studentName: recordData.studentName || '賽車手',
-                    seatNumber: recordData.seatNumber || '',
-                    className: recordData.className || '',
-                    mode: recordData.mode,
-                    correctCount: recordData.correctCount || 0,
-                    totalQuestions: recordData.totalQuestions || 0,
-                    accuracy: recordData.accuracy || 0,
-                    elapsedMs: recordData.elapsedMs || 0,
-                    elapsedFormatted: recordData.elapsedFormatted || formatTimeMs(recordData.elapsedMs || 0),
-                    timestamp: firebase.database.ServerValue.TIMESTAMP
-                });
-            } catch (err) {
-                console.warn("排行榜紀錄寫入提示:", err);
+            if (!recordData) return;
+            const pureMode = (recordData.mode || '50cc').replace(/\s*\(.*\)/, '').trim();
+            const score = recordData.score !== undefined ? recordData.score : ((recordData.correctCount || 0) * 10);
+            const elapsedMs = recordData.elapsedMs || 0;
+            const payload = {
+                studentName: recordData.studentName || '賽車手',
+                seatNumber: recordData.seatNumber || '',
+                className: recordData.className || '',
+                mode: pureMode,
+                score: score,
+                correctCount: recordData.correctCount || 0,
+                totalQuestions: recordData.totalQuestions || 0,
+                accuracy: recordData.accuracy || 0,
+                elapsedMs: elapsedMs,
+                elapsedFormatted: recordData.elapsedFormatted || formatTimeMs(elapsedMs),
+                isMultiplayer: !!recordData.isMultiplayer,
+                timestamp: (typeof firebase !== 'undefined' && firebase.database && firebase.database.ServerValue)
+                    ? firebase.database.ServerValue.TIMESTAMP
+                    : Date.now()
+            };
+
+            // 1. 同步上傳至 Firebase Realtime Database 排行榜
+            if (isFirebaseActive && typeof firebase !== 'undefined' && firebase.database) {
+                try {
+                    firebase.database().ref(`EqualRatioRacing/leaderboard/${pureMode}`).push(payload).then(() => {
+                        console.log(`競賽成績已成功記錄至全球排行榜 EqualRatioRacing/leaderboard/${pureMode}: ${score}分`);
+                    }).catch(err => {
+                        console.warn("寫入 Firebase 排行榜失敗:", err);
+                    });
+                } catch (err) {
+                    console.warn("呼叫 Firebase 排行榜 API 失敗:", err);
+                }
             }
+
+            // 2. 本機快取備份 (離線亦能保留個人紀錄)
+            try {
+                const localKey = `equal_ratio_lb_${pureMode}`;
+                const localList = JSON.parse(localStorage.getItem(localKey) || '[]');
+                localList.push({
+                    ...payload,
+                    timestamp: Date.now()
+                });
+                if (localList.length > 50) localList.shift();
+                localStorage.setItem(localKey, JSON.stringify(localList));
+            } catch (e) {}
         }
 
         let currentLeaderboardMode = '50cc';
@@ -5284,69 +5354,163 @@
             if (modal) modal.classList.add('hidden');
         }
 
+        function loadLocalLeaderboardFallback(mode, listEl) {
+            try {
+                const localList = JSON.parse(localStorage.getItem(`equal_ratio_lb_${mode}`) || '[]');
+                if (!localList || localList.length === 0) {
+                    listEl.innerHTML = '<div class="text-center py-8 text-slate-500">目前尚無此難度之排行榜紀錄，快來搶下第一名！🏁</div>';
+                    return;
+                }
+                localList.sort((a, b) => {
+                    const scoreA = a.score !== undefined ? a.score : ((a.correctCount || 0) * 10);
+                    const scoreB = b.score !== undefined ? b.score : ((b.correctCount || 0) * 10);
+                    if (scoreB !== scoreA) return scoreB - scoreA;
+                    const diffCorrect = (b.correctCount || 0) - (a.correctCount || 0);
+                    if (diffCorrect !== 0) return diffCorrect;
+                    return (a.elapsedMs || 9999999) - (b.elapsedMs || 9999999);
+                });
+                renderLeaderboardRows(localList.slice(0, 20), listEl);
+            } catch (e) {
+                listEl.innerHTML = '<div class="text-center py-8 text-slate-500">目前暫無排行資料</div>';
+            }
+        }
+
+        function renderLeaderboardRows(topRecords, listEl) {
+            let html = '';
+            topRecords.forEach((r, idx) => {
+                const rankIdx = idx + 1;
+                const medal = (rankIdx === 1) ? '🥇' : ((rankIdx === 2) ? '🥈' : ((rankIdx === 3) ? '🥉' : `${rankIdx}`));
+                const rankBadgeClass = (rankIdx === 1) ? 'text-yellow-400 font-black' : ((rankIdx === 2) ? 'text-slate-200 font-black' : ((rankIdx === 3) ? 'text-amber-500 font-black' : 'text-slate-400 font-bold'));
+                const displayScore = r.score !== undefined ? r.score : ((r.correctCount || 0) * 10);
+                const timeStr = r.elapsedFormatted ? r.elapsedFormatted : (r.elapsedMs ? formatTimeMs(r.elapsedMs) : '完賽');
+                const dateStr = r.timestamp ? new Date(r.timestamp).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : (r.dateStr || '');
+
+                html += `
+                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition">
+                    <div class="flex items-center gap-3">
+                        <span class="w-8 text-center text-lg ${rankBadgeClass}">${medal}</span>
+                        <div>
+                            <div class="font-bold text-white text-sm flex items-center gap-1.5 flex-wrap">
+                                <span>${escapeHtml(r.studentName || '賽車手')}</span>
+                                ${(r.className || r.seatNumber) ? `<span class="text-[11px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-mono">${escapeHtml(r.className || '')} ${escapeHtml(r.seatNumber ? r.seatNumber + '號' : '')}</span>` : ''}
+                                ${r.isMultiplayer ? `<span class="text-[10px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 font-bold">4人連線</span>` : ''}
+                            </div>
+                            <div class="text-[11px] text-slate-400 mt-0.5">
+                                ⏱️ 完賽用時: <span class="font-mono text-emerald-400 font-bold">${timeStr}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-amber-400 font-racing font-black text-base sm:text-lg">
+                            ${displayScore} <span class="text-xs text-amber-300 font-sans font-bold">分</span>
+                        </div>
+                        <div class="text-[11px] text-emerald-400 font-mono">
+                            ${r.correctCount || 0} 題正確${r.accuracy ? ` (${r.accuracy}%)` : ''}
+                        </div>
+                        <div class="text-[10px] text-slate-500 font-mono mt-0.5">
+                            ${dateStr}
+                        </div>
+                    </div>
+                </div>`;
+            });
+            listEl.innerHTML = html;
+        }
+
         function loadLeaderboardData(mode) {
             const listEl = document.getElementById('leaderboard-list');
             if (!listEl) return;
             listEl.innerHTML = '<div class="text-center py-8 text-slate-400">正在讀取雲端最新排行資料...</div>';
 
             if (!isFirebaseActive || !firebase.database) {
-                listEl.innerHTML = '<div class="text-center py-8 text-amber-400">連線未建立或暫無紀錄</div>';
+                loadLocalLeaderboardFallback(mode, listEl);
                 return;
             }
 
-            firebase.database().ref(`EqualRatioRacing/leaderboard/${mode}`).limitToLast(80).once('value', snapshot => {
-                const val = snapshot.val();
-                if (!val) {
+            // 同步讀取專用排行榜 EqualRatioRacing/leaderboard 與 歷史賽事紀錄 EqualRatioRacing/records
+            Promise.all([
+                firebase.database().ref(`EqualRatioRacing/leaderboard/${mode}`).limitToLast(100).once('value').catch(() => null),
+                firebase.database().ref('EqualRatioRacing/records').limitToLast(150).once('value').catch(() => null)
+            ]).then(([lbSnap, recSnap]) => {
+                const map = new Map();
+
+                // 1. 載入專用排行榜資料
+                if (lbSnap && lbSnap.val()) {
+                    const val = lbSnap.val();
+                    Object.keys(val).forEach(k => {
+                        const r = val[k];
+                        if (r) {
+                            const uniqueKey = `${r.studentName}_${r.className}_${r.seatNumber}_${r.timestamp || k}`;
+                            map.set(uniqueKey, { id: k, ...r });
+                        }
+                    });
+                }
+
+                // 2. 補充整合歷史賽事紀錄 (確保先前已遊玩的紀錄亦能即刻入榜！)
+                if (recSnap && recSnap.val()) {
+                    const val = recSnap.val();
+                    Object.keys(val).forEach(k => {
+                        const r = val[k];
+                        if (r && r.mode && r.mode.startsWith(mode)) {
+                            const uniqueKey = `${r.studentName}_${r.className}_${r.seatNumber}_${r.timestamp || k}`;
+                            if (!map.has(uniqueKey)) {
+                                const score = r.score !== undefined ? r.score : ((r.correctCount || 0) * 10);
+                                map.set(uniqueKey, {
+                                    id: k,
+                                    studentName: r.studentName || '賽車手',
+                                    seatNumber: r.seatNumber || '',
+                                    className: r.className || '',
+                                    mode: mode,
+                                    score: score,
+                                    correctCount: r.correctCount || 0,
+                                    totalQuestions: r.totalAnswered || 0,
+                                    accuracy: r.accuracy || 0,
+                                    elapsedMs: r.elapsedMs || 0,
+                                    elapsedFormatted: r.elapsedFormatted || (r.elapsedMs ? formatTimeMs(r.elapsedMs) : '完賽'),
+                                    isMultiplayer: r.mode.includes('連線'),
+                                    timestamp: r.timestamp || 0,
+                                    dateStr: r.dateStr || ''
+                                });
+                            }
+                        }
+                    });
+                }
+
+                // 3. 補充本機快取
+                try {
+                    const localList = JSON.parse(localStorage.getItem(`equal_ratio_lb_${mode}`) || '[]');
+                    localList.forEach(r => {
+                        const uniqueKey = `${r.studentName}_${r.className}_${r.seatNumber}_${r.timestamp}`;
+                        if (!map.has(uniqueKey)) {
+                            map.set(uniqueKey, r);
+                        }
+                    });
+                } catch (e) {}
+
+                const records = Array.from(map.values());
+
+                if (records.length === 0) {
                     listEl.innerHTML = '<div class="text-center py-8 text-slate-500">目前尚無此難度之排行榜紀錄，快來搶下全伺服器第一名！🏁</div>';
                     return;
                 }
-                const records = Object.keys(val).map(k => ({ id: k, ...val[k] }));
-                // 排序依據：優先比較答對題數 (越多越好 DESC)，若相同則比較完賽時間 (越小越快 ASC)
+
+                // 排序依據：優先比較分數 (越高越好 DESC)，若相同則比較答對題數 (越多越好 DESC)，再比較完賽時間 (越小越快 ASC)
                 records.sort((a, b) => {
-                    const diffScore = (b.correctCount || 0) - (a.correctCount || 0);
-                    if (diffScore !== 0) return diffScore;
-                    return (a.elapsedMs || 999999) - (b.elapsedMs || 999999);
+                    const scoreA = a.score !== undefined ? a.score : ((a.correctCount || 0) * 10);
+                    const scoreB = b.score !== undefined ? b.score : ((b.correctCount || 0) * 10);
+                    if (scoreB !== scoreA) return scoreB - scoreA;
+                    const diffCorrect = (b.correctCount || 0) - (a.correctCount || 0);
+                    if (diffCorrect !== 0) return diffCorrect;
+                    const timeA = a.elapsedMs || 9999999;
+                    const timeB = b.elapsedMs || 9999999;
+                    return timeA - timeB;
                 });
 
-                const topRecords = records.slice(0, 15);
-                let html = '';
-                topRecords.forEach((r, idx) => {
-                    const rankIdx = idx + 1;
-                    const medal = (rankIdx === 1) ? '🥇' : ((rankIdx === 2) ? '🥈' : ((rankIdx === 3) ? '🥉' : `${rankIdx}`));
-                    const rankBadgeClass = (rankIdx === 1) ? 'text-yellow-400 font-black' : ((rankIdx === 2) ? 'text-slate-200 font-black' : ((rankIdx === 3) ? 'text-amber-500 font-black' : 'text-slate-400 font-bold'));
-                    const timeStr = r.elapsedFormatted || formatTimeMs(r.elapsedMs || 0);
-                    const dateStr = r.timestamp ? new Date(r.timestamp).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
-
-                    html += `
-                    <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition">
-                        <div class="flex items-center gap-3">
-                            <span class="w-8 text-center text-lg ${rankBadgeClass}">${medal}</span>
-                            <div>
-                                <div class="font-bold text-white text-sm flex items-center gap-1.5">
-                                    <span>${escapeHtml(r.studentName || '賽車手')}</span>
-                                    <span class="text-[11px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-mono">${escapeHtml(r.className || '')} ${escapeHtml(r.seatNumber ? r.seatNumber + '號' : '')}</span>
-                                </div>
-                                <div class="text-[11px] text-slate-400 mt-0.5">
-                                    ⏱️ 完賽用時: <span class="font-mono text-emerald-400 font-bold">${timeStr}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-amber-400 font-racing font-bold text-sm">
-                                ${r.correctCount || 0} 題正確
-                            </div>
-                            <div class="text-[10px] text-slate-500 font-mono mt-0.5">
-                                ${dateStr}
-                            </div>
-                        </div>
-                    </div>`;
-                });
-                listEl.innerHTML = html;
-            }, err => {
-                listEl.innerHTML = `<div class="text-center py-6 text-red-400">載入失敗: ${err.message}</div>`;
+                renderLeaderboardRows(records.slice(0, 25), listEl);
+            }).catch(err => {
+                console.error("載入排行榜失敗:", err);
+                loadLocalLeaderboardFallback(mode, listEl);
             });
         }
-
         // =========================================================================
         // 【需求 4】：4人線上即時連線對戰系統核心 (4-Player Multiplayer Battle System)
         // 使用 Firebase Realtime Database 即時同步位置、里程、速度、名次與發射武器
@@ -6263,6 +6427,8 @@
             document.getElementById('modal-quiz').classList.add('hidden');
             updateDashGaugeUI();
 
+            State.raceStartTime = 0;
+            State.raceElapsedMs = 0;
             Sound.initEngine();
             Sound.playBGM();
             // 【精密賽道規劃】：550米主起跑大直道 (Main Straight)，4台車起跑距全面拉開
@@ -6372,7 +6538,7 @@
                         <h2 class="text-lg sm:text-xl font-racing font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-red-400">
                             等比賽車 全球競速排行榜
                         </h2>
-                        <p class="text-xs text-slate-400">排序準則：優先依據「答對題數」排序，題數相同則依「完賽時間」取最速車手！</p>
+                        <p class="text-xs text-slate-400">排序準則：優先依據「總分與答對題數」排序，分數相同則依「完賽時間」取最速車手！</p>
                     </div>
                 </div>
                 <button id="btn-close-leaderboard" class="text-slate-400 hover:text-white text-2xl font-bold cursor-pointer px-2">✕</button>
