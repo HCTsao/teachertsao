@@ -3,19 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>十十乘法心臟病 - 終極競賽版</title>
+    <title>九九乘法心臟病 - 終極競賽版</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React & Babel CDN -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
+    <!-- PeerJS for WebRTC P2P Multiplayer -->
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <style>
         /* 基礎飛行與動畫路徑 */
-        @keyframes flyFromBottom { 0% { transform: translateY(300px) scale(0.5); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
-        @keyframes flyFromLeft { 0% { transform: translateX(-500px) scale(0.5); opacity: 0; } 100% { transform: translateX(0) scale(1); opacity: 1; } }
-        @keyframes flyFromTop { 0% { transform: translateY(-400px) scale(0.5); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
-        @keyframes flyFromRight { 0% { transform: translateX(400px) scale(0.5); opacity: 0; } 100% { transform: translateX(0) scale(1); opacity: 1; } }
+        @keyframes flyFrom0 { 0% { transform: translateY(300px) scale(0.5); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+        @keyframes flyFrom1 { 0% { transform: translateX(-500px) scale(0.5); opacity: 0; } 100% { transform: translateX(0) scale(1); opacity: 1; } }
+        @keyframes flyFrom2 { 0% { transform: translateY(-400px) scale(0.5); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+        @keyframes flyFrom3 { 0% { transform: translateX(400px) scale(0.5); opacity: 0; } 100% { transform: translateX(0) scale(1); opacity: 1; } }
         
         /* 受罰回歸路徑 */
         @keyframes returnTo0 { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, 400px) scale(0.5); opacity: 0; } }
@@ -29,10 +31,10 @@
         @keyframes dealTo2 { 0% { transform: translate(-50%, -50%) rotate(0deg); opacity: 1; } 100% { transform: translate(-50%, -400px) rotate(var(--rot)); opacity: 1; } }
         @keyframes dealTo3 { 0% { transform: translate(-50%, -50%) rotate(0deg); opacity: 1; } 100% { transform: translate(400px, -50%) rotate(var(--rot)); opacity: 1; } }
 
-        .animate-fly-0 { animation: flyFromBottom 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-        .animate-fly-1 { animation: flyFromLeft 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-        .animate-fly-2 { animation: flyFromTop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-        .animate-fly-3 { animation: flyFromRight 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .animate-fly-0 { animation: flyFrom0 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .animate-fly-1 { animation: flyFrom1 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .animate-fly-2 { animation: flyFrom2 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .animate-fly-3 { animation: flyFrom3 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
 
         .animate-return-0 { animation: returnTo0 0.8s ease-in forwards; }
         .animate-return-1 { animation: returnTo1 0.8s ease-in forwards; }
@@ -78,8 +80,17 @@
         const Trophy = ({ size = 24, className = "" }) => (
             <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg>
         );
-        const Home = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
+        const Users = ({ size = 24, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        );
+        const Globe = ({ size = 24, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        );
+        const Copy = ({ size = 24, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+        );
+        const Check = ({ size = 24, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"/></svg>
         );
         const AlertCircle = ({ size = 24, className = "" }) => (
             <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
@@ -91,62 +102,84 @@
             <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" /></svg>
         );
 
-        const PLAYERS_COUNT = 4;
+        // 九九乘法：每一乘數只包含 1~9，無10
+        // 9 種數值各 6 張，共 54 張牌。2人遊玩每人27張，3人遊玩每人18張，均可整除！
         const CARDS_PER_TYPE = 6;
-        const MULTIPLIERS = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+        const MULTIPLIERS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
         const isDangerousPair = (cardVal, targetVal) => {
             const pairs = [
-                [10, 20], [20, 10], [16, 18], [18, 16], [12, 21], [21, 12], 
-                [24, 42], [42, 24], [40, 80], [80, 40], [60, 90], [90, 60],
-                [18, 81], [81, 18], [45, 54], [54, 45], [27, 72], [72, 27]
+                [16, 18], [18, 16], [12, 21], [21, 12], 
+                [24, 42], [42, 24], [18, 81], [81, 18], 
+                [45, 54], [54, 45], [27, 72], [72, 27],
+                [36, 63], [63, 36], [14, 41], [41, 14],
+                [16, 61], [61, 16], [28, 82], [82, 28]
             ];
             return pairs.some(p => p[0] === cardVal && p[1] === targetVal);
         };
 
         const toChineseNum = (n) => {
             const mapping = { 
-                0: "\u96f6", 1: "\u4e00", 2: "\u4e8c", 3: "\u4e09", 4: "\u56db", 
-                5: "\u4e94", 6: "\u516d", 7: "\u4e03", 8: "\u516b", 9: "\u4e5d" 
+                0: "零", 1: "一", 2: "二", 3: "三", 4: "四", 
+                5: "五", 6: "六", 7: "七", 8: "八", 9: "九" 
             };
             if (n < 10) return mapping[n];
-            if (n === 10) return "\u5341";
-            if (n < 20) return "\u5341" + mapping[n % 10];
-            if (n % 10 === 0) return mapping[Math.floor(n / 10)] + "\u5341";
-            return mapping[Math.floor(n / 10)] + "\u5341" + mapping[n % 10];
+            if (n === 10) return "十";
+            if (n < 20) return "十" + mapping[n % 10];
+            if (n % 10 === 0) return mapping[Math.floor(n / 10)] + "十";
+            return mapping[Math.floor(n / 10)] + "十" + mapping[n % 10];
         };
 
         const getChantText = (m, s, p) => {
-            // Simple concatenation: e.g. 3x1=3 -> "\u4e09\u4e00\u4e09", 3x4=12 -> "\u4e09\u56db\u5341\u4e8c"
             return toChineseNum(m) + toChineseNum(s) + toChineseNum(p);
         };
 
-        const App = () => {
-            const [gameState, setGameState] = useState('menu');
-            const [slapRipple, setSlapRipple] = useState(false);
-            const [slapHands, setSlapHands] = useState([]);
+        const PEER_CONFIG = {
+            host: '0.peerjs.com',
+            port: 443,
+            secure: true,
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' },
+                    { urls: 'stun:global.stun.twilio.com:3478' },
+                    {
+                        urls: 'turn:openrelay.metered.ca:80',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    },
+                    {
+                        urls: 'turn:openrelay.metered.ca:443',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    }
+                ]
+            }
+        };
 
-            const triggerSlapHand = (playerIndex) => {
-                const id = Date.now() + Math.random();
-                setSlapHands(prev => [...prev, { id, playerIndex }]);
-                setTimeout(() => setSlapHands(prev => prev.filter(h => h.id !== id)), 750);
-            };
-            const [scale, setScale] = useState(1);
-            useEffect(() => {
-                const handleResize = () => {
-                    const baseWidth = 1024;
-                    const baseHeight = 768;
-                    const scaleX = window.innerWidth / baseWidth;
-                    const scaleY = window.innerHeight / baseHeight;
-                    setScale(Math.min(scaleX, scaleY, 1));
-                };
-                window.addEventListener('resize', handleResize);
-                handleResize();
-                return () => window.removeEventListener('resize', handleResize);
-            }, []); 
+        const App = () => {
+            const [gameState, setGameState] = useState('menu'); // 'menu' | 'onlineLobby' | 'dealing' | 'starting' | 'playing' | 'slapping' | 'gameOver'
+            const [mainTab, setMainTab] = useState('local'); // 'local' | 'online'
+            const [playerCount, setPlayerCount] = useState(2); // 2 or 3
             const [multiplier, setMultiplier] = useState(2);
-            const [difficulty, setDifficulty] = useState('easy'); 
+            const [difficulty, setDifficulty] = useState('easy'); // 'easy' (正背 1->9) | 'hard' (倒背 9->1)
             const [aiLevel, setAiLevel] = useState('normal'); 
+
+            // 在線連線相關狀態
+            const [isOnline, setIsOnline] = useState(false);
+            const [isHost, setIsHost] = useState(false);
+            const [mySeatIndex, setMySeatIndex] = useState(0);
+            const [playerName, setPlayerName] = useState(() => localStorage.getItem('multi_heart_name') || '玩家 1');
+            const [roomCode, setRoomCode] = useState('');
+            const [joinInputCode, setJoinInputCode] = useState('');
+            const [roomPlayers, setRoomPlayers] = useState([]);
+            const [copiedCode, setCopiedCode] = useState(false);
+            const [copiedLink, setCopiedLink] = useState(false);
+            const [onlineStatusMsg, setOnlineStatusMsg] = useState('');
+            const [onlineError, setOnlineError] = useState('');
+
+            // 遊戲核心數據
             const [players, setPlayers] = useState([]);
             const [mainDeck, setMainDeck] = useState([]); 
             const [centerPile, setCenterPile] = useState([]); 
@@ -163,6 +196,9 @@
             const [startPrompt, setStartPrompt] = useState(""); 
             const [errorMsg, setErrorMsg] = useState(""); 
             const [showIdleHint, setShowIdleHint] = useState(false); 
+            const [slapRipple, setSlapRipple] = useState(false);
+            const [slapHands, setSlapHands] = useState([]);
+            const [scale, setScale] = useState(1);
 
             const timeoutRef = useRef(null);
             const idleTimerRef = useRef(null);
@@ -171,12 +207,68 @@
             const flippedCardRef = useRef(null);
             const isFlipResolvedRef = useRef(false);
 
+            // PeerJS 連線 Refs
+            const peerRef = useRef(null);
+            const hostConnsRef = useRef([]); // host 專用：所有客戶端連線
+            const clientConnRef = useRef(null); // client 專用：連接 host 的連線
+            const isOnlineRef = useRef(false);
+            const isHostRef = useRef(false);
+            const mySeatIndexRef = useRef(0);
+            const gameStateRef = useRef(gameState);
+            const playersRef = useRef(players);
+            const centerPileRef = useRef(centerPile);
+            const turnRef = useRef(turn);
+            const currentStepRef = useRef(currentStep);
+            const multiplierRef = useRef(multiplier);
+            const difficultyRef = useRef(difficulty);
+            const playerCountRef = useRef(playerCount);
+            const roomPlayersRef = useRef(roomPlayers);
+            const roomCodeRef = useRef(roomCode);
+
+            useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
+            useEffect(() => { playersRef.current = players; }, [players]);
+            useEffect(() => { centerPileRef.current = centerPile; }, [centerPile]);
+            useEffect(() => { turnRef.current = turn; }, [turn]);
+            useEffect(() => { currentStepRef.current = currentStep; }, [currentStep]);
+            useEffect(() => { multiplierRef.current = multiplier; }, [multiplier]);
+            useEffect(() => { difficultyRef.current = difficulty; }, [difficulty]);
+            useEffect(() => { playerCountRef.current = playerCount; }, [playerCount]);
+            useEffect(() => { isOnlineRef.current = isOnline; }, [isOnline]);
+            useEffect(() => { isHostRef.current = isHost; }, [isHost]);
+            useEffect(() => { mySeatIndexRef.current = mySeatIndex; }, [mySeatIndex]);
+            useEffect(() => { roomPlayersRef.current = roomPlayers; }, [roomPlayers]);
+            useEffect(() => { roomCodeRef.current = roomCode; }, [roomCode]);
+
+            // 自動檢測網址是否有 ?room=XXXX 邀請碼
+            useEffect(() => {
+                const params = new URLSearchParams(window.location.search);
+                const r = params.get('room');
+                if (r) {
+                    setJoinInputCode(r.trim());
+                    setMainTab('online');
+                }
+            }, []);
+
+            // 響應式縮放
+            useEffect(() => {
+                const handleResize = () => {
+                    const baseWidth = 1024;
+                    const baseHeight = 768;
+                    const scaleX = window.innerWidth / baseWidth;
+                    const scaleY = window.innerHeight / baseHeight;
+                    setScale(Math.min(scaleX, scaleY, 1));
+                };
+                window.addEventListener('resize', handleResize);
+                handleResize();
+                return () => window.removeEventListener('resize', handleResize);
+            }, []);
+
             const isDealing = gameState === 'dealing';
 
-            const getAiSpeedMultiplier = () => {
-                if (aiLevel === 'easy') return 1.5;
-                if (aiLevel === 'hard') return 0.5 / 1.3; 
-                return 1.0;
+            const triggerSlapHand = (playerIndex) => {
+                const id = Date.now() + Math.random();
+                setSlapHands(prev => [...prev, { id, playerIndex }]);
+                setTimeout(() => setSlapHands(prev => prev.filter(h => h.id !== id)), 750);
             };
 
             const getAiSlapMultiplier = () => {
@@ -191,9 +283,10 @@
             };
 
             const playSoundEffect = (type) => {
-                if (isMuted || !audioCtxRef.current) return;
+                if (isMuted) return;
                 initAudio();
                 const ctx = audioCtxRef.current;
+                if (!ctx) return;
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 if (type === 'flip' || type === 'deal') {
@@ -203,45 +296,419 @@
                     osc.type = 'square'; osc.frequency.setValueAtTime(180, ctx.currentTime); gain.gain.setValueAtTime(0.1, ctx.currentTime);
                     osc.connect(gain); gain.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.15);
                 } else if (type === 'error') {
-                    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(120, ctx.currentTime); gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(120, ctx.currentTime); gain.gain.setValueAtTime(0.12, ctx.currentTime);
                     osc.connect(gain); gain.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.3);
+                } else if (type === 'win') {
+                    const notes = [523.25, 659.25, 783.99, 1046.50];
+                    notes.forEach((freq, idx) => {
+                        const o = ctx.createOscillator();
+                        const g = ctx.createGain();
+                        o.type = 'triangle';
+                        o.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.1);
+                        g.gain.setValueAtTime(0.1, ctx.currentTime + idx * 0.1);
+                        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.1 + 0.3);
+                        o.connect(g); g.connect(ctx.destination);
+                        o.start(ctx.currentTime + idx * 0.1);
+                        o.stop(ctx.currentTime + idx * 0.1 + 0.35);
+                    });
                 }
             };
 
-            const startGame = async (num) => {
+            // 建立 54 張牌 (1~9 每種 6 張)
+            const createDeck = (num) => {
+                let deck = [];
+                for (let i = 1; i <= 9; i++) {
+                    for (let j = 0; j < CARDS_PER_TYPE; j++) {
+                        deck.push({ 
+                            id: `${i}-${j}-${Math.random()}`, 
+                            value: num * i, 
+                            stepNum: i,
+                            rot: Math.random() * 20 - 10, 
+                            ox: Math.random() * 10 - 5, 
+                            oy: Math.random() * 10 - 5, 
+                            dealRot: Math.random() * 60 - 30, 
+                            dealOx: Math.random() * 30 - 15, 
+                            dealOy: Math.random() * 30 - 15 
+                        });
+                    }
+                }
+                for (let i = deck.length - 1; i > 0; i--) { 
+                    const j = Math.floor(Math.random() * (i + 1)); 
+                    [deck[i], deck[j]] = [deck[j], deck[i]]; 
+                }
+                return deck;
+            };
+
+            // 取得下一個背誦步數 (正背 1->9 或 倒背 9->1)
+            const getNextStep = (step, diff) => {
+                if (diff === 'easy') {
+                    return step >= 9 ? 1 : step + 1;
+                } else {
+                    return step <= 1 ? 9 : step - 1;
+                }
+            };
+
+            // 廣播給所有連線客戶端 (Host 專用)
+            const broadcastToClients = (msg) => {
+                hostConnsRef.current.forEach(c => {
+                    if (c && c.open) {
+                        try { c.send(msg); } catch(e){}
+                    }
+                });
+            };
+
+            // 發送訊息給房主 (Client 專用)
+            const sendToHost = (msg) => {
+                if (clientConnRef.current && clientConnRef.current.open) {
+                    try { clientConnRef.current.send(msg); } catch(e){}
+                }
+            };
+
+            // 清理 PeerJS 連線
+            const cleanupPeer = () => {
+                if (peerRef.current) {
+                    try { peerRef.current.destroy(); } catch(e){}
+                    peerRef.current = null;
+                }
+                hostConnsRef.current = [];
+                clientConnRef.current = null;
+                setIsOnline(false);
+                setIsHost(false);
+                setRoomCode('');
+                setRoomPlayers([]);
+                setOnlineStatusMsg('');
+                setOnlineError('');
+            };
+
+            // 建立房間 (Host)
+            const handleCreateRoom = (mNum) => {
+                cleanupPeer();
+                initAudio();
+                const code = String(Math.floor(1000 + Math.random() * 9000));
+                setRoomCode(code);
+                setMultiplier(mNum);
+                setIsOnline(true);
+                setIsHost(true);
+                setMySeatIndex(0);
+                setOnlineStatusMsg('正在建立連線房間...');
+                setOnlineError('');
+
+                const pId = `agy-card99-${code}`;
+                const peer = new Peer(pId, PEER_CONFIG);
+                peerRef.current = peer;
+
+                peer.on('open', (id) => {
+                    setOnlineStatusMsg('房間已建立！請分享房號等待其他玩家加入');
+                    const hostPlayer = {
+                        seatIndex: 0,
+                        name: playerName || '房主',
+                        isHost: true,
+                        peerId: id
+                    };
+                    roomPlayersRef.current = [hostPlayer];
+                    roomCodeRef.current = code;
+                    setRoomPlayers([hostPlayer]);
+                    setGameState('onlineLobby');
+                });
+
+                peer.on('connection', (conn) => {
+                    conn.on('open', () => {
+                        conn.on('data', (data) => handleHostIncomingData(data, conn));
+                        conn.on('close', () => handleHostPlayerDisconnected(conn));
+                    });
+                });
+
+                peer.on('error', (err) => {
+                    console.error('Peer error:', err);
+                    if (err.type === 'unavailable-id') {
+                        setOnlineError('房號已被使用，請重新建立一次');
+                    } else {
+                        setOnlineError('連線錯誤：' + (err.message || err.type));
+                    }
+                });
+            };
+
+            // 加入房間 (Client)
+            const handleJoinRoom = () => {
+                const targetCode = joinInputCode.trim();
+                if (!targetCode) {
+                    setOnlineError('請輸入 4 位房號！');
+                    return;
+                }
+                cleanupPeer();
+                initAudio();
+                setIsOnline(true);
+                setIsHost(false);
+                setRoomCode(targetCode);
+                setOnlineStatusMsg('正在連接房間...');
+                setOnlineError('');
+
+                const peer = new Peer(null, PEER_CONFIG);
+                peerRef.current = peer;
+
+                peer.on('open', () => {
+                    const hostPeerId = `agy-card99-${targetCode}`;
+                    const conn = peer.connect(hostPeerId, { reliable: true });
+                    clientConnRef.current = conn;
+
+                    conn.on('open', () => {
+                        setOnlineStatusMsg('已連上房主，正在加入房間...');
+                        conn.send({
+                            type: 'CLIENT_JOIN_REQ',
+                            name: playerName || `玩家 ${Math.floor(Math.random() * 90 + 10)}`
+                        });
+                    });
+
+                    conn.on('data', (data) => handleClientIncomingData(data));
+
+                    conn.on('close', () => {
+                        setOnlineError('與房間的連線已中斷');
+                        setGameState('menu');
+                        cleanupPeer();
+                    });
+
+                    conn.on('error', (err) => {
+                        setOnlineError('連線錯誤：' + (err.message || '無法連上房間'));
+                    });
+                });
+
+                peer.on('error', (err) => {
+                    setOnlineError('連線伺服器異常：' + (err.message || err.type));
+                });
+            };
+
+            // Host 接收資料處理
+            const handleHostIncomingData = (data, conn) => {
+                if (data.type === 'CLIENT_JOIN_REQ') {
+                    const currentList = roomPlayersRef.current;
+                    if (currentList.length >= playerCountRef.current) {
+                        conn.send({ type: 'ROOM_FULL', message: '房間人數已滿！' });
+                        conn.close();
+                        return;
+                    }
+                    const newSeat = currentList.length;
+                    const newPlayer = {
+                        seatIndex: newSeat,
+                        name: data.name,
+                        isHost: false,
+                        peerId: conn.peer
+                    };
+                    conn.seatIndex = newSeat;
+                    hostConnsRef.current.push(conn);
+                    const updated = [...currentList, newPlayer];
+                    roomPlayersRef.current = updated;
+                    setRoomPlayers(updated);
+
+                    // 通知該新玩家加入成功
+                    conn.send({
+                        type: 'JOIN_SUCCESS',
+                        mySeatIndex: newSeat,
+                        maxPlayers: playerCountRef.current,
+                        multiplier: multiplierRef.current,
+                        difficulty: difficultyRef.current,
+                        roomCode: roomCodeRef.current,
+                        players: updated
+                    });
+
+                    // 廣播給所有玩家更新名單
+                    broadcastToClients({
+                        type: 'ROOM_UPDATE',
+                        players: updated,
+                        maxPlayers: playerCountRef.current
+                    });
+                } else if (data.type === 'CLIENT_PLAY_CARD') {
+                    // 客戶端出牌請求
+                    if (turnRef.current === data.seatIndex) {
+                        executeCardPlay(data.seatIndex);
+                    }
+                } else if (data.type === 'CLIENT_SLAP') {
+                    // 客戶端拍牌請求
+                    executeSlapAction(data.seatIndex);
+                }
+            };
+
+            // Host 處理玩家離線
+            const handleHostPlayerDisconnected = (conn) => {
+                hostConnsRef.current = hostConnsRef.current.filter(c => c !== conn);
+                setErrorMsg('有玩家離線！');
+                broadcastToClients({ type: 'PLAYER_DISCONNECTED', message: '有玩家中途斷線，遊戲結束' });
+                setTimeout(() => {
+                    setGameState('menu');
+                    cleanupPeer();
+                }, 2000);
+            };
+
+            // Client 接收資料處理
+            const handleClientIncomingData = (data) => {
+                if (data.type === 'JOIN_SUCCESS') {
+                    setMySeatIndex(data.mySeatIndex);
+                    setPlayerCount(data.maxPlayers);
+                    setMultiplier(data.multiplier);
+                    setDifficulty(data.difficulty);
+                    setRoomPlayers(data.players);
+                    setGameState('onlineLobby');
+                    setOnlineStatusMsg('已成功加入房間！等待房主開始遊戲');
+                } else if (data.type === 'ROOM_FULL') {
+                    setOnlineError(data.message);
+                    cleanupPeer();
+                } else if (data.type === 'ROOM_UPDATE') {
+                    setRoomPlayers(data.players);
+                    setPlayerCount(data.maxPlayers);
+                } else if (data.type === 'SYNC_GAME_START') {
+                    // 接收房主的初始牌局
+                    initAudio();
+                    setMultiplier(data.multiplier);
+                    setDifficulty(data.difficulty);
+                    setPlayerCount(data.playerCount);
+                    setMainDeck(data.mainDeck);
+                    setPlayers(data.players);
+                    setCenterPile([]);
+                    setCurrentStep(data.initialStep);
+                    setCurrentCall(null);
+                    setSlapResults([]);
+                    setWinner(null);
+                    setPunishingCard(null);
+                    setErrorMsg('');
+                    setShowIdleHint(false);
+                    setTurn(data.startingTurn);
+                    setGameState('dealing');
+                    setDealingProgress(0);
+                } else if (data.type === 'SYNC_CARD_FLIPPED') {
+                    applyCardFlipped(data);
+                } else if (data.type === 'SYNC_SLAP_TRIGGER') {
+                    if (data.playerIndex !== mySeatIndexRef.current) {
+                        triggerSlapHand(data.playerIndex);
+                        playSoundEffect('slap');
+                        setSlapRipple(true);
+                        setTimeout(() => setSlapRipple(false), 500);
+                    }
+                } else if (data.type === 'SYNC_MATCH_SLAP') {
+                    setGameState('slapping');
+                    setSlapResults(data.slapResults);
+                } else if (data.type === 'SYNC_PENALTY') {
+                    applyPenalty(data.loserIndex, data.pileSnapshot, data.nextTurn, data.nextStep, data.updatedPlayers);
+                } else if (data.type === 'SYNC_MISSLAP_PENALTY') {
+                    playSoundEffect('error');
+                    triggerSlapHand(data.playerIndex);
+                    setErrorMsg(data.errorMsg);
+                    applyPenalty(data.playerIndex, data.pileSnapshot, data.nextTurn, data.nextStep, data.updatedPlayers);
+                } else if (data.type === 'SYNC_GAME_OVER') {
+                    playSoundEffect('win');
+                    setWinner(data.winner);
+                    setGameState('gameOver');
+                } else if (data.type === 'PLAYER_DISCONNECTED') {
+                    setErrorMsg(data.message);
+                    setTimeout(() => {
+                        setGameState('menu');
+                        cleanupPeer();
+                    }, 2500);
+                }
+            };
+
+            // 開始單機遊戲
+            const startLocalGame = (num) => {
+                cleanupPeer();
+                setIsOnline(false);
+                setIsHost(false);
+                setMySeatIndex(0);
                 try {
                     const silent = new SpeechSynthesisUtterance("");
                     silent.lang = 'zh-TW';
                     window.speechSynthesis.speak(silent);
                 } catch(e){}
-                initAudio(); setMultiplier(num); 
-                let deck = [];
-                for (let i = 1; i <= 10; i++) {
-                    for (let j = 0; j < CARDS_PER_TYPE; j++) {
-                        deck.push({ id: `${i}-${j}-${Math.random()}`, value: num * i, rot: Math.random() * 20 - 10, ox: Math.random() * 10 - 5, oy: Math.random() * 10 - 5, dealRot: Math.random() * 60 - 30, dealOx: Math.random() * 30 - 15, dealOy: Math.random() * 30 - 15 });
-                    }
-                }
-                for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+                initAudio();
+                setMultiplier(num); 
+                const deck = createDeck(num);
+
                 const newPlayers = [];
-                for (let i = 0; i < PLAYERS_COUNT; i++) { newPlayers.push({ id: i, name: i === 0 ? "你" : `電腦 ${i}`, cards: [], isAI: i !== 0 }); }
-                const startingPlayer = Math.floor(Math.random() * PLAYERS_COUNT);
-                setMainDeck(deck); setPlayers(newPlayers); setCenterPile([]);
-                setCurrentStep(difficulty === 'easy' ? 1 : 10); setCurrentCall(null);
-                setSlapResults([]); setWinner(null); setPunishingCard(null); setErrorMsg(""); setShowIdleHint(false); aiSlapScheduledRef.current = false;
+                for (let i = 0; i < playerCount; i++) {
+                    newPlayers.push({
+                        id: i,
+                        seatIndex: i,
+                        name: i === 0 ? (playerName || "你") : `電腦 ${i}`,
+                        cards: [],
+                        isAI: i !== 0
+                    });
+                }
+                const startingPlayer = Math.floor(Math.random() * playerCount);
+                setMainDeck(deck);
+                setPlayers(newPlayers);
+                setCenterPile([]);
+                const initStep = difficulty === 'easy' ? 1 : 9;
+                setCurrentStep(initStep);
+                setCurrentCall(null);
+                setSlapResults([]);
+                setWinner(null);
+                setPunishingCard(null);
+                setErrorMsg("");
+                setShowIdleHint(false);
+                aiSlapScheduledRef.current = false;
                 setTurn(startingPlayer);
-                setGameState('dealing'); setDealingProgress(0);
+                setGameState('dealing');
+                setDealingProgress(0);
             };
 
+            // Host 開始連線對戰
+            const handleHostStartOnlineGame = () => {
+                const currentList = roomPlayersRef.current;
+                const currentCount = playerCountRef.current;
+                if (currentList.length !== currentCount) return;
+                initAudio();
+                const curMult = multiplierRef.current;
+                const curDiff = difficultyRef.current;
+                const deck = createDeck(curMult);
+                const newPlayers = currentList.map((rp, idx) => ({
+                    id: idx,
+                    seatIndex: idx,
+                    name: rp.name,
+                    cards: [],
+                    isAI: false
+                }));
+                const startingPlayer = Math.floor(Math.random() * currentCount);
+                const initStep = curDiff === 'easy' ? 1 : 9;
+
+                setMainDeck(deck);
+                setPlayers(newPlayers);
+                setCenterPile([]);
+                setCurrentStep(initStep);
+                setCurrentCall(null);
+                setSlapResults([]);
+                setWinner(null);
+                setPunishingCard(null);
+                setErrorMsg("");
+                setShowIdleHint(false);
+                setTurn(startingPlayer);
+                setGameState('dealing');
+                setDealingProgress(0);
+
+                // 廣播給所有連線客戶端
+                broadcastToClients({
+                    type: 'SYNC_GAME_START',
+                    multiplier: curMult,
+                    difficulty: curDiff,
+                    playerCount: currentCount,
+                    mainDeck: deck,
+                    players: newPlayers,
+                    startingTurn: startingPlayer,
+                    initialStep: initStep
+                });
+            };
+
+            // 發牌動畫循環 (54 張牌，每人整除)
             useEffect(() => {
                 if (gameState === 'dealing') {
-                    if (dealingProgress < 60) {
+                    if (dealingProgress < 54) {
                         const timer = setTimeout(() => {
                             playSoundEffect('deal');
-                            const targetIdx = dealingProgress % PLAYERS_COUNT;
+                            const targetIdx = dealingProgress % playerCount;
                             setMainDeck(prev => prev.slice(0, -1));
-                            setPlayers(prev => prev.map((p, idx) => idx === targetIdx ? { ...p, cards: [...p.cards, mainDeck[mainDeck.length - 1]] } : p ));
+                            setPlayers(prev => prev.map((p, idx) => 
+                                idx === targetIdx 
+                                    ? { ...p, cards: [...p.cards, mainDeck[mainDeck.length - 1]] } 
+                                    : p 
+                            ));
                             setDealingProgress(prev => prev + 1);
-                        }, 50);
+                        }, 40);
                         return () => clearTimeout(timer);
                     } else {
                         setGameState('starting'); setStartPrompt("3");
@@ -259,288 +726,761 @@
                         }, 1000);
                     }
                 }
-            }, [gameState, dealingProgress, mainDeck, players]);
+            }, [gameState, dealingProgress, mainDeck, players, playerCount]);
 
-            const executePenalty = (loserIndex, currentPile) => {
+            // 計算下一個有手牌的玩家
+            const findNextPlayerWithCards = (currentTurn, currentPlayers) => {
+                const countTotal = currentPlayers.length;
+                let next = (currentTurn + 1) % countTotal;
+                let loops = 0;
+                while (currentPlayers[next].cards.length === 0 && loops < countTotal) {
+                    next = (next + 1) % countTotal;
+                    loops++;
+                }
+                return loops >= countTotal ? null : next;
+            };
+
+            // 執行受罰回歸動畫與手牌歸屬
+            const applyPenalty = (loserIndex, pileSnapshot, nextTurn, nextStep, updatedPlayers) => {
                 if (punishingCard) return;
                 playSoundEffect('slap');
-                setPunishingCard({ toPlayer: loserIndex, pileSnapshot: currentPile.slice(-8) });
-                setCurrentCall(null); 
-                const nextStep = (difficulty === 'easy') ? (currentStep === 10 ? 1 : currentStep + 1) : (currentStep === 1 ? 10 : currentStep - 1);
+                setPunishingCard({ toPlayer: loserIndex, pileSnapshot: pileSnapshot.slice(-8) });
+                setCurrentCall(null);
 
                 setTimeout(() => {
-                    setPlayers(prevPlayers => {
-                        const newPlayers = [...prevPlayers];
-                        newPlayers[loserIndex] = {
-                            ...newPlayers[loserIndex],
-                            cards: [...currentPile, ...newPlayers[loserIndex].cards]
-                        };
-                        return newPlayers;
-                    });
-                    setCenterPile([]); setSlapResults([]); setPunishingCard(null); setErrorMsg(""); setGameState('playing');
-                    setTurn(loserIndex); setCurrentStep(nextStep); aiSlapScheduledRef.current = false;
+                    setPlayers(updatedPlayers);
+                    setCenterPile([]);
+                    setSlapResults([]);
+                    setPunishingCard(null);
+                    setErrorMsg("");
+                    setGameState('playing');
+                    setTurn(nextTurn);
+                    setCurrentStep(nextStep);
+                    aiSlapScheduledRef.current = false;
                 }, 800);
             };
 
-            const findNextPlayerWithCards = (currentTurn) => {
-                let next = (currentTurn + 1) % PLAYERS_COUNT;
-                let count = 0;
-                while (players[next].cards.length === 0 && count < PLAYERS_COUNT) {
-                    next = (next + 1) % PLAYERS_COUNT;
-                    count++;
-                }
-                return count >= PLAYERS_COUNT ? null : next;
-            };
-
-            const playTurn = (isManual = false) => {
-                if (gameState !== 'playing' || isAnimating || punishingCard) return;
-                if (isManual && turn !== 0) return; 
-
-                const playersWithCards = players.filter(p => p.cards.length > 0);
-                if (playersWithCards.length === 0) { setGameState('gameOver'); setWinner(null); return; }
-                
-                if (players[turn].cards.length === 0) {
-                    const next = findNextPlayerWithCards(turn);
-                    if (next !== null) setTurn(next);
-                    return;
-                }
+            // 執行出牌 (統一路徑)
+            const executeCardPlay = (fromSeat) => {
+                if (gameStateRef.current !== 'playing' || isAnimating || punishingCard) return;
+                const currentPls = playersRef.current;
+                if (!currentPls[fromSeat] || currentPls[fromSeat].cards.length === 0) return;
 
                 playSoundEffect('flip');
-                setIsAnimating(true); setShowIdleHint(false); 
-                const newPlayers = [...players];
-                const card = newPlayers[turn].cards.pop();
+                setIsAnimating(true);
+                setShowIdleHint(false);
+
+                const newPlayers = [...currentPls];
+                const card = newPlayers[fromSeat].cards.pop();
                 flippedCardRef.current = card;
                 isFlipResolvedRef.current = false;
-                const callValue = multiplier * currentStep;
-                
-                // If human player (turn === 0): no speech and no text display
-                if (turn === 0) {
-                    setCurrentCall(null);
-                    window.currentSpeechPromise = Promise.resolve();
-                } else {
-                    // Computer turns: show callout text and speak formula
-                    setCurrentCall({ playerIdx: turn, text: `${multiplier} \u00d7 ${currentStep} = ${callValue}` });
-                    
+
+                const curStep = currentStepRef.current;
+                const curMult = multiplierRef.current;
+                const callValue = curMult * curStep;
+                const isMatch = (card.value === callValue);
+
+                const callText = `${curMult} × ${curStep} = ${callValue}`;
+                const chantText = getChantText(curMult, curStep, callValue);
+
+                // 計算下一個輪到誰
+                let nextTurnVal = fromSeat;
+                let nextStepVal = curStep;
+                if (!isMatch) {
+                    const next = findNextPlayerWithCards(fromSeat, newPlayers);
+                    nextTurnVal = next !== null ? next : fromSeat;
+                    nextStepVal = getNextStep(curStep, difficultyRef.current);
+                }
+
+                const eventData = {
+                    type: 'SYNC_CARD_FLIPPED',
+                    fromSeat: fromSeat,
+                    card: card,
+                    callValue: callValue,
+                    callText: callText,
+                    chantText: chantText,
+                    isMatch: isMatch,
+                    updatedPlayers: newPlayers,
+                    nextTurn: nextTurnVal,
+                    nextStep: nextStepVal
+                };
+
+                if (isOnlineRef.current && isHostRef.current) {
+                    broadcastToClients(eventData);
+                }
+                applyCardFlipped(eventData);
+            };
+
+            // 客戶端與本地套用出牌動畫
+            const applyCardFlipped = (data) => {
+                playSoundEffect('flip');
+                setIsAnimating(true);
+                setShowIdleHint(false);
+                flippedCardRef.current = data.card;
+                isFlipResolvedRef.current = false;
+
+                // 若非自己出牌，朗讀口訣並顯示氣泡
+                if (data.fromSeat !== mySeatIndexRef.current) {
+                    setCurrentCall({ playerIdx: data.fromSeat, text: data.callText });
                     let speechPromise = Promise.resolve();
                     if (!isMuted) {
                         speechPromise = new Promise((resolve) => {
-                            const textToSpeak = getChantText(multiplier, currentStep, callValue);
-                            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+                            const utterance = new SpeechSynthesisUtterance(data.chantText);
                             utterance.lang = 'zh-TW';
                             utterance.rate = 1.0;
-                            
                             let resolved = false;
-                            const done = () => {
-                                if (resolved) return;
-                                resolved = true;
-                                resolve();
-                            };
+                            const done = () => { if (!resolved) { resolved = true; resolve(); } };
                             utterance.onend = done;
                             utterance.onerror = done;
-                            // 3 seconds safety timeout to prevent getting stuck
                             setTimeout(done, 3000);
-                            
                             window.speechSynthesis.speak(utterance);
                         });
                     }
                     window.currentSpeechPromise = speechPromise;
+                } else {
+                    setCurrentCall(null);
+                    window.currentSpeechPromise = Promise.resolve();
                 }
 
-                setFlyingCard({ value: card.value, fromPlayer: turn });
-                
+                setFlyingCard({ value: data.card.value, fromPlayer: data.fromSeat });
+
                 const advanceTurn = () => {
                     if (isFlipResolvedRef.current) return;
                     isFlipResolvedRef.current = true;
-                    const newPile = [...centerPile, card];
-                    setCenterPile(newPile); setFlyingCard(null); setPlayers(newPlayers);
-                    
-                    if (card.value === callValue) {
-                        setGameState('slapping'); aiSlapScheduledRef.current = false; setIsAnimating(false);
-                    } else {
-                        players.forEach((p, idx) => {
-                            if (p.isAI) {
-                                if (isDangerousPair(card.value, callValue)) {
-                                    const chance = aiLevel === 'easy' ? 0.5 : aiLevel === 'normal' ? 0.3 : 0.1;
-                                    if (Math.random() < chance) setTimeout(() => handleSlap(idx), (Math.random() * 500 + 300) * getAiSlapMultiplier());
-                                }
-                            }
-                        });
+                    setCenterPile(prev => [...prev, data.card]);
+                    setFlyingCard(null);
+                    setPlayers(data.updatedPlayers);
 
-                        const next = findNextPlayerWithCards(turn);
-                        if (next !== null) {
-                            setTurn(next);
-                            if (difficulty === 'easy') setCurrentStep(currentStep === 10 ? 1 : currentStep + 1);
-                            else setCurrentStep(currentStep === 1 ? 10 : currentStep - 1);
-                        } else { setGameState('gameOver'); setWinner(null); }
+                    if (data.isMatch) {
+                        setGameState('slapping');
+                        aiSlapScheduledRef.current = false;
+                        setIsAnimating(false);
+                    } else {
+                        // AI 假錯拍邏輯 (單機版)
+                        if (!isOnlineRef.current) {
+                            data.updatedPlayers.forEach((p, idx) => {
+                                if (p.isAI && isDangerousPair(data.card.value, data.callValue)) {
+                                    const chance = aiLevel === 'easy' ? 0.45 : aiLevel === 'normal' ? 0.25 : 0.08;
+                                    if (Math.random() < chance) {
+                                        setTimeout(() => handleSlap(idx), (Math.random() * 500 + 300) * getAiSlapMultiplier());
+                                    }
+                                }
+                            });
+                        }
+
+                        setTurn(data.nextTurn);
+                        setCurrentStep(data.nextStep);
                         setIsAnimating(false);
                     }
                 };
 
-                // Wait for the card animation (600ms) AND for any ongoing speech to finish
                 setTimeout(() => {
                     const speechDone = window.currentSpeechPromise || Promise.resolve();
                     speechDone.then(advanceTurn);
-                }, 600); 
+                }, 600);
             };
 
-            const handleSlap = (playerIndex) => {
-                if (punishingCard) return;
-                const currentCardValue = flyingCard ? flyingCard.value : (centerPile.length > 0 ? centerPile[centerPile.length - 1].value : null);
-                if (currentCardValue === null) return;
-                const isMatch = currentCardValue === multiplier * currentStep;
-                
-                if (gameState === 'playing' && isMatch) {
-                    if (isFlipResolvedRef.current) return;
-                    isFlipResolvedRef.current = true;
+            // 點擊卡牌出牌
+            const playTurn = (isManual = false) => {
+                if (gameState !== 'playing' || isAnimating || punishingCard) return;
+                if (isManual && turn !== mySeatIndex) return;
 
-                    const card = flippedCardRef.current;
-                    const newPile = [...centerPile, card];
-                    setCenterPile(newPile);
-                    setFlyingCard(null);
-                    setIsAnimating(false);
-                    setGameState('slapping');
-
-                    // Trigger slap ripple + hand animation
-                    setSlapRipple(true);
-                    setTimeout(() => setSlapRipple(false), 500);
-                    triggerSlapHand(playerIndex);
-
-                    setSlapResults([playerIndex]);
-                    playSoundEffect('slap');
-
-                    if (players[playerIndex].cards.length === 0) {
-                        setWinner(players[playerIndex]);
-                        setGameState('gameOver');
+                if (isOnline) {
+                    if (isHost) {
+                        executeCardPlay(0);
+                    } else {
+                        sendToHost({ type: 'CLIENT_PLAY_CARD', seatIndex: mySeatIndex });
                     }
-                    return;
+                } else {
+                    executeCardPlay(turn);
+                }
+            };
+
+            // 拍牌核心邏輯 (Host 或 Local 裁決)
+            const executeSlapAction = (playerIndex) => {
+                if (punishingCard) return;
+                const curPile = centerPileRef.current;
+                const curCardVal = flyingCard ? flyingCard.value : (curPile.length > 0 ? curPile[curPile.length - 1].value : null);
+                if (curCardVal === null) return;
+
+                const curMult = multiplierRef.current;
+                const curStep = currentStepRef.current;
+                const isMatch = (curCardVal === curMult * curStep);
+                const curPls = playersRef.current;
+                const totalCount = curPls.length;
+
+                // 廣播拍牌手勢
+                triggerSlapHand(playerIndex);
+                playSoundEffect('slap');
+                setSlapRipple(true);
+                setTimeout(() => setSlapRipple(false), 500);
+
+                if (isOnlineRef.current && isHostRef.current) {
+                    broadcastToClients({ type: 'SYNC_SLAP_TRIGGER', playerIndex });
                 }
 
-                if (gameState === 'slapping') {
+                // 正確拍牌
+                if ((gameStateRef.current === 'playing' && isMatch) || gameStateRef.current === 'slapping') {
+                    if (gameStateRef.current === 'playing') {
+                        if (!isFlipResolvedRef.current && flippedCardRef.current) {
+                            isFlipResolvedRef.current = true;
+                            setCenterPile(prev => [...prev, flippedCardRef.current]);
+                            setFlyingCard(null);
+                            setIsAnimating(false);
+                        }
+                        setGameState('slapping');
+                    }
+
                     setSlapResults(prev => {
                         if (prev.includes(playerIndex)) return prev;
                         const newResults = [...prev, playerIndex];
-                        triggerSlapHand(playerIndex);
-                        playSoundEffect('slap');
-                        
-                        if (players[playerIndex].cards.length === 0 && newResults.length <= 3) {
-                            setWinner(players[playerIndex]);
+
+                        if (isOnlineRef.current && isHostRef.current) {
+                            broadcastToClients({ type: 'SYNC_MATCH_SLAP', slapResults: newResults });
+                        }
+
+                        // 如果該玩家手牌已為0，且成功在前 (N-1) 名拍下，則獲勝！
+                        if (curPls[playerIndex].cards.length === 0 && newResults.length <= totalCount - 1) {
+                            const winPl = curPls[playerIndex];
+                            playSoundEffect('win');
+                            setWinner(winPl);
                             setGameState('gameOver');
+                            if (isOnlineRef.current && isHostRef.current) {
+                                broadcastToClients({ type: 'SYNC_GAME_OVER', winner: winPl });
+                            }
                             return newResults;
                         }
 
-                        if (newResults.length === 3) {
-                            const loserIndex = [0, 1, 2, 3].find(idx => !newResults.includes(idx));
-                            executePenalty(loserIndex, centerPile);
+                        // 當已有 (playerCount - 1) 位玩家拍牌，剩下最後 1 人即為輸家受罰！
+                        if (newResults.length === totalCount - 1) {
+                            const allSeats = Array.from({ length: totalCount }, (_, i) => i);
+                            const loserIndex = allSeats.find(idx => !newResults.includes(idx));
+                            const activePile = centerPileRef.current;
+                            const nextStepVal = getNextStep(currentStepRef.current, difficultyRef.current);
+
+                            const updatedPlayers = curPls.map((p, idx) => 
+                                idx === loserIndex 
+                                    ? { ...p, cards: [...activePile, ...p.cards] } 
+                                    : p
+                            );
+
+                            if (isOnlineRef.current && isHostRef.current) {
+                                broadcastToClients({
+                                    type: 'SYNC_PENALTY',
+                                    loserIndex: loserIndex,
+                                    pileSnapshot: activePile,
+                                    nextTurn: loserIndex,
+                                    nextStep: nextStepVal,
+                                    updatedPlayers: updatedPlayers
+                                });
+                            }
+                            applyPenalty(loserIndex, activePile, loserIndex, nextStepVal, updatedPlayers);
                         }
                         return newResults;
                     });
-                } else if (gameState === 'playing' && !isMatch) {
+                } else if (gameStateRef.current === 'playing' && !isMatch) {
+                    // 拍錯了！單獨受罰
                     if (slapResults.length === 0) {
                         playSoundEffect('error');
                         triggerSlapHand(playerIndex);
-                        setErrorMsg(`${players[playerIndex].name} 拍錯了！`); 
-                        setSlapResults([playerIndex]); 
+                        const err = `${curPls[playerIndex].name} 拍錯了！`;
+                        setErrorMsg(err);
+                        setSlapResults([playerIndex]);
 
-                        let activePile = centerPile;
-                        if (!isFlipResolvedRef.current) {
+                        let activePile = centerPileRef.current;
+                        if (!isFlipResolvedRef.current && flippedCardRef.current) {
                             isFlipResolvedRef.current = true;
-                            const card = flippedCardRef.current;
-                            activePile = [...centerPile, card];
+                            activePile = [...activePile, flippedCardRef.current];
                             setCenterPile(activePile);
                             setFlyingCard(null);
                             setIsAnimating(false);
                         }
 
-                        executePenalty(playerIndex, activePile);
+                        const nextStepVal = getNextStep(currentStepRef.current, difficultyRef.current);
+                        const updatedPlayers = curPls.map((p, idx) => 
+                            idx === playerIndex 
+                                ? { ...p, cards: [...activePile, ...p.cards] } 
+                                : p
+                        );
+
+                        if (isOnlineRef.current && isHostRef.current) {
+                            broadcastToClients({
+                                type: 'SYNC_MISSLAP_PENALTY',
+                                playerIndex: playerIndex,
+                                errorMsg: err,
+                                pileSnapshot: activePile,
+                                nextTurn: playerIndex,
+                                nextStep: nextStepVal,
+                                updatedPlayers: updatedPlayers
+                            });
+                        }
+                        applyPenalty(playerIndex, activePile, playerIndex, nextStepVal, updatedPlayers);
                     }
                 }
             };
 
+            // 玩家點擊拍牌區
+            const handleSlap = (playerIndex) => {
+                if (punishingCard) return;
+                if (isOnline) {
+                    if (isHost) {
+                        executeSlapAction(0);
+                    } else {
+                        // Client 觸發本地音效與手部，並送給 Host
+                        triggerSlapHand(mySeatIndex);
+                        playSoundEffect('slap');
+                        setSlapRipple(true);
+                        setTimeout(() => setSlapRipple(false), 500);
+                        sendToHost({ type: 'CLIENT_SLAP', seatIndex: mySeatIndex });
+                    }
+                } else {
+                    executeSlapAction(playerIndex);
+                }
+            };
+
+            // 閒置提示：輪到自己超過 5 秒提示
             useEffect(() => {
-                if (gameState === 'playing' && turn === myIndex && !isAnimating && !punishingCard) {
+                if (gameState === 'playing' && turn === mySeatIndex && !isAnimating && !punishingCard) {
                     idleTimerRef.current = setTimeout(() => setShowIdleHint(true), 5000);
                 } else {
-                    setShowIdleHint(false); if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+                    setShowIdleHint(false); 
+                    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
                 }
                 return () => clearTimeout(idleTimerRef.current);
-            }, [turn, gameState, isAnimating, punishingCard, centerPile]);
+            }, [turn, gameState, isAnimating, punishingCard, mySeatIndex]);
 
-            // Set myIndex as 0 (local player)
-            const myIndex = 0;
-
+            // 單機 AI 出牌定時器
             useEffect(() => {
-                if (gameState === 'playing' && players[turn]?.isAI && !isAnimating && !punishingCard) {
+                if (!isOnline && gameState === 'playing' && players[turn]?.isAI && !isAnimating && !punishingCard) {
                     const isFirstCard = centerPile.length === 0;
-                    // Unified AI dealing speed to 1200ms across all levels, ensuring voice readout completes first
                     const delay = isFirstCard ? 100 : 1200;
                     timeoutRef.current = setTimeout(() => playTurn(false), delay);
                 }
                 return () => clearTimeout(timeoutRef.current);
-            }, [turn, gameState, isAnimating, punishingCard, aiLevel, centerPile.length]);
+            }, [turn, gameState, isAnimating, punishingCard, aiLevel, centerPile.length, isOnline]);
 
+            // 單機 AI 拍牌反應定時器
             useEffect(() => {
-                if (gameState === 'slapping' && !aiSlapScheduledRef.current) {
+                if (!isOnline && gameState === 'slapping' && !aiSlapScheduledRef.current) {
                     aiSlapScheduledRef.current = true;
                     players.forEach((p, idx) => {
                         if (p.isAI) {
                             const delay = (Math.random() * 800 + 400) * getAiSlapMultiplier();
-                            setTimeout(() => { setGameState(curr => { if (curr === 'slapping') handleSlap(idx); return curr; }); }, delay);
+                            setTimeout(() => { 
+                                setGameState(curr => { 
+                                    if (curr === 'slapping') handleSlap(idx); 
+                                    return curr; 
+                                }); 
+                            }, delay);
                         }
                     });
                 }
-            }, [gameState, aiLevel]);
+            }, [gameState, aiLevel, isOnline]);
 
-                        const renderScreen = () => {
+            // 當前輪到的玩家若已無手牌，自動交棒給下一個有牌的玩家
+            useEffect(() => {
+                if (gameState === 'playing' && players.length > 0 && players[turn]?.cards.length === 0) {
+                    const next = findNextPlayerWithCards(turn, players);
+                    if (next !== null && next !== turn) {
+                        setTurn(next);
+                    }
+                }
+            }, [turn, gameState, players]);
+
+            // 座位與視角佈局映射
+            // 讓當前本地玩家永遠顯示在底部 (Slot 0)，其餘玩家依序排在頂部或左右！
+            const getRelativeSlot = (seatIdx) => {
+                const total = players.length || playerCount;
+                const rel = (seatIdx - mySeatIndex + total) % total;
+                if (total === 2) {
+                    return rel === 0 ? 0 : 2; // 0: 下方, 2: 上方
+                } else {
+                    return rel === 0 ? 0 : (rel === 1 ? 1 : 3); // 0: 下方, 1: 左方, 3: 右方
+                }
+            };
+
+            const SLOT_CONFIGS = [
+                { pos: "bottom-8 left-1/2 -translate-x-1/2", call: "left-full ml-4 top-1/2 -translate-y-1/2", cardAlign: "left-[110%] top-1/2 -translate-y-1/2" }, // 0
+                { pos: "left-12 top-1/2 -translate-y-1/2", call: "left-full ml-4 top-1/2 -translate-y-1/2", cardAlign: "" }, // 1
+                { pos: "top-8 left-1/2 -translate-x-1/2", call: "left-full ml-4 top-1/2 -translate-y-1/2", cardAlign: "" }, // 2
+                { pos: "right-12 top-1/2 -translate-y-1/2", call: "right-full mr-4 top-1/2 -translate-y-1/2", cardAlign: "" } // 3
+            ];
+
+            const copyToClipboard = (text, type) => {
+                navigator.clipboard.writeText(text);
+                if (type === 'code') {
+                    setCopiedCode(true);
+                    setTimeout(() => setCopiedCode(false), 2000);
+                } else {
+                    setCopiedLink(true);
+                    setTimeout(() => setCopiedLink(false), 2000);
+                }
+            };
+
+            const renderScreen = () => {
+                // 主選單
                 if (gameState === 'menu') {
                     return (
-                        <div className="flex flex-col items-center justify-center w-full h-full p-4 text-center overflow-y-auto bg-slate-900 text-white relative rounded-[40px]">
-                            <h1 className="text-6xl font-black mb-10 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 drop-shadow-md">{"\u5341\u5341\u4e58\u6cd5\u5fc3\u81df\u75c5"}</h1>
-                            <div className="flex flex-col gap-8 w-full max-w-md mb-8 text-white">
-                                <div className="bg-slate-800 p-6 rounded-3xl shadow-xl border border-slate-700 flex flex-col items-center">
-                                    <div className="flex items-center justify-center gap-6">
-                                        <span className={`text-lg font-bold transition-colors ${difficulty === 'easy' ? 'text-yellow-400' : 'text-slate-500'}`}>{"\u6b63\u80cc"}</span>
-                                        <div 
-                                            onClick={() => setDifficulty(d => d === 'easy' ? 'hard' : 'easy')}
-                                            className="relative w-16 h-8 bg-slate-700 rounded-full p-1 cursor-pointer border-2 border-slate-600 hover:border-white transition-all"
-                                        >
-                                            <div className={`absolute top-1 left-1 bottom-1 w-5 flex items-center justify-center rounded-full bg-white transition-all duration-300 transform ${difficulty === 'hard' ? 'translate-x-8 bg-orange-500' : 'bg-yellow-400'}`} />
-                                        </div>
-                                        <span className={`text-lg font-bold transition-colors ${difficulty === 'hard' ? 'text-orange-500' : 'text-slate-500'}`}>{"\u5012\u80cc"}</span>
-                                    </div>
-                                </div>
-                                <div className="bg-slate-800 p-6 rounded-3xl shadow-xl border border-slate-700">
-                                    <div className="flex items-center gap-2 mb-4 px-2 font-bold text-lg justify-center text-white"><Zap size={20} className="text-blue-400" /><span>{"\u96fb\u8166\u53cd\u61c9\u901f\u5ea6"}</span></div>
-                                    <div className="flex justify-between mb-2 px-2 text-sm font-bold">
-                                        <span className={aiLevel === 'easy' ? 'text-blue-400' : 'text-slate-400'}>{"\u7c21\u55ae"}</span>
-                                        <span className={aiLevel === 'normal' ? 'text-yellow-400' : 'text-slate-400'}>{"\u666e\u901a"}</span>
-                                        <span className={aiLevel === 'hard' ? 'text-red-500' : 'text-slate-400'}>{"\u56f0\u96e3"}</span>
-                                    </div>
-                                    <input type="range" min="0" max="2" step="1" value={aiLevel === 'easy' ? 0 : aiLevel === 'normal' ? 1 : 2} onChange={(e) => { const val = e.target.value; setAiLevel(val === "0" ? 'easy' : val === "1" ? 'normal' : 'hard'); }} className="w-full h-4 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500 custom-range" />
-                                </div>
+                        <div className="flex flex-col items-center justify-center w-full h-full p-6 text-center overflow-y-auto bg-slate-900 text-white relative rounded-[40px]">
+                            <h1 className="text-5xl font-black mb-3 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-orange-400 to-amber-500 drop-shadow-md">
+                                九九乘法心臟病
+                            </h1>
+                            <p className="text-slate-400 font-bold mb-6 text-sm">
+                                🎴 54張均分對抗 ⚡ 支援 2~3人 單機/連線對決
+                            </p>
+
+                            {/* 模式切換：單機 vs 連線 */}
+                            <div className="flex bg-slate-800 p-1.5 rounded-2xl mb-6 border border-slate-700 shadow-lg">
+                                <button
+                                    onClick={() => setMainTab('local')}
+                                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-base transition-all ${mainTab === 'local' ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    <Zap size={18} /> 單機練習
+                                </button>
+                                <button
+                                    onClick={() => setMainTab('online')}
+                                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-base transition-all ${mainTab === 'online' ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    <Globe size={18} /> 連線對戰 (2~3人)
+                                </button>
                             </div>
-                            <div className="grid grid-cols-3 gap-4 max-w-lg w-full text-center">
-                                {MULTIPLIERS.map(num => (<button key={num} onClick={() => startGame(num)} className="group relative h-16 bg-white text-slate-900 text-3xl font-black rounded-2xl hover:bg-yellow-400 transition-all shadow-[0_6px_0_0_#cbd5e1] active:shadow-none active:translate-y-1">{num}</button>))}
+
+                            {/* 單機練習面板 */}
+                            {mainTab === 'local' ? (
+                                <div className="flex flex-col gap-5 w-full max-w-lg mb-4 text-white">
+                                    {/* 玩家人數選擇 (2人或3人) */}
+                                    <div className="bg-slate-800/90 p-4 rounded-2xl border border-slate-700 shadow-md flex items-center justify-between">
+                                        <div className="flex items-center gap-2 font-bold text-slate-300">
+                                            <Users size={20} className="text-yellow-400" />
+                                            <span>遊玩人數</span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setPlayerCount(2)}
+                                                className={`px-4 py-1.5 rounded-xl font-bold text-sm transition-all ${playerCount === 2 ? 'bg-yellow-400 text-slate-900 shadow-md' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                                            >
+                                                2 人 (你 vs 電腦)
+                                            </button>
+                                            <button
+                                                onClick={() => setPlayerCount(3)}
+                                                className={`px-4 py-1.5 rounded-xl font-bold text-sm transition-all ${playerCount === 3 ? 'bg-yellow-400 text-slate-900 shadow-md' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                                            >
+                                                3 人 (你 vs 2電腦)
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* 正背/倒背切換 */}
+                                    <div className="bg-slate-800/90 p-4 rounded-2xl border border-slate-700 shadow-md flex items-center justify-between">
+                                        <span className="font-bold text-slate-300">念法順序</span>
+                                        <div className="flex items-center gap-4">
+                                            <span className={`text-base font-bold transition-colors ${difficulty === 'easy' ? 'text-yellow-400' : 'text-slate-500'}`}>正背 (1→9)</span>
+                                            <div 
+                                                onClick={() => setDifficulty(d => d === 'easy' ? 'hard' : 'easy')}
+                                                className="relative w-14 h-7 bg-slate-700 rounded-full p-1 cursor-pointer border-2 border-slate-600 hover:border-white transition-all"
+                                            >
+                                                <div className={`absolute top-0.5 left-0.5 bottom-0.5 w-5 rounded-full bg-white transition-all duration-300 transform ${difficulty === 'hard' ? 'translate-x-7 bg-orange-500' : 'bg-yellow-400'}`} />
+                                            </div>
+                                            <span className={`text-base font-bold transition-colors ${difficulty === 'hard' ? 'text-orange-500' : 'text-slate-500'}`}>倒背 (9→1)</span>
+                                        </div>
+                                    </div>
+
+                                    {/* 電腦速度 */}
+                                    <div className="bg-slate-800/90 p-4 rounded-2xl border border-slate-700 shadow-md">
+                                        <div className="flex items-center gap-2 mb-2 font-bold text-sm justify-between text-slate-300">
+                                            <span>電腦反應速度</span>
+                                            <span className={aiLevel === 'easy' ? 'text-blue-400' : aiLevel === 'normal' ? 'text-yellow-400' : 'text-red-400'}>
+                                                {aiLevel === 'easy' ? '簡單' : aiLevel === 'normal' ? '普通' : '困難'}
+                                            </span>
+                                        </div>
+                                        <input 
+                                            type="range" min="0" max="2" step="1" 
+                                            value={aiLevel === 'easy' ? 0 : aiLevel === 'normal' ? 1 : 2} 
+                                            onChange={(e) => { const val = e.target.value; setAiLevel(val === "0" ? 'easy' : val === "1" ? 'normal' : 'hard'); }} 
+                                            className="w-full h-3 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-yellow-400 custom-range" 
+                                        />
+                                    </div>
+
+                                    {/* 選擇九九乘法乘數 (1~9) */}
+                                    <div>
+                                        <div className="text-sm font-bold text-slate-400 mb-2">請選擇想挑戰的乘數：</div>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            {MULTIPLIERS.map(num => (
+                                                <button 
+                                                    key={num} 
+                                                    onClick={() => startLocalGame(num)} 
+                                                    className="group relative h-14 bg-white text-slate-900 text-2xl font-black rounded-2xl hover:bg-yellow-400 hover:scale-105 active:scale-95 transition-all shadow-[0_4px_0_0_#cbd5e1] active:shadow-none active:translate-y-1 flex items-center justify-center gap-1"
+                                                >
+                                                    <span>{num}</span>
+                                                    <span className="text-xs font-semibold text-slate-500 group-hover:text-slate-800">的乘法</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                /* 線上對戰面板 */
+                                <div className="flex flex-col gap-5 w-full max-w-lg mb-4 text-white">
+                                    {/* 暱稱輸入 */}
+                                    <div className="bg-slate-800/90 p-4 rounded-2xl border border-slate-700 shadow-md flex items-center gap-3">
+                                        <span className="font-bold text-slate-300 shrink-0">我的暱稱</span>
+                                        <input
+                                            type="text"
+                                            value={playerName}
+                                            maxLength={8}
+                                            onChange={(e) => {
+                                                setPlayerName(e.target.value);
+                                                localStorage.setItem('multi_heart_name', e.target.value);
+                                            }}
+                                            placeholder="請輸入你的名字"
+                                            className="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-1.5 font-bold text-yellow-400 focus:outline-none focus:border-yellow-400"
+                                        />
+                                    </div>
+
+                                    {/* 建立房間卡片 */}
+                                    <div className="bg-slate-800/90 p-5 rounded-2xl border border-slate-700 shadow-md flex flex-col gap-3">
+                                        <h3 className="text-lg font-black text-yellow-400 flex items-center gap-2">
+                                            👑 建立新房間 (我是房主)
+                                        </h3>
+                                        
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="text-slate-300 font-bold">遊戲人數</span>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => setPlayerCount(2)}
+                                                    className={`px-3 py-1 rounded-lg font-bold ${playerCount === 2 ? 'bg-yellow-400 text-slate-900' : 'bg-slate-700 text-slate-300'}`}
+                                                >
+                                                    2 人局
+                                                </button>
+                                                <button
+                                                    onClick={() => setPlayerCount(3)}
+                                                    className={`px-3 py-1 rounded-lg font-bold ${playerCount === 3 ? 'bg-yellow-400 text-slate-900' : 'bg-slate-700 text-slate-300'}`}
+                                                >
+                                                    3 人局
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="text-slate-300 font-bold">念法順序</span>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => setDifficulty('easy')}
+                                                    className={`px-3 py-1 rounded-lg font-bold ${difficulty === 'easy' ? 'bg-yellow-400 text-slate-900' : 'bg-slate-700 text-slate-300'}`}
+                                                >
+                                                    正背 (1→9)
+                                                </button>
+                                                <button
+                                                    onClick={() => setDifficulty('hard')}
+                                                    className={`px-3 py-1 rounded-lg font-bold ${difficulty === 'hard' ? 'bg-orange-500 text-white' : 'bg-slate-700 text-slate-300'}`}
+                                                >
+                                                    倒背 (9→1)
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-1">
+                                            <span className="text-xs font-bold text-slate-400 block mb-2">選擇開房乘數：</span>
+                                            <div className="grid grid-cols-5 gap-2">
+                                                {MULTIPLIERS.map(num => (
+                                                    <button
+                                                        key={num}
+                                                        onClick={() => handleCreateRoom(num)}
+                                                        className="py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-yellow-400 hover:to-amber-500 hover:text-slate-950 font-black rounded-xl text-base transition-all shadow-md active:scale-95"
+                                                    >
+                                                        {num}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 加入房間卡片 */}
+                                    <div className="bg-slate-800/90 p-5 rounded-2xl border border-slate-700 shadow-md flex flex-col gap-3">
+                                        <h3 className="text-lg font-black text-blue-400 flex items-center gap-2">
+                                            🚪 輸入房號加入房間
+                                        </h3>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                maxLength={6}
+                                                value={joinInputCode}
+                                                onChange={(e) => setJoinInputCode(e.target.value)}
+                                                placeholder="輸入 4 位房號"
+                                                className="flex-1 bg-slate-900 border border-slate-600 rounded-xl px-4 py-2 text-center text-xl tracking-widest font-black text-white focus:outline-none focus:border-blue-400"
+                                            />
+                                            <button
+                                                onClick={handleJoinRoom}
+                                                className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl transition-all shadow-md active:scale-95"
+                                            >
+                                                加入
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {onlineError && (
+                                        <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-2 rounded-xl text-sm font-bold animate-pulse">
+                                            ⚠️ {onlineError}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    );
+                }
+
+                // 線上連線等待室 (Lobby)
+                if (gameState === 'onlineLobby') {
+                    const currentUrl = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
+                    return (
+                        <div className="flex flex-col items-center justify-center w-full h-full p-6 text-center bg-slate-900 text-white relative rounded-[40px]">
+                            <div className="max-w-md w-full bg-slate-800 p-8 rounded-3xl border border-slate-700 shadow-2xl flex flex-col items-center">
+                                <span className="bg-blue-600/30 text-blue-400 px-4 py-1 rounded-full text-xs font-black uppercase tracking-wider mb-2">
+                                    {playerCount} 人對戰模式 • {multiplier} 的乘法 • {difficulty === 'easy' ? '正背' : '倒背'}
+                                </span>
+                                <h2 className="text-2xl font-black mb-1">房間等待室</h2>
+                                
+                                <div className="bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-yellow-400/50 my-4 w-full">
+                                    <div className="text-xs text-slate-400 font-bold mb-1">房間代碼</div>
+                                    <div className="text-4xl font-black text-yellow-400 tracking-widest">{roomCode}</div>
+                                    <div className="flex gap-2 justify-center mt-3">
+                                        <button 
+                                            onClick={() => copyToClipboard(roomCode, 'code')}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold transition-all text-slate-200"
+                                        >
+                                            {copiedCode ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+                                            {copiedCode ? "已複製房號" : "複製房號"}
+                                        </button>
+                                        <button 
+                                            onClick={() => copyToClipboard(currentUrl, 'link')}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold transition-all text-slate-200"
+                                        >
+                                            {copiedLink ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+                                            {copiedLink ? "已複製邀請連結" : "複製邀請連結"}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* 玩家列表 */}
+                                <div className="w-full mb-6">
+                                    <div className="flex justify-between items-center text-xs font-bold text-slate-400 mb-2">
+                                        <span>已連線玩家</span>
+                                        <span>({roomPlayers.length} / {playerCount})</span>
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        {Array.from({ length: playerCount }).map((_, idx) => {
+                                            const p = roomPlayers[idx];
+                                            return (
+                                                <div key={idx} className={`flex items-center justify-between p-3 rounded-xl border ${p ? 'bg-slate-750 border-slate-600' : 'bg-slate-900/40 border-dashed border-slate-700'}`}>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-lg font-bold">
+                                                            {p ? (p.isHost ? '👑' : '🧑') : '⏳'}
+                                                        </div>
+                                                        <span className="font-bold text-sm">
+                                                            {p ? p.name + (p.seatIndex === mySeatIndex ? ' (你)' : '') : '等待玩家加入...'}
+                                                        </span>
+                                                    </div>
+                                                    {p && p.isHost && (
+                                                        <span className="text-xs bg-yellow-400/20 text-yellow-400 font-bold px-2 py-0.5 rounded">房主</span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {onlineStatusMsg && (
+                                    <div className="text-xs text-blue-400 font-bold mb-4">{onlineStatusMsg}</div>
+                                )}
+
+                                {/* 開始按鈕 (僅房主可點且人數滿額) */}
+                                {isHost ? (
+                                    <button
+                                        disabled={roomPlayers.length !== playerCount}
+                                        onClick={handleHostStartOnlineGame}
+                                        className={`w-full py-4 rounded-2xl text-lg font-black transition-all shadow-lg ${roomPlayers.length === playerCount ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-slate-950 hover:scale-105 active:scale-95' : 'bg-slate-700 text-slate-500 cursor-not-allowed'}`}
+                                    >
+                                        {roomPlayers.length === playerCount ? '🚀 人數到齊，開始對戰！' : `等待玩家加入中 (${roomPlayers.length}/${playerCount})`}
+                                    </button>
+                                ) : (
+                                    <div className="text-sm font-bold text-yellow-400 animate-pulse py-3">
+                                        ⏳ 等待房主開始遊戲...
+                                    </div>
+                                )}
+
+                                <button
+                                    onClick={() => { cleanupPeer(); setGameState('menu'); }}
+                                    className="mt-4 text-xs text-slate-400 hover:text-white font-bold transition-colors"
+                                >
+                                    退出房間
+                                </button>
                             </div>
                         </div>
                     );
                 }
 
+                // 結算畫面
                 if (gameState === 'gameOver') {
                     return (
-                        <div className="flex flex-col items-center justify-center w-full h-full bg-yellow-400 p-4 text-center text-slate-900 rounded-[40px]">
-                            <Trophy size={120} className="mb-4 animate-bounce mx-auto" />
-                            <h2 className="text-5xl font-black mb-2">{winner ? `\u512a\u52dd\u8005\uff1a${winner.name}` : "\u5e73\u5c40\uff01\u724c\u90fd\u7528\u5b8c\u4e86"}</h2>
-                            <button onClick={() => setGameState('menu')} className="mt-8 px-12 py-5 bg-slate-900 text-white rounded-2xl text-2xl font-bold hover:scale-105 transition-transform shadow-2xl">{"\u56de\u4e3b\u9078\u55ae"}</button>
+                        <div className="flex flex-col items-center justify-center w-full h-full bg-yellow-400 p-6 text-center text-slate-900 rounded-[40px]">
+                            <Trophy size={110} className="mb-4 animate-bounce mx-auto text-slate-900" />
+                            <h2 className="text-5xl font-black mb-2">
+                                {winner ? `優勝者：${winner.name}` : "平局！牌都用完了"}
+                            </h2>
+                            <p className="text-xl font-bold text-slate-800 mb-6">
+                                {winner && (winner.seatIndex === mySeatIndex ? "🎉 太厲害了！你贏得了心臟病勝利！" : "👏 精彩的乘法對決！再接再厲！")}
+                            </p>
+                            <div className="flex gap-4">
+                                {isOnline ? (
+                                    isHost ? (
+                                        <button 
+                                            onClick={handleHostStartOnlineGame} 
+                                            className="px-10 py-4 bg-slate-900 text-white rounded-2xl text-xl font-bold hover:scale-105 transition-transform shadow-2xl"
+                                        >
+                                            再來一局
+                                        </button>
+                                    ) : (
+                                        <span className="text-slate-800 font-bold text-lg">等待房主重開...</span>
+                                    )
+                                ) : (
+                                    <button 
+                                        onClick={() => startLocalGame(multiplier)} 
+                                        className="px-10 py-4 bg-slate-900 text-white rounded-2xl text-xl font-bold hover:scale-105 transition-transform shadow-2xl"
+                                    >
+                                        再玩一次
+                                    </button>
+                                )}
+                                <button 
+                                    onClick={() => { cleanupPeer(); setGameState('menu'); }} 
+                                    className="px-8 py-4 bg-white text-slate-900 rounded-2xl text-xl font-bold hover:scale-105 transition-transform shadow-xl"
+                                >
+                                    回主選單
+                                </button>
+                            </div>
                         </div>
                     );
                 }
 
+                // 進行遊戲畫面 (包含發牌與對戰)
                 return (
                     <div className="relative w-full h-full bg-emerald-900 overflow-hidden rounded-[40px]">
-                        <div className="absolute top-4 left-4 z-50 flex gap-4">
-                            <button onClick={() => { setIsMuted(!isMuted); initAudio(); }} className="p-3 bg-white/20 rounded-full text-white hover:bg-white/40 transition-colors">{isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}</button>
+                        {/* 左上控制鈕 */}
+                        <div className="absolute top-4 left-4 z-50 flex items-center gap-3">
+                            <button 
+                                onClick={() => { setIsMuted(!isMuted); initAudio(); }} 
+                                className="p-3 bg-white/20 rounded-full text-white hover:bg-white/40 transition-colors shadow-lg"
+                            >
+                                {isMuted ? <VolumeX size={22} /> : <Volume2 size={22} />}
+                            </button>
+                            {isOnline && (
+                                <div className="bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 text-white text-xs font-black flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-green-400 animate-ping" />
+                                    <span>房號：{roomCode} ({playerCount}人局)</span>
+                                </div>
+                            )}
                         </div>
 
+                        {/* 遊戲開始倒數或拍錯彈窗 */}
                         {(gameState === 'starting' || errorMsg) && (
                             <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 text-center text-slate-900">
                                 <div className="bg-yellow-400 p-12 rounded-[40px] border-8 border-white shadow-2xl animate-bounce">
@@ -549,19 +1489,17 @@
                             </div>
                         )}
                         
+                        {/* 背景放射光影 */}
                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-emerald-800 to-emerald-950 opacity-40" />
 
-                        {players.map((player, idx) => {
-                            const layouts = [
-                                { pos: "bottom-8 left-1/2 -translate-x-1/2", call: "left-full ml-4 top-1/2 -translate-y-1/2", cardAlign: "left-[110%] top-1/2 -translate-y-1/2" },
-                                { pos: "left-12 top-1/2 -translate-y-1/2", call: "left-full ml-4 top-1/2 -translate-y-1/2", cardAlign: "" }, 
-                                { pos: "top-8 left-1/2 -translate-x-1/2", call: "left-full ml-4 top-1/2 -translate-y-1/2", cardAlign: "" },
-                                { pos: "right-12 top-1/2 -translate-y-1/2", call: "right-full mr-4 top-1/2 -translate-y-1/2", cardAlign: "" }
-                            ];
-                            const cfg = layouts[idx];
-                            const active = turn === idx;
-                            const isCallForMe = currentCall && currentCall.playerIdx === idx;
-                            
+                        {/* 玩家席位渲染 */}
+                        {players.map((player) => {
+                            const slot = getRelativeSlot(player.seatIndex);
+                            const cfg = SLOT_CONFIGS[slot];
+                            const active = turn === player.seatIndex;
+                            const isCallForPlayer = currentCall && currentCall.playerIdx === player.seatIndex;
+                            const isMe = player.seatIndex === mySeatIndex;
+
                             const unifiedCallBoxClass = "bg-yellow-400 text-slate-900 px-5 py-3 rounded-[30px] text-3xl font-black shadow-2xl border-4 border-white whitespace-nowrap";
 
                             return (
@@ -569,10 +1507,10 @@
                                     <div className={`absolute ${cfg.pos} flex flex-col items-center z-20`}>
                                         <div className="relative">
                                             <div className={`w-14 h-14 rounded-full border-4 flex items-center justify-center text-2xl bg-white shadow-xl transition-all duration-300 ${active ? 'scale-125 border-yellow-400 ring-4 ring-yellow-400/30' : 'border-slate-200'}`}>
-                                                {idx === 0 ? "\ud83d\ude4b" : "\ud83e\udd16"}
+                                                {isMe ? "🧑" : (player.isAI ? "🤖" : "🧑")}
                                             </div>
-                                            {/* ?餉?摰嗅撘?雿?頛?*/}
-                                            {idx !== 0 && isCallForMe && (
+                                            {/* 非自己出牌時的口訣浮現氣泡 */}
+                                            {!isMe && isCallForPlayer && (
                                                 <div className={`absolute ${cfg.call} z-40 pointer-events-none animate-bounce`}>
                                                     <div className={unifiedCallBoxClass}>
                                                         {currentCall.text}
@@ -580,11 +1518,17 @@
                                                 </div>
                                             )}
                                         </div>
+
                                         <div className="mt-2 bg-slate-900/80 backdrop-blur-sm text-white px-4 py-1 rounded-full text-sm font-bold border border-white/20 text-center min-w-[120px]">
-                                            {player.name} {player.cards.length === 0 ? "\uff08\u6436\u62cd\u596a\u51a0\uff09" : "(" + player.cards.length + "\u5f35)"}
+                                            {player.name} {isMe ? '(你)' : ''} {player.cards.length === 0 ? "（搶拍奪冠）" : `(${player.cards.length}張)`}
                                         </div>
+
+                                        {/* 手牌疊牌區 */}
                                         <div className="relative mt-3 w-16 h-24 flex justify-center items-center">
-                                            <div className={`relative w-full h-full transition-all duration-500 ${idx === 0 && gameState === 'playing' && player.cards.length > 0 ? 'hover:scale-105 active:scale-95 cursor-pointer' : ''}`} onClick={() => idx === 0 && playTurn(true)}>
+                                            <div 
+                                                className={`relative w-full h-full transition-all duration-300 ${isMe && gameState === 'playing' && player.cards.length > 0 && active ? 'hover:scale-110 active:scale-95 cursor-pointer ring-4 ring-yellow-400 rounded-xl' : ''}`} 
+                                                onClick={() => isMe && playTurn(true)}
+                                            >
                                                 {player.cards.length > 0 ? [...Array(Math.min(Math.ceil(player.cards.length / 1.5), 15))].map((_, i) => {
                                                     const cd = player.cards[player.cards.length - 1 - i] || {};
                                                     return (
@@ -598,55 +1542,81 @@
                                                         }} />
                                                     );
                                                 }) : (
-                                                    <div className="w-full h-full rounded-xl border-2 border-dashed border-white/30 flex items-center justify-center text-white/20 font-black">{"\u7a7a"}</div>
+                                                    <div className="w-full h-full rounded-xl border-2 border-dashed border-white/30 flex items-center justify-center text-white/30 font-black text-sm">
+                                                        空牌
+                                                    </div>
                                                 )}
                                             </div>
-                                            {idx === 0 && isCallForMe && (
-                                                <div className={`absolute ${cfg.cardAlign} z-40 pointer-events-none animate-bounce`}>
-                                                    <div className={unifiedCallBoxClass}>
-                                                        {currentCall.text}
-                                                    </div>
-                                                </div>
-                                            )}
                                         </div>
                                     </div>
                                 </Fragment>
                             );
                         })}
+
+                        {/* 中央卡牌與拍牌區 */}
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-52 h-64">
-                            <div className={`relative w-full h-full bg-emerald-800/40 rounded-[40px] border-4 border-dashed border-white/20 flex items-center justify-center cursor-pointer transition-colors slap-area ${gameState === 'slapping' ? 'bg-red-500/30 border-red-500' : ''}`} onClick={() => handleSlap(0)}>
+                            <div 
+                                className={`relative w-full h-full bg-emerald-800/40 rounded-[40px] border-4 border-dashed border-white/20 flex items-center justify-center cursor-pointer transition-colors slap-area ${gameState === 'slapping' ? 'bg-red-500/30 border-red-500 animate-pulse' : ''}`} 
+                                onClick={() => handleSlap(mySeatIndex)}
+                            >
                                 {isDealing ? (
                                     <div className="relative w-36 h-48">
-                                        {[...Array(Math.min(mainDeck.length, 20))].map((_, i) => (<div key={i} className="absolute inset-0 bg-blue-500 rounded-2xl shadow-xl border-2 border-blue-600" style={{ top: -i * 1.5, left: i * 0.2, zIndex: 100 - i }} />))}
-                                        {dealingProgress < 60 && (<div className={`fixed top-1/2 left-1/2 w-20 h-28 bg-blue-500 rounded-xl border-2 border-blue-600 shadow-lg z-[200] animate-deal-${dealingProgress % 4}`} />)}
+                                        {[...Array(Math.min(mainDeck.length, 20))].map((_, i) => (
+                                            <div key={i} className="absolute inset-0 bg-blue-500 rounded-2xl shadow-xl border-2 border-blue-600" style={{ top: -i * 1.5, left: i * 0.2, zIndex: 100 - i }} />
+                                        ))}
+                                        {dealingProgress < 54 && (
+                                            <div className={`fixed top-1/2 left-1/2 w-20 h-28 bg-blue-500 rounded-xl border-2 border-blue-600 shadow-lg z-[200] animate-deal-${getRelativeSlot(dealingProgress % playerCount)}`} />
+                                        )}
                                     </div>
                                 ) : punishingCard ? (
                                     <div className="relative w-36 h-48">
                                         {punishingCard.pileSnapshot.map((card, i) => (
-                                            <div key={card.id || i} className={`absolute inset-0 bg-white rounded-2xl shadow-xl flex items-center justify-center text-5xl font-black text-slate-900 border-4 border-slate-50 animate-return-${punishingCard.toPlayer}`} style={{ zIndex: i }}>
+                                            <div 
+                                                key={card.id || i} 
+                                                className={`absolute inset-0 bg-white rounded-2xl shadow-xl flex items-center justify-center text-5xl font-black text-slate-900 border-4 border-slate-50 animate-return-${getRelativeSlot(punishingCard.toPlayer)}`} 
+                                                style={{ zIndex: i }}
+                                            >
                                                 {i === punishingCard.pileSnapshot.length - 1 ? card.value : ""}
                                             </div>
                                         ))}
                                     </div>
                                 ) : (centerPile.length > 0 || flyingCard) ? (
                                     <div className="relative w-36 h-48">
-                                        {centerPile.slice(-8).map((card, i) => (<div key={card.id} className="absolute inset-0 bg-white rounded-2xl shadow-xl flex items-center justify-center text-5xl font-black text-slate-900 border-4 border-slate-50" style={{ zIndex: i }}>{i === centerPile.slice(-8).length - 1 ? card.value : ""}</div>))}
+                                        {centerPile.slice(-8).map((card, i) => (
+                                            <div key={card.id} className="absolute inset-0 bg-white rounded-2xl shadow-xl flex items-center justify-center text-5xl font-black text-slate-900 border-4 border-slate-50" style={{ zIndex: i }}>
+                                                {i === centerPile.slice(-8).length - 1 ? card.value : ""}
+                                            </div>
+                                        ))}
                                         {flyingCard && (
-                                            <div className={`absolute inset-0 bg-white rounded-2xl shadow-2xl flex items-center justify-center text-5xl font-black text-slate-900 z-[100] border-4 border-slate-200 pointer-events-none animate-fly-${flyingCard.fromPlayer}`}>
+                                            <div className={`absolute inset-0 bg-white rounded-2xl shadow-2xl flex items-center justify-center text-5xl font-black text-slate-900 z-[100] border-4 border-slate-200 pointer-events-none animate-fly-${getRelativeSlot(flyingCard.fromPlayer)}`}>
                                                 {flyingCard.value}
                                             </div>
                                         )}
                                     </div>
-                                ) : (gameState !== 'dealing') && (<div className="text-white/10 font-black text-lg uppercase tracking-widest text-center text-slate-300">{"\u62cd\u724c\u5340"}</div>)}
-                                {/* 拍牌波紋效果 */}
+                                ) : (gameState !== 'dealing') && (
+                                    <div className="text-white/20 font-black text-lg uppercase tracking-widest text-center">拍牌區</div>
+                                )}
+
+                                {/* 拍牌波紋動畫 */}
                                 {slapRipple && <div className="slap-ripple" />}
                                 {slapHands.map(h => (
-                                    <div key={h.id} className={`slap-hand slap-hand-${h.playerIndex}`}>✋</div>
+                                    <div key={h.id} className={`slap-hand slap-hand-${getRelativeSlot(h.playerIndex)}`}>✋</div>
                                 ))}
-                                {errorMsg && (<div className="absolute z-[160] bg-yellow-400 px-4 py-3 rounded-xl border-4 border-white shadow-2xl animate-pulse whitespace-nowrap pointer-events-none text-center text-slate-900"><h3 className="text-xl font-black">{errorMsg}</h3></div>)}
+
+                                {errorMsg && (
+                                    <div className="absolute z-[160] bg-yellow-400 px-4 py-3 rounded-xl border-4 border-white shadow-2xl animate-pulse whitespace-nowrap pointer-events-none text-center text-slate-900">
+                                        <h3 className="text-xl font-black">{errorMsg}</h3>
+                                    </div>
+                                )}
                             </div>
                         </div>
-                        {showIdleHint && (<div className="fixed bottom-40 left-1/2 -translate-x-1/2 z-[100] bg-white text-emerald-800 px-6 py-3 rounded-full shadow-2xl border-4 border-yellow-400 font-black text-2xl flex items-center gap-2 animate-pulse text-center"><AlertCircle className="text-yellow-500" /> {"\u8f2a\u5230\u4f60\u4e86\uff01"}</div>)}
+
+                        {/* 閒置提示 */}
+                        {showIdleHint && (
+                            <div className="fixed bottom-40 left-1/2 -translate-x-1/2 z-[100] bg-white text-emerald-800 px-6 py-3 rounded-full shadow-2xl border-4 border-yellow-400 font-black text-2xl flex items-center gap-2 animate-pulse text-center">
+                                <AlertCircle className="text-yellow-500" /> 輪到你出牌了！請點擊手牌！
+                            </div>
+                        )}
                     </div>
                 );
             };
@@ -658,7 +1628,7 @@
                     </a>
                     {gameState !== 'menu' && (
                         <button 
-                            onClick={() => setGameState('menu')} 
+                            onClick={() => { cleanupPeer(); setGameState('menu'); }} 
                             className="fixed top-[56px] left-3 z-[999999] bg-slate-900/90 text-white hover:bg-slate-800 px-4 py-2 rounded-full font-bold text-sm border border-white/20 transition-all shadow-lg flex items-center gap-1.5 cursor-pointer"
                         >
                             ↩️ 回主選單
@@ -670,6 +1640,7 @@
                 </div>
             );
         };
+
         ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>

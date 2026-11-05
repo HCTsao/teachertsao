@@ -27,15 +27,14 @@ const toolsData = [
         desc: "結合實體錢幣教具的大富翁遊戲！以商店購物的情境進行實際錢幣操作，經過機會與命運格考驗錢幣比大小與報讀，在遊戲中提升錢幣操作能力。",
         type: "遊戲"
     },
-    /* 暫時從首頁隱藏（仍可透過網址直接進入：二上/乘法心臟病.html）
     {
-        name: "乘法心臟病",
-        category: "二上",
-        path: "二上/乘法心臟病.html",
-        desc: "刺激的卡牌競賽遊戲，讓學生在緊張好玩的心臟病規則下，快速進行十十乘法的反應力與計算訓練。",
+        name: "九九乘法心臟病",
+        category: "二下",
+        categories: ["二下", "二上"],
+        path: "二下/乘法心臟病.html",
+        desc: "刺激的卡牌競賽遊戲！支援 2~3 人單機或即時連線對決，在緊張好玩的心臟病規則下，快速訓練九九乘法的反應力與心算能力！",
         type: "遊戲"
     },
-    */
     /* 暫時從首頁隱藏（仍可透過網址直接進入：二上/乘法的秘密：連加與倍數.html）
     {
         name: "乘法的秘密：連加與倍數",
@@ -494,7 +493,7 @@ function renderTools() {
             t.category === currentCategory || 
             (t.categories && t.categories.includes(currentCategory))
         );
-        const isBlankCategory = ['二下', '三下'].includes(currentCategory) || (currentCategory !== 'all' && !hasToolsForCategory);
+        const isBlankCategory = ['三下'].includes(currentCategory) || (currentCategory !== 'all' && !hasToolsForCategory);
         
         if (isBlankCategory && searchQuery === '') {
             toolsGrid.appendChild(createComingSoonCard(currentCategory));
