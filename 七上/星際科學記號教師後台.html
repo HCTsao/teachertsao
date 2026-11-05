@@ -148,7 +148,7 @@
                 <option>第4關</option><option>第5關</option><option>第6關</option>
                 <option>限時挑戰</option>
             </select>
-            <input type="date" id="filterDate">
+            <span style="font-size:12px;font-weight:bold;color:#a5b4fc;display:inline-flex;align-items:center;gap:4px;">📅 日期區間: <input type="date" id="filterDateStart" title="起始日期"> ～ <input type="date" id="filterDateEnd" title="結束日期"></span>
             <button class="btn" onclick="loadRecords()">🔄 重新整理</button>
             <a class="btn btn-pink" href="星際科學記號大冒險.html">🎮 回遊戲</a>
         </div>
@@ -287,12 +287,18 @@
         function filtered() {
             const c = document.getElementById('filterClass').value;
             const l = document.getElementById('filterLevel').value;
-            const d = document.getElementById('filterDate').value;
-            return allRecords.filter(r =>
-                (!c || r.class_name === c) &&
-                (!l || r.level === l) &&
-                (!d || String(r.played_at).startsWith(d))
-            );
+            const dStart = document.getElementById('filterDateStart').value;
+            const dEnd = document.getElementById('filterDateEnd').value;
+            return allRecords.filter(r => {
+                if (c && r.class_name !== c) return false;
+                if (l && r.level !== l) return false;
+                if (dStart || dEnd) {
+                    const rDate = String(r.played_at || '').substring(0, 10);
+                    if (dStart && rDate < dStart) return false;
+                    if (dEnd && rDate > dEnd) return false;
+                }
+                return true;
+            });
         }
 
         function render() {
@@ -348,7 +354,8 @@
 
         document.getElementById('filterClass').addEventListener('change', render);
         document.getElementById('filterLevel').addEventListener('change', render);
-        document.getElementById('filterDate').addEventListener('change', render);
+        document.getElementById('filterDateStart').addEventListener('change', render);
+        document.getElementById('filterDateEnd').addEventListener('change', render);
         // 已驗證過（從遊戲端開過來）則直接進入，免再輸入密碼
         if (teacherAuthed()) {
             document.getElementById('gate').style.display = 'none';

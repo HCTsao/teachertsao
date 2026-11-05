@@ -21,7 +21,7 @@
 <section class="filters" aria-label="錯題篩選">
 <label>班級<select id="class-filter"><option value="">全部班級</option></select></label>
 <label>姓名<input type="search" id="name-filter" placeholder="輸入姓名關鍵字（含訪客）"></label>
-<label>作答日期（預設今天，可清空）<input type="date" id="date-filter"></label>
+<label>作答日期區間<input type="date" id="date-start" title="起始日期"> ～ <input type="date" id="date-end" title="結束日期"></label>
 <label>作答開始時間<input type="datetime-local" id="time-start" step="1"></label>
 <label>作答結束時間<input type="datetime-local" id="time-end" step="1"></label>
 <label class="check"><input type="checkbox" checked disabled>只看錯題（目前僅記錄錯題）</label>
@@ -97,7 +97,8 @@ function selectRecords(records, filters) {
     return records.filter(r =>
         (!filters.className || r.className === filters.className) &&
         (!filters.name || r.name.toLocaleLowerCase().includes(filters.name.toLocaleLowerCase())) &&
-        (!filters.date || (r.timestamp !== null && localDate(r.timestamp) === filters.date)) &&
+        (!filters.dateStart || (r.timestamp !== null && localDate(r.timestamp) >= filters.dateStart)) &&
+        (!filters.dateEnd || (r.timestamp !== null && localDate(r.timestamp) <= filters.dateEnd)) &&
         (from === null || (r.timestamp !== null && r.timestamp >= from)) &&
         (to === null || (r.timestamp !== null && r.timestamp <= to))
     );
@@ -121,7 +122,7 @@ function formatTime(timestamp) {
 }
 function renderTable() {
     if (!requireAccess()) return;
-    const filters = {className:el('class-filter').value, name:el('name-filter').value.trim(), date:el('date-filter').value,
+    const filters = {className:el('class-filter').value, name:el('name-filter').value.trim(), dateStart:el('date-start').value, dateEnd:el('date-end').value,
         from:el('time-start').value, to:el('time-end').value};
     const invalid = filters.from && filters.to && new Date(filters.from) > new Date(filters.to);
     el('filter-error').textContent = invalid ? '開始時間不可晚於結束時間，請調整時間範圍。' : '';
@@ -165,17 +166,16 @@ function exportExcel() {
     sheet['!cols'] = [24,16,8,16,18,18,18,10].map(wch => ({wch}));
     const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book,sheet,'錯題紀錄');
     const className = (el('class-filter').value || '全部班級').replace(/[\/:*?"<>|]/g,'_');
-    XLSX.writeFile(book, '森林運動會時間障礙賽_' + className + '_' + (el('date-filter').value || '全部日期') + '_作答成果.xlsx');
+    XLSX.writeFile(book, '森林運動會時間障礙賽_' + className + '_' + ((el('date-start').value || '') + (el('date-end').value ? '_' + el('date-end').value : '') || '全部日期') + '_作答成果.xlsx');
 }
 function initialize() {
     if (!authorize()) return;
-    el('date-filter').value = localDate(Date.now());
-    ['class-filter','date-filter','time-start','time-end'].forEach(id => el(id).addEventListener('change',renderTable));
+    ['class-filter','date-start','date-end','time-start','time-end'].forEach(id => el(id).addEventListener('change',renderTable));
     el('name-filter').addEventListener('input',renderTable);
     el('export-btn').addEventListener('click',exportExcel);
     el('clear-btn').addEventListener('click',clearLogs);
     el('reset-btn').addEventListener('click', () => {
-        ['class-filter','date-filter','time-start','time-end','name-filter'].forEach(id => { el(id).value = ''; }); renderTable();
+        ['class-filter','date-start','date-end','time-start','time-end','name-filter'].forEach(id => { el(id).value = ''; }); renderTable();
     });
     try {
         firebase.initializeApp(firebaseConfig); db = firebase.database();

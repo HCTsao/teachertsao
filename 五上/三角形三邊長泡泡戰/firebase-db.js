@@ -55,14 +55,19 @@
         const result = await request('highscores', {}, { orderBy: 'score', limitToLast: limit });
         return rows(result.data).sort((a, b) => b.score - a.score || b.createdAt - a.createdAt);
       },
-      async listAttempts({ date, cls, name, wrongOnly } = {}) {
+      async listAttempts({ date, startDate, endDate, cls, name, wrongOnly } = {}) {
         const query = { orderBy: 'createdAt' };
-        if (date) {
-          const start = new Date(date + 'T00:00:00');
-          const end = new Date(start);
-          end.setDate(end.getDate() + 1);
-          query.startAt = start.getTime();
-          query.endAt = end.getTime() - 1;
+        const sDate = startDate || date;
+        const eDate = endDate || date;
+        if (sDate || eDate) {
+          if (sDate) {
+            query.startAt = new Date(sDate + 'T00:00:00').getTime();
+          }
+          if (eDate) {
+            const endD = new Date(eDate + 'T00:00:00');
+            endD.setDate(endD.getDate() + 1);
+            query.endAt = endD.getTime() - 1;
+          }
         } else { query.limitToLast = 500; }
         const result = await request('attempts', {}, query);
         return rows(result.data).filter(row => (!cls || row.class === cls) &&

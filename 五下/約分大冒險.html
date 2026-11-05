@@ -1101,9 +1101,9 @@
                             <span class="text-5xl sm:text-6xl font-black text-yellow-400 select-none leading-none">=</span>
                         </div>
                         <div id="answerAreaContainer" class="flex flex-col items-center">
-                            <input type="number" id="ansNum" class="w-[92px] h-[64px] bg-slate-950 border-4 border-slate-700 rounded-2xl text-center text-[34px] font-black text-blue-400 input-glow" placeholder="">
+                            <input type="number" id="ansNum" onkeydown="if(event.key==='Enter') checkFinalAnswer()" class="w-[92px] h-[64px] bg-slate-950 border-4 border-slate-700 rounded-2xl text-center text-[34px] font-black text-blue-400 input-glow" placeholder="">
                             <div class="fraction-line !h-[3.5px] !my-1.5 w-[92px]"></div>
-                            <input type="number" id="ansDen" class="w-[92px] h-[64px] bg-slate-950 border-4 border-slate-700 rounded-2xl text-center text-[34px] font-black text-blue-400 input-glow" placeholder="">
+                            <input type="number" id="ansDen" onkeydown="if(event.key==='Enter') checkFinalAnswer()" class="w-[92px] h-[64px] bg-slate-950 border-4 border-slate-700 rounded-2xl text-center text-[34px] font-black text-blue-400 input-glow" placeholder="">
                         </div>
                     </div>
 
@@ -1420,6 +1420,38 @@
         };
 
         function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+
+        // 計算題目的真實數學最簡分數答案與字串
+        function getProblemSimplestAnswer(problem, mode) {
+            const p = problem || (typeof gameState !== 'undefined' ? gameState.originalProblem : null) || {};
+            const n1 = parseInt(p.n1) || 1;
+            const d1 = parseInt(p.d1) || 1;
+            const n2 = parseInt(p.n2) || 1;
+            const d2 = parseInt(p.d2) || 1;
+            const op = p.op || ((mode || (typeof gameState !== 'undefined' ? gameState.mode : 'mul')) === 'div' ? '÷' : '×');
+            const isMul = (op === '×' || mode === 'mul' || (typeof gameState !== 'undefined' && gameState.mode === 'mul'));
+
+            let prodNum, prodDen;
+            if (isMul) {
+                prodNum = n1 * n2;
+                prodDen = d1 * d2;
+            } else {
+                prodNum = n1 * d2;
+                prodDen = d1 * n2;
+            }
+
+            const g = gcd(Math.abs(prodNum), Math.abs(prodDen)) || 1;
+            const simpNum = prodNum / g;
+            const simpDen = prodDen / g;
+
+            return {
+                num: simpNum,
+                den: simpDen,
+                rawNum: prodNum,
+                rawDen: prodDen,
+                str: simpDen === 1 ? `${simpNum}` : `${simpNum}/${simpDen}`
+            };
+        }
         function isComposite(n) {
             if (n <= 3) return false;
             for (let i = 2; i <= Math.sqrt(n); i++) if (n % i === 0) return true;
@@ -1484,36 +1516,78 @@
         }
 
         function recordMistake(studentAnsNum, studentAnsDen, errorType) {
+            const isVs = (typeof vsState !== 'undefined' && vsState.active);
             const ident = getStudentIdentity();
-            const correctNum = gameState.data.num1.current * gameState.data.num2.current;
-            const correctDen = gameState.data.den1.current * gameState.data.den2.current;
-            const g = gcd(correctNum, correctDen);
-            const finalSimpNum = correctNum / g;
-            const finalSimpDen = correctDen / g;
-
             const p = gameState.originalProblem || {};
-            const opSym = gameState.mode === 'mul' ? '×' : '÷';
+            const opSym = (gameState.mode === 'div' || p.op === '÷') ? '÷' : '×';
             const frac1Str = p.d1 === 1 ? `${p.n1}` : `${p.n1}/${p.d1}`;
             const frac2Str = p.d2 === 1 ? `${p.n2}` : `${p.n2}/${p.d2}`;
             const questionText = `${frac1Str} ${opSym} ${frac2Str}`;
 
-            const studentAnsStr = isNaN(studentAnsNum) 
-                ? '未作答' 
-                : (isNaN(studentAnsDen) || studentAnsDen === 1 ? `${studentAnsNum}` : `${studentAnsNum}/${studentAnsDen}`);
-            const correctAnsStr = finalSimpDen === 1 ? `${finalSimpNum}` : `${finalSimpNum}/${finalSimpDen}`;
+            const ansInfo = getProblemSimplestAnswer(p, gameState.mode);
+            const correctAnsStr = ansInfo.str;
+
+            // 判斷學生輸入的字串
+            let studentAnsStr;
+            if (isNaN(studentAnsNum)) {
+                studentAnsStr = '未作答';
+            } else if (isNaN(studentAnsDen)) {
+                // 如果分母未填：若正確答案本身就是整數，則視為整數填答；否則標記未作答完整
+                studentAnsStr = (ansInfo.den === 1) ? `${studentAnsNum}` : `${studentAnsNum}/?`;
+            } else if (studentAnsDen === 1) {
+                studentAnsStr = `${studentAnsNum}`;
+            } else {
+                studentAnsStr = `${studentAnsNum}/${studentAnsDen}`;
+            }
+
+            // 【核心防護 1】若學生的作答結果與正確答案字串完全相同，這絕不是錯題，絕不收錄進錯題庫！
+            if (studentAnsStr === correctAnsStr && !isNaN(studentAnsNum)) {
+                console.warn("作答結果與正確答案一致，不收錄至錯題資料庫：", studentAnsStr);
+                return;
+            }
+
+            // 【核心防護 2】若學生答案數值化為最簡後與正確答案相同且互質（例如整數 3 與 3/1）
+            if (!isNaN(studentAnsNum) && !isNaN(studentAnsDen || 1)) {
+                const sDen = isNaN(studentAnsDen) ? 1 : studentAnsDen;
+                const sG = gcd(Math.abs(studentAnsNum), Math.abs(sDen)) || 1;
+                const simpStudentNum = studentAnsNum / sG;
+                const simpStudentDen = sDen / sG;
+                if (simpStudentNum === ansInfo.num && simpStudentDen === ansInfo.den) {
+                    if (sG === 1) {
+                        // 數值正確且已互質，絕非錯題
+                        console.warn("學生作答已是最簡且正確，不收錄：", studentAnsStr);
+                        return;
+                    } else {
+                        // 數值正確但未化簡 (例如 2/4 vs 1/2)，錯誤診斷修正為「未約至最簡」
+                        errorType = "未約至最簡";
+                    }
+                }
+            }
+
+            const currentRound = isVs ? (vsState.myRound || 1) : (gameState.round || 1);
+            const currentDiff = isVs ? 'versus' : (gameState.difficulty || 'normal');
+
+            // 防止對戰或連續快速點擊同一題送出相同錯題 (防重複提交)
+            const mistakeKey = `${ident.className}_${ident.name}_${questionText}_${studentAnsStr}`;
+            const now = Date.now();
+            if (window._lastMistakeKey === mistakeKey && (now - (window._lastMistakeTime || 0)) < 2000) {
+                return;
+            }
+            window._lastMistakeKey = mistakeKey;
+            window._lastMistakeTime = now;
 
             const mistakeItem = {
                 className: ident.className || '訪客',
                 seatNumber: ident.seat ? ident.seat : '',
                 name: ident.name || '訪客',
                 mode: gameState.mode,
-                difficulty: gameState.difficulty,
-                round: gameState.round,
+                difficulty: currentDiff,
+                round: currentRound,
                 question: questionText,
                 studentAnswer: studentAnsStr,
                 correctAnswer: correctAnsStr,
                 errorType: errorType,
-                timestamp: Date.now()
+                timestamp: now
             };
 
             // 本機離線備份
@@ -1530,7 +1604,7 @@
                         ...mistakeItem,
                         timestamp: firebase.database.ServerValue.TIMESTAMP
                     });
-                    console.log("錯題已記錄並上傳至 Firebase FractionReduce/mistakes");
+                    console.log("錯題已記錄並上傳至 Firebase FractionReduce/mistakes", mistakeItem);
                 } catch (e) {
                     console.error("Firebase 錯題上傳失敗", e);
                 }
@@ -2418,6 +2492,15 @@
         // 最終答案驗證
         // ==========================================================================
         function checkFinalAnswer(isTimeUp = false) {
+            const uN = parseInt(document.getElementById('ansNum')?.value);
+            const uD = parseInt(document.getElementById('ansDen')?.value);
+
+            // 雙人對戰專屬答案檢查
+            if (typeof vsState !== 'undefined' && vsState.active) {
+                handleVersusCheckAnswer(uN, uD);
+                return;
+            }
+
             // 除法篇若尚未填妥第二行倒數數字，提醒先完成填入
             if (!isTimeUp && gameState.mode === 'div' && (!gameState.flipped.num2 || !gameState.flipped.den2)) {
                 const inputNum2 = document.getElementById('flipInput_num2');
@@ -2431,27 +2514,36 @@
                 return;
             }
 
-            const uN = parseInt(document.getElementById('ansNum').value);
-            const uD = parseInt(document.getElementById('ansDen').value);
-            
-            // 答對的乘積
-            const correctNum = gameState.data.num1.current * gameState.data.num2.current;
-            const correctDen = gameState.data.den1.current * gameState.data.den2.current;
+            // 計算正確最簡答案
+            const ansInfo = getProblemSimplestAnswer(gameState.originalProblem, gameState.mode);
+            const targetNum = ansInfo.num;
+            const targetDen = ansInfo.den;
+            const isIntegerAnswer = (targetDen === 1);
 
-            if (!isTimeUp && (isNaN(uN) || isNaN(uD))) {
-                synth.playWrong();
-                showWarning("請輸入完整的分數分子與分母！");
-                return;
+            // 判斷作答是否填寫完整
+            if (!isTimeUp) {
+                if (isNaN(uN)) {
+                    synth.playWrong();
+                    showWarning("請輸入分子答案！");
+                    return;
+                }
+                if (!isIntegerAnswer && isNaN(uD)) {
+                    synth.playWrong();
+                    showWarning("請輸入完整的分數分子與分母！");
+                    return;
+                }
             }
 
-            // 雙人對戰專屬答案檢查
-            if (typeof vsState !== 'undefined' && vsState.active) {
-                handleVersusCheckAnswer(uN, uD, correctNum, correctDen);
-                return;
-            }
+            const effectiveUD = isNaN(uD) ? 1 : uD;
 
-            // 完全正確：數值相同，且必須是互質 (最簡分數)
-            if (uN === correctNum && uD === correctDen && gcd(correctNum, correctDen) === 1) {
+            // 完全正確：數值相同，且必須是互質最簡分數
+            const isFullyCorrect = (!isNaN(uN)) && (
+                isIntegerAnswer 
+                    ? (uN === targetNum && (isNaN(uD) || uD === 1))
+                    : (uN === targetNum && uD === targetDen)
+            );
+
+            if (isFullyCorrect) {
                 clearInterval(gameState.timerId);
                 
                 const timeBonus = Math.max(0, gameState.timeLeft * 5);
@@ -2465,27 +2557,27 @@
                 
                 // 觸發多重煙火粒子效果
                 triggerParticles('ansNum', '#4ade80');
-                triggerParticles('ansDen', '#4ade80');
+                if (document.getElementById('ansDen')) triggerParticles('ansDen', '#4ade80');
                 setTimeout(() => triggerParticles('gameScreen', '#facc15'), 200);
 
                 document.getElementById('successOverlay').classList.remove('hidden');
             } 
-            // 數值正確但尚未化為最簡分數
-            else if (uN === correctNum && uD === correctDen && gcd(correctNum, correctDen) > 1) {
+            // 數值正確但尚未化為最簡分數 (例如 1/2 填寫為 2/4)
+            else if (!isNaN(uN) && !isNaN(effectiveUD) && (uN * targetDen === effectiveUD * targetNum) && (gcd(Math.abs(uN), Math.abs(effectiveUD)) > 1 || effectiveUD !== targetDen)) {
                 synth.playWrong();
                 showWarning("數值正確，但分數還能繼續約分喔！");
-                recordMistake(uN, uD, "未約至最簡");
+                recordMistake(uN, effectiveUD, "未約至最簡");
             } 
             // 逾時未作答 (由計時器觸發)
             else if (isTimeUp) {
                 synth.playWrong();
-                recordMistake(uN, uD, "逾時未答");
+                recordMistake(uN, effectiveUD, "逾時未答");
             }
             // 答案錯誤
             else {
                 synth.playWrong();
                 showWarning("答案不正確，再仔細算看看！");
-                recordMistake(uN, uD, "運算錯誤");
+                recordMistake(uN, effectiveUD, "運算錯誤");
             }
         }
 
@@ -3582,15 +3674,38 @@
         }
 
         // 處理對戰答案檢查（知識王：答對依剩餘時間加乘得分，答錯可繼續）
-        function handleVersusCheckAnswer(uN, uD, correctNum, correctDen) {
+        function handleVersusCheckAnswer(uN, uD) {
             if (vsState.isAnswering) return;
 
-            // 答案完全正確且為最簡分數
-            if (uN === correctNum && uD === correctDen && gcd(correctNum, correctDen) === 1) {
+            // 計算本題正確最簡答案
+            const ansInfo = getProblemSimplestAnswer(gameState.originalProblem, vsState.mode);
+            const targetNum = ansInfo.num;
+            const targetDen = ansInfo.den;
+            const isIntegerAnswer = (targetDen === 1);
+
+            if (isNaN(uN)) {
+                synth.playWrong();
+                showWarning("請輸入數字！");
+                return;
+            }
+            if (!isIntegerAnswer && isNaN(uD)) {
+                synth.playWrong();
+                showWarning("請輸入完整的分數分子與分母！");
+                return;
+            }
+
+            const effectiveUD = isNaN(uD) ? 1 : uD;
+
+            // 1. 完全正確且為最簡分數
+            const isFullyCorrect = isIntegerAnswer 
+                ? (uN === targetNum && (isNaN(uD) || uD === 1))
+                : (uN === targetNum && uD === targetDen);
+
+            if (isFullyCorrect) {
                 vsState.isAnswering = true;
                 synth.playCorrect();
                 triggerParticles('ansNum', '#4ade80');
-                triggerParticles('ansDen', '#4ade80');
+                if (document.getElementById('ansDen')) triggerParticles('ansDen', '#4ade80');
 
                 // 依本題答題耗時計算加乘分數（答得越快，分數越高！）
                 const elapsedSec = (Date.now() - (vsState.questionStartTime || Date.now())) / 1000;
@@ -3620,15 +3735,17 @@
                 }
 
             } 
-            // 數值正確但未約分至最簡
-            else if (uN === correctNum && uD === correctDen && gcd(correctNum, correctDen) > 1) {
+            // 2. 數值正確但未約分至最簡 (雙人對戰錯題同步收錄)
+            else if (!isNaN(uN) && !isNaN(effectiveUD) && (uN * targetDen === effectiveUD * targetNum) && (gcd(Math.abs(uN), Math.abs(effectiveUD)) > 1 || effectiveUD !== targetDen)) {
                 synth.playWrong();
                 showWarning("數值正確，但分數還能繼續約分喔！");
+                recordMistake(uN, effectiveUD, "未約至最簡");
             } 
-            // 答案錯誤
+            // 3. 答案錯誤 (雙人對戰錯題同步收錄)
             else {
                 synth.playWrong();
                 showWarning("答案不正確，再仔細算看看！");
+                recordMistake(uN, effectiveUD, "運算錯誤");
             }
         }
 
@@ -3679,6 +3796,30 @@
             if (endP2Name) endP2Name.innerText = oppName;
             if (endP1Score) endP1Score.innerText = vsState.p1Score;
             if (endP2Score) endP2Score.innerText = vsState.p2Score;
+
+            // 將對戰成績記錄存入完賽紀錄
+            try {
+                const ident = getStudentIdentity();
+                const vsRecord = {
+                    className: ident.className || '訪客',
+                    seatNumber: ident.seat ? ident.seat : '',
+                    name: ident.name || '訪客',
+                    mode: vsState.mode || 'mul',
+                    difficulty: 'versus',
+                    score: vsState.p1Score,
+                    date: Date.now()
+                };
+                let localRecords = JSON.parse(localStorage.getItem('FractionReduce_records') || '[]');
+                localRecords.push(vsRecord);
+                localStorage.setItem('FractionReduce_records', JSON.stringify(localRecords.slice(-100)));
+
+                if (gameState.isFirebaseActive && typeof firebase !== 'undefined') {
+                    firebase.database().ref('FractionReduce/records').push({
+                        ...vsRecord,
+                        timestamp: firebase.database.ServerValue.TIMESTAMP
+                    });
+                }
+            } catch (e) {}
 
             const modal = document.getElementById('versusGameOverModal');
             if (modal) modal.classList.remove('hidden');

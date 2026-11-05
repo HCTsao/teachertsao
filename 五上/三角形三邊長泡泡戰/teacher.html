@@ -38,7 +38,7 @@
   </header>
   <div style="font-size:14px;color:#64748b;margin:-6px 0 12px;">本後台只收錄「三角泡泡對戰」的作答與錯題紀錄 📝</div>
   <div class="filters">
-    <label>日期<input type="date" id="fDate"></label>
+    <label>日期區間<input type="date" id="fDateStart" title="起始日期"> ～ <input type="date" id="fDateEnd" title="結束日期"></label>
     <label>班級<input type="text" id="fCls" placeholder="例：501" style="width:110px"></label>
     <label>姓名<input type="text" id="fName" placeholder="例：王小明" style="width:130px"></label>
     <label class="chk"><input type="checkbox" id="fWrong" checked> 只看錯題</label>
@@ -61,7 +61,7 @@
 <script>
 const $=id=>document.getElementById(id);
 const pad=n=>String(n).padStart(2,'0');
-(function initDate(){const d=new Date();$('fDate').value=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;})();
+// 預設不填入今天，以便一開始即能檢視全部紀錄
 function fmtSides(s){ // "{4,5,9}" -> "4、5、9"
   const m=String(s).replace(/[{}]/g,'').split(',').map(x=>x.trim()).filter(Boolean);
   return m.join('、');
@@ -71,7 +71,7 @@ async function query(){
   $('status').textContent='查詢中…';$('tbl').style.display='none';$('empty').style.display='none';
   try{
     const rows=await TriangleDatabase.listAttempts({
-      date:$('fDate').value, cls:$('fCls').value.trim(), name:$('fName').value.trim(),
+      startDate:$('fDateStart').value, endDate:$('fDateEnd').value, cls:$('fCls').value.trim(), name:$('fName').value.trim(),
       wrongOnly:$('fWrong').checked
     });
     render(rows);
@@ -93,7 +93,7 @@ function render(rows){
   $('stAcc').textContent=rows.length?Math.round(ok/rows.length*100)+'%':'--';
   $('stW').textContent=rows.length-ok;
   $('stP').textContent=who.size;
-  $('status').textContent=`共 ${rows.length} 筆（${$('fWrong').checked?'只看錯題':'全部'}；${$('fDate').value?'所選日期':'最近 500 筆內'}，最多顯示 500 筆）`;
+  $('status').textContent=`共 ${rows.length} 筆（${$('fWrong').checked?'只看錯題':'全部'}；${($('fDateStart').value || $('fDateEnd').value)?'所選日期區間':'全部'}，最多顯示 500 筆）`;
   $('tbl').style.display=rows.length?'':'none';
   $('empty').style.display=rows.length?'none':'';
 }

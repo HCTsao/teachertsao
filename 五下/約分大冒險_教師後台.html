@@ -241,14 +241,16 @@
                 <!-- 3. 日期篩選 -->
                 <div class="lg:col-span-4">
                     <label class="block text-xs font-bold text-slate-400 mb-1.5 flex items-center gap-1.5">
-                        <i class="fa-solid fa-calendar-days text-emerald-400"></i> 日期 Date
+                        <i class="fa-solid fa-calendar-days text-emerald-400"></i> 日期區間 Date Range
                     </label>
-                    <div class="flex items-center gap-2">
-                        <input type="date" id="filterDate" onchange="applyFilters()" class="flex-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-white font-bold text-sm focus:outline-none focus:border-emerald-400 transition-colors">
-                        <button onclick="setFilterDateToday()" class="px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/35 border border-emerald-500/30 text-emerald-300 rounded-xl text-xs font-black transition-all shrink-0">
+                    <div class="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+                        <input type="date" id="filterDateStart" onchange="applyFilters()" title="起始日期" class="flex-1 min-w-[120px] bg-slate-900 border border-white/10 rounded-xl px-2 py-2 text-white font-bold text-xs sm:text-sm focus:outline-none focus:border-emerald-400 transition-colors">
+                        <span class="text-slate-400 font-bold">~</span>
+                        <input type="date" id="filterDateEnd" onchange="applyFilters()" title="結束日期" class="flex-1 min-w-[120px] bg-slate-900 border border-white/10 rounded-xl px-2 py-2 text-white font-bold text-xs sm:text-sm focus:outline-none focus:border-emerald-400 transition-colors">
+                        <button onclick="setFilterDateToday()" class="px-2.5 py-2 bg-emerald-500/20 hover:bg-emerald-500/35 border border-emerald-500/30 text-emerald-300 rounded-xl text-xs font-black transition-all shrink-0">
                             今日
                         </button>
-                        <button onclick="clearFilterDate()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl text-xs font-bold transition-all shrink-0">
+                        <button onclick="clearFilterDate()" class="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl text-xs font-bold transition-all shrink-0">
                             全部
                         </button>
                     </div>
@@ -284,6 +286,25 @@
 
         <!-- ================= 頁籤 1: 學生錯題紀錄 ================= -->
         <section id="sectionMistakes" class="space-y-4">
+            
+            <!-- 歷史誤判過濾通知橫幅 -->
+            <div id="falsePositiveBanner" class="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hidden">
+                <div class="flex items-center gap-3">
+                    <span class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 text-lg">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </span>
+                    <div>
+                        <div class="font-extrabold text-amber-300 text-sm">已自動過濾歷史判定誤差之紀錄</div>
+                        <div class="text-xs text-slate-300 mt-0.5" id="falsePositiveText">
+                            系統偵測到 0 筆學生作答與正確答案完全相同的紀錄，已自動為您過濾，確保錯題分析真實精準！
+                        </div>
+                    </div>
+                </div>
+                <button onclick="cleanFalsePositiveMistakes()" class="btn-action px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1.5 shrink-0 shadow-md">
+                    <i class="fa-solid fa-broom"></i>
+                    <span>一鍵自資料庫永久清理</span>
+                </button>
+            </div>
             
             <!-- 錯題洞察小看板 (高頻錯題排行) -->
             <div id="insightBox" class="glass-panel rounded-3xl p-5 border border-amber-500/20 bg-amber-950/10 hidden">
@@ -474,6 +495,90 @@
             return `<span class="math-expr">${formattedTokens.join('')}</span>`;
         }
 
+        // 誤判錯題過濾器（檢測學生作答與正確答案是否完全一致或整數等價）
+        let cachedFalsePositives = [];
+
+        function isFalsePositiveMistake(item) {
+            if (!item.studentAnswer || item.studentAnswer === '未作答' || !item.correctAnswer) return false;
+            const sAns = String(item.studentAnswer).trim();
+            const cAns = String(item.correctAnswer).trim();
+            if (sAns === cAns) return true;
+            
+            // 檢查整數與 n/1 等價情況 (例如 "3" 與 "3/1")
+            const parseFrac = (str) => {
+                if (!str) return null;
+                if (/^\d+$/.test(str)) return { n: parseInt(str), d: 1 };
+                const parts = str.split('/');
+                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1]) && parseInt(parts[1]) !== 0) {
+                    return { n: parseInt(parts[0]), d: parseInt(parts[1]) };
+                }
+                return null;
+            };
+            const sP = parseFrac(sAns);
+            const cP = parseFrac(cAns);
+            if (sP && cP) {
+                const gcdVal = (a, b) => b === 0 ? a : gcdVal(b, a % b);
+                const g1 = gcdVal(Math.abs(sP.n), Math.abs(sP.d)) || 1;
+                const g2 = gcdVal(Math.abs(cP.n), Math.abs(cP.d)) || 1;
+                // 如果學生答案化簡後與正確答案完全一致且學生答案也是最簡 (g1 === 1)
+                if (sP.n / g1 === cP.n / g2 && sP.d / g1 === cP.d / g2 && g1 === 1) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function renderFalsePositiveBanner(list) {
+            const banner = document.getElementById('falsePositiveBanner');
+            const textEl = document.getElementById('falsePositiveText');
+            if (!banner || !textEl) return;
+            if (list && list.length > 0) {
+                banner.classList.remove('hidden');
+                textEl.innerHTML = `系統偵測到 <strong class="text-amber-300 font-black">${list.length}</strong> 筆學生作答與正確答案完全相同的紀錄，已自動為您過濾，確保錯題分析真實精準！`;
+            } else {
+                banner.classList.add('hidden');
+            }
+        }
+
+        function cleanFalsePositiveMistakes() {
+            if (!cachedFalsePositives || cachedFalsePositives.length === 0) {
+                alert("目前無歷史誤判紀錄需清理！");
+                return;
+            }
+            const count = cachedFalsePositives.length;
+            if (!confirm(`確定要從資料庫中永久清除這 ${count} 筆作答正確的歷史誤判紀錄嗎？\n此動作將只清理誤判項目，不會影響學生的真實錯題與通關紀錄。`)) {
+                return;
+            }
+
+            const ids = cachedFalsePositives.map(item => item.id);
+
+            // 1. 本地清除
+            let localMistakes = JSON.parse(localStorage.getItem('FractionReduce_mistakes') || '[]');
+            localMistakes = localMistakes.filter(item => !ids.includes(item.id));
+            localStorage.setItem('FractionReduce_mistakes', JSON.stringify(localMistakes));
+
+            // 2. Firebase 批次清除
+            if (isFirebaseActive && database) {
+                const updates = {};
+                ids.forEach(id => {
+                    if (id && !id.startsWith('loc_')) {
+                        updates['FractionReduce/mistakes/' + id] = null;
+                    }
+                });
+                database.ref().update(updates)
+                    .then(() => {
+                        alert(`✅ 已成功從資料庫清除 ${count} 筆歷史誤收錄紀錄！`);
+                        cachedFalsePositives = [];
+                        renderFalsePositiveBanner([]);
+                    })
+                    .catch(e => alert("清除失敗：" + e.message));
+            } else {
+                alert(`✅ 已從本地緩存清除 ${count} 筆歷史誤收錄紀錄！`);
+                cachedFalsePositives = [];
+                renderFalsePositiveBanner([]);
+            }
+        }
+
         // ==========================================
         // 4. 資料載入與即時監聽
         // ==========================================
@@ -488,7 +593,12 @@
                         list.push(val);
                     });
                     list.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); // 最新在前
-                    rawMistakes = list;
+                    // 分離真實錯題與歷史誤收錄的正確作答
+                    const falsePos = list.filter(isFalsePositiveMistake);
+                    const trueMistakes = list.filter(item => !isFalsePositiveMistake(item));
+                    cachedFalsePositives = falsePos;
+                    rawMistakes = trueMistakes;
+                    renderFalsePositiveBanner(falsePos);
                     updateClassDropdownOptions();
                     applyFilters();
                 }, err => {
@@ -523,7 +633,10 @@
                 if (!item.id) item.id = 'loc_m_' + (item.timestamp || idx) + '_' + idx;
             });
             mList.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-            rawMistakes = mList;
+            const falsePosLocal = mList.filter(isFalsePositiveMistake);
+            cachedFalsePositives = falsePosLocal;
+            rawMistakes = mList.filter(item => !isFalsePositiveMistake(item));
+            renderFalsePositiveBanner(falsePosLocal);
 
             let rList = JSON.parse(localStorage.getItem('FractionReduce_records') || '[]');
             rList.forEach((item, idx) => {
@@ -575,7 +688,8 @@
         function applyFilters() {
             const selectedClass = document.getElementById('filterClass').value;
             const searchName = document.getElementById('filterName').value.trim().toLowerCase();
-            const selectedDate = document.getElementById('filterDate').value; // YYYY-MM-DD
+            const dateStart = document.getElementById('filterDateStart').value;
+            const dateEnd = document.getElementById('filterDateEnd').value;
             const selectedMode = document.getElementById('filterMode').value; // ALL | mul | div
 
             // 錯題篩選
@@ -585,7 +699,11 @@
                 // 姓名模糊搜尋
                 if (searchName && (!item.name || !item.name.toLowerCase().includes(searchName))) return false;
                 // 日期比對
-                if (selectedDate && formatYMD(item.timestamp) !== selectedDate) return false;
+                if (dateStart || dateEnd) {
+                    const dStr = formatYMD(item.timestamp);
+                    if (dateStart && dStr < dateStart) return false;
+                    if (dateEnd && dStr > dateEnd) return false;
+                }
                 // 模式比對
                 if (selectedMode !== 'ALL' && item.mode !== selectedMode) return false;
                 return true;
@@ -595,7 +713,11 @@
             const filteredRecords = rawRecords.filter(item => {
                 if (selectedClass !== 'ALL' && item.className !== selectedClass) return false;
                 if (searchName && (!item.name || !item.name.toLowerCase().includes(searchName))) return false;
-                if (selectedDate && formatYMD(item.timestamp || item.date) !== selectedDate) return false;
+                if (dateStart || dateEnd) {
+                    const dStr = formatYMD(item.timestamp || item.date);
+                    if (dateStart && dStr < dateStart) return false;
+                    if (dateEnd && dStr > dateEnd) return false;
+                }
                 if (selectedMode !== 'ALL' && item.mode !== selectedMode) return false;
                 return true;
             });
@@ -687,7 +809,9 @@
                 const diffMap = {
                     'easy': '<span class="text-xs text-emerald-400 font-extrabold">🌱 簡單</span>',
                     'normal': '<span class="text-xs text-amber-400 font-extrabold">⭐ 普通</span>',
-                    'hard': '<span class="text-xs text-purple-400 font-extrabold">🔥 困難</span>'
+                    'hard': '<span class="text-xs text-purple-400 font-extrabold">🔥 困難</span>',
+                    'versus': '<span class="text-xs text-indigo-400 font-extrabold">⚔️ 對戰</span>',
+                    'random': '<span class="text-xs text-indigo-400 font-extrabold">⚔️ 對戰</span>'
                 };
                 const diffBadge = diffMap[item.difficulty] || '<span class="text-xs text-slate-400 font-bold">一般</span>';
 
@@ -763,7 +887,9 @@
                 const diffMap = {
                     'easy': '<span class="text-xs text-emerald-400 font-extrabold">🌱 簡單</span>',
                     'normal': '<span class="text-xs text-amber-400 font-extrabold">⭐ 普通</span>',
-                    'hard': '<span class="text-xs text-purple-400 font-extrabold">🔥 困難</span>'
+                    'hard': '<span class="text-xs text-purple-400 font-extrabold">🔥 困難</span>',
+                    'versus': '<span class="text-xs text-indigo-400 font-extrabold">⚔️ 對戰</span>',
+                    'random': '<span class="text-xs text-indigo-400 font-extrabold">⚔️ 對戰</span>'
                 };
                 const diffBadge = diffMap[item.difficulty] || '<span class="text-xs text-slate-400 font-bold">一般</span>';
 
@@ -817,19 +943,22 @@
         // ==========================================
         function setFilterDateToday() {
             const todayStr = formatYMD(Date.now());
-            document.getElementById('filterDate').value = todayStr;
+            document.getElementById('filterDateStart').value = todayStr;
+            document.getElementById('filterDateEnd').value = todayStr;
             applyFilters();
         }
 
         function clearFilterDate() {
-            document.getElementById('filterDate').value = '';
+            document.getElementById('filterDateStart').value = '';
+            document.getElementById('filterDateEnd').value = '';
             applyFilters();
         }
 
         function resetAllFilters() {
             document.getElementById('filterClass').value = 'ALL';
             document.getElementById('filterName').value = '';
-            document.getElementById('filterDate').value = '';
+            document.getElementById('filterDateStart').value = '';
+            document.getElementById('filterDateEnd').value = '';
             document.getElementById('filterMode').value = 'ALL';
             applyFilters();
         }
@@ -921,7 +1050,7 @@
                 "座號": item.seatNumber ? item.seatNumber : '',
                 "學生姓名": item.name || '訪客',
                 "單元模式": item.mode === 'mul' ? '分數乘法' : '分數除法',
-                "挑戰難度": item.difficulty === 'easy' ? '簡單' : (item.difficulty === 'normal' ? '普通' : '困難'),
+                "挑戰難度": item.difficulty === 'easy' ? '簡單' : (item.difficulty === 'normal' ? '普通' : (item.difficulty === 'hard' ? '困難' : (item.difficulty === 'versus' || item.difficulty === 'random' ? '雙人對戰' : '一般'))),
                 "第幾題": item.round || 1,
                 "題目算式": item.question || '',
                 "學生輸入答案": item.studentAnswer || '未作答',
@@ -978,7 +1107,7 @@
                 "座號": item.seatNumber ? item.seatNumber : '',
                 "學生姓名": item.name || '訪客',
                 "單元模式": item.mode === 'mul' ? '分數乘法' : '分數除法',
-                "難度等級": item.difficulty === 'easy' ? '簡單' : (item.difficulty === 'normal' ? '普通' : '困難'),
+                "難度等級": item.difficulty === 'easy' ? '簡單' : (item.difficulty === 'normal' ? '普通' : (item.difficulty === 'hard' ? '困難' : (item.difficulty === 'versus' || item.difficulty === 'random' ? '雙人對戰' : '一般'))),
                 "總積分": item.score || 0
             }));
 

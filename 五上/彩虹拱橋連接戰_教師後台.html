@@ -306,8 +306,10 @@
     <div class="card" style="margin-bottom: 25px; padding: 18px 24px;">
       <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <label for="filter-date" style="font-weight: 800; font-size: 0.95rem; color: var(--color-primary);">📅 日期篩選：</label>
-          <input type="date" id="filter-date" style="padding: 7px 12px; border-radius: 8px; border: 1px solid var(--color-border); font-size: 0.95rem; font-weight: bold; background: #fff; cursor: pointer; color: var(--color-text-main); font-family: inherit;">
+          <label style="font-weight: 800; font-size: 0.95rem; color: var(--color-primary);">📅 日期區間：</label>
+          <input type="date" id="filter-date-start" style="padding: 7px 10px; border-radius: 8px; border: 1px solid var(--color-border); font-size: 0.95rem; font-weight: bold; background: #fff; cursor: pointer; color: var(--color-text-main); font-family: inherit;" title="起始日期">
+          <span style="font-weight: bold; color: var(--color-text-muted);">~</span>
+          <input type="date" id="filter-date-end" style="padding: 7px 10px; border-radius: 8px; border: 1px solid var(--color-border); font-size: 0.95rem; font-weight: bold; background: #fff; cursor: pointer; color: var(--color-text-main); font-family: inherit;" title="結束日期">
         </div>
 
         <div style="display: flex; align-items: center; gap: 8px;">
@@ -607,7 +609,8 @@
 
     function applyFilters() {
       const filterClass = document.getElementById('filter-class').value.trim().toLowerCase();
-      const filterDate = document.getElementById('filter-date').value;
+      const filterDateStart = document.getElementById('filter-date-start').value;
+      const filterDateEnd = document.getElementById('filter-date-end').value;
       const filterKeyword = document.getElementById('filter-keyword').value.trim().toLowerCase();
 
       function matchesFilter(item) {
@@ -615,11 +618,10 @@
         if (filterClass && info.classStr.toLowerCase() !== filterClass) {
           return false;
         }
-        if (filterDate) {
+        if (filterDateStart || filterDateEnd) {
           const itemDate = getLocalDateStr(item.timestamp);
-          if (itemDate !== filterDate) {
-            return false;
-          }
+          if (filterDateStart && itemDate < filterDateStart) return false;
+          if (filterDateEnd && itemDate > filterDateEnd) return false;
         }
         if (filterKeyword) {
           let fullSearch = `${info.classStr} ${info.seatStr} ${info.nameStr} ${item.name || ''} ${item.base || ''} ${item.type || ''}`.toLowerCase();
@@ -837,10 +839,12 @@
 
     // Event listeners
     document.getElementById('filter-class').addEventListener('change', applyFilters);
-    document.getElementById('filter-date').addEventListener('change', applyFilters);
+    document.getElementById('filter-date-start').addEventListener('change', applyFilters);
+    document.getElementById('filter-date-end').addEventListener('change', applyFilters);
     document.getElementById('filter-keyword').addEventListener('input', applyFilters);
     document.getElementById('btn-reset-filter').addEventListener('click', () => {
-      document.getElementById('filter-date').value = '';
+      document.getElementById('filter-date-start').value = '';
+      document.getElementById('filter-date-end').value = '';
       document.getElementById('filter-class').value = '';
       document.getElementById('filter-keyword').value = '';
       applyFilters();

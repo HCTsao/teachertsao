@@ -118,16 +118,17 @@
             return pairs.some(p => p[0] === cardVal && p[1] === targetVal);
         };
 
+        // 使用 Unicode 跳脫字元，徹底避免任何檔案編碼轉換問題
         const toChineseNum = (n) => {
             const mapping = { 
-                0: "零", 1: "一", 2: "二", 3: "三", 4: "四", 
-                5: "五", 6: "六", 7: "七", 8: "八", 9: "九" 
+                0: "\u96f6", 1: "\u4e00", 2: "\u4e8c", 3: "\u4e09", 4: "\u56db", 
+                5: "\u4e94", 6: "\u516d", 7: "\u4e03", 8: "\u516b", 9: "\u4e5d" 
             };
             if (n < 10) return mapping[n];
-            if (n === 10) return "十";
-            if (n < 20) return "十" + mapping[n % 10];
-            if (n % 10 === 0) return mapping[Math.floor(n / 10)] + "十";
-            return mapping[Math.floor(n / 10)] + "十" + mapping[n % 10];
+            if (n === 10) return "\u5341";
+            if (n < 20) return "\u5341" + mapping[n % 10];
+            if (n % 10 === 0) return mapping[Math.floor(n / 10)] + "\u5341";
+            return mapping[Math.floor(n / 10)] + "\u5341" + mapping[n % 10];
         };
 
         const getChantText = (m, s, p) => {
@@ -224,6 +225,7 @@
             const playerCountRef = useRef(playerCount);
             const roomPlayersRef = useRef(roomPlayers);
             const roomCodeRef = useRef(roomCode);
+            const punishingCardRef = useRef(null);
 
             useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
             useEffect(() => { playersRef.current = players; }, [players]);
@@ -238,6 +240,7 @@
             useEffect(() => { mySeatIndexRef.current = mySeatIndex; }, [mySeatIndex]);
             useEffect(() => { roomPlayersRef.current = roomPlayers; }, [roomPlayers]);
             useEffect(() => { roomCodeRef.current = roomCode; }, [roomCode]);
+            useEffect(() => { punishingCardRef.current = punishingCard; }, [punishingCard]);
 
             // 自動檢測網址是否有 ?room=XXXX 邀請碼
             useEffect(() => {
@@ -272,8 +275,8 @@
             };
 
             const getAiSlapMultiplier = () => {
-                if (aiLevel === 'easy') return 1.5 * 1.3;
-                if (aiLevel === 'hard') return 0.5;
+                if (aiLevel === 'easy') return 1.4;
+                if (aiLevel === 'hard') return 0.55;
                 return 1.0;
             };
 
@@ -612,9 +615,13 @@
                 setIsHost(false);
                 setMySeatIndex(0);
                 try {
-                    const silent = new SpeechSynthesisUtterance("");
-                    silent.lang = 'zh-TW';
-                    window.speechSynthesis.speak(silent);
+                    if (window.speechSynthesis) {
+                        window.speechSynthesis.cancel();
+                        window.speechSynthesis.resume();
+                        const silent = new SpeechSynthesisUtterance("");
+                        silent.lang = 'zh-TW';
+                        window.speechSynthesis.speak(silent);
+                    }
                 } catch(e){}
                 initAudio();
                 setMultiplier(num); 
@@ -742,7 +749,7 @@
 
             // 執行受罰回歸動畫與手牌歸屬
             const applyPenalty = (loserIndex, pileSnapshot, nextTurn, nextStep, updatedPlayers) => {
-                if (punishingCard) return;
+                if (punishingCardRef.current) return;
                 playSoundEffect('slap');
                 setPunishingCard({ toPlayer: loserIndex, pileSnapshot: pileSnapshot.slice(-8) });
                 setCurrentCall(null);
@@ -750,6 +757,7 @@
                 setTimeout(() => {
                     setPlayers(updatedPlayers);
                     setCenterPile([]);
+                    centerPileRef.current = [];
                     setSlapResults([]);
                     setPunishingCard(null);
                     setErrorMsg("");
@@ -762,7 +770,7 @@
 
             // 執行出牌 (統一路徑)
             const executeCardPlay = (fromSeat) => {
-                if (gameStateRef.current !== 'playing' || isAnimating || punishingCard) return;
+                if (gameStateRef.current !== 'playing' || isAnimating || punishingCardRef.current) return;
                 const currentPls = playersRef.current;
                 if (!currentPls[fromSeat] || currentPls[fromSeat].cards.length === 0) return;
 
@@ -823,17 +831,23 @@
                 if (data.fromSeat !== mySeatIndexRef.current) {
                     setCurrentCall({ playerIdx: data.fromSeat, text: data.callText });
                     let speechPromise = Promise.resolve();
-                    if (!isMuted) {
+                    if (!isMuted && window.speechSynthesis) {
                         speechPromise = new Promise((resolve) => {
-                            const utterance = new SpeechSynthesisUtterance(data.chantText);
-                            utterance.lang = 'zh-TW';
-                            utterance.rate = 1.0;
-                            let resolved = false;
-                            const done = () => { if (!resolved) { resolved = true; resolve(); } };
-                            utterance.onend = done;
-                            utterance.onerror = done;
-                            setTimeout(done, 3000);
-                            window.speechSynthesis.speak(utterance);
+                            try {
+                                window.speechSynthesis.cancel();
+                                window.speechSynthesis.resume();
+                                const utterance = new SpeechSynthesisUtterance(data.chantText);
+                                utterance.lang = 'zh-TW';
+                                utterance.rate = 1.0;
+                                let resolved = false;
+                                const done = () => { if (!resolved) { resolved = true; resolve(); } };
+                                utterance.onend = done;
+                                utterance.onerror = done;
+                                setTimeout(done, 1500); // 1.5 秒安全保護
+                                window.speechSynthesis.speak(utterance);
+                            } catch(e) {
+                                resolve();
+                            }
                         });
                     }
                     window.currentSpeechPromise = speechPromise;
@@ -844,30 +858,52 @@
 
                 setFlyingCard({ value: data.card.value, fromPlayer: data.fromSeat });
 
+                // 單機模式：當翻出相符的牌 (isMatch) 時，電腦玩家立即依難度排程反應拍牌！
+                if (!isOnlineRef.current && data.isMatch) {
+                    aiSlapScheduledRef.current = true;
+                    const curPls = playersRef.current;
+                    curPls.forEach((p, idx) => {
+                        if (p.isAI) {
+                            // 電腦反應時間：困難 350~550ms, 普通 600~850ms, 簡單 900~1200ms
+                            const baseTime = aiLevel === 'easy' ? 950 : (aiLevel === 'normal' ? 650 : 380);
+                            const delay = baseTime + Math.random() * 250;
+                            setTimeout(() => {
+                                if ((gameStateRef.current === 'playing' || gameStateRef.current === 'slapping') && !punishingCardRef.current) {
+                                    executeSlapAction(idx);
+                                }
+                            }, delay);
+                        }
+                    });
+                } else if (!isOnlineRef.current && !data.isMatch) {
+                    // 假錯拍機制 (危險數對)
+                    const curPls = playersRef.current;
+                    curPls.forEach((p, idx) => {
+                        if (p.isAI && isDangerousPair(data.card.value, data.callValue)) {
+                            const chance = aiLevel === 'easy' ? 0.45 : aiLevel === 'normal' ? 0.25 : 0.08;
+                            if (Math.random() < chance) {
+                                const delay = Math.random() * 400 + 400;
+                                setTimeout(() => {
+                                    if (gameStateRef.current === 'playing' && !punishingCardRef.current) {
+                                        executeSlapAction(idx);
+                                    }
+                                }, delay);
+                            }
+                        }
+                    });
+                }
+
                 const advanceTurn = () => {
                     if (isFlipResolvedRef.current) return;
                     isFlipResolvedRef.current = true;
                     setCenterPile(prev => [...prev, data.card]);
+                    centerPileRef.current = [...centerPileRef.current, data.card];
                     setFlyingCard(null);
                     setPlayers(data.updatedPlayers);
 
                     if (data.isMatch) {
                         setGameState('slapping');
-                        aiSlapScheduledRef.current = false;
                         setIsAnimating(false);
                     } else {
-                        // AI 假錯拍邏輯 (單機版)
-                        if (!isOnlineRef.current) {
-                            data.updatedPlayers.forEach((p, idx) => {
-                                if (p.isAI && isDangerousPair(data.card.value, data.callValue)) {
-                                    const chance = aiLevel === 'easy' ? 0.45 : aiLevel === 'normal' ? 0.25 : 0.08;
-                                    if (Math.random() < chance) {
-                                        setTimeout(() => handleSlap(idx), (Math.random() * 500 + 300) * getAiSlapMultiplier());
-                                    }
-                                }
-                            });
-                        }
-
                         setTurn(data.nextTurn);
                         setCurrentStep(data.nextStep);
                         setIsAnimating(false);
@@ -882,7 +918,7 @@
 
             // 點擊卡牌出牌
             const playTurn = (isManual = false) => {
-                if (gameState !== 'playing' || isAnimating || punishingCard) return;
+                if (gameState !== 'playing' || isAnimating || punishingCardRef.current) return;
                 if (isManual && turn !== mySeatIndex) return;
 
                 if (isOnline) {
@@ -898,9 +934,9 @@
 
             // 拍牌核心邏輯 (Host 或 Local 裁決)
             const executeSlapAction = (playerIndex) => {
-                if (punishingCard) return;
+                if (punishingCardRef.current) return;
                 const curPile = centerPileRef.current;
-                const curCardVal = flyingCard ? flyingCard.value : (curPile.length > 0 ? curPile[curPile.length - 1].value : null);
+                const curCardVal = flyingCard ? flyingCard.value : (curPile.length > 0 ? curPile[curPile.length - 1].value : (flippedCardRef.current ? flippedCardRef.current.value : null));
                 if (curCardVal === null) return;
 
                 const curMult = multiplierRef.current;
@@ -925,6 +961,7 @@
                         if (!isFlipResolvedRef.current && flippedCardRef.current) {
                             isFlipResolvedRef.current = true;
                             setCenterPile(prev => [...prev, flippedCardRef.current]);
+                            centerPileRef.current = [...centerPileRef.current, flippedCardRef.current];
                             setFlyingCard(null);
                             setIsAnimating(false);
                         }
@@ -955,7 +992,7 @@
                         if (newResults.length === totalCount - 1) {
                             const allSeats = Array.from({ length: totalCount }, (_, i) => i);
                             const loserIndex = allSeats.find(idx => !newResults.includes(idx));
-                            const activePile = centerPileRef.current;
+                            const activePile = centerPileRef.current.length > 0 ? centerPileRef.current : (flippedCardRef.current ? [flippedCardRef.current] : []);
                             const nextStepVal = getNextStep(currentStepRef.current, difficultyRef.current);
 
                             const updatedPlayers = curPls.map((p, idx) => 
@@ -974,7 +1011,10 @@
                                     updatedPlayers: updatedPlayers
                                 });
                             }
-                            applyPenalty(loserIndex, activePile, loserIndex, nextStepVal, updatedPlayers);
+                            // 延遲 300ms 讓其他玩家/電腦的拍牌小手動作有時間完整落下展示，隨後執行收牌處罰
+                            setTimeout(() => {
+                                applyPenalty(loserIndex, activePile, loserIndex, nextStepVal, updatedPlayers);
+                            }, 300);
                         }
                         return newResults;
                     });
@@ -992,6 +1032,7 @@
                             isFlipResolvedRef.current = true;
                             activePile = [...activePile, flippedCardRef.current];
                             setCenterPile(activePile);
+                            centerPileRef.current = activePile;
                             setFlyingCard(null);
                             setIsAnimating(false);
                         }
@@ -1021,7 +1062,7 @@
 
             // 玩家點擊拍牌區
             const handleSlap = (playerIndex) => {
-                if (punishingCard) return;
+                if (punishingCardRef.current) return;
                 if (isOnline) {
                     if (isHost) {
                         executeSlapAction(0);
@@ -1058,24 +1099,6 @@
                 }
                 return () => clearTimeout(timeoutRef.current);
             }, [turn, gameState, isAnimating, punishingCard, aiLevel, centerPile.length, isOnline]);
-
-            // 單機 AI 拍牌反應定時器
-            useEffect(() => {
-                if (!isOnline && gameState === 'slapping' && !aiSlapScheduledRef.current) {
-                    aiSlapScheduledRef.current = true;
-                    players.forEach((p, idx) => {
-                        if (p.isAI) {
-                            const delay = (Math.random() * 800 + 400) * getAiSlapMultiplier();
-                            setTimeout(() => { 
-                                setGameState(curr => { 
-                                    if (curr === 'slapping') handleSlap(idx); 
-                                    return curr; 
-                                }); 
-                            }, delay);
-                        }
-                    });
-                }
-            }, [gameState, aiLevel, isOnline]);
 
             // 當前輪到的玩家若已無手牌，自動交棒給下一個有牌的玩家
             useEffect(() => {
