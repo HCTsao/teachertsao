@@ -63,9 +63,7 @@
 
         * { touch-action: manipulation; }
         .slap-area { touch-action: none !important; }
-        body { overflow: hidden; background-color: #0f172a; margin: 0; font-family: system-ui, -apple-system, sans-serif; }
-        .custom-range::-webkit-slider-runnable-track { background: #334155; height: 8px; border-radius: 4px; }
-        .custom-range::-webkit-slider-thumb { margin-top: -6px; height: 20px; width: 20px; border-radius: 50%; background: #fbbf24; cursor: pointer; -webkit-appearance: none; }
+        body { overflow: hidden; background-color: #064e3b; margin: 0; font-family: system-ui, -apple-system, sans-serif; }
     </style>
 </head>
 <body>
@@ -74,14 +72,8 @@
     <script type="text/babel" data-type="module">
         const { useState, useEffect, useRef, Fragment } = React;
 
-        const Zap = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
-        );
         const Trophy = ({ size = 24, className = "" }) => (
             <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg>
-        );
-        const Users = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         );
         const Globe = ({ size = 24, className = "" }) => (
             <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -118,23 +110,30 @@
             return pairs.some(p => p[0] === cardVal && p[1] === targetVal);
         };
 
-        // 使用 Unicode 跳脫字元，徹底避免任何檔案編碼問題
+        // 中文數字轉換 (使用 Unicode 跳脫字元，徹底避免任何檔案編碼問題)
         const toChineseNum = (n) => {
             const mapping = { 
                 0: "\u96f6", 1: "\u4e00", 2: "\u4e8c", 3: "\u4e09", 4: "\u56db", 
                 5: "\u4e94", 6: "\u516d", 7: "\u4e03", 8: "\u516b", 9: "\u4e5d" 
             };
             if (n < 10) return mapping[n];
-            if (n === 10) return "\u5341";
+            if (n === 10) return "\u4e00\u5341";
             if (n < 20) return "\u5341" + mapping[n % 10];
             if (n % 10 === 0) return mapping[Math.floor(n / 10)] + "\u5341";
             return mapping[Math.floor(n / 10)] + "\u5341" + mapping[n % 10];
         };
 
+        // 台灣小學二年級標準乘法口訣：個位數帶「得」（二一得二、二三得六），十位數帶「十」（二五一十、三四十二）
         const getChantText = (m, s, p) => {
-            return toChineseNum(m) + toChineseNum(s) + toChineseNum(p);
+            const mStr = toChineseNum(m);
+            const sStr = toChineseNum(s);
+            if (p < 10) {
+                return mStr + sStr + "\u5f97" + toChineseNum(p);
+            }
+            return mStr + sStr + toChineseNum(p);
         };
 
+        // PeerJS 伺服器設定
         const PEER_CONFIG = {
             host: '0.peerjs.com',
             port: 443,
@@ -149,6 +148,9 @@
             }
         };
 
+        // 全域引用，避免 Chromium 垃圾回收提早中止語音
+        let activeUtteranceRef = null;
+
         const App = () => {
             // 基本遊戲狀態
             const [gameState, setGameState] = useState('menu'); // menu, lobby, dealing, starting, playing, slapping, gameOver
@@ -158,10 +160,9 @@
             const [difficulty, setDifficulty] = useState('easy'); // 'easy' (1->9), 'hard' (9->1)
             const [aiLevel, setAiLevel] = useState('normal'); // 'easy', 'normal', 'hard'
 
-            // 連線相關狀態
+            // 連線相關狀態 (不需打字輸入姓名)
             const [isOnline, setIsOnline] = useState(false);
             const [isHost, setIsHost] = useState(false);
-            const [myPlayerName, setMyPlayerName] = useState(() => '玩家' + Math.floor(Math.random() * 900 + 100));
             const [mySeatIndex, setMySeatIndex] = useState(0);
             const [roomCode, setRoomCode] = useState('');
             const [joinInputCode, setJoinInputCode] = useState('');
@@ -200,8 +201,8 @@
 
             // PeerJS 連線 Refs
             const peerRef = useRef(null);
-            const hostConnsRef = useRef([]); // host 專用：所有客戶端連線
-            const clientConnRef = useRef(null); // client 專用：連到 host 的連線
+            const hostConnsRef = useRef([]);
+            const clientConnRef = useRef(null);
 
             // 狀態即時 Refs
             const gameStateRef = useRef(gameState);
@@ -236,6 +237,16 @@
             useEffect(() => { roomCodeRef.current = roomCode; }, [roomCode]);
             useEffect(() => { punishingCardRef.current = punishingCard; }, [punishingCard]);
             useEffect(() => { isPenaltyCoolingRef.current = isPenaltyCooling; }, [isPenaltyCooling]);
+
+            // 預載 Windows / Chrome 語音包
+            useEffect(() => {
+                if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                    window.speechSynthesis.getVoices();
+                    window.speechSynthesis.onvoiceschanged = () => {
+                        window.speechSynthesis.getVoices();
+                    };
+                }
+            }, []);
 
             // 自動檢測網址是否有 ?room=XXXX 邀請碼
             useEffect(() => {
@@ -272,6 +283,48 @@
             const initAudio = () => {
                 if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
                 if (audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.resume();
+                }
+            };
+
+            // 專屬 Windows 電腦的高相容語音報讀函式
+            const playChantVoice = (text) => {
+                if (isMuted || !('speechSynthesis' in window)) return;
+                try {
+                    window.speechSynthesis.resume();
+
+                    const u = new SpeechSynthesisUtterance(text);
+                    u.lang = 'zh-TW';
+                    u.rate = 1.0;
+                    u.pitch = 1.0;
+
+                    const voices = window.speechSynthesis.getVoices();
+                    if (voices && voices.length > 0) {
+                        const twVoice = voices.find(v => (v.lang === 'zh-TW' || v.lang === 'zh_TW') && (v.name.includes('Hanhan') || v.name.includes('Taiwan') || v.name.includes('臺灣') || v.name.includes('國語')))
+                                     || voices.find(v => v.lang === 'zh-TW' || v.lang === 'zh_TW')
+                                     || voices.find(v => v.lang.toLowerCase().startsWith('zh'));
+                        if (twVoice) {
+                            u.voice = twVoice;
+                        }
+                    }
+
+                    activeUtteranceRef = u;
+                    u.onend = () => { activeUtteranceRef = null; };
+                    u.onerror = () => { activeUtteranceRef = null; };
+
+                    if (window.speechSynthesis.speaking) {
+                        window.speechSynthesis.cancel();
+                        setTimeout(() => {
+                            window.speechSynthesis.resume();
+                            window.speechSynthesis.speak(u);
+                        }, 40);
+                    } else {
+                        window.speechSynthesis.speak(u);
+                    }
+                } catch(e) {
+                    console.error("SpeechSynthesis error:", e);
+                }
             };
 
             const playSoundEffect = (type) => {
@@ -374,7 +427,7 @@
                 }
             };
 
-            // 創建房間 (Host)
+            // 創建房間 (Host) - 免輸入姓名
             const handleCreateRoom = (selectedMult) => {
                 cleanupPeer();
                 initAudio();
@@ -390,8 +443,8 @@
                 peerRef.current = peer;
 
                 peer.on('open', () => {
-                    setConnStatus('房間已就緒！等待好友加入...');
-                    const initialRoomPlayers = [{ seat: 0, name: myPlayerName || '房主', isHost: true }];
+                    setConnStatus('房間已就緒！等待加入...');
+                    const initialRoomPlayers = [{ seat: 0, name: '你 (房主)', isHost: true }];
                     setRoomPlayers(initialRoomPlayers);
                     roomPlayersRef.current = initialRoomPlayers;
                     setGameState('lobby');
@@ -434,7 +487,8 @@
             const handleHostReceivedData = (conn, data, seat) => {
                 if (data.type === 'CLIENT_JOIN_REQUEST') {
                     const currentPls = roomPlayersRef.current;
-                    const newPlayer = { seat: seat, name: data.playerName, isHost: false };
+                    const defaultName = `玩家 ${seat + 1}`;
+                    const newPlayer = { seat: seat, name: defaultName, isHost: false };
                     const updated = [...currentPls, newPlayer];
                     setRoomPlayers(updated);
                     roomPlayersRef.current = updated;
@@ -481,8 +535,8 @@
                     clientConnRef.current = conn;
 
                     conn.on('open', () => {
-                        setConnStatus('已連上房主，傳送加入請求...');
-                        conn.send({ type: 'CLIENT_JOIN_REQUEST', playerName: myPlayerName || '挑戰者' });
+                        setConnStatus('已連上房主，準備進入...');
+                        conn.send({ type: 'CLIENT_JOIN_REQUEST' });
                     });
 
                     conn.on('data', (data) => {
@@ -513,7 +567,7 @@
                     setDifficulty(data.difficulty);
                     setRoomPlayers(data.roomPlayers);
                     setGameState('lobby');
-                    setConnStatus('已成功進入房間等待大廳！');
+                    setConnStatus('已進入房間等待大廳！');
                 } else if (data.type === 'ROOM_FULL') {
                     alert(data.message);
                     cleanupPeer();
@@ -556,34 +610,24 @@
                     playSoundEffect('win');
                     setWinner(data.winner);
                     setGameState('gameOver');
-                } else if (data.type === 'PLAYER_DISCONNECTED') {
-                    setErrorMsg(data.message);
-                    setTimeout(() => {
-                        setGameState('menu');
-                        cleanupPeer();
-                    }, 2500);
                 }
             };
 
-            // 開始單機遊戲
+            // 開始單機遊戲 (免打名字，專為二年級學生設計)
             const startLocalGame = (num) => {
                 cleanupPeer();
                 initAudio();
-                if (window.speechSynthesis) {
-                    window.speechSynthesis.cancel();
-                    window.speechSynthesis.resume();
-                    const silent = new SpeechSynthesisUtterance('');
-                    window.speechSynthesis.speak(silent);
-                }
 
                 setMultiplier(num);
                 multiplierRef.current = num;
                 const deck = createDeck(num);
 
+                // 2人模式：你 (🙋) vs 電腦 (🤖)
+                // 3人模式：你 (🙋) vs 電腦 1 (🤖) vs 電腦 2 (🐰)
                 const avatarList = [
-                    { name: myPlayerName || '你', avatar: '🧑‍🎓', isAI: false },
-                    { name: '兔寶電腦', avatar: '🐰', isAI: true },
-                    { name: '熊寶電腦', avatar: '🐻', isAI: true }
+                    { name: '你', avatar: '🙋', isAI: false },
+                    { name: playerCount === 2 ? '電腦' : '電腦 1', avatar: '🤖', isAI: true },
+                    { name: '電腦 2', avatar: '🐰', isAI: true }
                 ];
 
                 const initialPlayers = Array.from({ length: playerCount }, (_, i) => ({
@@ -615,7 +659,7 @@
                 setDealingProgress(0);
             };
 
-            // 連線模式：房主點擊「開始遊戲」
+            // 連線模式：房主開始遊戲
             const startOnlineGame = () => {
                 if (!isHost) return;
                 initAudio();
@@ -625,7 +669,7 @@
                 const initialPlayers = roomPlayers.map((rp, idx) => ({
                     id: idx,
                     name: rp.name,
-                    avatar: idx === 0 ? '👑' : (idx === 1 ? '🦊' : '🐼'),
+                    avatar: idx === 0 ? '🙋' : (idx === 1 ? '🦊' : '🐼'),
                     cards: [],
                     isAI: false
                 }));
@@ -789,7 +833,7 @@
                 applyCardFlipped(eventData);
             };
 
-            // 客端與本機共用出牌動畫
+            // 客端與本機共用出牌動畫與語音
             const applyCardFlipped = (data) => {
                 playSoundEffect('flip');
                 setIsAnimating(true);
@@ -797,31 +841,11 @@
                 flippedCardRef.current = data.card;
                 isFlipResolvedRef.current = false;
 
-                // 顯示出牌者口訣氣泡
+                // 顯示出牌者口訣氣泡 (黃底大字體，小二學生看得超清楚)
                 setCurrentCall({ playerIdx: data.fromSeat, text: data.callText });
 
-                // 朗讀口訣：若開啟聲音，電腦出牌或對手出牌必定朗讀口訣；自己出牌亦提供語音回饋
-                let speechPromise = Promise.resolve();
-                if (!isMuted && window.speechSynthesis) {
-                    speechPromise = new Promise((resolve) => {
-                        try {
-                            window.speechSynthesis.cancel();
-                            window.speechSynthesis.resume();
-                            const utterance = new SpeechSynthesisUtterance(data.chantText);
-                            utterance.lang = 'zh-TW';
-                            utterance.rate = 1.0;
-                            let resolved = false;
-                            const done = () => { if (!resolved) { resolved = true; resolve(); } };
-                            utterance.onend = done;
-                            utterance.onerror = done;
-                            setTimeout(done, 1200); // 1.2 秒超時安全保護
-                            window.speechSynthesis.speak(utterance);
-                        } catch(e) {
-                            resolve();
-                        }
-                    });
-                }
-                window.currentSpeechPromise = speechPromise;
+                // 播放真人語音朗讀口訣（如「二三得六」、「二五一十」）
+                playChantVoice(data.chantText);
 
                 setFlyingCard({ value: data.card.value, fromPlayer: data.fromSeat });
 
@@ -831,7 +855,7 @@
                     const curPls = playersRef.current;
                     curPls.forEach((p, idx) => {
                         if (p.isAI) {
-                            const baseTime = aiLevel === 'easy' ? 1000 : (aiLevel === 'normal' ? 700 : 480);
+                            const baseTime = aiLevel === 'easy' ? 1050 : (aiLevel === 'normal' ? 750 : 500);
                             const delay = baseTime + Math.random() * 200;
                             setTimeout(() => {
                                 if ((gameStateRef.current === 'playing' || gameStateRef.current === 'slapping') && !punishingCardRef.current && !penaltyScheduledRef.current) {
@@ -876,10 +900,8 @@
                     }
                 };
 
-                setTimeout(() => {
-                    const speechDone = window.currentSpeechPromise || Promise.resolve();
-                    speechDone.then(advanceTurn);
-                }, 500);
+                // 留出 600ms 翻牌與口訣誦讀時間，隨後進入下一動
+                setTimeout(advanceTurn, 650);
             };
 
             // 點卡牌出牌
@@ -901,7 +923,7 @@
             // 執行拍牌動作
             const executeSlapAction = (playerIndex) => {
                 if (punishingCardRef.current || isPenaltyCoolingRef.current) return;
-                if (window.speechSynthesis) window.speechSynthesis.cancel();
+                if ('speechSynthesis' in window) window.speechSynthesis.cancel();
                 const curPile = centerPileRef.current;
                 const curCardVal = flyingCard ? flyingCard.value : (curPile.length > 0 ? curPile[curPile.length - 1].value : (flippedCardRef.current ? flippedCardRef.current.value : null));
                 if (curCardVal === null) return;
@@ -1043,7 +1065,6 @@
                     if (isHost) {
                         executeSlapAction(0);
                     } else {
-                        // Client 觸發本地音效與手部，並送給 Host
                         triggerSlapHand(mySeatIndex);
                         playSoundEffect('slap');
                         setSlapRipple(true);
@@ -1070,7 +1091,7 @@
             // 輪到 AI 出牌時的定時器
             useEffect(() => {
                 if (!isOnline && gameState === 'playing' && players[turn]?.isAI && !isAnimating && !punishingCard && !isPenaltyCooling) {
-                    const delay = 1000; // 穩定保持 1 秒節奏，絕不在 100ms 瞬間出牌
+                    const delay = 1000; // 穩定保持 1 秒舒適節奏，絕不瞬間翻牌
                     timeoutRef.current = setTimeout(() => playTurn(false), delay);
                 }
                 return () => clearTimeout(timeoutRef.current);
@@ -1086,23 +1107,22 @@
                 }
             }, [turn, gameState, players]);
 
-            // 座位畫面映射
-            // 當前本地玩家永遠顯示在底部 (Slot 0)，其餘玩家依序排在頂端或左右！
+            // 座位畫面映射 (自己永遠在下方 Slot 0)
             const getRelativeSlot = (seatIdx) => {
                 const total = players.length || playerCount;
                 const rel = (seatIdx - mySeatIndex + total) % total;
                 if (total === 2) {
-                    return rel === 0 ? 0 : 2; // 0: 底部, 2: 頂端
+                    return rel === 0 ? 0 : 2; // 0: 底部, 2: 頂部對手
                 } else {
                     return rel === 0 ? 0 : (rel === 1 ? 1 : 3); // 0: 底部, 1: 左側, 3: 右側
                 }
             };
 
             const SLOT_CONFIGS = [
-                { pos: "bottom-8 left-1/2 -translate-x-1/2", call: "left-full ml-4 top-1/2 -translate-y-1/2", cardAlign: "items-center" }, // 0: 下方自己
-                { pos: "left-12 top-1/2 -translate-y-1/2", call: "left-full ml-4 top-1/2 -translate-y-1/2", cardAlign: "items-start" },   // 1: 左側
-                { pos: "top-8 left-1/2 -translate-x-1/2", call: "left-full ml-4 top-1/2 -translate-y-1/2", cardAlign: "items-center" },    // 2: 上方 (2人對戰對手)
-                { pos: "right-12 top-1/2 -translate-y-1/2", call: "right-full mr-4 top-1/2 -translate-y-1/2", cardAlign: "items-end" }   // 3: 右側
+                { pos: "bottom-6 left-1/2 -translate-x-1/2", call: "left-full ml-4 top-1/2 -translate-y-1/2" }, // 0: 下方自己
+                { pos: "left-10 top-1/2 -translate-y-1/2", call: "left-full ml-4 top-1/2 -translate-y-1/2" },    // 1: 左側電腦1
+                { pos: "top-6 left-1/2 -translate-x-1/2", call: "left-full ml-4 top-1/2 -translate-y-1/2" },     // 2: 上方 (2人模式電腦)
+                { pos: "right-10 top-1/2 -translate-y-1/2", call: "right-full mr-4 top-1/2 -translate-y-1/2" }  // 3: 右側電腦2
             ];
 
             return (
@@ -1111,267 +1131,127 @@
                         className="relative w-[1024px] h-[768px] flex items-center justify-center"
                         style={{ transform: `scale(${scale})`, transformOrigin: 'center center' }}
                     >
-                        {/* 頂部功能列 */}
-                        <div className="absolute top-4 left-6 right-6 flex justify-between items-center z-50 pointer-events-auto">
-                            <button 
-                                onClick={() => {
-                                    cleanupPeer();
-                                    setGameState('menu');
-                                }}
-                                className="px-4 py-2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-xl font-bold flex items-center gap-2 backdrop-blur border border-slate-700 shadow-lg transition active:scale-95 text-sm"
-                            >
-                                <span>↩</span> 返回主選單
-                            </button>
-
-                            {gameState !== 'menu' && gameState !== 'lobby' && (
-                                <div className="flex items-center gap-3">
-                                    <div className="px-5 py-2 bg-amber-500/20 border border-amber-500/40 text-amber-300 font-black text-lg rounded-2xl shadow-lg backdrop-blur flex items-center gap-2">
-                                        <Zap size={20} className="text-amber-400 fill-amber-400" />
-                                        <span>【{multiplier} 的九九乘法】</span>
-                                        <span className="text-sm font-normal text-amber-200">
-                                            ({difficulty === 'easy' ? '順數 1→9' : '倒數 9→1'})
-                                        </span>
-                                    </div>
-                                    {isOnline && (
-                                        <div className="px-3 py-1.5 bg-blue-500/20 border border-blue-500/40 text-blue-300 font-bold text-xs rounded-xl backdrop-blur flex items-center gap-1.5">
-                                            <Globe size={14} /> 房間 {roomCode}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            <div className="flex items-center gap-2">
-                                <button 
-                                    onClick={() => setIsMuted(!isMuted)} 
-                                    className="p-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 rounded-xl backdrop-blur border border-slate-700 shadow-lg active:scale-95 transition"
-                                    title={isMuted ? "開啟聲音" : "靜音"}
-                                >
-                                    {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* 主選單 */}
+                        {/* 主選單 (簡潔直覺，專為二年級小學生設計，免輸入姓名！) */}
                         {gameState === 'menu' && (
-                            <div className="relative z-50 flex flex-col items-center justify-center w-full max-h-[720px] p-6 bg-slate-900/95 border border-slate-800 rounded-3xl shadow-2xl backdrop-blur-md">
-                                <div className="text-center mb-5">
-                                    <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-400 to-yellow-200 tracking-wide drop-shadow mb-1">
-                                        九九乘法心臟病
-                                    </h1>
-                                    <p className="text-slate-400 text-sm">眼明手快！乘法口訣大對決</p>
-                                </div>
+                            <div className="relative z-50 flex flex-col items-center justify-center w-full h-full p-6 text-center bg-slate-900 text-white rounded-[40px] border-4 border-slate-800 shadow-2xl">
+                                <h1 className="text-5xl font-black mb-6 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-500 drop-shadow-md">
+                                    九九乘法心臟病
+                                </h1>
 
-                                {/* 模式分頁切換 */}
-                                <div className="flex bg-slate-800 p-1.5 rounded-2xl mb-5 border border-slate-700 w-full max-w-md">
+                                {/* 模式切換：單機 vs 線上對戰 */}
+                                <div className="flex bg-slate-800 p-1.5 rounded-2xl mb-6 border border-slate-700 w-full max-w-sm">
                                     <button 
                                         onClick={() => setMainTab('local')}
-                                        className={`flex-1 py-2.5 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition ${mainTab === 'local' ? 'bg-amber-400 text-slate-900 shadow-md' : 'text-slate-400 hover:text-white'}`}
+                                        className={`flex-1 py-2 rounded-xl font-black text-sm transition ${mainTab === 'local' ? 'bg-amber-400 text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}
                                     >
-                                        <Users size={18} /> 單機對戰
+                                        🎮 單機練習 (vs 電腦)
                                     </button>
                                     <button 
                                         onClick={() => setMainTab('online')}
-                                        className={`flex-1 py-2.5 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition ${mainTab === 'online' ? 'bg-blue-500 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                                        className={`flex-1 py-2 rounded-xl font-black text-sm transition ${mainTab === 'online' ? 'bg-blue-500 text-white shadow' : 'text-slate-400 hover:text-white'}`}
                                     >
-                                        <Globe size={18} /> 線上即時對戰
+                                        🌐 線上對戰
                                     </button>
                                 </div>
 
                                 {mainTab === 'local' ? (
                                     /* 單機模式 */
-                                    <div className="flex flex-col gap-4 w-full max-w-lg mb-2">
-                                        {/* 遊玩人數選擇 */}
-                                        <div className="bg-slate-800/90 p-4 rounded-2xl border border-slate-700 shadow-md">
-                                            <div className="text-xs font-bold text-slate-400 mb-2 flex items-center justify-between">
-                                                <span>遊玩人數（共 54 張牌平均分配）：</span>
-                                                <span className="text-amber-400 font-extrabold">{playerCount} 人對戰</span>
+                                    <div className="flex flex-col gap-5 w-full max-w-md">
+                                        {/* 人數設定 */}
+                                        <div className="flex items-center justify-center gap-3">
+                                            <button 
+                                                onClick={() => setPlayerCount(2)}
+                                                className={`flex-1 py-3 rounded-2xl font-black text-base border-2 transition ${playerCount === 2 ? 'bg-amber-400 text-slate-900 border-amber-300 shadow-lg scale-105' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'}`}
+                                            >
+                                                👥 2 人遊玩 <span className="text-xs font-normal block opacity-80">(每人27張牌)</span>
+                                            </button>
+                                            <button 
+                                                onClick={() => setPlayerCount(3)}
+                                                className={`flex-1 py-3 rounded-2xl font-black text-base border-2 transition ${playerCount === 3 ? 'bg-amber-400 text-slate-900 border-amber-300 shadow-lg scale-105' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'}`}
+                                            >
+                                                👨‍👩‍👦 3 人遊玩 <span className="text-xs font-normal block opacity-80">(每人18張牌)</span>
+                                            </button>
+                                        </div>
+
+                                        {/* 出牌順序與速度 */}
+                                        <div className="flex items-center justify-center gap-3">
+                                            <div className="bg-slate-800 px-4 py-2.5 rounded-2xl border border-slate-700 flex items-center gap-2">
+                                                <span className="text-xs font-bold text-slate-400">口訣：</span>
+                                                <button onClick={() => setDifficulty('easy')} className={`px-3 py-1 rounded-xl text-xs font-black transition ${difficulty === 'easy' ? 'bg-emerald-500 text-white shadow' : 'bg-slate-700 text-slate-300'}`}>正背 (1→9)</button>
+                                                <button onClick={() => setDifficulty('hard')} className={`px-3 py-1 rounded-xl text-xs font-black transition ${difficulty === 'hard' ? 'bg-emerald-500 text-white shadow' : 'bg-slate-700 text-slate-300'}`}>倒背 (9→1)</button>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <button 
-                                                    onClick={() => setPlayerCount(2)}
-                                                    className={`py-2.5 rounded-xl font-black text-sm flex items-center justify-center gap-2 border-2 transition ${playerCount === 2 ? 'bg-amber-400 text-slate-900 border-amber-300 shadow-lg scale-[1.02]' : 'bg-slate-700/60 text-slate-300 border-transparent hover:bg-slate-700'}`}
-                                                >
-                                                    <span>👥 2 人遊玩</span>
-                                                    <span className="text-xs font-normal opacity-80">(每人27張)</span>
-                                                </button>
-                                                <button 
-                                                    onClick={() => setPlayerCount(3)}
-                                                    className={`py-2.5 rounded-xl font-black text-sm flex items-center justify-center gap-2 border-2 transition ${playerCount === 3 ? 'bg-amber-400 text-slate-900 border-amber-300 shadow-lg scale-[1.02]' : 'bg-slate-700/60 text-slate-300 border-transparent hover:bg-slate-700'}`}
-                                                >
-                                                    <span>👨‍👩‍👦 3 人遊玩</span>
-                                                    <span className="text-xs font-normal opacity-80">(每人18張)</span>
-                                                </button>
+                                            <div className="bg-slate-800 px-4 py-2.5 rounded-2xl border border-slate-700 flex items-center gap-2">
+                                                <span className="text-xs font-bold text-slate-400">電腦速度：</span>
+                                                <button onClick={() => setAiLevel('easy')} className={`px-2.5 py-1 rounded-xl text-xs font-black transition ${aiLevel === 'easy' ? 'bg-blue-500 text-white shadow' : 'bg-slate-700 text-slate-300'}`}>慢速</button>
+                                                <button onClick={() => setAiLevel('normal')} className={`px-2.5 py-1 rounded-xl text-xs font-black transition ${aiLevel === 'normal' ? 'bg-amber-500 text-slate-900 shadow' : 'bg-slate-700 text-slate-300'}`}>標準</button>
+                                                <button onClick={() => setAiLevel('hard')} className={`px-2.5 py-1 rounded-xl text-xs font-black transition ${aiLevel === 'hard' ? 'bg-red-500 text-white shadow' : 'bg-slate-700 text-slate-300'}`}>快速</button>
                                             </div>
                                         </div>
 
-                                        {/* 電腦難度與出牌模式 */}
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div className="bg-slate-800/90 p-3 rounded-2xl border border-slate-700 shadow-md">
-                                                <span className="text-xs font-bold text-slate-400 block mb-1.5">電腦難度：</span>
-                                                <div className="flex gap-1.5">
-                                                    {[
-                                                        { id: 'easy', label: '慢速' },
-                                                        { id: 'normal', label: '標準' },
-                                                        { id: 'hard', label: '快速' }
-                                                    ].map(l => (
-                                                        <button 
-                                                            key={l.id} 
-                                                            onClick={() => setAiLevel(l.id)} 
-                                                            className={`flex-1 py-1.5 rounded-lg text-xs font-black transition ${aiLevel === l.id ? 'bg-indigo-600 text-white shadow' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
-                                                        >
-                                                            {l.label}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            <div className="bg-slate-800/90 p-3 rounded-2xl border border-slate-700 shadow-md">
-                                                <span className="text-xs font-bold text-slate-400 block mb-1.5">念口訣順序：</span>
-                                                <div className="flex gap-1.5">
-                                                    <button 
-                                                        onClick={() => setDifficulty('easy')} 
-                                                        className={`flex-1 py-1.5 rounded-lg text-xs font-black transition ${difficulty === 'easy' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
-                                                    >
-                                                        順數 (1→9)
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => setDifficulty('hard')} 
-                                                        className={`flex-1 py-1.5 rounded-lg text-xs font-black transition ${difficulty === 'hard' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
-                                                    >
-                                                        倒數 (9→1)
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* 暱稱輸入 */}
-                                        <div className="bg-slate-800/90 p-3 rounded-2xl border border-slate-700 flex items-center gap-3">
-                                            <span className="text-xs font-bold text-slate-400 whitespace-nowrap">你的名字：</span>
-                                            <input 
-                                                type="text" 
-                                                value={myPlayerName} 
-                                                onChange={e => setMyPlayerName(e.target.value.substring(0, 8))} 
-                                                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white font-bold w-full focus:outline-none focus:border-amber-400"
-                                            />
-                                        </div>
-
-                                        {/* 選擇九九乘法表 (2~9，移除1) */}
-                                        <div>
-                                            <div className="text-sm font-bold text-slate-400 mb-2">請選擇想挑戰的乘數：</div>
-                                            <div className="grid grid-cols-4 gap-3">
+                                        {/* 選擇乘數立即開始 (移除1，只留2~9) */}
+                                        <div className="mt-2">
+                                            <p className="text-sm font-bold text-slate-300 mb-3">請點選要挑戰的乘數直接開始：</p>
+                                            <div className="grid grid-cols-4 gap-3.5 max-w-sm mx-auto">
                                                 {MULTIPLIERS.map(num => (
                                                     <button 
                                                         key={num} 
                                                         onClick={() => startLocalGame(num)} 
-                                                        className="group relative h-14 bg-white text-slate-900 text-2xl font-black rounded-2xl shadow-lg hover:shadow-amber-400/30 hover:scale-105 active:scale-95 transition flex flex-col items-center justify-center border-2 border-slate-100 hover:border-amber-400"
+                                                        className="h-16 bg-white hover:bg-yellow-400 text-slate-900 text-3xl font-black rounded-2xl transition-all shadow-[0_6px_0_0_#cbd5e1] hover:shadow-[0_6px_0_0_#d97706] active:shadow-none active:translate-y-1.5 flex flex-col items-center justify-center cursor-pointer border border-slate-100"
                                                     >
                                                         <span>{num}</span>
-                                                        <span className="text-xs font-semibold text-slate-500 group-hover:text-amber-600">{num} 的乘法</span>
+                                                        <span className="text-[11px] font-bold text-slate-500">{num} 的乘法</span>
                                                     </button>
                                                 ))}
                                             </div>
                                         </div>
                                     </div>
                                 ) : (
-                                    /* 線上對戰 */
-                                    <div className="flex flex-col gap-5 w-full max-w-lg mb-4 text-white">
-                                        {/* 暱稱輸入 */}
-                                        <div className="bg-slate-800/90 p-4 rounded-2xl border border-slate-700 shadow-md flex items-center gap-3">
-                                            <span className="text-sm font-bold text-slate-300 whitespace-nowrap">連線暱稱：</span>
-                                            <input 
-                                                type="text" 
-                                                value={myPlayerName} 
-                                                onChange={e => setMyPlayerName(e.target.value.substring(0, 8))} 
-                                                placeholder="輸入暱稱"
-                                                className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white font-bold w-full focus:outline-none focus:border-blue-400"
-                                            />
-                                        </div>
-
-                                        {/* 創建新房間 */}
-                                        <div className="bg-slate-800/90 p-5 rounded-2xl border border-slate-700 shadow-md flex flex-col gap-3">
-                                            <h3 className="text-lg font-black text-amber-400 flex items-center gap-2">
-                                                <span>👑</span> 創建連線對戰房間 (房主)
-                                            </h3>
-                                            
-                                            <div className="grid grid-cols-2 gap-3 mt-1">
-                                                <div>
-                                                    <span className="text-xs font-bold text-slate-400 block mb-1.5">房間人數：</span>
-                                                    <div className="flex gap-2">
-                                                        <button 
-                                                            onClick={() => setPlayerCount(2)}
-                                                            className={`flex-1 py-2 rounded-xl text-xs font-bold border transition ${playerCount === 2 ? 'bg-amber-400 text-slate-900 border-amber-300 shadow' : 'bg-slate-700 text-slate-300 border-transparent'}`}
-                                                        >
-                                                            2 人對決
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => setPlayerCount(3)}
-                                                            className={`flex-1 py-2 rounded-xl text-xs font-bold border transition ${playerCount === 3 ? 'bg-amber-400 text-slate-900 border-amber-300 shadow' : 'bg-slate-700 text-slate-300 border-transparent'}`}
-                                                        >
-                                                            3 人混戰
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                <div>
-                                                    <span className="text-xs font-bold text-slate-400 block mb-1.5">出牌順序：</span>
-                                                    <div className="flex gap-2">
-                                                        <button 
-                                                            onClick={() => setDifficulty('easy')}
-                                                            className={`flex-1 py-2 rounded-xl text-xs font-bold border transition ${difficulty === 'easy' ? 'bg-emerald-500 text-white border-emerald-400 shadow' : 'bg-slate-700 text-slate-300 border-transparent'}`}
-                                                        >
-                                                            順數 (1→9)
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => setDifficulty('hard')}
-                                                            className={`flex-1 py-2 rounded-xl text-xs font-bold border transition ${difficulty === 'hard' ? 'bg-emerald-500 text-white border-emerald-400 shadow' : 'bg-slate-700 text-slate-300 border-transparent'}`}
-                                                        >
-                                                            倒數 (9→1)
-                                                        </button>
-                                                    </div>
+                                    /* 線上對戰 (免打姓名，超簡單) */
+                                    <div className="flex flex-col gap-4 w-full max-w-md text-white">
+                                        <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 flex flex-col gap-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm font-black text-amber-400">👑 我要開新房間 (房主)</span>
+                                                <div className="flex gap-1.5">
+                                                    <button onClick={() => setPlayerCount(2)} className={`px-2.5 py-1 rounded-lg text-xs font-bold ${playerCount === 2 ? 'bg-amber-400 text-slate-900' : 'bg-slate-700'}`}>2人</button>
+                                                    <button onClick={() => setPlayerCount(3)} className={`px-2.5 py-1 rounded-lg text-xs font-bold ${playerCount === 3 ? 'bg-amber-400 text-slate-900' : 'bg-slate-700'}`}>3人</button>
                                                 </div>
                                             </div>
-
-                                            <div className="mt-1">
-                                                <span className="text-xs font-bold text-slate-400 block mb-2">選擇開房乘數 (2~9)：</span>
-                                                <div className="grid grid-cols-4 gap-2">
-                                                    {MULTIPLIERS.map(num => (
-                                                        <button
-                                                            key={num}
-                                                            onClick={() => handleCreateRoom(num)}
-                                                            className="py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-black text-sm shadow hover:scale-105 active:scale-95 transition"
-                                                        >
-                                                            {num} 的乘法
-                                                        </button>
-                                                    ))}
-                                                </div>
+                                            <p className="text-xs text-slate-400 text-left">點選乘數立即開房：</p>
+                                            <div className="grid grid-cols-4 gap-2">
+                                                {MULTIPLIERS.map(num => (
+                                                    <button
+                                                        key={num}
+                                                        onClick={() => handleCreateRoom(num)}
+                                                        className="py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-black text-sm shadow active:scale-95 transition"
+                                                    >
+                                                        {num} 的乘法
+                                                    </button>
+                                                ))}
                                             </div>
                                         </div>
 
-                                        {/* 加入現有房間 */}
-                                        <div className="bg-slate-800/90 p-5 rounded-2xl border border-slate-700 shadow-md flex flex-col gap-3">
-                                            <h3 className="text-lg font-black text-blue-400 flex items-center gap-2">
-                                                <span>🚪</span> 加入好友房間
-                                            </h3>
-                                            <div className="flex gap-3">
+                                        <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 flex flex-col gap-2">
+                                            <span className="text-sm font-black text-blue-400 text-left">🚪 我要加入好友的房間</span>
+                                            <div className="flex gap-2">
                                                 <input 
                                                     type="text" 
                                                     value={joinInputCode} 
                                                     onChange={e => setJoinInputCode(e.target.value.toUpperCase())} 
-                                                    placeholder="輸入 6 位數代碼" 
+                                                    placeholder="輸入 6 位房間碼" 
                                                     maxLength="6"
-                                                    className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-center text-lg font-black tracking-widest text-amber-400 uppercase w-full focus:outline-none focus:border-blue-400"
+                                                    className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-center text-lg font-black tracking-widest text-amber-400 uppercase flex-1 focus:outline-none focus:border-blue-400"
                                                 />
                                                 <button 
                                                     onClick={handleJoinRoom}
-                                                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-sm whitespace-nowrap shadow-lg active:scale-95 transition flex items-center gap-1.5"
+                                                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-sm shadow active:scale-95 transition"
                                                 >
-                                                    <span>進入對戰</span>
+                                                    進入
                                                 </button>
                                             </div>
                                         </div>
 
                                         {connStatus && (
-                                            <div className="text-center text-xs text-amber-300 font-bold bg-amber-500/10 py-2 px-4 rounded-xl border border-amber-500/20">
+                                            <div className="text-xs text-amber-300 font-bold bg-amber-500/10 py-2 rounded-xl border border-amber-500/20">
                                                 {connStatus}
                                             </div>
                                         )}
@@ -1380,19 +1260,18 @@
                             </div>
                         )}
 
-                        {/* 線上等待大廳 (Lobby) */}
+                        {/* 連線大廳 (Lobby) */}
                         {gameState === 'lobby' && (
-                            <div className="relative z-50 flex flex-col items-center justify-center w-full max-w-lg p-8 bg-slate-900/95 border border-slate-800 rounded-3xl shadow-2xl backdrop-blur-md">
-                                <h2 className="text-2xl font-black text-amber-300 mb-2 flex items-center gap-2">
-                                    <Globe size={24} /> 連線房間大廳
+                            <div className="relative z-50 flex flex-col items-center justify-center w-full max-w-md p-6 bg-slate-900 text-white rounded-[40px] border-4 border-slate-800 shadow-2xl">
+                                <h2 className="text-2xl font-black text-amber-300 mb-1 flex items-center gap-2">
+                                    <Globe size={24} /> 連線等待室
                                 </h2>
-                                <p className="text-slate-400 text-sm mb-6">
-                                    挑戰乘數：<strong className="text-white text-base">{multiplier} 的九九乘法</strong> ({difficulty === 'easy' ? '順數 1→9' : '倒數 9→1'})
+                                <p className="text-slate-400 text-xs mb-4">
+                                    挑戰乘數：<strong className="text-white text-sm">{multiplier} 的九九乘法</strong>
                                 </p>
 
-                                {/* 房間代碼分享 */}
-                                <div className="w-full bg-slate-800/90 border border-slate-700 rounded-2xl p-4 flex flex-col items-center gap-2 mb-6 shadow-inner">
-                                    <span className="text-xs font-bold text-slate-400">房間連線代碼</span>
+                                <div className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3 flex flex-col items-center gap-1.5 mb-4">
+                                    <span className="text-xs text-slate-400 font-bold">房間代碼</span>
                                     <div className="text-3xl font-black tracking-widest text-amber-400">{roomCode}</div>
                                     <button 
                                         onClick={() => {
@@ -1401,73 +1280,84 @@
                                             setCopied(true);
                                             setTimeout(() => setCopied(false), 2000);
                                         }}
-                                        className="mt-1 px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold rounded-lg flex items-center gap-1.5 transition active:scale-95"
+                                        className="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-xs font-bold rounded-lg flex items-center gap-1.5 transition active:scale-95"
                                     >
                                         {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                                        {copied ? '已複製連線網址！' : '複製邀請網址'}
+                                        {copied ? '已複製！' : '複製連結給同學'}
                                     </button>
                                 </div>
 
-                                {/* 玩家列表 */}
-                                <div className="w-full mb-6">
-                                    <div className="text-xs font-bold text-slate-400 mb-2 flex justify-between">
-                                        <span>已連線玩家清單：</span>
-                                        <span className="text-amber-400 font-extrabold">{roomPlayers.length} / {playerCount} 人</span>
-                                    </div>
-                                    <div className="flex flex-col gap-2">
-                                        {Array.from({ length: playerCount }).map((_, idx) => {
-                                            const p = roomPlayers[idx];
-                                            return (
-                                                <div 
-                                                    key={idx} 
-                                                    className={`p-3 rounded-xl border flex items-center justify-between ${p ? 'bg-slate-800/80 border-slate-700 text-white' : 'bg-slate-900/50 border-dashed border-slate-800 text-slate-500'}`}
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="text-2xl">{idx === 0 ? '👑' : (idx === 1 ? '🦊' : '🐼')}</span>
-                                                        <div className="flex flex-col">
-                                                            <span className="font-bold text-sm">
-                                                                {p ? p.name : `等待玩家 ${idx + 1} 加入...`}
-                                                            </span>
-                                                            <span className="text-[10px] text-slate-400">
-                                                                {p ? (p.seat === mySeatIndex ? '（你自己）' : (p.isHost ? '房主' : '挑戰者')) : '空位'}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    {p ? (
-                                                        <span className="text-xs font-bold text-emerald-400 px-2 py-0.5 bg-emerald-500/10 rounded-full border border-emerald-500/30">已就緒</span>
-                                                    ) : (
-                                                        <span className="text-xs text-slate-500 animate-pulse">等待中...</span>
-                                                    )}
+                                <div className="w-full flex flex-col gap-2 mb-5">
+                                    {Array.from({ length: playerCount }).map((_, idx) => {
+                                        const p = roomPlayers[idx];
+                                        return (
+                                            <div key={idx} className={`p-2.5 rounded-xl border flex items-center justify-between ${p ? 'bg-slate-800 border-slate-700' : 'bg-slate-900/40 border-dashed border-slate-800 text-slate-500'}`}>
+                                                <div className="flex items-center gap-2.5">
+                                                    <span className="text-2xl">{idx === 0 ? '🙋' : (idx === 1 ? '🦊' : '🐼')}</span>
+                                                    <span className="font-bold text-sm">{p ? p.name : `等待玩家 ${idx + 1}...`}</span>
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
+                                                {p ? <span className="text-xs text-emerald-400 font-bold">已準備</span> : <span className="text-xs text-slate-500">等待中</span>}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
 
-                                {/* 控制按鈕 */}
                                 {isHost ? (
                                     <button 
                                         onClick={startOnlineGame}
                                         disabled={roomPlayers.length < playerCount}
-                                        className={`w-full py-3.5 rounded-2xl font-black text-base shadow-xl transition active:scale-95 ${roomPlayers.length >= playerCount ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-slate-900 hover:scale-[1.02] cursor-pointer' : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'}`}
+                                        className={`w-full py-3 rounded-2xl font-black text-base shadow-xl transition active:scale-95 ${roomPlayers.length >= playerCount ? 'bg-amber-400 hover:bg-amber-300 text-slate-900 cursor-pointer' : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'}`}
                                     >
-                                        {roomPlayers.length >= playerCount ? '人員已齊全！開始對戰！' : `等待玩家加入中 (${roomPlayers.length}/${playerCount})...`}
+                                        {roomPlayers.length >= playerCount ? '人員已齊全！開始對戰！' : `等待人數齊全 (${roomPlayers.length}/${playerCount})...`}
                                     </button>
                                 ) : (
-                                    <div className="text-center text-sm font-bold text-amber-300 py-3 bg-amber-500/10 rounded-2xl border border-amber-500/30 w-full animate-pulse">
-                                        已成功加入！等待房主開始遊戲...
+                                    <div className="text-center text-sm font-bold text-amber-300 py-2.5 bg-amber-500/10 rounded-2xl border border-amber-500/30 w-full animate-pulse">
+                                        已就緒！等待房主開始遊戲...
                                     </div>
                                 )}
                             </div>
                         )}
 
-                        {/* 遊戲桌面主體 */}
+                        {/* 【經典綠色牌桌】(回復原版 bg-emerald-900 牌桌與圓角) */}
                         {gameState !== 'menu' && gameState !== 'lobby' && (
-                            <Fragment>
-                                {/* 桌面圓形裝飾 */}
-                                <div className="absolute w-[600px] h-[600px] rounded-full border-4 border-dashed border-slate-800/60 pointer-events-none" />
+                            <div className="relative w-full h-full bg-emerald-900 overflow-hidden rounded-[40px] shadow-2xl border-8 border-emerald-950">
+                                {/* 綠色牌桌漸層光澤 */}
+                                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-emerald-800 to-emerald-950 opacity-60 pointer-events-none" />
 
-                                {/* 各玩家座位 */}
+                                {/* 頂部功能列 */}
+                                <div className="absolute top-4 left-6 right-6 flex justify-between items-center z-50 pointer-events-auto">
+                                    <div className="flex items-center gap-3">
+                                        <button 
+                                            onClick={() => {
+                                                cleanupPeer();
+                                                setGameState('menu');
+                                            }}
+                                            className="px-4 py-2 bg-slate-900/80 hover:bg-slate-800 text-white rounded-full font-bold flex items-center gap-1.5 backdrop-blur border border-white/20 shadow-lg transition active:scale-95 text-sm"
+                                        >
+                                            <span>↩</span> 回選單
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                setIsMuted(!isMuted);
+                                                initAudio();
+                                            }} 
+                                            className="p-2 bg-slate-900/80 hover:bg-slate-800 text-white rounded-full backdrop-blur border border-white/20 shadow-lg active:scale-95 transition"
+                                            title={isMuted ? "開啟聲音" : "靜音"}
+                                        >
+                                            {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                                        </button>
+                                    </div>
+
+                                    {/* 乘數提示徽章 */}
+                                    <div className="px-5 py-1.5 bg-slate-900/80 border border-white/20 text-yellow-300 font-black text-base rounded-full shadow-lg backdrop-blur">
+                                        【{multiplier} 的九九乘法】
+                                        <span className="text-xs font-normal text-yellow-100 ml-1">
+                                            ({difficulty === 'easy' ? '順數 1→9' : '倒數 9→1'})
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* 各玩家座位與卡牌 */}
                                 {players.map((p, idx) => {
                                     const slot = getRelativeSlot(idx);
                                     const conf = SLOT_CONFIGS[slot];
@@ -1476,66 +1366,65 @@
 
                                     return (
                                         <Fragment key={p.id || idx}>
-                                            <div className={`absolute ${conf.pos} flex flex-col ${conf.cardAlign} z-20`}>
-                                                {/* 玩家個人資訊區 */}
-                                                <div className="flex items-center gap-3 bg-slate-800/90 px-4 py-2 rounded-2xl border border-slate-700 shadow-xl backdrop-blur-sm">
-                                                    <span className="text-3xl">{p.avatar}</span>
-                                                    <div>
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="font-extrabold text-sm text-white">{p.name}</span>
-                                                            {isMe && <span className="text-[10px] font-bold bg-amber-400 text-slate-900 px-1.5 py-0.2 rounded">你</span>}
-                                                            {p.isAI && <span className="text-[10px] font-bold bg-indigo-500 text-white px-1.5 py-0.2 rounded">電腦</span>}
-                                                        </div>
-                                                        <div className="text-xs text-amber-400 font-bold">
-                                                            剩餘手牌：<span className="text-sm font-black text-white">{p.cards.length}</span> 張
-                                                        </div>
+                                            <div className={`absolute ${conf.pos} flex flex-col items-center z-20`}>
+                                                {/* 頭像 */}
+                                                <div className="relative">
+                                                    <div className={`w-14 h-14 rounded-full border-4 flex items-center justify-center text-3xl bg-white shadow-xl transition-all duration-300 ${isCurrentTurn ? 'scale-125 border-yellow-400 ring-4 ring-yellow-400/40' : 'border-slate-200'}`}>
+                                                        {p.avatar}
                                                     </div>
+
+                                                    {/* 出牌口訣氣泡 (黃底大字體，小二學生超好讀) */}
+                                                    {currentCall && currentCall.playerIdx === idx && (
+                                                        <div className={`absolute ${conf.call} z-40 pointer-events-none animate-bounce`}>
+                                                            <div className="bg-yellow-400 text-slate-900 px-5 py-2.5 rounded-[26px] text-2xl font-black shadow-2xl border-4 border-white whitespace-nowrap">
+                                                                {currentCall.text}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
 
-                                                {/* 玩家手牌堆 (點擊出牌) */}
+                                                {/* 姓名與牌數膠囊 */}
+                                                <div className="mt-1.5 bg-slate-900/80 backdrop-blur-sm text-white px-3.5 py-0.5 rounded-full text-xs font-bold border border-white/20 text-center">
+                                                    {p.name} {p.cards.length === 0 ? "（搶拍奪冠）" : `(${p.cards.length}張)`}
+                                                </div>
+
+                                                {/* 手牌牌庫 (點擊出牌) */}
                                                 <div 
                                                     className="relative mt-2 cursor-pointer group"
                                                     onClick={() => isMe && playTurn(true)}
                                                 >
-                                                    <div className={`relative w-24 h-32 rounded-xl transition-transform duration-200 ${isCurrentTurn && isMe && !isAnimating && !punishingCard && !isPenaltyCooling ? 'ring-4 ring-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.6)] animate-pulse scale-105' : ''}`}>
+                                                    <div className={`relative w-20 h-28 rounded-xl transition-transform duration-200 ${isCurrentTurn && isMe && !isAnimating && !punishingCard && !isPenaltyCooling ? 'ring-4 ring-yellow-400 shadow-[0_0_20px_rgba(251,191,36,0.8)] scale-105 animate-pulse' : ''}`}>
                                                         {p.cards.length > 0 ? (
-                                                            [...Array(Math.min(p.cards.length, 12))].map((_, i) => (
+                                                            [...Array(Math.min(p.cards.length, 10))].map((_, i) => (
                                                                 <div 
                                                                     key={i} 
                                                                     className="absolute inset-0 bg-blue-600 rounded-xl border-2 border-white shadow-md flex items-center justify-center"
                                                                     style={{ transform: `translate(${i * 1.5}px, ${-i * 1.5}px)` }}
                                                                 >
-                                                                    <div className="w-16 h-24 border border-blue-400/40 rounded-lg flex items-center justify-center">
-                                                                        <span className="text-xl font-black text-white/40">99</span>
+                                                                    <div className="w-14 h-20 border border-blue-400/40 rounded-lg flex items-center justify-center">
+                                                                        <span className="text-lg font-black text-white/50">99</span>
                                                                     </div>
                                                                 </div>
                                                             ))
                                                         ) : (
-                                                            <div className="w-24 h-32 border-2 border-dashed border-slate-600 rounded-xl flex items-center justify-center text-slate-500 font-bold text-xs">
-                                                                已無手牌
+                                                            <div className="w-20 h-28 border-2 border-dashed border-white/30 rounded-xl flex items-center justify-center text-white/30 font-black text-xs">
+                                                                空
                                                             </div>
                                                         )}
                                                     </div>
-
-                                                    {/* 輪到出牌氣泡 */}
-                                                    {currentCall && currentCall.playerIdx === idx && (
-                                                        <div className={`absolute ${conf.call} z-30 bg-white text-slate-900 px-4 py-2 rounded-2xl font-black text-base shadow-2xl border-2 border-amber-400 animate-bounce whitespace-nowrap`}>
-                                                            {currentCall.text}
-                                                        </div>
-                                                    )}
                                                 </div>
                                             </div>
                                         </Fragment>
                                     );
                                 })}
 
-                                {/* 中央出牌與拍牌區 */}
+                                {/* 中央出牌與拍牌區 (經典原版拍牌區) */}
                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-52 h-64">
                                     <div 
-                                        className={`relative w-full h-full bg-emerald-800/40 rounded-[40px] border-4 border-dashed transition-all duration-300 flex items-center justify-center cursor-pointer select-none slap-area ${gameState === 'slapping' ? 'border-amber-400 shadow-[0_0_35px_rgba(251,191,36,0.8)] scale-105 bg-amber-500/20' : 'border-emerald-600/50 hover:border-emerald-400/80 hover:bg-emerald-800/60'}`}
+                                        className={`relative w-full h-full bg-emerald-800/40 rounded-[40px] border-4 border-dashed transition-all duration-300 flex items-center justify-center cursor-pointer select-none slap-area ${gameState === 'slapping' ? 'border-amber-400 bg-amber-500/30 shadow-[0_0_40px_rgba(251,191,36,0.8)] scale-105' : 'border-white/25 hover:border-white/50 hover:bg-emerald-800/60'}`}
                                         onClick={() => handleSlap(mySeatIndex)}
                                     >
-                                        {/* 發牌動畫展示 */}
+                                        {/* 發牌動畫 */}
                                         {isDealing ? (
                                             <div className="relative w-36 h-48">
                                                 {[...Array(Math.min(mainDeck.length, 20))].map((_, i) => (
@@ -1573,8 +1462,8 @@
                                                 )}
                                             </div>
                                         ) : (gameState !== 'dealing') && (
-                                            <div className="text-white/20 font-black text-lg uppercase tracking-widest text-center pointer-events-none">
-                                                乘法心臟病<br/><span className="text-xs">相符立即拍牌！</span>
+                                            <div className="text-white/20 font-black text-2xl uppercase tracking-widest text-center pointer-events-none">
+                                                拍牌區
                                             </div>
                                         )}
 
@@ -1586,28 +1475,28 @@
                                             </div>
                                         ))}
 
-                                        {/* 錯誤或狀態提示 */}
+                                        {/* 錯誤或狀態提示橫幅 */}
                                         {errorMsg && (
-                                            <div className="absolute z-[160] bg-yellow-400 px-5 py-3 rounded-2xl border-4 border-yellow-500 text-yellow-950 font-black shadow-2xl animate-bounce text-center whitespace-nowrap">
+                                            <div className="absolute z-[160] bg-yellow-400 px-5 py-3 rounded-2xl border-4 border-white text-slate-900 font-black shadow-2xl animate-bounce text-center whitespace-nowrap">
                                                 <h3 className="text-xl font-black">{errorMsg}</h3>
                                             </div>
                                         )}
                                     </div>
                                 </div>
 
-                                {/* 閒置提示 */}
+                                {/* 輪到出牌閒置提示 */}
                                 {showIdleHint && (
-                                    <div className="fixed bottom-40 left-1/2 -translate-x-1/2 z-[100] bg-white text-emerald-800 px-6 py-2.5 rounded-full font-black text-sm shadow-2xl border-2 border-emerald-500 animate-bounce flex items-center gap-2">
-                                        <AlertCircle className="text-yellow-500" /> 輪到你出牌囉！點擊你的手牌出牌！
+                                    <div className="fixed bottom-36 left-1/2 -translate-x-1/2 z-[100] bg-white text-emerald-800 px-6 py-2.5 rounded-full font-black text-base shadow-2xl border-4 border-yellow-400 animate-bounce flex items-center gap-2">
+                                        <AlertCircle className="text-yellow-500" /> 輪到你出牌囉！點擊你的手牌！
                                     </div>
                                 )}
-                            </Fragment>
+                            </div>
                         )}
 
                         {/* 開局倒數 3, 2, 1 */}
                         {gameState === 'starting' && (
                             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm pointer-events-none">
-                                <h2 className="text-8xl font-black text-amber-400 animate-ping">
+                                <h2 className="text-8xl font-black text-yellow-400 animate-ping">
                                     {startPrompt}
                                 </h2>
                             </div>
@@ -1631,7 +1520,7 @@
                                                     startLocalGame(multiplier);
                                                 }
                                             }}
-                                            className="flex-1 py-3 bg-amber-400 hover:bg-amber-300 text-slate-900 rounded-xl font-black text-sm shadow-lg active:scale-95 transition"
+                                            className="flex-1 py-3 bg-amber-400 hover:bg-amber-300 text-slate-900 rounded-xl font-black text-sm shadow-lg active:scale-95 transition cursor-pointer"
                                         >
                                             再玩一局
                                         </button>
@@ -1640,7 +1529,7 @@
                                                 cleanupPeer();
                                                 setGameState('menu');
                                             }}
-                                            className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-black text-sm active:scale-95 transition"
+                                            className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-black text-sm active:scale-95 transition cursor-pointer"
                                         >
                                             回主選單
                                         </button>
