@@ -1,35 +1,109 @@
 'use strict';
 
-const W = 12, H = 10, VERSION = 2, HISTORY = 'symmetryTreasure.records.v2';
+const W = 12, H = 10, VERSION = 3, HISTORY = 'symmetryTreasure.records.v2';
 const $ = id => document.getElementById(id);
 
+// 座標鏡像運算
 const mirror = (key, axis) => {
   let [r, c] = key.split(',').map(Number);
   return axis === 'V' ? `${r},${W - 1 - c}` : `${H - 1 - r},${c}`;
 };
 
-const reflectToHorizontal = given => given.map(k => {
-  let [r, c] = k.split(',').map(Number);
-  return `${c - 1},${r + 1}`;
-});
+// =========================================================
+// 🌟 豐富多元題庫庫存 (35+ 組精緻題型，分 5 個難度階梯) 🌟
+// =========================================================
 
-const BASE = [
-  ['3,3','3,4','4,2','4,5','5,2','5,5','6,3','6,4'],
-  ['4,2','4,3','4,4','5,2','5,4','6,2','6,3','6,4','3,3','3,4'],
-  ['3,2','4,2','5,2','6,2','2,3','7,3','3,4','4,4','5,4','6,4','4,5','5,5'],
-  ['2,3','3,3','3,4','4,3','4,4','4,5','5,3','6,3','6,4','7,2','7,3','2,4','5,4'],
-  ['2,3','2,4','3,2','3,5','4,2','4,3','4,4','4,5','5,3','5,4','6,4','7,3','7,4','7,5','3,3','3,4']
+// 鉛直對稱軸題庫 (左半題目前景：c < 6，右半玩家作答：c >= 6)
+const V_BANK = [
+  // Tier 1: 4-6 格 (入門基礎)
+  { name: '古幣菱形', tier: 1, axis: 'V', given: ['3,4','4,3','5,3','6,4'] },
+  { name: '階梯金字塔', tier: 1, axis: 'V', given: ['3,5','4,4','4,5','5,3','5,4','5,5'] },
+  { name: '海盜指路箭', tier: 1, axis: 'V', given: ['2,5','3,4','4,3','5,4','6,5'] },
+  { name: '小船錨角', tier: 1, axis: 'V', given: ['2,5','3,5','4,5','5,5','6,4','6,5'] },
+  { name: '高腳酒杯', tier: 1, axis: 'V', given: ['3,3','4,3','4,4','5,5','6,5'] },
+
+  // Tier 2: 7-9 格 (初階進階)
+  { name: '秘島杉樹', tier: 2, axis: 'V', given: ['2,5','3,4','3,5','4,3','4,4','4,5','5,4','5,5','6,5'] },
+  { name: '單桅帆船', tier: 2, axis: 'V', given: ['1,5','2,4','2,5','3,3','3,4','3,5','4,5','5,3','5,4'] },
+  { name: '黃金小王冠', tier: 2, axis: 'V', given: ['3,2','3,4','4,2','4,3','4,4','4,5','5,2','5,3','5,4','5,5'] },
+  { name: '彩蝶翼翅', tier: 2, axis: 'V', given: ['2,3','2,4','3,2','3,5','4,3','4,5','5,2','6,3','6,4'] },
+  { name: '航海羅盤針', tier: 2, axis: 'V', given: ['2,5','3,4','3,5','4,2','4,3','4,4','4,5','5,4','5,5','6,5'] },
+
+  // Tier 3: 10-12 格 (中階挑戰)
+  { name: '海盜骷髏眼眶', tier: 3, axis: 'V', given: ['2,4','2,5','3,3','3,5','4,3','4,5','5,4','5,5','6,3','6,5','7,4','7,5'] },
+  { name: '雙層石砌古堡', tier: 3, axis: 'V', given: ['2,3','2,5','3,3','3,4','3,5','4,2','4,3','4,4','4,5','5,2','5,5','6,2','6,3','6,4','6,5'] },
+  { name: '聖十字架印章', tier: 3, axis: 'V', given: ['1,5','2,5','3,2','3,3','3,4','3,5','4,2','4,3','4,4','4,5','5,5','6,5','7,5'] },
+  { name: '海馬神秘圖騰', tier: 3, axis: 'V', given: ['1,4','2,3','2,4','3,4','4,4','5,3','5,4','6,3','7,4','7,5','8,5'] },
+  { name: '五芒海星半體', tier: 3, axis: 'V', given: ['1,5','2,4','2,5','3,3','3,4','4,1','4,2','4,3','4,4','4,5','5,3','6,4'] },
+
+  // Tier 4: 13-15 格 (高階複雜)
+  { name: '大西洋導航燈塔', tier: 4, axis: 'V', given: ['1,5','2,4','2,5','3,4','3,5','4,3','4,4','4,5','5,3','5,4','5,5','6,2','6,3','6,4','6,5'] },
+  { name: '海盜騎士戰盔', tier: 4, axis: 'V', given: ['2,3','2,4','2,5','3,2','3,5','4,2','4,3','4,4','4,5','5,3','5,5','6,2','6,4','6,5','7,3','7,4'] },
+  { name: '深海巨章觸手', tier: 4, axis: 'V', given: ['2,4','2,5','3,3','3,5','4,3','4,4','4,5','5,2','5,5','6,1','6,2','6,5','7,3','7,4','7,5'] },
+  { name: '古重錨與鐵環', tier: 4, axis: 'V', given: ['1,4','1,5','2,4','3,5','4,2','4,3','4,4','4,5','5,5','6,1','6,5','7,2','7,3','7,4','7,5'] },
+
+  // Tier 5: 16-20 格 (大師終極)
+  { name: '黑珍珠號巨帆', tier: 5, axis: 'V', given: ['1,5','2,4','2,5','3,3','3,4','3,5','4,2','4,3','4,4','4,5','5,5','6,1','6,2','6,3','6,4','6,5','7,2','7,3','7,4','7,5'] },
+  { name: '骷髏與海盜雙刀', tier: 5, axis: 'V', given: ['1,2','2,3','2,5','3,4','3,5','4,2','4,4','4,5','5,3','5,4','5,5','6,1','6,5','7,2','7,4','7,5','8,3','8,5'] },
+  { name: '皇家雙翼大徽章', tier: 5, axis: 'V', given: ['2,2','2,5','3,1','3,2','3,4','3,5','4,2','4,3','4,4','4,5','5,3','5,4','5,5','6,2','6,3','6,5','7,4','7,5'] }
 ];
 
+// 水平對稱軸題庫 (上半題目前景：r < 5，下半玩家作答：r >= 5)
+const H_BANK = [
+  // Tier 1: 4-6 格 (入門基礎)
+  { name: '雙子山峰', tier: 1, axis: 'H', given: ['3,4','3,7','4,3','4,4','4,7','4,8'] },
+  { name: '蘑菇圓傘蓋', tier: 1, axis: 'H', given: ['2,5','2,6','3,4','3,5','3,6','3,7','4,5','4,6'] },
+  { name: '飛碟穹頂', tier: 1, axis: 'H', given: ['3,5','3,6','4,3','4,4','4,5','4,6','4,7','4,8'] },
+  { name: '航海前進箭印', tier: 1, axis: 'H', given: ['2,5','2,6','3,4','3,5','3,6','3,7','4,5','4,6'] },
+  { name: '波浪微瀾', tier: 1, axis: 'H', given: ['3,2','3,5','3,8','4,1','4,2','4,4','4,5','4,7','4,8'] },
+
+  // Tier 2: 7-9 格 (初階進階)
+  { name: '海燕凌空展翅', tier: 2, axis: 'H', given: ['2,1','2,10','3,2','3,3','3,8','3,9','4,4','4,5','4,6','4,7'] },
+  { name: '古幣雕花上弧', tier: 2, axis: 'H', given: ['2,4','2,5','2,6','2,7','3,3','3,8','4,3','4,8'] },
+  { name: '寶箱拱形頂蓋', tier: 2, axis: 'H', given: ['2,4','2,5','2,6','2,7','3,2','3,3','3,8','3,9','4,2','4,9'] },
+  { name: '跨海石橋樑', tier: 2, axis: 'H', given: ['2,5','2,6','3,3','3,4','3,7','3,8','4,2','4,9'] },
+
+  // Tier 3: 10-12 格 (中階挑戰)
+  { name: '古神殿三角簷', tier: 3, axis: 'H', given: ['1,5','1,6','2,4','2,5','2,6','2,7','3,3','3,4','3,7','3,8','4,2','4,3','4,4','4,7','4,8','4,9'] },
+  { name: '西班牙戰船甲板', tier: 3, axis: 'H', given: ['2,4','2,5','2,6','2,7','3,3','3,4','3,5','3,6','3,7','3,8','4,1','4,2','4,9','4,10'] },
+  { name: '星月穹頂天幕', tier: 3, axis: 'H', given: ['1,5','1,6','2,3','2,4','2,7','2,8','3,2','3,5','3,6','3,9','4,3','4,8'] },
+  { name: '深海巨星上臂', tier: 3, axis: 'H', given: ['1,5','1,6','2,5','2,6','3,1','3,2','3,9','3,10','4,3','4,4','4,5','4,6','4,7','4,8'] },
+
+  // Tier 4: 13-15 格 (高階複雜)
+  { name: '神鷹翱翔翼頂', tier: 4, axis: 'H', given: ['1,1','1,10','2,2','2,3','2,8','2,9','3,3','3,7','3,8','4,4','4,5','4,6','4,7'] },
+  { name: '海盜三角大戰旗', tier: 4, axis: 'H', given: ['1,5','1,6','2,4','2,5','2,6','2,7','3,3','3,5','3,6','3,8','4,2','4,3','4,4','4,7','4,8','4,9'] },
+  { name: '古堡石雕城垛', tier: 4, axis: 'H', given: ['2,2','2,4','2,7','2,9','3,2','3,3','3,4','3,7','3,8','3,9','4,1','4,2','4,3','4,8','4,9','4,10'] },
+
+  // Tier 5: 16-20 格 (大師終極)
+  { name: '神話巨海龍身', tier: 5, axis: 'H', given: ['1,3','1,5','1,8','2,2','2,3','2,5','2,6','2,8','2,9','3,1','3,2','3,4','3,7','3,9','3,10','4,1','4,2','4,3','4,4','4,7','4,8','4,9','4,10'] },
+  { name: '終極西班牙冠冕', tier: 5, axis: 'H', given: ['1,2','1,5','1,6','1,9','2,2','2,3','2,5','2,6','2,8','2,9','3,1','3,3','3,4','3,7','3,8','3,10','4,1','4,2','4,3','4,8','4,9','4,10'] }
+];
+
+// 隨機選題：保證每次遊玩均由題庫池隨機抽取 5 題，難度階梯逐級遞增
 function makeLevels() {
-  return BASE.map((given, i) => {
-    let axis = i % 2 ? 'H' : 'V';
-    let cells = axis === 'H' ? reflectToHorizontal(given) : [...given];
-    return { axis, given: cells, id: `v2-${i + 1}` };
-  });
+  const chosen = [];
+  // 5 個關卡分別對應 Tier 1 ~ Tier 5，交替抽垂直與水平對稱
+  for (let tier = 1; tier <= 5; tier++) {
+    // 依據關卡設定軸向（例：1=V, 2=H, 3=V, 4=H, 5=V，或隨機抽取）
+    const preferAxis = (tier % 2 === 1) ? 'V' : 'H';
+    const primaryPool = (preferAxis === 'V' ? V_BANK : H_BANK).filter(item => item.tier === tier);
+    const fallbackPool = (preferAxis === 'V' ? H_BANK : V_BANK).filter(item => item.tier === tier);
+
+    const pool = primaryPool.length ? primaryPool : fallbackPool;
+    const item = pool[Math.floor(Math.random() * pool.length)];
+
+    chosen.push({
+      id: `v3-t${tier}-${Math.random().toString(36).slice(2, 6)}`,
+      tier: tier,
+      name: item.name,
+      axis: item.axis,
+      given: [...item.given]
+    });
+  }
+  return chosen;
 }
 
-let run = null, tool = 'draw', undo = [], stroke = null, lastCheck = null, hintTarget = null;
+let run = null, undo = [], stroke = null, lastCheck = null, hintTarget = null;
 const cells = new Map();
 
 function answer() {
@@ -50,7 +124,12 @@ function message(text) {
   if (el) el.textContent = text;
 }
 
+// 記錄作答歷程至本機與觸發日誌事件
 function record(kind, extra = {}) {
+  if (!run) return;
+  const curLevel = run.levels[run.index];
+  const ansSet = answer();
+
   const row = {
     id: crypto.randomUUID(),
     runId: run.id,
@@ -58,11 +137,13 @@ function record(kind, extra = {}) {
     kind,
     mode: 'challenge',
     level: run.index + 1,
-    axis: run.levels[run.index].axis,
+    shapeName: curLevel.name,
+    axis: curLevel.axis,
     bankVersion: VERSION,
-    given: run.levels[run.index].given,
+    given: [...curLevel.given],
     student: { ...run.student },
     cells: [...run.mine],
+    target: [...ansSet],
     attempts: run.failures,
     hints: run.hints,
     elapsed: Math.round((Date.now() - run.startedAt) / 1000),
@@ -85,7 +166,7 @@ function start() {
     mode: 'challenge',
     student: {
       className: ($('inClass').value || '').trim() || '未分班',
-      name: ($('inName').value || '').trim() || '無名水手',
+      name: ($('inName').value || '').trim() || '王小明',
       seat: ($('inSeat').value || '').trim() || '-'
     },
     levels: makeLevels(),
@@ -114,7 +195,6 @@ function start() {
 
 function menu() {
   stroke = null;
-  // 關閉浮層（若開啟）
   if ($('puzzleModal')) $('puzzleModal').hidden = true;
   $('startScreen').hidden = false;
   $('gameScreen').hidden = true;
@@ -124,7 +204,6 @@ function menu() {
 
 function choose(i) {
   if (!run || i === run.index) return;
-  // 只能點選已完成或當前關卡
   if (!run.results[i] && i > Object.keys(run.results).length) return;
   load(i);
 }
@@ -143,7 +222,7 @@ function load(i) {
   hintTarget = null;
   build();
   refresh();
-  message(run.passed ? '🎉 此海島之殘卷已被收穫！' : '🧭 丈量紅線彼端之等距位置，繪出完全鏡像圖騰吧！');
+  message(run.passed ? '🎉 此關卡殘卷已收穫！' : '先找出對應格，再開始畫。');
 }
 
 function build() {
@@ -174,7 +253,7 @@ function build() {
           e.preventDefault();
           if (!e.repeat && !run.passed) {
             remember();
-            paint(k, tool === 'draw' ? !run.mine.includes(k) : false);
+            paint(k, !run.mine.includes(k));
             commitStroke();
           }
         }
@@ -188,7 +267,8 @@ function build() {
 
 function refresh() {
   if (!run) return;
-  const given = new Set(run.levels[run.index].given);
+  const lv = run.levels[run.index];
+  const given = new Set(lv.given);
   for (const [k, b] of cells) {
     const has = run.mine.includes(k);
     b.classList.toggle('mine', has);
@@ -199,8 +279,8 @@ function refresh() {
 
   const solvedCount = Object.keys(run.results).length;
 
-  $('levelTitle').textContent = `第 ${run.index + 1} 島 · ${run.levels[run.index].axis === 'V' ? '左右鉛直鏡像' : '上下水平鏡像'}`;
-  $('levelLabel').textContent = `島嶼 ${run.index + 1} / 5`;
+  $('levelTitle').textContent = `第 ${run.index + 1} 關 · ${lv.name} (${lv.axis === 'V' ? '左右對稱' : '上下對稱'})`;
+  $('levelLabel').textContent = `關卡 ${run.index + 1} / 5`;
   $('gold').textContent = Object.values(run.results).reduce((n, r) => n + r.gold, 0);
   $('stars').textContent = `${solvedCount} / 5`;
   if ($('fragmentCount')) $('fragmentCount').textContent = solvedCount;
@@ -210,18 +290,18 @@ function refresh() {
   $('undoBtn').disabled = run.passed || !undo.length;
   $('clearBtn').disabled = run.passed;
 
-  $('hintBtn').innerHTML = run.failures < 2 ? `<span class="parrot-ic">🦜</span> 鸚鵡密語 (再試 ${2 - run.failures} 次)` : '<span class="parrot-ic">🦜</span> 鸚鵡密語指路';
+  $('hintBtn').innerHTML = run.failures < 2 ? `<span class="parrot-ic">💡</span> 分步提示 (再試 ${2 - run.failures} 次)` : '<span class="parrot-ic">💡</span> 分步提示';
   $('nextBtn').hidden = !run.passed;
-  $('nextBtn').innerHTML = run.index === 4 ? '航向最後的秘寶島洞窟 ⛵ →' : '航向下一座海島探險 ⛵ →';
+  $('nextBtn').innerHTML = run.index === 4 ? '前往秘寶島洞窟 👑 →' : '前往下一關 ⛵ →';
 
-  // 島嶼進度列
+  // 關卡進度列
   $('islands').replaceChildren();
   run.levels.forEach((_, i) => {
     let b = document.createElement('button');
     b.className = 'island' + (i === run.index ? ' active' : '') + (run.results[i] ? ' done' : '');
     b.textContent = run.results[i] ? '★' : (i + 1);
     b.disabled = !run.results[i] && i > solvedCount;
-    b.setAttribute('aria-label', `第 ${i + 1} 座島嶼${run.results[i] ? '，已完成' : ''}`);
+    b.setAttribute('aria-label', `第 ${i + 1} 關${run.results[i] ? '，已完成' : ''}`);
     b.onclick = () => choose(i);
     $('islands').append(b);
   });
@@ -238,10 +318,12 @@ function paint(k, value) {
   value ? m.add(k) : m.delete(k);
   run.mine = [...m];
   const b = cells.get(k);
-  b.classList.toggle('mine', value);
-  b.textContent = value ? '■' : '';
-  b.classList.remove('wrong', 'missing', 'pair');
-  b.setAttribute('aria-selected', String(value));
+  if (b) {
+    b.classList.toggle('mine', value);
+    b.textContent = value ? '■' : '';
+    b.classList.remove('wrong', 'missing', 'pair');
+    b.setAttribute('aria-selected', String(value));
+  }
 }
 
 function commitStroke() {
@@ -253,6 +335,7 @@ function hit(e) {
   return document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-key]')?.dataset.key;
 }
 
+// 畫筆交互：點擊空白格塗色，點擊已填格抹除；拖曳跟隨初始點擊狀態
 function begin(e) {
   if (!run || run.passed || stroke || e.button > 0) return;
   const k = hit(e);
@@ -261,7 +344,7 @@ function begin(e) {
   remember();
   stroke = {
     id: e.pointerId,
-    value: tool === 'draw' ? !run.mine.includes(k) : false,
+    value: !run.mine.includes(k),
     last: k,
     seen: new Set([k])
   };
@@ -291,7 +374,7 @@ function finish(e) {
 }
 
 // =========================================================
-// 🌟 核心過關：顯現 5 塊撕碎藏寶圖拼圖動畫 (Puzzle Modal) 🌟
+// 🌟 核心過關：顯現 5 塊撕碎藏寶圖殘卷拼合 (Puzzle Modal) 🌟
 // =========================================================
 function showTornMapPuzzleModal(newlySolvedPieceIndex) {
   const modal = $('puzzleModal');
@@ -310,7 +393,6 @@ function showTornMapPuzzleModal(newlySolvedPieceIndex) {
 
   statusText.textContent = `已拼齊 ${currentTotalSolved} / 5 塊碎片 · ${currentTotalSolved === 5 ? '海圖完整解開！' : `尚有 ${5 - currentTotalSolved} 塊隱沒於海霧中`}`;
 
-  // 更新 5 塊拼圖的狀態
   for (let p = 1; p <= 5; p++) {
     const pieceEl = $(`piece${p}`);
     if (!pieceEl) continue;
@@ -319,7 +401,6 @@ function showTornMapPuzzleModal(newlySolvedPieceIndex) {
 
     if (p <= currentTotalSolved) {
       pieceEl.classList.remove('locked');
-      // 剛獲得的這塊播放咬合飛行震撼動畫
       if (p === newlySolvedPieceIndex) {
         setTimeout(() => {
           pieceEl.classList.add('snapping');
@@ -330,32 +411,30 @@ function showTornMapPuzzleModal(newlySolvedPieceIndex) {
     }
   }
 
-  // 若第 5 塊也拼齊，啟動金色接縫交融光芒
   if (seamGlow) {
     if (currentTotalSolved === 5) {
       setTimeout(() => {
         seamGlow.classList.add('ignited');
       }, 700);
-      closeBtn.innerHTML = '<span class="btn-shine"></span> 前往秘寶洞窟見證出土 👑 →';
+      closeBtn.innerHTML = '前往秘寶洞窟見證出土 👑 →';
     } else {
       seamGlow.classList.remove('ignited');
-      closeBtn.innerHTML = '收起殘卷，航向下一座海島 ⛵';
+      closeBtn.innerHTML = '收起殘卷，前往下一關 ⛵';
     }
   }
 
-  // 顯現浮層
   modal.hidden = false;
 }
 
 function check() {
   if (!run || run.passed) return;
   if (!run.mine.length) {
-    message('⚠️ 先試著在紅線對稱側填入格子，再來檢驗刻印吧！');
+    message('⚠️ 先試著在對稱側填入格子，再來檢查吧！');
     return;
   }
   const signature = [...run.mine].sort().join(';');
   if (signature === lastCheck) {
-    message('⚠️ 圖形尚未改動，調整後再行檢驗！');
+    message('⚠️ 圖形尚未改動，調整後再行檢查！');
     return;
   }
   lastCheck = signature;
@@ -381,19 +460,18 @@ function check() {
         independent: run.hints === 0
       };
     }
-    record('complete', { correct: true });
+    record('complete', { correct: true, wrong: [], missing: [] });
     refresh();
 
-    // 答對時立即彈出「撕碎藏寶圖拼合儀式」！
     const solvedPieceNum = run.index + 1;
     showTornMapPuzzleModal(solvedPieceNum);
 
-    message(`🎉 刻印完全吻合！獲得 50 枚金幣與第 ${solvedPieceNum} 塊藏寶圖殘卷！`);
+    message(`🎉 完全正確！獲得 50 枚金幣與第 ${solvedPieceNum} 塊藏寶圖殘卷！`);
     return;
   }
 
   refresh();
-  message(`⚠️ 航海符號有誤：多填了 ${wrong.length} 格，遺漏 ${missing.length} 格。仔細丈量與對稱軸之距離！`);
+  message(`⚠️ 還不太對稱：多畫了 ${wrong.length} 格，漏畫了 ${missing.length} 格。請仔細檢查與對稱軸的距離！`);
 }
 
 function hint() {
@@ -404,28 +482,28 @@ function hint() {
   refresh();
 
   if (run.hintStage === 1) {
-    message('🦜 鸚鵡密語：對稱兩格與紅線的垂直距離完全相等！先觀察最貼近紅線之格！');
+    message('💡 提示：對稱兩格與紅線的垂直距離完全相等！先觀察最貼近紅線的格子。');
   } else if (run.hintStage === 2) {
     hintTarget = missing[0] || wrong[0];
     if (hintTarget) {
       cells.get(hintTarget)?.classList.add('pair');
       cells.get(mirror(hintTarget, run.levels[run.index].axis))?.classList.add('pair');
     }
-    message('🦜 紫色符印是一組鏡像位置！看看它們各自距離紅線幾格？');
+    message('💡 紫色格子是一組對稱位置！算算看它們各自距離紅線幾格？');
   } else {
     remember();
     if (missing.length) {
       paint(missing[0], true);
-      message('🦜 鸚鵡揮舞翅膀為你填入了一格對應格，剩下請自行完成！');
+      message('💡 已為你填入一格對應格，剩下請自行完成！');
     } else if (wrong.length) {
       paint(wrong[0], false);
-      message('🦜 鸚鵡幫你拂去了一個多填的錯誤格，再次檢驗吧！');
+      message('💡 已幫你清除一個多畫的錯誤格，再次檢查吧！');
     } else {
-      message('🦜 卷面已經完全對稱，快按下檢驗藏寶格吧！');
+      message('💡 已經完全對稱，快按下檢查藏寶圖吧！');
     }
   }
 
-  record('hint', { stage: run.hintStage });
+  record('hint', { stage: run.hintStage, wrong, missing });
 }
 
 // =========================================================
@@ -441,20 +519,17 @@ function playEpicPirateTreasureCinematic() {
 
   if (!ship || !hunter || !sparks || !chestVault || !geyser || !narrative) return;
 
-  // 重置各元素狀態
   ship.className = 'pirate-galleon';
   hunter.className = 'cine-hunter';
   sparks.className = 'cine-dig-sparks';
   chestVault.className = 'cine-chest-vault';
   geyser.className = 'cine-gold-geyser';
 
-  // 幕 1：黑帆海盜船靠岸
   narrative.textContent = '🌊 血月當空，拼齊藏寶殘卷的海盜船破浪抵達骷髏島秘窟...';
   setTimeout(() => {
     ship.classList.add('arrive');
   }, 100);
 
-  // 幕 2：海盜獵人手提火把與鐵鏟上岸，踏向紅叉印記
   setTimeout(() => {
     narrative.textContent = '🤠 獵人手提搖曳火把與鐵鏟，踏上海灘走向 ✕ 標記處...';
     hunter.classList.add('appear');
@@ -462,13 +537,11 @@ function playEpicPirateTreasureCinematic() {
     sparks.classList.add('sparking');
   }, 2600);
 
-  // 幕 3：泥沙飛濺，地底古老海盜鎖鏈木箱浮出
   setTimeout(() => {
     narrative.textContent = '⛏️ 鐵鏟觸及硬物！沉睡數百年的鐵皮海盜大木箱破土而出！';
     chestVault.classList.add('emerge');
   }, 4400);
 
-  // 幕 4：青銅巨鎖斷裂，古木箱嘎吱掀開，西班牙金幣翡翠萬丈噴發
   setTimeout(() => {
     narrative.textContent = '✨ 巨鎖崩解！西班牙金幣、翡翠珠寶與黃金王冠光芒萬丈噴湧！';
     sparks.classList.remove('sparking');
@@ -481,22 +554,20 @@ function playEpicPirateTreasureCinematic() {
 
 function result() {
   stroke = null;
-  // 關閉浮層
   if ($('puzzleModal')) $('puzzleModal').hidden = true;
   $('gameScreen').hidden = true;
   $('endScreen').hidden = false;
   $('summary').replaceChildren();
   let completed = Object.entries(run.results);
-  $('finalScore').textContent = `收集了全部 ${completed.length} 塊藏寶圖殘卷 · 共奪得 ${completed.reduce((n, [, r]) => n + r.gold, 0)} 枚黃金都布倫幣！`;
+  $('finalScore').textContent = `收集了全部 ${completed.length} 塊藏寶圖殘卷 · 共奪得 ${completed.reduce((n, [, r]) => n + r.gold, 0)} 枚金幣！`;
 
   for (const [i, r] of completed) {
     let p = document.createElement('div');
     p.className = 'summary-item';
-    p.innerHTML = `<strong>🏝️ 第 ${Number(i) + 1} 島</strong> · ${r.independent ? '🏆 獨立解開鏡像' : '🦜 鸚鵡引導解開'} <span>（重試 ${r.attempts} 次 · 耗時 ${r.seconds} 秒）</span>`;
+    p.innerHTML = `<strong>🏝️ 第 ${Number(i) + 1} 關 (${run.levels[i].name})</strong> · ${r.independent ? '🏆 獨立解開' : '💡 提示輔助'} <span>（重試 ${r.attempts} 次 · 耗時 ${r.seconds} 秒）</span>`;
     $('summary').append(p);
   }
 
-  // 觸發史詩級海盜尋寶動畫
   playEpicPirateTreasureCinematic();
 }
 
@@ -507,23 +578,16 @@ for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
   $('grid').addEventListener(type, finish);
 }
 
-// 工具按鈕切換
+// 單一畫筆工具 (點擊已填格即自動清除，拖曳順暢塗繪)
 $('drawBtn').onclick = () => {
-  tool = 'draw';
   $('drawBtn').setAttribute('aria-pressed', 'true');
-  $('eraseBtn').setAttribute('aria-pressed', 'false');
-};
-$('eraseBtn').onclick = () => {
-  tool = 'erase';
-  $('drawBtn').setAttribute('aria-pressed', 'false');
-  $('eraseBtn').setAttribute('aria-pressed', 'true');
 };
 
 $('undoBtn').onclick = () => {
   if (run.passed || !undo.length) return;
   run.mine = undo.pop();
   refresh();
-  message('步序已回退。');
+  message('已復原上一步。');
 };
 
 $('clearBtn').onclick = () => {
@@ -531,7 +595,7 @@ $('clearBtn').onclick = () => {
   remember();
   run.mine = [];
   refresh();
-  message('卷面已滌清。');
+  message('卷面已全部清除。');
 };
 
 $('checkBtn').onclick = check;
@@ -541,7 +605,6 @@ $('menuBtn').onclick = menu;
 $('nextBtn').onclick = () => run.index === 4 ? result() : load(run.index + 1);
 $('againBtn').onclick = menu;
 
-// 拼圖 Modal 關閉 / 前進按鈕
 if ($('closePuzzleBtn')) {
   $('closePuzzleBtn').onclick = () => {
     $('puzzleModal').hidden = true;

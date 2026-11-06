@@ -29,9 +29,8 @@ const toolsData = [
     },
     {
         name: "九九乘法心臟病",
-        category: "二下",
-        categories: ["二下", "二上"],
-        path: "二下/乘法心臟病.html",
+        category: "二上",
+        path: "二上/乘法心臟病.html",
         desc: "刺激的卡牌競賽遊戲！支援 2~3 人單機或即時連線對決，在緊張好玩的心臟病規則下，快速訓練九九乘法的反應力與心算能力！",
         type: "遊戲"
     },
