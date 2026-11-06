@@ -20,19 +20,23 @@ const BASE = [
   ['2,3','2,4','3,2','3,5','4,2','4,3','4,4','4,5','5,3','5,4','6,4','7,3','7,4','7,5','3,3','3,4']
 ];
 
-function makeLevels(variant = false) {
+function makeLevels() {
   return BASE.map((given, i) => {
     let axis = i % 2 ? 'H' : 'V';
     let cells = axis === 'H' ? reflectToHorizontal(given) : [...given];
-    if (variant && Math.random() < 0.5) {
-      cells = cells.map(k => {
-        let [r, c] = k.split(',').map(Number);
-        return axis === 'V' ? `${H - 1 - r},${c}` : `${r},${W - 1 - c}`;
-      });
-    }
     return { axis, given: cells, id: `v2-${i + 1}` };
   });
 }
+
+// 5座島嶼在 SVG 藏寶圖中的座標
+const ISLAND_COORDS = [
+  { x: 60, y: 105 },
+  { x: 160, y: 90 },
+  { x: 270, y: 60 },
+  { x: 380, y: 100 },
+  { x: 480, y: 50 },
+  { x: 530, y: 110 } // 終點寶藏點
+];
 
 let run = null, tool = 'draw', undo = [], stroke = null, lastCheck = null, hintTarget = null;
 const cells = new Map();
@@ -93,7 +97,7 @@ function start() {
       name: ($('inName').value || '').trim() || '小小尋寶家',
       seat: ($('inSeat').value || '').trim() || '-'
     },
-    levels: makeLevels($('variant').checked),
+    levels: makeLevels(),
     index: 0,
     mine: [],
     results: {},
@@ -189,6 +193,57 @@ function build() {
   }
 }
 
+function updateTreasureMapClarity(solvedCount, currentIndex) {
+  const wrap = $('mapProgressWrap');
+  const badge = $('mapClarityBadge');
+  const fogTip = $('fogTextTip');
+  const fogLayer = $('mapFogOverlay');
+  const hunterToken = $('hunterToken');
+  const mapChestIcon = $('mapChestIcon');
+
+  if (!wrap) return;
+
+  // 設定 0~5 的清晰度 class
+  wrap.className = `map-progress-wrap fog-level-${solvedCount}`;
+  if (fogLayer) {
+    fogLayer.className = `map-fog-layer fog-level-${solvedCount}`;
+  }
+
+  const clarityNames = [
+    '迷霧深鎖中 (0/5)',
+    '海霧初開 (1/5)',
+    '隱約看見群島 (2/5)',
+    '航海路線浮現 (3/5)',
+    '即將抵達寶藏地 (4/5)',
+    '✨ 藏寶圖完全解開！ (5/5)'
+  ];
+
+  if (badge) {
+    badge.textContent = clarityNames[solvedCount] || `${solvedCount}/5`;
+    badge.style.background = solvedCount === 5 ? '#dcfce7' : '#fef3c7';
+    badge.style.color = solvedCount === 5 ? '#15803d' : '#92400e';
+  }
+
+  if (fogTip) {
+    if (solvedCount === 5) {
+      fogTip.textContent = '🎉 迷霧完全散去，終極寶藏出現了！';
+    } else {
+      fogTip.textContent = `🧩 尚有 ${5 - solvedCount} 片線索，完成這座島嶼讓地圖更清晰！`;
+    }
+  }
+
+  // 小船在藏寶圖上的位置對應
+  const targetPos = ISLAND_COORDS[Math.min(currentIndex, 5)] || ISLAND_COORDS[0];
+  if (hunterToken) {
+    hunterToken.setAttribute('transform', `translate(${targetPos.x}, ${targetPos.y})`);
+  }
+
+  // 若全部解開，紅叉旁的寶箱點亮金色大寶箱
+  if (mapChestIcon) {
+    mapChestIcon.textContent = solvedCount === 5 ? '👑' : '🎁';
+  }
+}
+
 function refresh() {
   if (!run) return;
   const given = new Set(run.levels[run.index].given);
@@ -200,10 +255,12 @@ function refresh() {
     b.classList.remove('wrong', 'missing', 'pair');
   }
 
+  const solvedCount = Object.keys(run.results).length;
+
   $('levelTitle').textContent = `🏝️ 第 ${run.index + 1} 島 · ${run.levels[run.index].axis === 'V' ? '左右鏡像對稱' : '上下鏡像對稱'}`;
   $('levelLabel').textContent = `島嶼 ${run.index + 1} / 5`;
   $('gold').textContent = Object.values(run.results).reduce((n, r) => n + r.gold, 0);
-  $('stars').textContent = `${Object.keys(run.results).length} / 5`;
+  $('stars').textContent = `${solvedCount} / 5`;
 
   $('checkBtn').disabled = run.passed;
   $('hintBtn').disabled = run.passed || run.failures < 2;
@@ -212,7 +269,10 @@ function refresh() {
 
   $('hintBtn').textContent = run.failures < 2 ? `💡 提示 (需先嘗試 ${2 - run.failures} 次)` : '🦜 鸚鵡指路提示';
   $('nextBtn').hidden = !run.passed;
-  $('nextBtn').textContent = run.index === 4 ? '🏆 探險成果背包 →' : '前往下一座島嶼 ⛵ →';
+  $('nextBtn').textContent = run.index === 4 ? '🏆 航向終極寶藏島！ →' : '前往下一座島嶼 ⛵ →';
+
+  // 更新藏寶圖清晰度與小船位置
+  updateTreasureMapClarity(solvedCount, run.index);
 
   // 島嶼進度列
   $('islands').replaceChildren();
@@ -220,7 +280,7 @@ function refresh() {
     let b = document.createElement('button');
     b.className = 'island' + (i === run.index ? ' active' : '') + (run.results[i] ? ' done' : '');
     b.textContent = run.results[i] ? '⭐' : (i + 1);
-    b.disabled = !run.results[i] && i > Object.keys(run.results).length;
+    b.disabled = !run.results[i] && i > solvedCount;
     b.setAttribute('aria-label', `第 ${i + 1} 座島嶼${run.results[i] ? '，已完成' : ''}`);
     b.onclick = () => choose(i);
     $('islands').append(b);
@@ -325,7 +385,13 @@ function check() {
     }
     record('complete', { correct: true });
     refresh();
-    message('🎉 完美對稱！獲得 50 探險金幣 🪙 與尋寶之星 ⭐！');
+
+    const currentSolved = Object.keys(run.results).length;
+    if (currentSolved === 5) {
+      message('🎉 太神了！5 座島嶼謎題全部解開！點擊下方按鈕啟航開挖終極寶藏！');
+    } else {
+      message(`🎉 完美對稱！地圖線索越來越清晰了（已解鎖 ${currentSolved}/5）！`);
+    }
     return;
   }
 
@@ -365,6 +431,49 @@ function hint() {
   record('hint', { stage: run.hintStage });
 }
 
+// 播放破關：獵人出發找到寶藏之生動多幕動畫
+function playTreasureHuntSequence() {
+  const actor = $('hunterActor');
+  const dust = $('digDust');
+  const chest = $('stageChest');
+  const burst = $('goldBurst');
+  const banner = $('huntStatusBanner');
+
+  if (!actor || !dust || !chest || !burst || !banner) return;
+
+  // 重置動畫狀態
+  actor.className = 'hunter-actor';
+  dust.className = 'dig-dust';
+  chest.className = 'stage-chest';
+  burst.className = 'chest-gold-burst';
+
+  // 幕 1：獵人出發奔向神秘寶藏島
+  banner.textContent = '🤠 獵人看著清晰的藏寶圖，全力朝 X 標記奔跑！';
+  setTimeout(() => {
+    actor.className = 'hunter-actor running';
+  }, 100);
+
+  // 幕 2：抵達寶藏地，拿出鏟子開始挖掘
+  setTimeout(() => {
+    banner.textContent = '⛏️ 抵達神秘洞窟！獵人揮動鏟子奮力挖土...';
+    dust.className = 'dig-dust active';
+  }, 2700);
+
+  // 幕 3：挖出大寶箱，喀噠一聲打開！金幣寶物爆發
+  setTimeout(() => {
+    banner.textContent = '✨ 找到了！地下埋藏的古老寶箱被挖出來了！';
+    chest.className = 'stage-chest pop-open';
+    chest.textContent = '👑';
+  }, 3900);
+
+  // 幕 4：金幣萬丈光芒，獵人開心歡呼慶祝
+  setTimeout(() => {
+    banner.textContent = '🎉 寶藏打開！滿滿的黃金與寶石，探險大獲全勝！';
+    burst.className = 'chest-gold-burst bursting';
+    actor.className = 'hunter-actor cheering';
+  }, 4500);
+}
+
 function result() {
   stroke = null;
   $('gameScreen').hidden = true;
@@ -379,6 +488,9 @@ function result() {
     p.innerHTML = `<strong>🏝️ 第 ${Number(i) + 1} 島</strong> · ${r.independent ? '🏆 獨立解開' : '💡 獲得提示'} <span>（重試 ${r.attempts} 次 · 耗時 ${r.seconds} 秒）</span>`;
     $('summary').append(p);
   }
+
+  // 觸發獵人出發找到寶藏動畫
+  playTreasureHuntSequence();
 }
 
 // 綁定棋盤事件
@@ -420,5 +532,4 @@ $('hintBtn').onclick = hint;
 $('startBtn').onclick = () => start();
 $('menuBtn').onclick = menu;
 $('nextBtn').onclick = () => run.index === 4 ? result() : load(run.index + 1);
-$('resultBtn').onclick = result;
 $('againBtn').onclick = menu;
