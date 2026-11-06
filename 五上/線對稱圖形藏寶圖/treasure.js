@@ -1,4 +1,5 @@
 'use strict';
+
 const W = 12, H = 10, VERSION = 2, HISTORY = 'symmetryTreasure.records.v2';
 const $ = id => document.getElementById(id);
 
@@ -27,16 +28,6 @@ function makeLevels() {
     return { axis, given: cells, id: `v2-${i + 1}` };
   });
 }
-
-// 5座島嶼在 SVG 藏寶圖中的座標
-const ISLAND_COORDS = [
-  { x: 60, y: 105 },
-  { x: 160, y: 90 },
-  { x: 270, y: 60 },
-  { x: 380, y: 100 },
-  { x: 480, y: 50 },
-  { x: 530, y: 110 } // 終點寶藏點
-];
 
 let run = null, tool = 'draw', undo = [], stroke = null, lastCheck = null, hintTarget = null;
 const cells = new Map();
@@ -94,7 +85,7 @@ function start() {
     mode: 'challenge',
     student: {
       className: ($('inClass').value || '').trim() || '未分班',
-      name: ($('inName').value || '').trim() || '小小尋寶家',
+      name: ($('inName').value || '').trim() || '無名水手',
       seat: ($('inSeat').value || '').trim() || '-'
     },
     levels: makeLevels(),
@@ -123,6 +114,8 @@ function start() {
 
 function menu() {
   stroke = null;
+  // 關閉浮層（若開啟）
+  if ($('puzzleModal')) $('puzzleModal').hidden = true;
   $('startScreen').hidden = false;
   $('gameScreen').hidden = true;
   $('endScreen').hidden = true;
@@ -131,7 +124,7 @@ function menu() {
 
 function choose(i) {
   if (!run || i === run.index) return;
-  // challenge 模式：只能點選已完成或當前關卡
+  // 只能點選已完成或當前關卡
   if (!run.results[i] && i > Object.keys(run.results).length) return;
   load(i);
 }
@@ -150,7 +143,7 @@ function load(i) {
   hintTarget = null;
   build();
   refresh();
-  message(run.passed ? '🎉 這座島嶼已經探險成功！' : '🧭 觀察對稱軸，找出右/下側對應格開始塗畫。');
+  message(run.passed ? '🎉 此海島之殘卷已被收穫！' : '🧭 丈量紅線彼端之等距位置，繪出完全鏡像圖騰吧！');
 }
 
 function build() {
@@ -193,57 +186,6 @@ function build() {
   }
 }
 
-function updateTreasureMapClarity(solvedCount, currentIndex) {
-  const wrap = $('mapProgressWrap');
-  const badge = $('mapClarityBadge');
-  const fogTip = $('fogTextTip');
-  const fogLayer = $('mapFogOverlay');
-  const hunterToken = $('hunterToken');
-  const mapChestIcon = $('mapChestIcon');
-
-  if (!wrap) return;
-
-  // 設定 0~5 的清晰度 class
-  wrap.className = `map-progress-wrap fog-level-${solvedCount}`;
-  if (fogLayer) {
-    fogLayer.className = `map-fog-layer fog-level-${solvedCount}`;
-  }
-
-  const clarityNames = [
-    '迷霧深鎖中 (0/5)',
-    '海霧初開 (1/5)',
-    '隱約看見群島 (2/5)',
-    '航海路線浮現 (3/5)',
-    '即將抵達寶藏地 (4/5)',
-    '✨ 藏寶圖完全解開！ (5/5)'
-  ];
-
-  if (badge) {
-    badge.textContent = clarityNames[solvedCount] || `${solvedCount}/5`;
-    badge.style.background = solvedCount === 5 ? '#dcfce7' : '#fef3c7';
-    badge.style.color = solvedCount === 5 ? '#15803d' : '#92400e';
-  }
-
-  if (fogTip) {
-    if (solvedCount === 5) {
-      fogTip.textContent = '🎉 迷霧完全散去，終極寶藏出現了！';
-    } else {
-      fogTip.textContent = `🧩 尚有 ${5 - solvedCount} 片線索，完成這座島嶼讓地圖更清晰！`;
-    }
-  }
-
-  // 小船在藏寶圖上的位置對應
-  const targetPos = ISLAND_COORDS[Math.min(currentIndex, 5)] || ISLAND_COORDS[0];
-  if (hunterToken) {
-    hunterToken.setAttribute('transform', `translate(${targetPos.x}, ${targetPos.y})`);
-  }
-
-  // 若全部解開，紅叉旁的寶箱點亮金色大寶箱
-  if (mapChestIcon) {
-    mapChestIcon.textContent = solvedCount === 5 ? '👑' : '🎁';
-  }
-}
-
 function refresh() {
   if (!run) return;
   const given = new Set(run.levels[run.index].given);
@@ -257,29 +199,27 @@ function refresh() {
 
   const solvedCount = Object.keys(run.results).length;
 
-  $('levelTitle').textContent = `🏝️ 第 ${run.index + 1} 島 · ${run.levels[run.index].axis === 'V' ? '左右鏡像對稱' : '上下鏡像對稱'}`;
+  $('levelTitle').textContent = `第 ${run.index + 1} 島 · ${run.levels[run.index].axis === 'V' ? '左右鉛直鏡像' : '上下水平鏡像'}`;
   $('levelLabel').textContent = `島嶼 ${run.index + 1} / 5`;
   $('gold').textContent = Object.values(run.results).reduce((n, r) => n + r.gold, 0);
   $('stars').textContent = `${solvedCount} / 5`;
+  if ($('fragmentCount')) $('fragmentCount').textContent = solvedCount;
 
   $('checkBtn').disabled = run.passed;
   $('hintBtn').disabled = run.passed || run.failures < 2;
   $('undoBtn').disabled = run.passed || !undo.length;
   $('clearBtn').disabled = run.passed;
 
-  $('hintBtn').textContent = run.failures < 2 ? `💡 提示 (需先嘗試 ${2 - run.failures} 次)` : '🦜 鸚鵡指路提示';
+  $('hintBtn').innerHTML = run.failures < 2 ? `<span class="parrot-ic">🦜</span> 鸚鵡密語 (再試 ${2 - run.failures} 次)` : '<span class="parrot-ic">🦜</span> 鸚鵡密語指路';
   $('nextBtn').hidden = !run.passed;
-  $('nextBtn').textContent = run.index === 4 ? '🏆 航向終極寶藏島！ →' : '前往下一座島嶼 ⛵ →';
-
-  // 更新藏寶圖清晰度與小船位置
-  updateTreasureMapClarity(solvedCount, run.index);
+  $('nextBtn').innerHTML = run.index === 4 ? '航向最後的秘寶島洞窟 ⛵ →' : '航向下一座海島探險 ⛵ →';
 
   // 島嶼進度列
   $('islands').replaceChildren();
   run.levels.forEach((_, i) => {
     let b = document.createElement('button');
     b.className = 'island' + (i === run.index ? ' active' : '') + (run.results[i] ? ' done' : '');
-    b.textContent = run.results[i] ? '⭐' : (i + 1);
+    b.textContent = run.results[i] ? '★' : (i + 1);
     b.disabled = !run.results[i] && i > solvedCount;
     b.setAttribute('aria-label', `第 ${i + 1} 座島嶼${run.results[i] ? '，已完成' : ''}`);
     b.onclick = () => choose(i);
@@ -350,15 +290,72 @@ function finish(e) {
   if (stroke && stroke.id === e.pointerId) commitStroke();
 }
 
+// =========================================================
+// 🌟 核心過關：顯現 5 塊撕碎藏寶圖拼圖動畫 (Puzzle Modal) 🌟
+// =========================================================
+function showTornMapPuzzleModal(newlySolvedPieceIndex) {
+  const modal = $('puzzleModal');
+  const heading = $('puzzleHeading');
+  const sub = $('puzzleSub');
+  const statusText = $('piecesStatusText');
+  const seamGlow = $('seamGlow');
+  const closeBtn = $('closePuzzleBtn');
+
+  if (!modal) return;
+
+  const currentTotalSolved = Object.keys(run.results).length;
+
+  heading.textContent = `⚔️ 尋獲第 ${newlySolvedPieceIndex} 塊海盜藏寶圖殘卷！`;
+  sub.textContent = currentTotalSolved === 5 ? '⚡ 5 塊殘卷全部拼齊！終極藏寶圖在金光中完整合璧！' : '殘卷正在與其他拼圖產生古老共鳴...';
+
+  statusText.textContent = `已拼齊 ${currentTotalSolved} / 5 塊碎片 · ${currentTotalSolved === 5 ? '海圖完整解開！' : `尚有 ${5 - currentTotalSolved} 塊隱沒於海霧中`}`;
+
+  // 更新 5 塊拼圖的狀態
+  for (let p = 1; p <= 5; p++) {
+    const pieceEl = $(`piece${p}`);
+    if (!pieceEl) continue;
+
+    pieceEl.classList.remove('snapping');
+
+    if (p <= currentTotalSolved) {
+      pieceEl.classList.remove('locked');
+      // 剛獲得的這塊播放咬合飛行震撼動畫
+      if (p === newlySolvedPieceIndex) {
+        setTimeout(() => {
+          pieceEl.classList.add('snapping');
+        }, 80);
+      }
+    } else {
+      pieceEl.classList.add('locked');
+    }
+  }
+
+  // 若第 5 塊也拼齊，啟動金色接縫交融光芒
+  if (seamGlow) {
+    if (currentTotalSolved === 5) {
+      setTimeout(() => {
+        seamGlow.classList.add('ignited');
+      }, 700);
+      closeBtn.innerHTML = '<span class="btn-shine"></span> 前往秘寶洞窟見證出土 👑 →';
+    } else {
+      seamGlow.classList.remove('ignited');
+      closeBtn.innerHTML = '收起殘卷，航向下一座海島 ⛵';
+    }
+  }
+
+  // 顯現浮層
+  modal.hidden = false;
+}
+
 function check() {
   if (!run || run.passed) return;
   if (!run.mine.length) {
-    message('⚠️ 先試著塗上對應格，再來按檢查吧！');
+    message('⚠️ 先試著在紅線對稱側填入格子，再來檢驗刻印吧！');
     return;
   }
   const signature = [...run.mine].sort().join(';');
   if (signature === lastCheck) {
-    message('⚠️ 圖形尚未改動，調整後再檢查才算一次喔！');
+    message('⚠️ 圖形尚未改動，調整後再行檢驗！');
     return;
   }
   lastCheck = signature;
@@ -373,7 +370,8 @@ function check() {
 
   if (!wrong.length && !missing.length) {
     run.passed = true;
-    if (!progress()) {
+    const isFirstTime = !progress();
+    if (isFirstTime) {
       run.results[run.index] = {
         cells: [...run.mine],
         gold: 50,
@@ -386,17 +384,16 @@ function check() {
     record('complete', { correct: true });
     refresh();
 
-    const currentSolved = Object.keys(run.results).length;
-    if (currentSolved === 5) {
-      message('🎉 太神了！5 座島嶼謎題全部解開！點擊下方按鈕啟航開挖終極寶藏！');
-    } else {
-      message(`🎉 完美對稱！地圖線索越來越清晰了（已解鎖 ${currentSolved}/5）！`);
-    }
+    // 答對時立即彈出「撕碎藏寶圖拼合儀式」！
+    const solvedPieceNum = run.index + 1;
+    showTornMapPuzzleModal(solvedPieceNum);
+
+    message(`🎉 刻印完全吻合！獲得 50 枚金幣與第 ${solvedPieceNum} 塊藏寶圖殘卷！`);
     return;
   }
 
   refresh();
-  message(`⚠️ 還差一點點：多畫了 ${wrong.length} 格，漏畫了 ${missing.length} 格。仔細數數離紅線幾格！`);
+  message(`⚠️ 航海符號有誤：多填了 ${wrong.length} 格，遺漏 ${missing.length} 格。仔細丈量與對稱軸之距離！`);
 }
 
 function hint() {
@@ -407,90 +404,100 @@ function hint() {
   refresh();
 
   if (run.hintStage === 1) {
-    message('🦜 鸚鵡提示：對稱兩格到紅線的格子數完全相同！先找最靠紅線的格子！');
+    message('🦜 鸚鵡密語：對稱兩格與紅線的垂直距離完全相等！先觀察最貼近紅線之格！');
   } else if (run.hintStage === 2) {
     hintTarget = missing[0] || wrong[0];
     if (hintTarget) {
       cells.get(hintTarget)?.classList.add('pair');
       cells.get(mirror(hintTarget, run.levels[run.index].axis))?.classList.add('pair');
     }
-    message('🦜 紫色亮框是一組對應格！看看兩邊離紅線幾步？');
+    message('🦜 紫色符印是一組鏡像位置！看看它們各自距離紅線幾格？');
   } else {
     remember();
     if (missing.length) {
       paint(missing[0], true);
-      message('🦜 鸚鵡幫你畫上了一格對應格，剩下自己加油！');
+      message('🦜 鸚鵡揮舞翅膀為你填入了一格對應格，剩下請自行完成！');
     } else if (wrong.length) {
       paint(wrong[0], false);
-      message('🦜 鸚鵡幫你擦掉了一個多畫的格子，再檢查看看！');
+      message('🦜 鸚鵡幫你拂去了一個多填的錯誤格，再次檢驗吧！');
     } else {
-      message('🦜 圖形已經對稱，快按檢查確認吧！');
+      message('🦜 卷面已經完全對稱，快按下檢驗藏寶格吧！');
     }
   }
 
   record('hint', { stage: run.hintStage });
 }
 
-// 播放破關：獵人出發找到寶藏之生動多幕動畫
-function playTreasureHuntSequence() {
-  const actor = $('hunterActor');
-  const dust = $('digDust');
-  const chest = $('stageChest');
-  const burst = $('goldBurst');
-  const banner = $('huntStatusBanner');
+// =========================================================
+// 🌟 破關：古老海盜風格「獵人出發找到寶藏」史詩動畫 🌟
+// =========================================================
+function playEpicPirateTreasureCinematic() {
+  const ship = $('cineShip');
+  const hunter = $('cineHunter');
+  const sparks = $('cineDigSparks');
+  const chestVault = $('cineChestVault');
+  const geyser = $('cineGoldGeyser');
+  const narrative = $('cineNarrative');
 
-  if (!actor || !dust || !chest || !burst || !banner) return;
+  if (!ship || !hunter || !sparks || !chestVault || !geyser || !narrative) return;
 
-  // 重置動畫狀態
-  actor.className = 'hunter-actor';
-  dust.className = 'dig-dust';
-  chest.className = 'stage-chest';
-  burst.className = 'chest-gold-burst';
+  // 重置各元素狀態
+  ship.className = 'pirate-galleon';
+  hunter.className = 'cine-hunter';
+  sparks.className = 'cine-dig-sparks';
+  chestVault.className = 'cine-chest-vault';
+  geyser.className = 'cine-gold-geyser';
 
-  // 幕 1：獵人出發奔向神秘寶藏島
-  banner.textContent = '🤠 獵人看著清晰的藏寶圖，全力朝 X 標記奔跑！';
+  // 幕 1：黑帆海盜船靠岸
+  narrative.textContent = '🌊 血月當空，拼齊藏寶殘卷的海盜船破浪抵達骷髏島秘窟...';
   setTimeout(() => {
-    actor.className = 'hunter-actor running';
+    ship.classList.add('arrive');
   }, 100);
 
-  // 幕 2：抵達寶藏地，拿出鏟子開始挖掘
+  // 幕 2：海盜獵人手提火把與鐵鏟上岸，踏向紅叉印記
   setTimeout(() => {
-    banner.textContent = '⛏️ 抵達神秘洞窟！獵人揮動鏟子奮力挖土...';
-    dust.className = 'dig-dust active';
-  }, 2700);
+    narrative.textContent = '🤠 獵人手提搖曳火把與鐵鏟，踏上海灘走向 ✕ 標記處...';
+    hunter.classList.add('appear');
+    hunter.classList.add('digging');
+    sparks.classList.add('sparking');
+  }, 2600);
 
-  // 幕 3：挖出大寶箱，喀噠一聲打開！金幣寶物爆發
+  // 幕 3：泥沙飛濺，地底古老海盜鎖鏈木箱浮出
   setTimeout(() => {
-    banner.textContent = '✨ 找到了！地下埋藏的古老寶箱被挖出來了！';
-    chest.className = 'stage-chest pop-open';
-    chest.textContent = '👑';
-  }, 3900);
+    narrative.textContent = '⛏️ 鐵鏟觸及硬物！沉睡數百年的鐵皮海盜大木箱破土而出！';
+    chestVault.classList.add('emerge');
+  }, 4400);
 
-  // 幕 4：金幣萬丈光芒，獵人開心歡呼慶祝
+  // 幕 4：青銅巨鎖斷裂，古木箱嘎吱掀開，西班牙金幣翡翠萬丈噴發
   setTimeout(() => {
-    banner.textContent = '🎉 寶藏打開！滿滿的黃金與寶石，探險大獲全勝！';
-    burst.className = 'chest-gold-burst bursting';
-    actor.className = 'hunter-actor cheering';
-  }, 4500);
+    narrative.textContent = '✨ 巨鎖崩解！西班牙金幣、翡翠珠寶與黃金王冠光芒萬丈噴湧！';
+    sparks.classList.remove('sparking');
+    hunter.classList.remove('digging');
+    hunter.classList.add('cheering');
+    chestVault.classList.add('open');
+    geyser.classList.add('bursting');
+  }, 5800);
 }
 
 function result() {
   stroke = null;
+  // 關閉浮層
+  if ($('puzzleModal')) $('puzzleModal').hidden = true;
   $('gameScreen').hidden = true;
   $('endScreen').hidden = false;
   $('summary').replaceChildren();
   let completed = Object.entries(run.results);
-  $('finalScore').textContent = `收集了 ${completed.length} 顆島嶼之星，共獲得 ${completed.reduce((n, [, r]) => n + r.gold, 0)} 金幣！`;
+  $('finalScore').textContent = `收集了全部 ${completed.length} 塊藏寶圖殘卷 · 共奪得 ${completed.reduce((n, [, r]) => n + r.gold, 0)} 枚黃金都布倫幣！`;
 
   for (const [i, r] of completed) {
     let p = document.createElement('div');
     p.className = 'summary-item';
-    p.innerHTML = `<strong>🏝️ 第 ${Number(i) + 1} 島</strong> · ${r.independent ? '🏆 獨立解開' : '💡 獲得提示'} <span>（重試 ${r.attempts} 次 · 耗時 ${r.seconds} 秒）</span>`;
+    p.innerHTML = `<strong>🏝️ 第 ${Number(i) + 1} 島</strong> · ${r.independent ? '🏆 獨立解開鏡像' : '🦜 鸚鵡引導解開'} <span>（重試 ${r.attempts} 次 · 耗時 ${r.seconds} 秒）</span>`;
     $('summary').append(p);
   }
 
-  // 觸發獵人出發找到寶藏動畫
-  playTreasureHuntSequence();
+  // 觸發史詩級海盜尋寶動畫
+  playEpicPirateTreasureCinematic();
 }
 
 // 綁定棋盤事件
@@ -516,7 +523,7 @@ $('undoBtn').onclick = () => {
   if (run.passed || !undo.length) return;
   run.mine = undo.pop();
   refresh();
-  message('已復原上一筆塗色。');
+  message('步序已回退。');
 };
 
 $('clearBtn').onclick = () => {
@@ -524,7 +531,7 @@ $('clearBtn').onclick = () => {
   remember();
   run.mine = [];
   refresh();
-  message('已清空全部塗色。');
+  message('卷面已滌清。');
 };
 
 $('checkBtn').onclick = check;
@@ -533,3 +540,16 @@ $('startBtn').onclick = () => start();
 $('menuBtn').onclick = menu;
 $('nextBtn').onclick = () => run.index === 4 ? result() : load(run.index + 1);
 $('againBtn').onclick = menu;
+
+// 拼圖 Modal 關閉 / 前進按鈕
+if ($('closePuzzleBtn')) {
+  $('closePuzzleBtn').onclick = () => {
+    $('puzzleModal').hidden = true;
+    const currentSolved = Object.keys(run.results).length;
+    if (currentSolved === 5) {
+      result();
+    } else {
+      load(run.index + 1);
+    }
+  };
+}
