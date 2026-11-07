@@ -983,11 +983,11 @@ function updateCommonHud() {
   if ($('fragmentCount')) $('fragmentCount').textContent = solvedCount;
 
   $('checkBtn').disabled = run.passed;
-  $('hintBtn').disabled = run.passed || run.failures < 2;
+  $('hintBtn').disabled = run.passed;
   $('undoBtn').disabled = run.passed || !undo.length;
   $('clearBtn').disabled = run.passed;
 
-  $('hintBtn').innerHTML = run.failures < 2 ? `<span class="parrot-ic">💡</span> 分步提示 (再試 ${2 - run.failures} 次)` : '<span class="parrot-ic">💡</span> 分步提示';
+  $('hintBtn').innerHTML = '<span class="parrot-ic">💡</span> 分步提示';
   $('nextBtn').hidden = !run.passed;
   $('nextBtn').innerHTML = run.index === 4 ? '前往秘寶島洞窟 👑 →' : '前往下一關 ⛵ →';
 
@@ -1103,11 +1103,13 @@ function onLevelPassed() {
 
 // =========================================================
 // 🌟 分步提示 (Hint) 🌟
+// 規則：
+// 1. 第一次按：清空玩家畫的內容，直接幫畫第 1 步正確位置。
+// 2. 第二次、第三次及之後按：將畫錯的清空（保留畫對的），再多給一步正確位置。
 // =========================================================
 function hint() {
-  if (run.passed || run.failures < 2) return;
+  if (run.passed) return;
   run.hints++;
-  run.hintStage = Math.min(3, run.hintStage + 1);
 
   if (run.mode === 'advanced') {
     hintAdvanced();
@@ -1117,78 +1119,92 @@ function hint() {
 }
 
 function hintSimple() {
-  const ans = answerSimple();
-  const missing = [...ans].filter(k => !run.mine.includes(k));
-  const wrong = run.mine.filter(k => !ans.has(k));
-  refreshSimple();
+  rememberSimple();
+  const ans = answerSimple(); // 正確方格集合
 
-  if (run.hintStage === 1) {
-    message('💡 提示：對稱兩格與紅線的垂直距離完全相等！先觀察最貼近紅線的格子。');
-  } else if (run.hintStage === 2) {
-    hintTarget = missing[0] || wrong[0];
-    if (hintTarget) {
-      cells.get(hintTarget)?.classList.add('pair');
-      cells.get(mirror(hintTarget, run.levels[run.index].axis))?.classList.add('pair');
+  if (run.hints === 1) {
+    // 第一次按提示：自動把玩家畫的東西先清空，然後直接幫忙畫一步
+    run.mine = [];
+    const firstCell = [...ans][0];
+    if (firstCell) {
+      run.mine = [firstCell];
     }
-    message('💡 紫色格子是一組對稱位置！算算看它們各自距離紅線幾格？');
+    refreshSimple();
+    message('💡 已為你清空卷面，並直接標出第 1 格正確的對稱位置！請接著完成。');
+    record('hint', { stage: 1, action: 'clear_and_give_first', cell: firstCell });
   } else {
-    rememberSimple();
-    if (missing.length) {
-      paintSimple(missing[0], true);
-      message('💡 已為你填入一格對應格，剩下請自行完成！');
-    } else if (wrong.length) {
-      paintSimple(wrong[0], false);
-      message('💡 已幫你清除一個多畫的錯誤格，再次檢查吧！');
-    } else {
-      message('💡 已經完全對稱，快按下檢查藏寶圖吧！');
-    }
-  }
+    // 第二次、第三次...之後：把玩家畫錯的清空，再給他一步正確的
+    const validMine = run.mine.filter(k => ans.has(k));
+    const wrongCount = run.mine.length - validMine.length;
 
-  record('hint', { stage: run.hintStage, wrong, missing });
+    // 找出尚未畫出的正確格
+    const missing = [...ans].filter(k => !validMine.includes(k));
+    let addedCell = null;
+    if (missing.length > 0) {
+      addedCell = missing[0];
+      validMine.push(addedCell);
+    }
+
+    run.mine = validMine;
+    refreshSimple();
+
+    if (missing.length === 0) {
+      message('💡 已經全部為你完成對稱格，快按下檢查藏寶圖吧！');
+    } else if (wrongCount > 0) {
+      message(`💡 已清除 ${wrongCount} 個畫錯的格子，並再為你補上一格正確對稱格！`);
+    } else {
+      message('💡 已再為你補上一步正確的對稱格，請繼續完成！');
+    }
+
+    record('hint', { stage: run.hints, action: 'clear_wrong_and_give_step', wrongCleared: wrongCount, cell: addedCell });
+  }
 }
 
 function hintAdvanced() {
-  const ans = answerAdvanced();
-  const userSet = new Set(run.segments || []);
-  const missing = [...ans].filter(s => !userSet.has(s));
-  const wrong = (run.segments || []).filter(s => !ans.has(s));
-  const lv = run.levels[run.index];
+  rememberAdvanced();
+  const ans = answerAdvanced(); // 正確線段集合
 
-  if (run.hintStage === 1) {
-    message('💡 提示：先找出題目黑色折線的轉折點，數數看每個點距離紅色對稱軸幾格！在另一側相同格數處標出對稱點。');
-  } else if (run.hintStage === 2) {
-    // 找出一個尚未完成的目標線段，挑選其中一個端點作為對應提示
-    if (missing.length) {
-      const [tp1] = missing[0].split('_');
-      const gp1 = mirrorDotAdv(tp1, lv.axis);
-      advHintPair = { pGiven: gp1, pTarget: tp1 };
-      renderActiveDotRing();
-      message(`💡 紫色虛線與光圈是一組對稱頂點！算算看它們各自距離紅色對稱軸幾格？`);
-    } else if (wrong.length) {
-      const [wp1, wp2] = wrong[0].split('_');
-      message(`💡 注意：線段 (${wp1}) 至 (${wp2}) 不是對稱線段喔，請點擊它將其刪除。`);
+  if (run.hints === 1) {
+    // 第一次按提示：自動把玩家畫的東西先清空，然後直接幫忙畫一步
+    run.segments = [];
+    advActiveDot = null;
+    advHintPair = null;
+    const firstSeg = [...ans][0];
+    if (firstSeg) {
+      run.segments = [firstSeg];
     }
+    refreshAdvanced();
+    message('💡 已為你清空畫布，並直接連出第 1 條正確的對稱線段！請接著完成。');
+    record('hint', { stage: 1, action: 'clear_and_give_first', segment: firstSeg });
   } else {
-    // 第三階段直接幫忙補上一條線段或移除錯誤線段
-    rememberAdvanced();
-    if (missing.length) {
-      const targetSeg = missing[0];
-      const newSegs = new Set(run.segments || []);
-      newSegs.add(targetSeg);
-      run.segments = [...newSegs];
-      advHintPair = null;
-      refreshAdvanced();
-      message('💡 已為你連上一條正確的對稱線段，剩下的請試著完成！');
-    } else if (wrong.length) {
-      deleteAdvancedSegment(wrong[0]);
-      advHintPair = null;
-      message('💡 已幫你清除一條多連的錯誤線段，再次檢查吧！');
-    } else {
-      message('💡 已經完全對稱，快按下檢查藏寶圖吧！');
-    }
-  }
+    // 第二次、第三次...之後：把玩家連錯的清空，再給他一步正確的
+    advActiveDot = null;
+    advHintPair = null;
+    const currentSegs = run.segments || [];
+    const validSegs = currentSegs.filter(s => ans.has(s));
+    const wrongCount = currentSegs.length - validSegs.length;
 
-  record('hint', { stage: run.hintStage, wrong, missing });
+    // 找出尚未連上的正確線段
+    const missing = [...ans].filter(s => !validSegs.includes(s));
+    let addedSeg = null;
+    if (missing.length > 0) {
+      addedSeg = missing[0];
+      validSegs.push(addedSeg);
+    }
+
+    run.segments = validSegs;
+    refreshAdvanced();
+
+    if (missing.length === 0) {
+      message('💡 已經全部為你連好對稱線段，快按下檢查藏寶圖吧！');
+    } else if (wrongCount > 0) {
+      message(`💡 已清除 ${wrongCount} 條連錯的線段，並再為你連上一條正確線段！`);
+    } else {
+      message('💡 已再為你連上一條正確的對稱線段，請繼續完成！');
+    }
+
+    record('hint', { stage: run.hints, action: 'clear_wrong_and_give_step', wrongCleared: wrongCount, segment: addedSeg });
+  }
 }
 
 // =========================================================
