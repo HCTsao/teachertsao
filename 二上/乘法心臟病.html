@@ -913,11 +913,20 @@
                 flippedCardRef.current = data.card;
                 isFlipResolvedRef.current = false;
 
-                // 顯示出牌者口訣氣泡 (黃底大字體，小二學生看得超清楚)
-                setCurrentCall({ playerIdx: data.fromSeat, text: data.callText });
+                // 判斷是否為自己出牌 (單機模式下自己是 seat 0，連線模式下對應自己的座位 mySeatIndexRef.current)
+                const isMyCard = (data.fromSeat === mySeatIndexRef.current);
 
-                // 播放真人語音朗讀口訣（如「二三得六」、「二五一十」）
-                playChantVoice(data.chantText);
+                // 教學邏輯：輪到自己出牌時不唸出聲音、不顯示乘法算式（訓練學生自行心算背誦）；
+                // 只有別人（電腦或對手）出牌時，才會出現語音朗讀與口訣算式氣泡
+                if (!isMyCard) {
+                    setCurrentCall({ playerIdx: data.fromSeat, text: data.callText });
+                    playChantVoice(data.chantText);
+                } else {
+                    if ('speechSynthesis' in window) {
+                        try { window.speechSynthesis.cancel(); } catch(e){}
+                    }
+                    setCurrentCall(null);
+                }
 
                 setFlyingCard({ value: data.card.value, fromPlayer: data.fromSeat });
 
@@ -1563,8 +1572,8 @@
                                                         {p.avatar}
                                                     </div>
 
-                                                    {/* 出牌口訣氣泡 (超大字體 text-4xl，小二學生超好讀) */}
-                                                    {currentCall && currentCall.playerIdx === idx && (
+                                                    {/* 出牌口訣氣泡 (僅在他人出牌時顯示，自己出牌不顯示算式) */}
+                                                    {currentCall && currentCall.playerIdx === idx && idx !== mySeatIndex && (
                                                         <div className={`absolute ${conf.call} z-50 pointer-events-none animate-bounce`}>
                                                             <div className="bg-yellow-400 text-slate-900 px-6 py-3 rounded-[32px] text-4xl font-black shadow-2xl border-4 border-white whitespace-nowrap">
                                                                 {currentCall.text}
