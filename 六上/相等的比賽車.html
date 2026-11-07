@@ -2116,6 +2116,7 @@
             finishDistance: 1800,
             isRaceFinished: false
         };
+        window.State = State;
 
         const Input = {
             left: false,
@@ -4915,7 +4916,13 @@
         // -------------------------------------------------------------
         // 8. 倒數計時 3 秒啟動流程
         // -------------------------------------------------------------
+        let countdownInterval = null;
+
         function startCountdown() {
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
             State.isCountingDown = true;
             State.countdownStep = 3;
             updateRankBadge(State.player ? State.player.rank : 7);
@@ -4931,7 +4938,13 @@
             Sound.countdownPing(false);
 
             let current = 3;
-            const timer = setInterval(() => {
+            countdownInterval = setInterval(() => {
+                if (State.currentScreen !== 'race') {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                    overlay.classList.add('hidden');
+                    return;
+                }
                 current--;
                 if (current === 2) {
                     numEl.innerText = '2';
@@ -4951,16 +4964,19 @@
                     State.raceStartTime = Date.now();
                     State.raceElapsedMs = 0;
                     const cruise = State.currentMode === '150cc' ? 280 : (State.currentMode === '100cc' ? 250 : 220);
-                    State.player.targetSpeed = cruise;
-                    State.player.speed = Math.round(cruise * 0.75); // 快速起步
-                    if (!State.isMultiplayer) {
+                    if (State.player) {
+                        State.player.targetSpeed = cruise;
+                        State.player.speed = Math.round(cruise * 0.75); // 快速起步
+                    }
+                    if (!State.isMultiplayer && State.opponents) {
                         State.opponents.forEach(ai => {
                             ai.speed = Math.round(cruise * 0.72 + ai.id * 5);
                             ai.targetSpeed = cruise + ai.id * 8;
                         });
                     }
                 } else {
-                    clearInterval(timer);
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
                     overlay.classList.add('hidden');
                 }
             }, 1000);
@@ -6039,27 +6055,71 @@
         }
 
         // 返回主選單
-        function returnToMainMenu() {
-            if (State.currentScreen === 'race') {
+        function returnToMainMenu(force = false) {
+            if (!force && State.currentScreen === 'race' && !State.isRaceFinished) {
                 if (!confirm('確定要結束目前比賽返回主選單嗎？本局競賽進度將不會保留。')) return;
             }
             if (State.isMultiplayer) {
-                leaveMultiplayerRoom();
+                try {
+                    leaveMultiplayerRoom();
+                } catch (e) {
+                    console.error("離開多人房間失敗:", e);
+                }
             }
             State.isMultiplayer = false;
             State.opponents = [];
+            State.projectiles = [];
             State.currentScreen = 'start';
-            State.isRaceFinished = false;
+            State.isRaceFinished = true;
+            State.isCountingDown = false;
             State.isQuizModalOpen = false;
-            if (countdownInterval) clearInterval(countdownInterval);
+
+            if (typeof countdownInterval !== 'undefined' && countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+            if (typeof quizCountdownTimer !== 'undefined' && quizCountdownTimer) {
+                clearInterval(quizCountdownTimer);
+                quizCountdownTimer = null;
+            }
+            if (State.autoNextTimeout) {
+                clearTimeout(State.autoNextTimeout);
+                State.autoNextTimeout = null;
+            }
+
             document.getElementById('countdown-overlay')?.classList.add('hidden');
             document.getElementById('modal-quiz')?.classList.add('hidden');
+            document.getElementById('modal-help')?.classList.add('hidden');
+            document.getElementById('hud-penalty-banner')?.classList.add('hidden');
+            document.getElementById('hud-mp-finished-waiting')?.classList.add('hidden');
+
             document.getElementById('screen-race')?.classList.add('hidden');
             document.getElementById('screen-result')?.classList.add('hidden');
             document.getElementById('screen-start')?.classList.remove('hidden');
-            Sound.silenceEngine();
-            Sound.pauseBGM();
+
+            try {
+                Sound.silenceEngine();
+                Sound.pauseBGM();
+            } catch (e) {}
+
+            try {
+                const modeBtns = document.querySelectorAll('.mode-select-btn');
+                modeBtns.forEach(btn => {
+                    if (btn.dataset.mode === State.currentMode) {
+                        btn.classList.add('active', 'border-emerald-500', 'bg-emerald-950/40');
+                        btn.classList.remove('border-slate-700', 'bg-slate-800/40');
+                    } else {
+                        btn.classList.remove('active', 'border-emerald-500', 'bg-emerald-950/40');
+                        btn.classList.add('border-slate-700', 'bg-slate-800/40');
+                    }
+                });
+                updateModeInfoHighlight(State.currentMode);
+            } catch (e) {}
         }
+
+        window.finishRace = finishRace;
+        window.returnToMainMenu = returnToMainMenu;
+        window.goToMainMenu = goToMainMenu;
 
         function initEvents() {
             // 排行榜按鈕綁定
@@ -6201,12 +6261,12 @@
             });
 
             // 左上角固定回主選單按鈕
-            document.getElementById('btn-fixed-menu')?.addEventListener('click', returnToMainMenu);
+            document.getElementById('btn-fixed-menu')?.addEventListener('click', () => returnToMainMenu(false));
             // 頂部回主選單按鈕
-            document.getElementById('btn-restart')?.addEventListener('click', returnToMainMenu);
+            document.getElementById('btn-restart')?.addEventListener('click', () => returnToMainMenu(false));
 
-            document.getElementById('btn-play-again').addEventListener('click', () => {
-                goToMainMenu();
+            document.getElementById('btn-play-again')?.addEventListener('click', () => {
+                returnToMainMenu(true);
             });
 
             document.getElementById('btn-review-questions').addEventListener('click', () => {
@@ -6486,31 +6546,7 @@
 
         // 返回主選單 (重新選擇難度)
         function goToMainMenu() {
-            State.currentScreen = 'start';
-            State.isRaceFinished = true;
-            State.isCountingDown = false;
-            State.isQuizModalOpen = false;
-
-            Sound.silenceEngine();
-            Sound.pauseBGM();
-
-            document.getElementById('modal-quiz').classList.add('hidden');
-            document.getElementById('screen-race').classList.add('hidden');
-            document.getElementById('screen-result').classList.add('hidden');
-            document.getElementById('screen-start').classList.remove('hidden');
-
-            // 同步難度按鈕選取狀態
-            const modeBtns = document.querySelectorAll('.mode-select-btn');
-            modeBtns.forEach(btn => {
-                if (btn.dataset.mode === State.currentMode) {
-                    btn.classList.add('active', 'border-emerald-500', 'bg-emerald-950/40');
-                    btn.classList.remove('border-slate-700', 'bg-slate-800/40');
-                } else {
-                    btn.classList.remove('active', 'border-emerald-500', 'bg-emerald-950/40');
-                    btn.classList.add('border-slate-700', 'bg-slate-800/40');
-                }
-            });
-            updateModeInfoHighlight(State.currentMode);
+            returnToMainMenu(true);
         }
 
         // 開始新賽事 (單人模式 isMp=false，連線對戰 isMp=true)
