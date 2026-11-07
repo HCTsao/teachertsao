@@ -4968,11 +4968,6 @@
                         State.player.targetSpeed = cruise;
                         State.player.speed = Math.round(cruise * 0.75); // 快速起步
                     }
-                    if (State.isMultiplayer && State.multiplayer && State.multiplayer.isHost && mpRoomRef) {
-                        try {
-                            mpRoomRef.update({ status: 'racing' });
-                        } catch (e) {}
-                    }
                     if (!State.isMultiplayer && State.opponents) {
                         State.opponents.forEach(ai => {
                             ai.speed = Math.round(cruise * 0.72 + ai.id * 5);
@@ -5702,10 +5697,12 @@
         let mpProjectilesRef = null;
 
         function getOrCreatePlayerId() {
-            if (!window.__equal_ratio_pid) {
-                window.__equal_ratio_pid = 'P_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
+            let pid = sessionStorage.getItem('equal_ratio_pid');
+            if (!pid) {
+                pid = 'P_' + Math.random().toString(36).substring(2, 9);
+                sessionStorage.setItem('equal_ratio_pid', pid);
             }
-            return window.__equal_ratio_pid;
+            return pid;
         }
 
         function openMultiplayerModal() {
@@ -5927,14 +5924,12 @@
                 const tagEl = document.getElementById('mp-lobby-mode-tag');
                 if (tagEl) tagEl.innerText = State.currentMode;
 
-                // 【關鍵修復】：若房間進入倒數或競速狀態，立即關閉對戰大廳並進入遊戲！
-                if ((room.status === 'countdown' || room.status === 'racing' || room.status === 'race') && State.currentScreen !== 'race') {
+                updateMpLobbySlotsUI(room.players || {}, room.hostId);
+
+                if (room.status === 'countdown' && State.currentScreen !== 'race') {
                     closeMultiplayerModal();
                     startNewRace(true);
-                    return;
                 }
-
-                updateMpLobbySlotsUI(room.players || {}, room.hostId);
 
                 // 【核心要求】：連線對戰時檢查是否所有玩家都跑完三圈
                 if (State.isMultiplayer && State.currentScreen === 'race') {
@@ -6012,25 +6007,15 @@
         }
 
         function startMultiplayerCountdown() {
-            if (!State.multiplayer || !State.multiplayer.isHost || !mpRoomRef) return;
-            try {
-                mpRoomRef.update({
-                    status: 'countdown',
-                    countdownStartedAt: firebase.database.ServerValue.TIMESTAMP
-                });
-            } catch (e) {
-                console.error("更新發車狀態失敗:", e);
-            }
-            // 房長端點擊「發車」後立即關閉彈窗並進入競速畫面，確保房長與成員 100% 同步進場！
-            closeMultiplayerModal();
-            startNewRace(true);
+            if (!State.multiplayer.isHost || !mpRoomRef) return;
+            mpRoomRef.update({
+                status: 'countdown',
+                countdownStartedAt: firebase.database.ServerValue.TIMESTAMP
+            });
         }
 
-        function syncMultiplayerState(force = false) {
-            if (!mpRoomRef || !State.multiplayer || !State.multiplayer.myPlayerId || !State.player) return;
-            const now = Date.now();
-            if (!force && (now - (State.multiplayer.lastSyncTime || 0) < 50)) return; // 20 FPS 傳輸限流，防止 WebSocket 阻塞
-            State.multiplayer.lastSyncTime = now;
+        function syncMultiplayerState() {
+            if (!mpRoomRef || !State.multiplayer.myPlayerId) return;
             try {
                 mpRoomRef.child(`players/${State.multiplayer.myPlayerId}`).update({
                     distance: Math.round(State.player.distance),
@@ -6630,12 +6615,7 @@
             const initialRank = State.isMultiplayer
                 ? (State.multiplayer.mySlot || totalRacers)
                 : 7;
-            const curColor = (State.isMultiplayer && State.multiplayer && State.multiplayer.players && State.multiplayer.myPlayerId && State.multiplayer.players[State.multiplayer.myPlayerId])
-                ? (State.multiplayer.players[State.multiplayer.myPlayerId].color || (State.player ? State.player.color : '#ef4444'))
-                : (State.player ? State.player.color : '#ef4444');
-
             State.player = {
-                color: curColor,
                 x: -0.3,
                 tilt: 0,
                 steerVel: 0,
@@ -6712,12 +6692,6 @@
             initEvents();
             requestAnimationFrame(gameLoop);
         }
-
-        window.addEventListener('beforeunload', () => {
-            if (State.isMultiplayer) {
-                try { leaveMultiplayerRoom(); } catch (e) {}
-            }
-        });
 
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', init);
