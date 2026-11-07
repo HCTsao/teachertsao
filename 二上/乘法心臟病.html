@@ -305,6 +305,7 @@
             const timeoutRef = useRef(null);
             const idleTimerRef = useRef(null);
             const audioCtxRef = useRef(null);
+            const chantAudioRef = useRef(null);
             const aiSlapScheduledRef = useRef(false);
             const flippedCardRef = useRef(null);
             const isFlipResolvedRef = useRef(false);
@@ -422,7 +423,7 @@
                 const voices = window.speechSynthesis.getVoices() || [];
                 if (!voices || voices.length === 0) return null;
 
-                // 1. 優先匹配臺灣國語（iOS: Mei-Jia, Windows: Hanhan/Yating, Android: cmn-tw / Taiwan）
+                // 優先匹配臺灣國語（iOS: Mei-Jia, Windows: Hanhan/Yating, Android: cmn-tw / Taiwan）
                 const twVoice = voices.find(v => {
                     const l = (v.lang || '').toLowerCase().replace('_', '-');
                     const n = (v.name || '').toLowerCase();
@@ -444,16 +445,25 @@
 
             const initAudio = () => {
                 try {
+                    // 1. Web Audio API 初始化與解鎖（所有現代瀏覽器與 iOS/Android 適用）
                     if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
                     if (audioCtxRef.current) {
                         if (audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
-                        // iOS / iPadOS Web Audio 標準喚醒方式：播放極短無聲 buffer
                         const buffer = audioCtxRef.current.createBuffer(1, 1, 22050);
                         const source = audioCtxRef.current.createBufferSource();
                         source.buffer = buffer;
                         source.connect(audioCtxRef.current.destination);
                         source.start(0);
                     }
+
+                    // 2. 解鎖專門用於手機與平板（iOS Safari / Android Chrome）的 Audio 播放器
+                    if (chantAudioRef.current) {
+                        chantAudioRef.current.play().then(() => {
+                            chantAudioRef.current.pause();
+                        }).catch(() => {});
+                    }
+
+                    // 3. 電腦 Web Speech API 解鎖
                     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
                         window.speechSynthesis.resume();
                         window.speechSynthesis.getVoices();
@@ -461,9 +471,8 @@
                 } catch(e) {}
             };
 
-            // 全平台（電腦、手機、平板）高相容語音報讀函式
-            const playChantVoice = (text) => {
-                if (isMuted || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+            const playSpeechSynthesisFallback = (text) => {
+                if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
                 try {
                     window.speechSynthesis.resume();
 
@@ -484,13 +493,51 @@
                         window._activeUtterance = null;
                     };
 
-                    // 行動裝置與平板（iOS Safari / Android Chrome）切勿在 setTimeout 中呼叫 speak，否則手勢遺失導致完全無聲
                     if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
                         window.speechSynthesis.cancel();
                     }
                     window.speechSynthesis.speak(u);
                 } catch(e) {
                     console.error("SpeechSynthesis error:", e);
+                }
+            };
+
+            // 全平台（電腦、手機、平板）雙引擎高相容語音報讀函式
+            const playChantVoice = (text) => {
+                if (isMuted) return;
+
+                // 檢測是否為行動裝置或平板 (iPad, iPhone, Android, iPadOS 等)
+                const isMobileDevice = typeof navigator !== 'undefined' && (
+                    /iPad|iPhone|iPod|Android/i.test(navigator.userAgent) ||
+                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+                );
+
+                // 行動端（手機與平板）優先使用預先在使用者手勢中解鎖的標準音訊串流，徹底突破 iOS/iPadOS 對定時器 TTS 的限制
+                if (isMobileDevice && chantAudioRef.current) {
+                    try {
+                        const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=zh-TW&client=tw-ob&q=${encodeURIComponent(text)}`;
+                        chantAudioRef.current.src = url;
+                        const p = chantAudioRef.current.play();
+                        if (p !== undefined) {
+                            p.catch((err) => {
+                                console.warn("Mobile audio play failed, falling back to SpeechSynthesis:", err);
+                                playSpeechSynthesisFallback(text);
+                            });
+                        }
+                        return;
+                    } catch(e) {
+                        console.warn("Mobile audio element exception:", e);
+                    }
+                }
+
+                // 電腦端直接使用本機 SpeechSynthesis，若異常則回退至 Audio 串流
+                try {
+                    playSpeechSynthesisFallback(text);
+                } catch(e) {
+                    if (chantAudioRef.current) {
+                        chantAudioRef.current.src = `https://translate.google.com/translate_tts?ie=UTF-8&tl=zh-TW&client=tw-ob&q=${encodeURIComponent(text)}`;
+                        chantAudioRef.current.play().catch(() => {});
+                    }
                 }
             };
 
@@ -2168,6 +2215,15 @@
                                 </div>
                             </div>
                         )}
+
+                        {/* 行動裝置與平板專屬解鎖音訊播放器 */}
+                        <audio 
+                            ref={chantAudioRef} 
+                            src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA" 
+                            playsInline 
+                            preload="auto" 
+                            className="hidden" 
+                        />
                     </div>
                 </div>
             );
