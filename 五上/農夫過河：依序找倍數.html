@@ -6,7 +6,165 @@
   <title>找倍數過河拱橋戰</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
   <!-- Firebase Compatibility SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js">
+    // ==========================================
+    // 🏆 前台專屬英雄榜 (Leaderboard Modal) 邏輯 🏆
+    // ==========================================
+    let cachedLeaderboardList = [];
+
+    function openLeaderboardModal() {
+      const modal = document.getElementById('leaderboard-overlay');
+      if (modal) {
+        modal.classList.add('active');
+        fetchLeaderboardForModal();
+      }
+    }
+
+    function closeLeaderboardModal() {
+      const modal = document.getElementById('leaderboard-overlay');
+      if (modal) {
+        modal.classList.remove('active');
+      }
+    }
+
+    function fetchLeaderboardForModal() {
+      const tbody = document.getElementById('lb-modal-tbody');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="4" style="padding: 24px; color: #94a3b8;">資料連線載入中...</td></tr>';
+
+      if (isFirebaseActive) {
+        database.ref('LCM/leaderboard').orderByChild('score').limitToLast(100).once('value', snapshot => {
+          let list = [];
+          snapshot.forEach(child => {
+            let val = child.val() || {};
+            val.id = child.key;
+            list.push(val);
+          });
+          list.sort((a, b) => (b.score || 0) - (a.score || 0));
+          cachedLeaderboardList = list;
+          updateLeaderboardClassFilter(list);
+          renderLeaderboardModalTable(list);
+        }).catch(err => {
+          console.warn("Firebase leaderboard load err:", err);
+          loadLocalLeaderboardForModal();
+        });
+      } else {
+        loadLocalLeaderboardForModal();
+      }
+    }
+
+    function loadLocalLeaderboardForModal() {
+      let localData = JSON.parse(localStorage.getItem('LCM_leaderboard') || '[]');
+      localData.sort((a, b) => (b.score || 0) - (a.score || 0));
+      cachedLeaderboardList = localData;
+      updateLeaderboardClassFilter(localData);
+      renderLeaderboardModalTable(localData);
+    }
+
+    function updateLeaderboardClassFilter(records) {
+      const select = document.getElementById('lb-filter-class');
+      if (!select) return;
+      const currentVal = select.value;
+      const classSet = new Set();
+      records.forEach(r => {
+        let c = (r.className || r.class || '').trim();
+        if (!c && r.name) {
+          let parts = r.name.trim().split(/\s+/);
+          if (parts.length >= 2 && /^\d+/.test(parts[0])) c = parts[0];
+        }
+        if (c && c !== '-') classSet.add(c);
+      });
+
+      let optionsHtml = '<option value="">全部班級</option>';
+      Array.from(classSet).sort().forEach(c => {
+        optionsHtml += `<option value="${c}">${c} 班</option>`;
+      });
+      select.innerHTML = optionsHtml;
+      if (Array.from(classSet).includes(currentVal)) {
+        select.value = currentVal;
+      }
+    }
+
+    function renderLeaderboardModalTable(records) {
+      const tbody = document.getElementById('lb-modal-tbody');
+      if (!tbody) return;
+      const select = document.getElementById('lb-filter-class');
+      const filterClass = select ? select.value.trim().toLowerCase() : '';
+
+      let list = records;
+      if (filterClass) {
+        list = list.filter(r => {
+          let c = (r.className || r.class || '').trim().toLowerCase();
+          if (!c && r.name) {
+            let parts = r.name.trim().split(/\s+/);
+            if (parts.length >= 2 && /^\d+/.test(parts[0])) c = parts[0].toLowerCase();
+          }
+          return c === filterClass;
+        });
+      }
+
+      tbody.innerHTML = '';
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="padding: 24px; color: #94a3b8;">目前暫無排行紀錄，快來挑戰爭取榮譽吧！</td></tr>';
+        return;
+      }
+
+      list.slice(0, 10).forEach((rec, idx) => {
+        let tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid #f1f5f9';
+        if (idx === 0) tr.style.background = '#fefce8';
+        else if (idx === 1) tr.style.background = '#f8fafc';
+        else if (idx === 2) tr.style.background = '#fff7ed';
+
+        let rankBadge = '';
+        if (idx === 0) rankBadge = '<span style="font-size: 1.3rem;">🥇</span>';
+        else if (idx === 1) rankBadge = '<span style="font-size: 1.3rem;">🥈</span>';
+        else if (idx === 2) rankBadge = '<span style="font-size: 1.3rem;">🥉</span>';
+        else rankBadge = `<strong style="color: #64748b;">${idx + 1}</strong>`;
+
+        let classStr = (rec.className || rec.class) ? `${rec.className || rec.class}班 ` : '';
+        let seatStr = (rec.seatNumber || rec.seat) ? `${rec.seatNumber || rec.seat}號 ` : '';
+        let nameStr = rec.name || '訪客';
+        let dateStr = rec.timestamp ? new Date(rec.timestamp).toLocaleDateString() : '-';
+
+        tr.innerHTML = `
+          <td style="padding: 10px;">${rankBadge}</td>
+          <td style="padding: 10px; font-weight: 800; color: #334155; text-align: left;">
+            <span style="color: #d97706;">${classStr}</span>${seatStr}<span style="color: #0f172a;">${nameStr}</span>
+          </td>
+          <td style="padding: 10px; font-weight: 900; color: #b45309; font-size: 1.15rem;">${rec.score || 0}</td>
+          <td style="padding: 10px; font-size: 0.85rem; color: #94a3b8;">${dateStr}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // 綁定所有英雄榜開關按鈕
+    function initLeaderboardEvents() {
+      const btnShowLb = document.getElementById('btn-show-leaderboard');
+      if (btnShowLb) btnShowLb.addEventListener('click', openLeaderboardModal);
+
+      const btnHudLb = document.getElementById('btn-hud-leaderboard');
+      if (btnHudLb) btnHudLb.addEventListener('click', openLeaderboardModal);
+
+      const btnVictoryLb = document.getElementById('btn-victory-leaderboard');
+      if (btnVictoryLb) btnVictoryLb.addEventListener('click', openLeaderboardModal);
+
+      const btnCloseLb = document.getElementById('btn-close-leaderboard');
+      if (btnCloseLb) btnCloseLb.addEventListener('click', closeLeaderboardModal);
+
+      const btnCloseLbBottom = document.getElementById('btn-close-lb-bottom');
+      if (btnCloseLbBottom) btnCloseLbBottom.addEventListener('click', closeLeaderboardModal);
+
+      const lbFilterClass = document.getElementById('lb-filter-class');
+      if (lbFilterClass) {
+        lbFilterClass.addEventListener('change', () => {
+          renderLeaderboardModalTable(cachedLeaderboardList);
+        });
+      }
+    }
+    initLeaderboardEvents();
+
+</script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
   <style>
     /* --- CSS Variables & Design Tokens --- */
@@ -896,6 +1054,7 @@
 
         <div style="display: flex; gap: 15px; justify-content: center; width: 100%;">
           <button class="btn-primary" id="btn-enter-lcm" style="display: none; background: linear-gradient(to right, #d97706, #ca8a04);">解鎖隱藏關：公倍數戰 🔓</button>
+          <button class="btn-primary" id="btn-victory-leaderboard" type="button" style="background: linear-gradient(135deg, #f59e0b, #d97706); cursor: pointer;">🏆 英雄榜</button>
           <button class="btn-primary" id="btn-back-to-menu" onclick="handleTopMenuClick()" style="background: #6c757d; box-shadow: none;">返回主選單 🏠</button>
         </div>
       </div>
@@ -935,8 +1094,50 @@
         <p id="lcm-extra-progress" style="font-size:0.9rem; color:#6b7280;"></p>
       </div>
     </div>
-  </div>
+    <!-- 🏆 前台全班/全校英雄榜彈窗 🏆 -->
+    <div class="overlay" id="leaderboard-overlay" style="z-index: 500; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px);">
+      <div class="modal-card" style="max-width: 640px; width: 92%; max-height: 85vh; display: flex; flex-direction: column; padding: 24px 20px; border: 4px solid #f59e0b; background: #fffbeb;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #fed7aa; padding-bottom: 12px; margin-bottom: 14px;">
+          <h2 style="color: #b45309; font-size: 1.6rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+            <span>🏆</span> 農夫過河・倍數榮譽英雄榜
+          </h2>
+          <button id="btn-close-leaderboard" type="button" style="background: none; border: none; font-size: 1.8rem; cursor: pointer; color: #94a3b8; line-height: 1; padding: 0 4px;" title="關閉">✖</button>
+        </div>
 
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 10px; flex-wrap: wrap;">
+          <div style="font-size: 0.95rem; color: #78350f; font-weight: bold;">
+            🌟 挑戰積分排行榜 (Top 10)
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <label for="lb-filter-class" style="font-size: 0.9rem; font-weight: bold; color: #78350f;">班級：</label>
+            <select id="lb-filter-class" style="padding: 5px 12px; border-radius: 8px; border: 1.5px solid #d97706; font-size: 0.9rem; font-weight: bold; background: white; cursor: pointer; color: #78350f;">
+              <option value="">全部班級</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="overflow-y: auto; flex: 1; max-height: 50vh; border-radius: 10px; border: 1.5px solid #fed7aa; background: #ffffff;">
+          <table class="lboard-table" style="width: 100%; border-collapse: collapse; text-align: center; font-size: 0.95rem;">
+            <thead style="background: #fef3c7; position: sticky; top: 0; z-index: 2;">
+              <tr>
+                <th style="padding: 10px 6px; color: #78350f; font-weight: 800; border-bottom: 2px solid #fde68a; width: 65px;">排名</th>
+                <th style="padding: 10px 8px; color: #78350f; font-weight: 800; border-bottom: 2px solid #fde68a;">學生姓名</th>
+                <th style="padding: 10px 8px; color: #78350f; font-weight: 800; border-bottom: 2px solid #fde68a; width: 95px;">總積分</th>
+                <th style="padding: 10px 8px; color: #78350f; font-weight: 800; border-bottom: 2px solid #fde68a; width: 110px;">挑戰時間</th>
+              </tr>
+            </thead>
+            <tbody id="lb-modal-tbody">
+              <tr><td colspan="4" style="padding: 24px; color: #94a3b8;">資料載入中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="margin-top: 16px; display: flex; justify-content: center; gap: 12px;">
+          <button class="btn-primary" id="btn-close-lb-bottom" type="button" style="padding: 10px 36px; font-size: 1rem; background: #64748b; box-shadow: none; cursor: pointer;">關閉 ✕</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <script>
     // ==========================================
     // Firebase 連線設定 (HighGrade 專案)
@@ -2638,49 +2839,7 @@
     adjustScale();
   </script>
 
-  <!-- 🏆 前台全校/班級英雄榜彈窗 🏆 -->
-  <div class="overlay" id="leaderboard-overlay" style="z-index: 100;">
-    <div class="modal-card" style="max-width: 620px; width: 92%; max-height: 85vh; display: flex; flex-direction: column;">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #fed7aa; padding-bottom: 12px; margin-bottom: 14px;">
-        <h2 style="color: #b45309; font-size: 1.6rem; margin: 0; display: flex; align-items: center; gap: 8px;">
-          <span>🏆</span> 倍數過河英雄榜
-        </h2>
-        <button id="btn-close-leaderboard" style="background: none; border: none; font-size: 1.6rem; cursor: pointer; color: #94a3b8; line-height: 1;" title="關閉">✖</button>
-      </div>
-
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 10px; flex-wrap: wrap;">
-        <div style="font-size: 0.95rem; color: #64748b; font-weight: bold;">
-          🌟 挑戰積分排行榜 (Top 10)
-        </div>
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <label for="lb-filter-class" style="font-size: 0.9rem; font-weight: bold; color: #475569;">班級篩選：</label>
-          <select id="lb-filter-class" style="padding: 5px 10px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 0.9rem; font-weight: bold; background: white; cursor: pointer;">
-            <option value="">全部班級</option>
-          </select>
-        </div>
-      </div>
-
-      <div style="overflow-y: auto; flex: 1; border-radius: 10px; border: 1px solid #e2e8f0;">
-        <table class="lboard-table" style="width: 100%; border-collapse: collapse; text-align: center;">
-          <thead style="background: #fffbeb; position: sticky; top: 0; z-index: 2;">
-            <tr>
-              <th style="padding: 10px; color: #78350f; font-weight: 800; border-bottom: 2px solid #fde68a; width: 60px;">排名</th>
-              <th style="padding: 10px; color: #78350f; font-weight: 800; border-bottom: 2px solid #fde68a;">學生</th>
-              <th style="padding: 10px; color: #78350f; font-weight: 800; border-bottom: 2px solid #fde68a; width: 90px;">總積分</th>
-              <th style="padding: 10px; color: #78350f; font-weight: 800; border-bottom: 2px solid #fde68a; width: 110px;">時間</th>
-            </tr>
-          </thead>
-          <tbody id="lb-modal-tbody">
-            <tr><td colspan="4" style="padding: 24px; color: #94a3b8;">資料載入中...</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div style="margin-top: 16px; text-align: center;">
-        <button class="btn-primary" id="btn-close-lb-bottom" style="padding: 10px 32px; font-size: 1rem; background: #64748b; box-shadow: none;">關閉 ✕</button>
-      </div>
-    </div>
-  </div>
+  
 
 </body>
 </html>
