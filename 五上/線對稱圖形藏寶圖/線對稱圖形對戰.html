@@ -457,12 +457,24 @@
     <!-- 🌟 畫面 4：單題結算浮層 (Round Result Modal) 🌟 -->
     <div id="roundModal" class="puzzle-overlay" hidden>
       <div class="battle-result-card">
-        <h2 id="roundModalTitle" style="color:#451a03;font-size:1.6rem;margin-bottom:6px;">第 1 題 結算</h2>
-        <div id="roundModalBadge" style="font-size:3rem;margin:10px 0;">🎉</div>
-        <p id="roundModalMsg" style="font-size:1.05rem;font-weight:700;color:#78350f;line-height:1.6;"></p>
-        <div id="roundScoreDetail" style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px;margin:14px 0;font-size:0.95rem;font-weight:800;color:#9a3412;"></div>
+        <h2 id="roundModalTitle" style="color:#451a03;font-size:1.6rem;margin-bottom:4px;">第 1 題 結算</h2>
+        <div id="roundModalBadge" style="font-size:2.4rem;margin:6px 0;">🎉</div>
+        <p id="roundModalMsg" style="font-size:1rem;font-weight:700;color:#78350f;line-height:1.5;margin-bottom:8px;"></p>
+
+        <!-- 雙方都能清楚看到的完整線對稱圖形展示 -->
+        <div id="roundCompletedPreview" style="background:#fdfaf2;border:2px dashed #b45309;border-radius:12px;padding:8px;margin:8px auto;max-width:260px;">
+          <div style="font-size:0.85rem;font-weight:900;color:#78350f;margin-bottom:4px;">✨ 完整線對稱圖形</div>
+          <svg id="roundPreviewSvg" viewBox="0 0 420 420" style="width:100%;height:auto;display:block;background:#fff;border-radius:8px;border:1px solid #e2d5bd;"></svg>
+          <div style="display:flex;justify-content:center;gap:12px;font-size:0.75rem;font-weight:800;margin-top:6px;color:#451a03;">
+            <span><span style="display:inline-block;width:12px;height:3px;background:#0f172a;vertical-align:middle;"></span> 題目半邊</span>
+            <span><span style="display:inline-block;width:12px;height:3px;background:#059669;vertical-align:middle;"></span> 答題半邊</span>
+            <span style="color:#dc2626;">🔴 對稱軸</span>
+          </div>
+        </div>
+
+        <div id="roundScoreDetail" style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:10px;margin:10px 0;font-size:0.95rem;font-weight:800;color:#9a3412;"></div>
         <button class="primary wide antique-gold-btn" id="roundNextBtn">
-          進入下一題 ⛵ (5s)
+          進入下一題 ⛵ (7s)
         </button>
       </div>
     </div>
@@ -930,6 +942,22 @@
         startStageTimer(room, 90, onSolveTimeout);
 
       } else if (room.phase === 'roundResult') {
+        clearInterval(gameState.timerInterval);
+        $('lockOverlay').hidden = true;
+        $('phaseTitle').textContent = `🎉 破解完成！雙方請檢視完整線對稱圖形！`;
+        $('phaseDesc').textContent = `完整線對稱圖形已拼合完畢，出題者與答題者皆可共同欣賞！`;
+        $('bSubmitBtn').textContent = '本題已結束 ✓';
+        $('bSubmitBtn').disabled = true;
+        $('bUndoBtn').disabled = true;
+        $('bClearBtn').disabled = true;
+        bMessage('✨ 對手破解完成！完整線對稱圖形已呈現在畫布上。');
+
+        // 在主畫布上同步繪製出題線段與答題完成線段
+        buildBattleSvg(room, 'solve');
+        const solverSegs = room.solverSegs || room.targetSegs || [];
+        gameState.localUserSegs = new Set(solverSegs);
+        renderBattleUserLines();
+
         showRoundResultModal(room);
       }
     }
@@ -1394,7 +1422,7 @@
         // 分數公式：10 + 剩餘秒數 (最高 100 分，越快分數越高)
         const roundScore = Math.max(10, 10 + gameState.timeLeft);
 
-        finishRound(true, timeUsed, roundScore);
+        finishRound(true, timeUsed, roundScore, [...userSet]);
       } else {
         soundWrong();
         bMessage(`⚠️ 還差一點喔！多連了 ${wrong.length} 條線，漏連了 ${missing.length} 條線。請繼續修正！`);
@@ -1430,7 +1458,7 @@
 
       if (gameState.myRole === room.solver || gameState.isAi) {
         setTimeout(() => {
-          finishRound(false, 90, 0);
+          finishRound(false, 90, 0, room.targetSegs || []);
         }, 3500);
       }
     }
@@ -1448,8 +1476,8 @@
       }
     }
 
-    // 完成本題結算
-    async function finishRound(success, timeUsed, earnedScore) {
+    // 完成本題結算 (包含儲存答題者完成的線段，供出題者與雙方檢視)
+    async function finishRound(success, timeUsed, earnedScore, solverSegs = []) {
       const room = gameState.roomData;
       const solverRole = room.solver;
       const designerRole = room.designer;
@@ -1458,6 +1486,8 @@
       const newP1Score = (room.p1?.score || 0) + (solverRole === 'p1' ? earnedScore : 0);
       const newP2Score = (room.p2?.score || 0) + (solverRole === 'p2' ? earnedScore : 0);
 
+      const finalSolverSegs = solverSegs.length ? solverSegs : (room.targetSegs || []);
+
       const roundStatItem = {
         round: room.round,
         designer: designerRole,
@@ -1465,7 +1495,10 @@
         solverName: room[solverRole]?.name || '',
         success: success,
         timeUsed: timeUsed,
-        score: earnedScore
+        score: earnedScore,
+        axis: room.axis,
+        designSegs: room.designSegs || [],
+        solverSegs: finalSolverSegs
       };
 
       const updatedStats = [...(room.roundStats || []), roundStatItem];
@@ -1474,6 +1507,7 @@
         room.p1.score = newP1Score;
         room.p2.score = newP2Score;
         room.roundStats = updatedStats;
+        room.solverSegs = finalSolverSegs;
         room.phase = 'roundResult';
         renderBattleStage(room);
       } else {
@@ -1482,6 +1516,7 @@
             'p1/score': newP1Score,
             'p2/score': newP2Score,
             roundStats: updatedStats,
+            solverSegs: finalSolverSegs,
             phase: 'roundResult',
             updatedAt: Date.now()
           });
@@ -1491,7 +1526,91 @@
       }
     }
 
-    // 單題結算彈窗展示
+    // 繪製完成的線對稱圖形 (黑色題目線 + 綠色答題線 + 紅色對稱軸)
+    function renderCompletedPreviewSvg(targetSvg, axis, designSegs, solverSegs) {
+      targetSvg.replaceChildren();
+
+      // 1. 細網格
+      for (let i = 0; i < 7; i++) {
+        const hl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        hl.setAttribute('x1', toSvgX(0)); hl.setAttribute('y1', toSvgY(i));
+        hl.setAttribute('x2', toSvgX(6)); hl.setAttribute('y2', toSvgY(i));
+        hl.setAttribute('stroke', '#ede4d4'); hl.setAttribute('stroke-width', '1'); hl.setAttribute('stroke-dasharray', '2 4');
+        targetSvg.appendChild(hl);
+
+        const vl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        vl.setAttribute('x1', toSvgX(i)); vl.setAttribute('y1', toSvgY(0));
+        vl.setAttribute('x2', toSvgX(i)); vl.setAttribute('y2', toSvgY(6));
+        vl.setAttribute('stroke', '#ede4d4'); vl.setAttribute('stroke-width', '1'); vl.setAttribute('stroke-dasharray', '2 4');
+        targetSvg.appendChild(vl);
+      }
+
+      // 2. 對稱軸紅虛線
+      const axisLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      axisLine.setAttribute('class', 'axis-svg-line');
+      if (axis === 'V') {
+        axisLine.setAttribute('x1', toSvgX(3)); axisLine.setAttribute('y1', 12);
+        axisLine.setAttribute('x2', toSvgX(3)); axisLine.setAttribute('y2', 408);
+      } else {
+        axisLine.setAttribute('x1', 12); axisLine.setAttribute('y1', toSvgY(3));
+        axisLine.setAttribute('x2', 408); axisLine.setAttribute('y2', toSvgY(3));
+      }
+      targetSvg.appendChild(axisLine);
+
+      // 3. 題目線段 (深黑色)
+      const dPts = new Set();
+      (designSegs || []).forEach(seg => {
+        const [p1, p2] = seg.split('_');
+        const [x1, y1] = p1.split(',').map(Number);
+        const [x2, y2] = p2.split(',').map(Number);
+        dPts.add(p1); dPts.add(p2);
+        const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        l.setAttribute('x1', toSvgX(x1)); l.setAttribute('y1', toSvgY(y1));
+        l.setAttribute('x2', toSvgX(x2)); l.setAttribute('y2', toSvgY(y2));
+        l.setAttribute('class', 'given-line');
+        targetSvg.appendChild(l);
+      });
+      dPts.forEach(pt => {
+        const [x, y] = pt.split(',').map(Number);
+        const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        c.setAttribute('cx', toSvgX(x)); c.setAttribute('cy', toSvgY(y)); c.setAttribute('r', '5');
+        c.setAttribute('class', 'given-vertex');
+        targetSvg.appendChild(c);
+      });
+
+      // 4. 答題者連出的對稱線段 (翡翠綠色)
+      const sPts = new Set();
+      (solverSegs || []).forEach(seg => {
+        const [p1, p2] = seg.split('_');
+        const [x1, y1] = p1.split(',').map(Number);
+        const [x2, y2] = p2.split(',').map(Number);
+        sPts.add(p1); sPts.add(p2);
+        const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        l.setAttribute('x1', toSvgX(x1)); l.setAttribute('y1', toSvgY(y1));
+        l.setAttribute('x2', toSvgX(x2)); l.setAttribute('y2', toSvgY(y2));
+        l.setAttribute('class', 'user-line');
+        targetSvg.appendChild(l);
+      });
+      sPts.forEach(pt => {
+        const [x, y] = pt.split(',').map(Number);
+        const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        c.setAttribute('cx', toSvgX(x)); c.setAttribute('cy', toSvgY(y)); c.setAttribute('r', '5');
+        c.setAttribute('class', 'user-vertex');
+        targetSvg.appendChild(c);
+      });
+
+      // 5. 49 格點
+      for (let y = 0; y < 7; y++) {
+        for (let x = 0; x < 7; x++) {
+          const pt = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          pt.setAttribute('cx', toSvgX(x)); pt.setAttribute('cy', toSvgY(y)); pt.setAttribute('r', '3');
+          pt.setAttribute('class', 'dot-point');
+          targetSvg.appendChild(pt);
+        }
+      }
+    }
+
+    // 單題結算彈窗展示 (出題者與答題者皆可共同檢視完成圖形)
     function showRoundResultModal(room) {
       const modal = $('roundModal');
       const latestStat = room.roundStats?.[room.roundStats.length - 1];
@@ -1502,14 +1621,14 @@
       if (latestStat.success) {
         $('roundModalBadge').textContent = '🎉 破解成功！';
         $('roundModalMsg').innerHTML = `
-          水手 <strong>${latestStat.solverName}</strong> 僅耗時 <strong>${latestStat.timeUsed} 秒</strong> 即完美對稱！<br>
-          奪得高達 <strong>${latestStat.score} 分</strong>！
+          水手 <strong>${latestStat.solverName}</strong> 耗時 <strong>${latestStat.timeUsed} 秒</strong> 成功破解！<br>
+          已為出題者與大家展現了完整的線對稱圖形，奪得 <strong>${latestStat.score} 分</strong>！
         `;
       } else {
         $('roundModalBadge').textContent = '⏳ 時間耗盡！';
         $('roundModalMsg').innerHTML = `
           水手 <strong>${latestStat.solverName}</strong> 超過 90 秒未能完成圖形，獲得 0 分。<br>
-          下次要看準對稱軸更快出招喔！
+          已為出題者與答題者公佈標準完整答案圖形！
         `;
       }
 
@@ -1518,10 +1637,16 @@
         👑 ${room.p1?.name}：${room.p1?.score || 0} 分 ｜ ⚔️ ${room.p2?.name}：${room.p2?.score || 0} 分
       `;
 
+      // 渲染完成的線對稱圖形預覽 (題目半邊 + 答題完成半邊)
+      const previewSvg = $('roundPreviewSvg');
+      if (previewSvg) {
+        renderCompletedPreviewSvg(previewSvg, room.axis, room.designSegs || [], room.solverSegs || room.targetSegs || []);
+      }
+
       modal.hidden = false;
 
-      // 5 秒自動跳往下一題或結束
-      let secCountdown = 5;
+      // 7 秒倒數跳下一題
+      let secCountdown = 7;
       $('roundNextBtn').textContent = `進入下一題 ⛵ (${secCountdown}s)`;
       clearInterval(gameState.roundNextTimeout);
 
@@ -1621,7 +1746,7 @@
       setTimeout(() => {
         if (room.phase !== 'solve') return;
         const score = 10 + (90 - solveSeconds);
-        finishRound(true, solveSeconds, score);
+        finishRound(true, solveSeconds, score, room.targetSegs || []);
       }, solveSeconds * 1000);
     }
 
