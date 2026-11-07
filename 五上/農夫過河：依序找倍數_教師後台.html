@@ -8,6 +8,8 @@
   <!-- Firebase Compatibility SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  <!-- 純前端 Excel 匯出庫 -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root {
       --font-body: 'Noto Sans TC', sans-serif;
@@ -15,10 +17,11 @@
       --color-accent: #2563eb;
       --color-success: #16a34a;
       --color-danger: #dc2626;
+      --color-warning: #ea580c;
       --color-bg: #f8fafc;
       --color-card: #ffffff;
-      --color-border: #e2e8f0;
-      --color-text-main: #334155;
+      --color-border: #cbd5e1;
+      --color-text-main: #1e293b;
       --color-text-muted: #64748b;
     }
 
@@ -28,15 +31,18 @@
       padding: 0;
     }
 
+    /* 放大4號字體：基準字級設定為 18px (原為 14px) */
     body {
       font-family: var(--font-body);
       background-color: var(--color-bg);
       color: var(--color-text-main);
       padding: 30px;
+      font-size: 18px;
+      line-height: 1.6;
     }
 
     .dashboard-container {
-      max-width: 1200px;
+      max-width: 1400px;
       margin: 0 auto;
     }
 
@@ -44,23 +50,28 @@
     .top-left-nav {
       margin-bottom: 25px;
       display: flex;
-      gap: 10px;
+      gap: 12px;
     }
     .top-left-nav a {
       background: #ffffff;
-      color: #333;
-      border: 1px solid var(--color-border);
-      padding: 8px 16px;
+      color: #1e293b;
+      border: 2px solid var(--color-border);
+      padding: 10px 22px;
       border-radius: 30px;
-      font-size: 0.95rem;
-      font-weight: bold;
+      font-size: 1.05rem;
+      font-weight: 800;
       text-decoration: none;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-      transition: all 0.2s;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
     .top-left-nav a:hover {
       background: #f1f5f9;
-      transform: translateY(-1px);
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+      transform: translateY(-2px);
     }
 
     header {
@@ -68,48 +79,71 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 30px;
-      border-bottom: 2px solid var(--color-border);
+      border-bottom: 3px solid var(--color-border);
       padding-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 15px;
     }
 
     h1 {
-      font-size: 2rem;
+      font-size: 2.2rem;
       font-weight: 900;
       color: var(--color-primary);
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
     .btn {
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-weight: 700;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-weight: 800;
+      font-size: 1.05rem;
       cursor: pointer;
       border: none;
       transition: all 0.2s ease;
       font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .btn-danger {
       background-color: var(--color-danger);
       color: #fff;
-      box-shadow: 0 4px 10px rgba(220, 38, 38, 0.2);
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
     }
 
     .btn-danger:hover {
       background-color: #b91c1c;
-      transform: translateY(-1px);
+      transform: translateY(-2px);
+    }
+
+    .btn-success {
+      background-color: var(--color-success);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);
+    }
+
+    .btn-success:hover {
+      background-color: #15803d;
+      transform: translateY(-2px);
     }
 
     .btn-delete-row {
-      padding: 5px 10px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      border: 1px solid #fecaca;
+      padding: 6px 14px;
+      font-size: 0.95rem;
+      font-weight: 800;
+      border: 1.5px solid #fecaca;
       background-color: #fef2f2;
       color: #dc2626;
-      border-radius: 6px;
+      border-radius: 8px;
       cursor: pointer;
       transition: all 0.2s ease;
       font-family: inherit;
@@ -124,11 +158,33 @@
       color: #ffffff;
       border-color: #dc2626;
       transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);
+      box-shadow: 0 3px 6px rgba(220, 38, 38, 0.25);
+    }
+
+    input[type="date"],
+    input[type="text"],
+    input[type="password"],
+    select {
+      font-size: 1.05rem;
+      font-family: inherit;
+      font-weight: bold;
+      color: var(--color-text-main);
+      padding: 9px 14px;
+      border-radius: 10px;
+      border: 2px solid var(--color-border);
+      background: #fff;
+      transition: all 0.2s;
+    }
+
+    /* 密碼輸入框強制使用圓形黑點屏蔽 */
+    input[type="password"] {
+      -webkit-text-security: disc !important;
+      letter-spacing: 6px;
     }
 
     input[type="date"]:focus,
     input[type="text"]:focus,
+    input[type="password"]:focus,
     select:focus {
       outline: none;
       border-color: var(--color-accent) !important;
@@ -138,269 +194,235 @@
     /* --- Stats cards --- */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 18px;
       margin-bottom: 30px;
     }
 
     .stats-card {
       background: var(--color-card);
-      border: 1px solid var(--color-border);
+      border: 2px solid var(--color-border);
       border-radius: 16px;
-      padding: 24px;
+      padding: 22px;
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
+      text-align: center;
     }
 
     .stats-card h3 {
-      font-size: 0.95rem;
-      font-weight: 700;
+      font-size: 1.05rem;
+      font-weight: 800;
       color: var(--color-text-muted);
-      text-transform: uppercase;
       letter-spacing: 0.5px;
     }
 
     .stats-card .value {
-      font-size: 2.2rem;
+      font-size: 2.6rem;
       font-weight: 900;
       color: var(--color-primary);
+      margin: 4px 0;
     }
 
     .stats-card .desc {
-      font-size: 0.85rem;
+      font-size: 0.95rem;
       color: var(--color-text-muted);
-    }
-
-    /* --- Tabs --- */
-    .tabs-bar {
-      display: flex;
-      border-bottom: 2px solid var(--color-border);
-      gap: 15px;
-      margin-bottom: 20px;
-    }
-
-    .tab-btn {
-      padding: 12px 24px;
-      font-size: 1.1rem;
-      font-weight: 800;
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--color-text-muted);
-      border-bottom: 3px solid transparent;
-      transition: all 0.2s;
-      font-family: inherit;
-    }
-
-    .tab-btn:hover {
-      color: var(--color-primary);
-    }
-
-    .tab-btn.active {
-      color: var(--color-accent);
-      border-bottom-color: var(--color-accent);
-    }
-
-    .tab-content {
-      display: none;
-      animation: fadeIn 0.25s ease-out;
-    }
-
-    .tab-content.active {
-      display: block;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+      font-weight: 600;
     }
 
     /* --- Table & Card Layout --- */
     .card {
       background: var(--color-card);
-      border: 1px solid var(--color-border);
+      border: 2px solid var(--color-border);
       border-radius: 16px;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      box-shadow: 0 4px 8px -1px rgba(0, 0, 0, 0.06);
       padding: 24px;
       overflow: hidden;
+      margin-bottom: 30px;
     }
 
     .table-container {
       overflow-x: auto;
       margin-top: 15px;
+      border-radius: 12px;
+      border: 1px solid var(--color-border);
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.95rem;
+      font-size: 1.05rem;
       text-align: left;
+      min-width: 1100px;
     }
 
     th, td {
       padding: 14px 16px;
       border-bottom: 1px solid var(--color-border);
+      vertical-align: middle;
     }
 
     th {
-      background-color: #f8fafc;
-      font-weight: 800;
+      background-color: #f1f5f9;
+      font-weight: 900;
       color: var(--color-primary);
+      white-space: nowrap;
+      font-size: 1.05rem;
     }
 
     tr:hover {
       background-color: #f8fafc;
     }
 
+    tr.good td {
+      background-color: #f0fdf4 !important;
+    }
+
+    tr.wrong td {
+      background-color: #fef2f2 !important;
+    }
+
     .badge {
       display: inline-block;
-      padding: 4px 8px;
+      padding: 5px 12px;
       border-radius: 20px;
-      font-size: 0.8rem;
-      font-weight: bold;
+      font-size: 0.9rem;
+      font-weight: 800;
+      white-space: nowrap;
     }
 
     .badge-error {
       background-color: #fee2e2;
       color: var(--color-danger);
+      border: 1px solid #fca5a5;
     }
 
     .badge-success {
       background-color: #dcfce7;
       color: var(--color-success);
+      border: 1px solid #86efac;
+    }
+
+    /* --- Factor Pills & Highlights (圈出多填與漏填) --- */
+    .factor-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 34px;
+      height: 34px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-family: monospace;
+      font-weight: 900;
+      font-size: 1.1rem;
+      margin: 2px 3px;
+      vertical-align: middle;
+      transition: transform 0.15s;
+    }
+
+    /* 學生多填的因數：明顯紅圈圈出來 */
+    .factor-extra {
+      border: 3px solid #dc2626 !important;
+      background-color: #fee2e2 !important;
+      color: #991b1b !important;
+      box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.25);
+      animation: pulseExtra 1.8s infinite;
+    }
+
+    @keyframes pulseExtra {
+      0% { box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.4); }
+      50% { box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.15); }
+      100% { box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.4); }
+    }
+
+    /* 正確答案中，學生漏填的因數：明顯橘紅圈圈起來 */
+    .factor-missed {
+      border: 3px dashed #ea580c !important;
+      background-color: #ffedd5 !important;
+      color: #c2410c !important;
+      box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.25);
+    }
+
+    /* 正確比對到的因數 */
+    .factor-matched {
+      border: 1.5px solid #cbd5e1;
+      background-color: #ffffff;
+      color: #334155;
+    }
+
+    .good .factor-matched {
+      border-color: #86efac;
+      background-color: #f0fdf4;
+      color: #166534;
+    }
+
+    .legend-bar {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 12px;
+      padding: 10px 16px;
+      background: #f8fafc;
+      border-radius: 10px;
+      border: 1px dashed var(--color-border);
+      font-size: 0.95rem;
+      font-weight: 700;
     }
 
     .status-banner {
       background-color: #ffedd5;
-      border: 1px solid #fed7aa;
+      border: 2px solid #fed7aa;
       color: #9a3412;
-      padding: 12px 20px;
-      border-radius: 10px;
+      padding: 14px 22px;
+      border-radius: 12px;
       margin-bottom: 20px;
       font-weight: bold;
       display: none;
     }
-
-    /* --- Answer chips styling --- */
-    .answers-sequence-container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      align-items: center;
-      max-width: 480px;
-    }
-
-    .num-chip {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 3px 9px;
-      border-radius: 8px;
-      font-family: monospace, var(--font-body);
-      font-weight: 800;
-      font-size: 0.95rem;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-      transition: transform 0.1s;
-    }
-
-    .num-chip:hover {
-      transform: translateY(-1px);
-    }
-
-    .chip-correct {
-      background-color: #f1f5f9;
-      color: #334155;
-      border: 1px solid #cbd5e1;
-    }
-
-    .chip-wrong {
-      background-color: #fee2e2;
-      color: #dc2626;
-      border: 1.5px solid #ef4444;
-      text-decoration: underline;
-      font-weight: 900;
-    }
-
-    .chip-empty {
-      background-color: #f8fafc;
-      color: #94a3b8;
-      border: 1px dashed #cbd5e1;
-      font-size: 0.8rem;
-    }
-
-    .seq-separator {
-      color: #94a3b8;
-      font-weight: bold;
-    }
-
-    .question-cell {
-      font-weight: 700;
-      color: var(--color-primary);
-      line-height: 1.4;
-      max-width: 280px;
-    }
-
-    /* --- Filter Panel --- */
-    .filter-card {
-      background: var(--color-card);
-      border: 1px solid var(--color-border);
-      border-radius: 16px;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-      padding: 18px 24px;
-      margin-bottom: 25px;
-    }
-
-    .filter-row {
-      display: flex;
-      gap: 15px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    .filter-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .filter-group label {
-      font-weight: 800;
-      font-size: 0.95rem;
-      color: var(--color-primary);
-    }
-
-    .filter-select, .filter-input {
-      padding: 8px 14px;
-      border-radius: 8px;
-      border: 1px solid var(--color-border);
-      font-size: 0.95rem;
-      font-family: inherit;
-    }
-
-    .filter-select {
-      font-weight: bold;
-      background: #fff;
-      cursor: pointer;
-    }
-
-    .filter-input {
-      width: 100%;
-    }
-
-    .btn-secondary {
-      background-color: #e2e8f0;
-      color: #334155;
-    }
-
-    .btn-secondary:hover {
-      background-color: #cbd5e1;
-    }
   </style>
 </head>
 <body>
-  <div class="dashboard-container">
+  <!-- 🔒 進入後台密碼驗證遮罩 (黑點屏蔽輸入) 🔒 -->
+  <div id="login-overlay" style="position: fixed; inset: 0; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(6px); display: flex; justify-content: center; align-items: center; z-index: 9999;">
+    <div style="background: #ffffff; border-radius: 24px; padding: 38px 32px; max-width: 450px; width: 90%; text-align: center; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);">
+      <h2 style="font-size: 1.9rem; font-weight: 900; color: var(--color-primary); margin-bottom: 12px;">👨‍🏫 教師管理登入</h2>
+      <p style="color: var(--color-text-muted); font-size: 1.1rem; margin-bottom: 24px;">請輸入教師管理密碼以查閱學生作答紀錄：</p>
+      <form id="teacher-login-form" onsubmit="handleTeacherLogin(event)">
+        <div style="margin-bottom: 18px;">
+          <input type="password" id="teacher-login-pwd" placeholder="請輸入密碼" autocomplete="new-password" value="" autofocus required
+                 style="-webkit-text-security: disc !important; font-size: 1.5rem; letter-spacing: 8px; text-align: center; width: 100%; max-width: 320px; padding: 14px 18px; border-radius: 14px; border: 2.5px solid var(--color-border); font-family: inherit;">
+          <p id="teacher-login-error" style="color: var(--color-danger); font-size: 1.05rem; font-weight: 800; margin-top: 10px; min-height: 26px;"></p>
+        </div>
+        <div style="display: flex; gap: 14px; justify-content: center;">
+          <a href="農夫過河：依序找倍數.html" class="btn" style="background: #e2e8f0; color: #334155; text-decoration: none;">🎮 回遊戲</a>
+          <button type="submit" class="btn btn-success" style="padding: 12px 32px; font-size: 1.1rem;">進入後台 ➔</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 🔒 清空資料 / 管理者操作確認彈窗 (黑點屏蔽密碼) 🔒 -->
+  <div id="admin-modal" style="position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(5px); display: none; justify-content: center; align-items: center; z-index: 10000;">
+    <div style="background: #ffffff; border-radius: 22px; padding: 36px 30px; max-width: 460px; width: 90%; text-align: center; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);">
+      <h3 id="admin-modal-title" style="font-size: 1.7rem; font-weight: 900; color: var(--color-danger); margin-bottom: 12px;">⚠️ 清空作答紀錄確認</h3>
+      <p id="admin-modal-desc" style="color: var(--color-text-main); font-size: 1.1rem; margin-bottom: 22px;">警告：即將清空學生作答紀錄！請輸入密碼確認：</p>
+      <form id="admin-modal-form" onsubmit="handleAdminModalSubmit(event)">
+        <div style="margin-bottom: 18px;">
+          <input type="password" id="admin-modal-pwd" placeholder="請輸入密碼" autocomplete="off" required
+                 style="-webkit-text-security: disc !important; font-size: 1.5rem; letter-spacing: 8px; text-align: center; width: 100%; max-width: 320px; padding: 14px 18px; border-radius: 14px; border: 2.5px solid var(--color-border); font-family: inherit;">
+          <p id="admin-modal-error" style="color: var(--color-danger); font-size: 1.05rem; font-weight: 800; margin-top: 10px; min-height: 26px;"></p>
+        </div>
+        <div style="display: flex; gap: 14px; justify-content: center;">
+          <button type="button" class="btn" style="background: #e2e8f0; color: #334155;" onclick="closeAdminModal()">取消</button>
+          <button type="submit" class="btn btn-danger" id="admin-modal-confirm-btn" style="padding: 12px 28px;">確認執行</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="dashboard-container" id="main-content" style="display: none;">
     <!-- Top Left Nav -->
     <div class="top-left-nav">
       <a href="農夫過河：依序找倍數.html">🎮 回到遊戲</a>
@@ -412,156 +434,150 @@
     </div>
 
     <header>
-      <h1>👨‍🏫 農夫過河：依序找倍數 - 管理後台</h1>
-      <button class="btn btn-danger" id="btn-clear-db">🧹 清除所有紀錄</button>
+      <h1>👨‍🏫 農夫過河：依序找倍數・教師管理後台</h1>
+      <div class="header-actions">
+        <button class="btn btn-success" id="btn-export-excel">📥 下載 Excel</button>
+        <button class="btn btn-danger" id="btn-clear-db">🧹 清除篩選紀錄</button>
+      </div>
     </header>
 
     <!-- Stats Cards -->
     <div class="stats-grid">
       <div class="stats-card">
-        <h3>累計遊玩人數</h3>
+        <h3>累計作答人數</h3>
         <div class="value" id="stats-total-players">0</div>
-        <div class="desc">人已登錄總積分</div>
+        <div class="desc">位學生已完成練習</div>
       </div>
       <div class="stats-card">
-        <h3>全體平均分數</h3>
-        <div class="value" id="stats-avg-score">0</div>
-        <div class="desc">分 (滿分視限時完成剩餘時間而定)</div>
+        <h3>全班答對率</h3>
+        <div class="value" id="stats-avg-accuracy">0%</div>
+        <div class="desc">全體平均命中正確率</div>
       </div>
       <div class="stats-card">
-        <h3>常見出錯題目數字</h3>
+        <h3>總作答題數</h3>
+        <div class="value" id="stats-total-attempts">0</div>
+        <div class="desc">題 (含因數與公因數)</div>
+      </div>
+      <div class="stats-card">
+        <h3>錯題總次數</h3>
+        <div class="value" id="stats-total-wrong">0</div>
+        <div class="desc">次漏找、找錯或超時</div>
+      </div>
+      <div class="stats-card">
+        <h3>高頻出錯題目數字</h3>
         <div class="value" id="stats-most-failed-base">-</div>
-        <div class="desc">學生答錯次數最多的數字</div>
+        <div class="desc">學生失誤最多的目標數</div>
       </div>
     </div>
 
     <!-- Filter Panel -->
-    <div class="filter-card">
-      <div class="filter-row">
-        <div class="filter-group">
-          <label>📅 日期區間：</label>
-          <input type="date" id="filter-date-start" class="filter-input" style="padding: 7px 10px; font-weight: bold; background: #fff; cursor: pointer; color: var(--color-text-main); width: auto;" title="起始日期">
+    <div class="card" style="margin-bottom: 25px; padding: 20px 24px;">
+      <div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label style="font-weight: 800; font-size: 1.05rem; color: var(--color-primary);">📅 日期區間：</label>
+          <input type="date" id="filter-date-start" title="起始日期">
           <span style="font-weight: bold; color: var(--color-text-muted);">~</span>
-          <input type="date" id="filter-date-end" class="filter-input" style="padding: 7px 10px; font-weight: bold; background: #fff; cursor: pointer; color: var(--color-text-main); width: auto;" title="結束日期">
+          <input type="date" id="filter-date-end" title="結束日期">
         </div>
 
-        <div class="filter-group">
-          <label for="filter-class">🏫 班級篩選：</label>
-          <select id="filter-class" class="filter-select">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label for="filter-class" style="font-weight: 800; font-size: 1.05rem; color: var(--color-primary);">🏫 班級：</label>
+          <select id="filter-class">
             <option value="">全部班級</option>
           </select>
         </div>
 
-        <div class="filter-group" style="flex: 1; min-width: 220px;">
-          <label for="filter-keyword">🔍 關鍵字搜尋：</label>
-          <input type="text" id="filter-keyword" class="filter-input" placeholder="搜尋學生姓名、題目、班級或座號...">
+        <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 220px;">
+          <label for="filter-keyword" style="font-weight: 800; font-size: 1.05rem; color: var(--color-primary);">🔍 關鍵字：</label>
+          <input type="text" id="filter-keyword" placeholder="搜尋學生姓名、座號或題目..." style="width: 100%;">
         </div>
 
-        <button class="btn btn-secondary" id="btn-reset-filter">↺ 重置篩選</button>
+        <!-- 只看錯題 Checkbox -->
+        <div style="display: flex; align-items: center;">
+          <label style="font-weight: 900; font-size: 1.1rem; color: var(--color-danger); cursor: pointer; display: flex; align-items: center; gap: 8px; background: #fee2e2; padding: 8px 16px; border-radius: 10px; border: 1.5px solid #fca5a5;">
+            <input type="checkbox" id="filter-wrong-only" style="width: 22px; height: 22px; cursor: pointer;">
+            ❌ 只看錯題
+          </label>
+        </div>
+
+        <button class="btn" id="btn-reset-filter" style="background: #e2e8f0; color: #334155; padding: 9px 18px;">↺ 重置篩選</button>
+      </div>
+
+      <!-- 標記圖例 (Legend) -->
+      <div class="legend-bar">
+        <span>💡 因數標記圖例：</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px;">
+          <span class="factor-pill factor-extra" style="min-width: 28px; height: 28px; font-size: 0.95rem;">5</span>
+          <strong>紅實線圈：學生多填（非題目因數）</strong>
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 6px;">
+          <span class="factor-pill factor-missed" style="min-width: 28px; height: 28px; font-size: 0.95rem;">8</span>
+          <strong>橘虛線圈：學生漏填（正解中有但未找出）</strong>
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 6px;">
+          <span class="factor-pill factor-matched" style="min-width: 28px; height: 28px; font-size: 0.95rem;">1</span>
+          正確配對之因數
+        </span>
       </div>
     </div>
 
-    <!-- Tabs Menu -->
-    <div class="tabs-bar">
-      <button class="tab-btn active" data-tab="tab-mistakes">學生答錯紀錄 (Mistakes)</button>
-      <button class="tab-btn" data-tab="tab-leaderboard">全班積分英雄榜 (Leaderboard)</button>
-    </div>
-
-    <!-- Tab Mistakes -->
-    <div class="tab-content active" id="tab-mistakes">
-      <div class="card">
-        <h2>❌ 學生答錯題目紀錄表</h2>
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th style="min-width: 140px;">時間</th>
-                <th style="min-width: 75px;">班級</th>
-                <th style="min-width: 65px;">座號</th>
-                <th style="min-width: 90px;">學生姓名</th>
-                <th style="min-width: 110px;">關卡類型</th>
-                <th style="min-width: 200px;">題目</th>
-                <th style="min-width: 240px;">學生作答的答案</th>
-                <th style="text-align: center; width: 90px;">操作</th>
-              </tr>
-            </thead>
-            <tbody id="mistakes-table-body">
-              <tr><td colspan="8" style="text-align: center;">載入資料中...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tab Leaderboard -->
-    <div class="tab-content" id="tab-leaderboard">
-      <div class="card">
-        <h2>🏆 學生總積分榜</h2>
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th style="min-width: 60px;">排名</th>
-                <th style="min-width: 140px;">時間</th>
-                <th style="min-width: 80px;">班級</th>
-                <th style="min-width: 70px;">座號</th>
-                <th style="min-width: 100px;">學生姓名</th>
-                <th style="min-width: 80px;">總積分</th>
-                <th style="text-align: center; width: 90px;">操作</th>
-              </tr>
-            </thead>
-            <tbody id="leaderboard-table-body">
-              <tr><td colspan="7" style="text-align: center;">載入資料中...</td></tr>
-            </tbody>
-          </table>
-        </div>
+    <!-- Student Records Table -->
+    <div class="card">
+      <h2 style="font-size: 1.5rem; font-weight: 900; color: var(--color-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+        <span>📋</span> 學生作答紀錄總表 (作答成果與錯題分析)
+      </h2>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 140px;">作答時間</th>
+              <th style="width: 80px;">班級</th>
+              <th style="width: 70px;">座號</th>
+              <th style="width: 100px;">學生姓名</th>
+              <th style="width: 100px;">關卡類型</th>
+              <th style="width: 100px;">目標數</th>
+              <th style="min-width: 200px;">學生選/填的因數</th>
+              <th style="min-width: 200px;">正確答案</th>
+              <th style="width: 130px;">結果</th>
+              <th style="text-align: center; width: 90px;">操作</th>
+            </tr>
+          </thead>
+          <tbody id="records-table-body">
+            <tr><td colspan="10" style="text-align: center; padding: 40px; color: var(--color-text-muted);">載入資料中...</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
 
   <script>
     // ==========================================
-    // 進入教師後台密碼驗證 (8888)
+    // 進入教師後台密碼驗證 (黑點屏蔽)
     // ==========================================
-    function verifyTeacherAccess() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const isParamAuthed = urlParams.get('auth') === '8888';
-      let isSessionAuthed = false;
-      try {
-        isSessionAuthed = sessionStorage.getItem('lcm_teacher_authed') === 'true';
-      } catch (e) {}
+    function handleTeacherLogin(e) {
+      e.preventDefault();
+      const pwdInput = document.getElementById('teacher-login-pwd');
+      const errEl = document.getElementById('teacher-login-error');
+      const val = pwdInput.value.trim();
 
-      if (isParamAuthed || isSessionAuthed) {
-        try {
-          sessionStorage.setItem('lcm_teacher_authed', 'true');
-        } catch (e) {}
-        if (isParamAuthed) {
-          window.history.replaceState({}, document.title, window.location.pathname);
+      if (val === '8888') {
+        document.getElementById('login-overlay').style.display = 'none';
+        document.getElementById('main-content').style.display = 'block';
+        if (!isAppInitialized) {
+          isAppInitialized = true;
+          initDataLoad();
         }
-        return true;
-      }
-
-      const inputPwd = prompt("🔒 請輸入教師後台密碼：");
-      if (inputPwd === "8888") {
-        try {
-          sessionStorage.setItem('lcm_teacher_authed', 'true');
-        } catch (e) {}
-        return true;
       } else {
-        if (inputPwd !== null) {
-          alert("❌ 密碼錯誤，無法進入教師後台！");
-        }
-        window.location.href = "農夫過河：依序找倍數.html";
-        return false;
+        errEl.innerText = '❌ 密碼錯誤，請重新輸入！';
+        pwdInput.value = '';
+        pwdInput.focus();
       }
     }
 
-    if (!verifyTeacherAccess()) {
-      throw new Error("Teacher authentication failed");
-    }
+    let isAppInitialized = false;
 
     // ==========================================
-    // Firebase 連線設定 (與遊戲檔案一致)
+    // Firebase 連線設定 (與遊戲一致)
     // ==========================================
     const firebaseConfig = {
       apiKey: "AIzaSyCFNaVRETt062_As1hF7Mfyr22pKMG-lvk",
@@ -570,7 +586,7 @@
       projectId: "chickenrabbit-ea442",
       storageBucket: "chickenrabbit-ea442.firebasestorage.app",
       messagingSenderId: "65728951973",
-      appId: "1:65728951973:web:666b1c64cfb3a7fa5abf4c"
+      appId: "1:65728951973:web:eb52738ca86ed7175abf4c"
     };
 
     let database = null;
@@ -588,18 +604,125 @@
       document.getElementById('status-banner').style.display = 'block';
     }
 
-    // --- Tab Switching ---
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        
-        btn.classList.add('active');
-        document.getElementById(btn.dataset.tab).classList.add('active');
-      });
-    });
+    // --- 資料緩存 ---
+    let rawRecords = [];
+    let rawMistakes = [];
+    let combinedRecords = [];
+    let currentFilteredRecords = [];
 
-    // --- Helper to parse date YYYY-MM-DD ---
+    // --- 載入資料庫 ---
+    function initDataLoad() {
+      if (isFirebaseActive) {
+        // 監聽完整作答紀錄 LCM/records
+        database.ref('LCM/records').on('value', snapshot => {
+          let list = [];
+          snapshot.forEach(child => {
+            let data = child.val() || {};
+            data.id = child.key;
+            data.sourceNode = 'records';
+            list.push(data);
+          });
+          rawRecords = list;
+          mergeAndRefreshData();
+        }, error => {
+          console.error("Firebase records error:", error);
+          document.getElementById('status-banner').style.display = 'block';
+        });
+
+        // 同步監聽 LCM/mistakes 以兼顧舊紀錄
+        database.ref('LCM/mistakes').on('value', snapshot => {
+          let list = [];
+          snapshot.forEach(child => {
+            let data = child.val() || {};
+            data.id = child.key;
+            data.sourceNode = 'mistakes';
+            data.isCorrect = false;
+            list.push(data);
+          });
+          rawMistakes = list;
+          mergeAndRefreshData();
+        });
+      } else {
+        loadLocalData();
+      }
+    }
+
+    function loadLocalData() {
+      let localRec = JSON.parse(localStorage.getItem('LCM_records') || '[]');
+      let localMis = JSON.parse(localStorage.getItem('LCM_mistakes') || '[]');
+
+      localRec.forEach((item, idx) => {
+        if (!item.id) item.id = 'loc_r_' + (item.timestamp || idx) + '_' + idx;
+        item.sourceNode = 'records';
+      });
+      localMis.forEach((item, idx) => {
+        if (!item.id) item.id = 'loc_m_' + (item.timestamp || idx) + '_' + idx;
+        item.sourceNode = 'mistakes';
+        item.isCorrect = false;
+      });
+
+      rawRecords = localRec;
+      rawMistakes = localMis;
+      mergeAndRefreshData();
+    }
+
+    // 合併 records 與 mistakes (去重，以 records 優先)
+    function mergeAndRefreshData() {
+      let map = new Map();
+      rawRecords.forEach(r => {
+        let key = r.id || (r.timestamp + '_' + (r.studentName || '') + '_' + (r.base || ''));
+        map.set(key, r);
+      });
+
+      rawMistakes.forEach(m => {
+        let key = m.id || (m.timestamp + '_' + (m.studentName || '') + '_' + (m.base || ''));
+        if (!map.has(key)) {
+          let exists = rawRecords.some(r => Math.abs((r.timestamp || 0) - (m.timestamp || 0)) < 1000 && r.studentName === m.studentName);
+          if (!exists) {
+            map.set(key, m);
+          }
+        }
+      });
+
+      combinedRecords = Array.from(map.values());
+      combinedRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+      populateClassOptions();
+      applyFilters();
+    }
+
+    // 解析班級、座號、姓名
+    function getStudentInfo(item) {
+      let cls = item.studentClass || item.className || '';
+      let seat = item.studentSeat || item.seat || '';
+      let name = item.studentOnlyName || '';
+
+      if (!cls && !seat && item.name) {
+        let raw = item.name.trim();
+        let parts = raw.split(/\s+/);
+        if (parts.length >= 3) {
+          cls = parts[0];
+          seat = parts[1];
+          name = parts.slice(2).join(' ');
+        } else if (parts.length === 2) {
+          if (/^\d+/.test(parts[0])) {
+            cls = parts[0];
+            name = parts[1];
+          } else {
+            name = raw;
+          }
+        } else {
+          name = raw;
+        }
+      }
+
+      return {
+        classStr: cls || '-',
+        seatStr: seat || '-',
+        nameStr: name || item.studentName || item.name || '訪客'
+      };
+    }
+
     function getLocalDateStr(ts) {
       if (!ts) return '';
       const d = new Date(ts);
@@ -610,443 +733,415 @@
       return `${year}-${month}-${day}`;
     }
 
-    // --- Data Binding & Database Listeners ---
-    function initDataLoad() {
-      if (isFirebaseActive) {
-        // Listen mistakes
-        database.ref('LCM/mistakes').on('value', snapshot => {
-          let mistakesList = [];
-          snapshot.forEach(child => {
-            let data = child.val() || {};
-            data.id = child.key;
-            mistakesList.push(data);
-          });
-          mistakesList.reverse(); // Newest first
-          cacheMistakes = mistakesList;
-          updateClassFilterOptions(cacheMistakes, cacheLeaderboard);
-          renderMistakes();
-          updateStatistics(cacheMistakes, null);
-        }, error => {
-          console.error("Firebase Mistakes error:", error);
-          document.getElementById('mistakes-table-body').innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--color-danger); font-weight: bold;">連線遭拒絕 (Permission Denied)。</td></tr>`;
-        });
+    function populateClassOptions() {
+      const classSelect = document.getElementById('filter-class');
+      let currentVal = classSelect.value;
+      let classes = new Set();
 
-        // Listen leaderboard
-        database.ref('LCM/leaderboard').on('value', snapshot => {
-          let leaderboardList = [];
-          snapshot.forEach(child => {
-            let data = child.val() || {};
-            data.id = child.key;
-            leaderboardList.push(data);
-          });
-          leaderboardList.sort((a, b) => b.score - a.score);
-          cacheLeaderboard = leaderboardList;
-          updateClassFilterOptions(cacheMistakes, cacheLeaderboard);
-          renderLeaderboard();
-          updateStatistics(null, cacheLeaderboard);
-        }, error => {
-          console.error("Firebase Leaderboard error:", error);
-          document.getElementById('leaderboard-table-body').innerHTML = `<tr><td colspan="7" style="color: var(--color-danger); font-weight: bold; text-align: center;">載入排行榜失敗。</td></tr>`;
-        });
-      } else {
-        // Fallback local storage
-        loadLocalData();
-      }
-    }
-
-    function loadLocalData() {
-      let mistakesList = JSON.parse(localStorage.getItem('LCM_mistakes') || '[]');
-      let leaderboardList = JSON.parse(localStorage.getItem('LCM_leaderboard') || '[]');
-      
-      mistakesList.forEach((item, idx) => {
-        if (!item.id) item.id = 'loc_m_' + (item.timestamp || idx) + '_' + idx;
-      });
-      leaderboardList.forEach((item, idx) => {
-        if (!item.id) item.id = 'loc_l_' + (item.timestamp || idx) + '_' + idx;
+      combinedRecords.forEach(item => {
+        let info = getStudentInfo(item);
+        if (info.classStr && info.classStr !== '-') {
+          classes.add(info.classStr);
+        }
       });
 
-      mistakesList.reverse();
-      leaderboardList.sort((a, b) => b.score - a.score);
-
-      cacheMistakes = mistakesList;
-      cacheLeaderboard = leaderboardList;
-
-      updateClassFilterOptions(cacheMistakes, cacheLeaderboard);
-      renderMistakes();
-      renderLeaderboard();
-      updateStatistics(cacheMistakes, leaderboardList);
+      let sorted = Array.from(classes).sort();
+      classSelect.innerHTML = '<option value="">全部班級</option>';
+      sorted.forEach(cls => {
+        let opt = document.createElement('option');
+        opt.value = cls;
+        opt.innerText = cls + ' 班';
+        if (cls === currentVal) opt.selected = true;
+        classSelect.appendChild(opt);
+      });
     }
 
-    // --- Helper Functions for Formatting ---
-    function formatQuestion(item) {
-      if (item.question) return item.question;
-      let type = item.type || '';
-      let count = (item.expected && Array.isArray(item.expected)) ? item.expected.length : (item.count || '');
-      if (type.includes('公倍數') || (typeof item.base === 'string' && item.base.includes(','))) {
-        if (item.stepIndex === 100 || item.stepIndex === 99) {
-          return `依序找出 ${item.base} 的公倍數`;
-        }
-        return `依序找出 ${item.base} 的前 ${count || 3} 個公倍數`;
-      } else {
-        return `請依序輸入 ${item.base} 的前 ${count || 5} 個倍數`;
+    function extractNumbers(val) {
+      if (!val || val === '無' || val === '超時未完成' || val === '-') return [];
+      if (Array.isArray(val)) {
+        return val.filter(x => x !== null && x !== undefined && !isNaN(x)).map(Number);
       }
+      let str = String(val);
+      let matches = str.match(/\d+/g);
+      if (!matches) return [];
+      return matches.map(m => parseInt(m, 10));
     }
 
-    function formatStudentAnswer(item) {
-      let list = [];
-      if (Array.isArray(item.userInput)) {
-        list = item.userInput;
-      } else if (item.userInput !== undefined && item.userInput !== null) {
-        list = [item.userInput];
-      } else if (item.userInputVal !== undefined && item.userInputVal !== null) {
-        list = [item.userInputVal];
-      } else {
-        return '<span style="color: var(--color-text-muted);">-</span>';
+    function renderComparisonPills(userInputVal, expectedVal, isCorrect) {
+      let studentNums = extractNumbers(userInputVal);
+      let correctNums = extractNumbers(expectedVal);
+
+      if (studentNums.length === 0) {
+        let studentText = userInputVal ? String(userInputVal) : '未填 / 超時';
+        let studentHtml = `<span style="color: var(--color-danger); font-weight: bold;">${studentText}</span>`;
+        let correctHtml = correctNums.length > 0
+          ? correctNums.map(n => `<span class="factor-pill factor-missed" title="⭕ 漏填因數">${n}</span>`).join('')
+          : String(expectedVal || '-');
+        return { studentHtml, correctHtml };
       }
 
-      let expectedList = Array.isArray(item.expected) ? item.expected : [];
+      if (correctNums.length === 0) {
+        return {
+          studentHtml: String(userInputVal || '-'),
+          correctHtml: String(expectedVal || '-')
+        };
+      }
 
-      let badges = list.map((val, idx) => {
-        if (val === null || val === undefined || val === '') {
-          return `<span class="num-chip chip-empty" title="第 ${idx + 1} 個數字：未填">(未填)</span>`;
-        }
-        
-        let isWrong = false;
-        if (expectedList.length > idx) {
-          if (val !== expectedList[idx]) {
-            isWrong = true;
-          }
-        } else if (item.userInputVal !== undefined && val === item.userInputVal) {
-          isWrong = true;
-        }
-
-        if (isWrong) {
-          return `<span class="num-chip chip-wrong" title="第 ${idx + 1} 個輸入：${val} (答錯)">${val}</span>`;
+      // 1. 學生作答欄：圈出多填 (紅實線圈 factor-extra)
+      let studentHtml = studentNums.map(num => {
+        if (!correctNums.includes(num)) {
+          return `<span class="factor-pill factor-extra" title="⚠️ 多填（非因數）">${num}</span>`;
         } else {
-          return `<span class="num-chip chip-correct" title="第 ${idx + 1} 個輸入：${val}">${val}</span>`;
+          return `<span class="factor-pill factor-matched">${num}</span>`;
         }
-      });
+      }).join('');
 
-      return `<div class="answers-sequence-container">${badges.join('<span class="seq-separator">, </span>')}</div>`;
+      // 2. 正確答案欄：圈出漏填 (橘紅虛線圈 factor-missed)
+      let correctHtml = correctNums.map(num => {
+        if (!studentNums.includes(num)) {
+          return `<span class="factor-pill factor-missed" title="⭕ 學生漏填">${num}</span>`;
+        } else {
+          return `<span class="factor-pill factor-matched">${num}</span>`;
+        }
+      }).join('');
+
+      return { studentHtml, correctHtml };
     }
 
-    function formatClass(className) {
-      if (!className) return '訪客';
-      let str = String(className).trim();
-      if (str === '' || str === '-' || str === '小學') return '訪客';
-      return str;
-    }
+    function applyFilters() {
+      const filterClass = document.getElementById('filter-class').value.trim().toLowerCase();
+      const filterDateStart = document.getElementById('filter-date-start').value;
+      const filterDateEnd = document.getElementById('filter-date-end').value;
+      const filterKeyword = document.getElementById('filter-keyword').value.trim().toLowerCase();
+      const filterWrongOnly = document.getElementById('filter-wrong-only').checked;
 
-    function formatSeat(seatNumber) {
-      if (seatNumber === undefined || seatNumber === null || seatNumber === '') return '';
-      let n = parseInt(seatNumber, 10);
-      if (isNaN(n) || n <= 0) return '';
-      return `${n} 號`;
-    }
+      let filtered = combinedRecords.filter(item => {
+        let info = getStudentInfo(item);
+        let isItemCorrect = item.isCorrect === true || item.isCorrect === 'true';
 
-    function filterItems(list) {
-      const startDate = document.getElementById('filter-date-start').value;
-      const endDate = document.getElementById('filter-date-end').value;
-      const selectedClass = document.getElementById('filter-class').value.trim();
-      const keyword = document.getElementById('filter-keyword').value.trim().toLowerCase();
+        if (filterWrongOnly && isItemCorrect) {
+          return false;
+        }
 
-      return list.filter(item => {
-        if (startDate || endDate) {
+        if (filterClass && info.classStr.toLowerCase() !== filterClass) {
+          return false;
+        }
+
+        if (filterDateStart || filterDateEnd) {
           const itemDate = getLocalDateStr(item.timestamp);
-          if (startDate && itemDate < startDate) return false;
-          if (endDate && itemDate > endDate) return false;
+          if (filterDateStart && itemDate < filterDateStart) return false;
+          if (filterDateEnd && itemDate > filterDateEnd) return false;
         }
 
-        const itemClass = formatClass(item.className);
-        const itemSeat = formatSeat(item.seatNumber);
-
-        if (selectedClass) {
-          if (itemClass !== selectedClass) return false;
-        }
-
-        if (keyword) {
-          const name = (item.name || '').toLowerCase();
-          const qText = formatQuestion(item).toLowerCase();
-          const userAnsStr = Array.isArray(item.userInput) ? item.userInput.join(' ') : String(item.userInputVal || '');
-          const match = name.includes(keyword) || itemClass.toLowerCase().includes(keyword) || itemSeat.toLowerCase().includes(keyword) || qText.includes(keyword) || userAnsStr.includes(keyword);
-          if (!match) return false;
+        if (filterKeyword) {
+          let fullSearch = `${info.classStr} ${info.seatStr} ${info.nameStr} ${item.name || ''} ${item.base || ''} ${item.type || ''} ${item.errorType || ''}`.toLowerCase();
+          if (!fullSearch.includes(filterKeyword)) {
+            return false;
+          }
         }
 
         return true;
       });
+
+      currentFilteredRecords = filtered;
+      renderRecordsTable(filtered);
+      updateStatisticsDisplay(filtered);
     }
 
-    function updateClassFilterOptions(mistakes, leaderboard) {
-      const select = document.getElementById('filter-class');
-      const currentVal = select.value;
-      const classSet = new Set();
-
-      (mistakes || []).forEach(m => {
-        let c = formatClass(m.className);
-        if (c) classSet.add(c);
-      });
-      (leaderboard || []).forEach(l => {
-        let c = formatClass(l.className);
-        if (c) classSet.add(l.className);
-      });
-
-      select.innerHTML = '<option value="">全部班級</option>';
-      Array.from(classSet).sort().forEach(cls => {
-        const opt = document.createElement('option');
-        opt.value = cls;
-        opt.innerText = cls;
-        if (cls === currentVal) opt.selected = true;
-        select.appendChild(opt);
-      });
-    }
-
-    // --- Rendering Functions ---
-    function renderMistakes(list) {
-      const tbody = document.getElementById('mistakes-table-body');
+    function renderRecordsTable(list) {
+      const tbody = document.getElementById('records-table-body');
       tbody.innerHTML = '';
 
-      const targetList = list || cacheMistakes;
-      const filtered = filterItems(targetList);
-
-      if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--color-text-muted);">目前無符合條件的答錯紀錄。</td></tr>';
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 40px; color: var(--color-text-muted); font-size: 1.1rem;">沒有符合條件的作答紀錄。</td></tr>';
         return;
       }
 
-      filtered.forEach(item => {
+      list.forEach(item => {
+        let info = getStudentInfo(item);
         let tr = document.createElement('tr');
+        let isItemCorrect = item.isCorrect === true || item.isCorrect === 'true';
+
+        tr.className = isItemCorrect ? 'good' : 'wrong';
+
         let dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString() : '-';
-        let classStr = formatClass(item.className);
-        let seatStr = formatSeat(item.seatNumber);
-        let isLCM = (item.type && item.type.includes('公倍數'));
-        let qText = formatQuestion(item);
-        let ansHtml = formatStudentAnswer(item);
+        let levelType = item.type || (item.mode === 'basic' ? '簡單' : (item.mode === 'advanced' ? '進階' : '困難'));
+        let targetBase = item.base || '-';
+        let studentAnsRaw = (item.userInput !== undefined && item.userInput !== null) ? item.userInput : (item.studentAnswer || item.userInputVal || '無');
+        let correctAnsRaw = (item.expected !== undefined && item.expected !== null) ? item.expected : (item.correctAnswer || item.expectedVal || '-');
+
+        let pills = renderComparisonPills(studentAnsRaw, correctAnsRaw, isItemCorrect);
+
+        let errorTypeStr = item.errorType || (isItemCorrect ? '完全正確' : '作答失誤');
+        if (errorTypeStr.includes('我找完了') || errorTypeStr.includes('倍數找錯或漏填')) {
+          errorTypeStr = '漏找或找錯';
+        }
+
+        let resultBadge = isItemCorrect
+          ? '<span class="badge badge-success">✅ 答對</span>'
+          : `<span class="badge badge-error">❌ 答錯 (${errorTypeStr})</span>`;
 
         tr.innerHTML = `
-          <td style="font-size: 0.85rem; color: var(--color-text-muted);">${dateStr}</td>
-          <td style="font-weight: 700; color: #475569;">${classStr}</td>
-          <td style="font-weight: 700; color: #475569;">${seatStr}</td>
-          <td style="font-weight: bold; color: var(--color-primary);">${item.name || '訪客'}</td>
-          <td><span class="badge ${isLCM ? 'badge-success' : 'badge-error'}">${item.type || '找倍數挑戰'}</span></td>
-          <td class="question-cell">${qText}</td>
-          <td>${ansHtml}</td>
+          <td style="font-size: 0.95rem; color: var(--color-text-muted);">${dateStr}</td>
+          <td style="font-weight: 900; color: var(--color-accent);">${info.classStr}</td>
+          <td style="font-weight: 800;">${info.seatStr}</td>
+          <td style="font-weight: 900; color: var(--color-primary);">${info.nameStr}</td>
+          <td><span class="badge ${levelType === '公因數挑戰' ? 'badge-success' : 'badge-error'}" style="background:#e0e7ff; color:#3730a3; border-color:#c7d2fe;">${levelType}</span></td>
+          <td style="font-family: monospace; font-weight: 900; font-size: 1.2rem; color: var(--color-primary);">${targetBase}</td>
+          <td>${pills.studentHtml}</td>
+          <td>${pills.correctHtml}</td>
+          <td>${resultBadge}</td>
           <td style="text-align: center;">
-            <button class="btn-delete-row" data-id="${item.id}" title="刪除此筆紀錄">🗑️ 刪除</button>
+            <button class="btn-delete-row" data-id="${item.id}" data-node="${item.sourceNode || 'records'}" title="刪除此筆紀錄">🗑️ 刪除</button>
           </td>
         `;
         tbody.appendChild(tr);
       });
     }
 
-    function renderLeaderboard(list) {
-      const tbody = document.getElementById('leaderboard-table-body');
-      tbody.innerHTML = '';
-
-      const targetList = list || cacheLeaderboard;
-      const filtered = filterItems(targetList);
-
-      if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--color-text-muted);">目前無符合條件的積分成績。</td></tr>';
-        return;
-      }
-
-      filtered.forEach((item, idx) => {
-        let tr = document.createElement('tr');
-        let dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString() : '-';
-        let classStr = formatClass(item.className);
-        let seatStr = formatSeat(item.seatNumber);
-
-        tr.innerHTML = `
-          <td style="font-weight: 800; color: var(--color-accent);">${idx + 1}</td>
-          <td style="font-size: 0.85rem; color: var(--color-text-muted);">${dateStr}</td>
-          <td style="font-weight: 700; color: #475569;">${classStr}</td>
-          <td style="font-weight: 700; color: #475569;">${seatStr}</td>
-          <td style="font-weight: bold;">${item.name || '訪客'}</td>
-          <td style="font-weight: bold; color: var(--color-success);">${item.score}</td>
-          <td style="text-align: center;">
-            <button class="btn-delete-row" data-id="${item.id}" title="刪除此筆紀錄">🗑️ 刪除</button>
-          </td>
-        `;
-        tbody.appendChild(tr);
+    function updateStatisticsDisplay(list) {
+      let studentSet = new Set();
+      list.forEach(item => {
+        let info = getStudentInfo(item);
+        studentSet.add(`${info.classStr}_${info.seatStr}_${info.nameStr}`);
       });
+      document.getElementById('stats-total-players').innerText = studentSet.size;
+
+      document.getElementById('stats-total-attempts').innerText = list.length;
+
+      let correctCount = list.filter(item => item.isCorrect === true || item.isCorrect === 'true').length;
+      let wrongCount = list.length - correctCount;
+      document.getElementById('stats-total-wrong').innerText = wrongCount;
+
+      let acc = list.length > 0 ? Math.round((correctCount / list.length) * 100) : 0;
+      document.getElementById('stats-avg-accuracy').innerText = acc + '%';
+
+      let wrongList = list.filter(item => !(item.isCorrect === true || item.isCorrect === 'true'));
+      let freq = {};
+      wrongList.forEach(m => {
+        let b = m.base;
+        if (b) freq[b] = (freq[b] || 0) + 1;
+      });
+
+      let maxBase = '-';
+      let maxCount = 0;
+      for (let b in freq) {
+        if (freq[b] > maxCount) {
+          maxCount = freq[b];
+          maxBase = b;
+        }
+      }
+      document.getElementById('stats-most-failed-base').innerText = maxBase !== '-' ? `${maxBase} (${maxCount}次)` : '-';
     }
 
-    // Cache metrics locally for cross-reference updates
-    let cacheMistakes = [];
-    let cacheLeaderboard = [];
+    // ==========================================
+    // 清空資料 / 刪除紀錄驗證彈窗 (黑點屏蔽密碼)
+    // ==========================================
+    let currentAdminAction = null;
 
-    function updateStatistics(mistakes, leaderboard) {
-      if (mistakes) cacheMistakes = mistakes;
-      if (leaderboard) cacheLeaderboard = leaderboard;
+    function openAdminModal(options) {
+      currentAdminAction = options.onConfirm;
+      document.getElementById('admin-modal-title').innerText = options.title || '⚠️ 清空作答紀錄確認';
+      document.getElementById('admin-modal-desc').innerText = options.desc || '請輸入密碼以確認清空：';
+      document.getElementById('admin-modal-confirm-btn').innerText = options.btnText || '確認執行';
+      const pwdInput = document.getElementById('admin-modal-pwd');
+      pwdInput.value = '';
+      document.getElementById('admin-modal-error').innerText = '';
+      document.getElementById('admin-modal').style.display = 'flex';
+      setTimeout(() => pwdInput.focus(), 150);
+    }
 
-      const filteredMistakes = filterItems(cacheMistakes);
-      const filteredLeaderboard = filterItems(cacheLeaderboard);
+    function closeAdminModal() {
+      document.getElementById('admin-modal').style.display = 'none';
+      document.getElementById('admin-modal-pwd').value = '';
+      currentAdminAction = null;
+    }
 
-      // 1. Total players
-      document.getElementById('stats-total-players').innerText = filteredLeaderboard.length;
+    function handleAdminModalSubmit(e) {
+      e.preventDefault();
+      const pwd = document.getElementById('admin-modal-pwd').value.trim();
+      const errEl = document.getElementById('admin-modal-error');
 
-      // 2. Average score
-      if (filteredLeaderboard.length > 0) {
-        let sum = filteredLeaderboard.reduce((acc, curr) => acc + (curr.score || 0), 0);
-        let avg = Math.round(sum / filteredLeaderboard.length);
-        document.getElementById('stats-avg-score').innerText = avg;
+      // 支援管理密碼 0987912307 或 8888
+      if (pwd === '0987912307' || pwd === '8888') {
+        const action = currentAdminAction;
+        closeAdminModal();
+        if (action) action();
       } else {
-        document.getElementById('stats-avg-score').innerText = '0';
+        errEl.innerText = '❌ 密碼錯誤，請重新輸入！';
+        document.getElementById('admin-modal-pwd').value = '';
+        document.getElementById('admin-modal-pwd').focus();
       }
+    }
 
-      // 3. Most failed base number
-      if (filteredMistakes.length > 0) {
-        let freq = {};
-        filteredMistakes.forEach(m => {
-          let b = m.base;
-          if (b) {
-            freq[b] = (freq[b] || 0) + 1;
-          }
-        });
-        
-        let maxBase = '-';
-        let maxCount = 0;
-        for (let b in freq) {
-          if (freq[b] > maxCount) {
-            maxCount = freq[b];
-            maxBase = b;
+    // --- 單筆刪除 ---
+    function deleteSingleRecord(id, node) {
+      if (!id) return;
+      const target = combinedRecords.find(r => r.id === id);
+      const studentName = target ? (getStudentInfo(target).nameStr || '該學生') : '該學生';
+
+      openAdminModal({
+        title: '🗑️ 刪除紀錄確認',
+        desc: `準備刪除「${studentName}」的這筆作答紀錄。請輸入密碼確認：`,
+        btnText: '確認刪除',
+        onConfirm: () => {
+          if (isFirebaseActive) {
+            let path = (node === 'mistakes') ? ('LCM/mistakes/' + id) : ('LCM/records/' + id);
+            database.ref(path).remove()
+              .then(() => {
+                if (node === 'records') {
+                  database.ref('LCM/mistakes/' + id).remove().catch(() => {});
+                }
+              })
+              .catch(err => {
+                alert("❌ 刪除失敗：" + err.message);
+              });
+          } else {
+            let localRec = JSON.parse(localStorage.getItem('LCM_records') || '[]');
+            let localMis = JSON.parse(localStorage.getItem('LCM_mistakes') || '[]');
+
+            localRec = localRec.filter(r => r.id !== id);
+            localMis = localMis.filter(m => m.id !== id);
+
+            localStorage.setItem('LCM_records', JSON.stringify(localRec));
+            localStorage.setItem('LCM_mistakes', JSON.stringify(localMis));
+            loadLocalData();
           }
         }
-        
-        document.getElementById('stats-most-failed-base').innerText = maxBase !== '-' ? `${maxBase} (${maxCount} 次)` : '-';
-      } else {
-        document.getElementById('stats-most-failed-base').innerText = '-';
-      }
+      });
     }
 
-    function applyAllFilters() {
-      renderMistakes();
-      renderLeaderboard();
-      updateStatistics();
-    }
-
-    // --- Delete Single Record Actions ---
-    function deleteMistakeRecord(id) {
-      if (!id) return;
-      const target = cacheMistakes.find(m => m.id === id);
-      const studentName = target ? (target.name || '該學生') : '該學生';
-      
-      const pwd = prompt(`⚠️ 準備刪除「${studentName}」的這筆答錯紀錄。\n請輸入管理者密碼確認刪除：`);
-      if (pwd === null) return;
-      if (pwd !== "0987912307") {
-        alert("❌ 管理者密碼錯誤，無法刪除！");
+    // --- 清除已篩選紀錄 (黑點屏蔽密碼彈窗) ---
+    document.getElementById('btn-clear-db').addEventListener('click', () => {
+      if (!currentFilteredRecords || currentFilteredRecords.length === 0) {
+        alert("目前篩選條件下沒有任何紀錄可供刪除！");
         return;
       }
 
-      if (isFirebaseActive) {
-        database.ref('LCM/mistakes/' + id).remove()
-          .then(() => {
-            // Firebase on('value') 會自動同步畫面
-          })
-          .catch(err => {
-            alert("❌ 刪除失敗：" + err.message);
-          });
-      } else {
-        let list = JSON.parse(localStorage.getItem('LCM_mistakes') || '[]');
-        list = list.filter((item, idx) => {
-          let itemId = item.id || ('loc_m_' + (item.timestamp || idx) + '_' + idx);
-          return itemId !== id;
-        });
-        localStorage.setItem('LCM_mistakes', JSON.stringify(list));
-        loadLocalData();
-      }
-    }
+      const filterClass = document.getElementById('filter-class').value.trim();
+      const filterWrongOnly = document.getElementById('filter-wrong-only').checked;
+      let targetDesc = '';
+      if (filterClass) targetDesc += `「${filterClass} 班」`;
+      if (filterWrongOnly) targetDesc += '【只看錯題】';
+      if (!targetDesc) targetDesc = '「全部班級」';
 
-    function deleteLeaderboardRecord(id) {
-      if (!id) return;
-      const target = cacheLeaderboard.find(l => l.id === id);
-      const studentName = target ? (target.name || '該學生') : '該學生';
-      
-      const pwd = prompt(`⚠️ 準備刪除「${studentName}」的這筆英雄榜積分紀錄。\n請輸入管理者密碼確認刪除：`);
-      if (pwd === null) return;
-      if (pwd !== "0987912307") {
-        alert("❌ 管理者密碼錯誤，無法刪除！");
+      const count = currentFilteredRecords.length;
+
+      openAdminModal({
+        title: '🧹 清除篩選紀錄確認',
+        desc: `⚠️ 準備刪除目前已篩選的 ${targetDesc} 共 ${count} 筆作答紀錄。此操作無法復原，請輸入密碼以確認刪除：`,
+        btnText: `確定刪除 (${count} 筆)`,
+        onConfirm: () => {
+          if (isFirebaseActive) {
+            let deletePromises = [];
+            currentFilteredRecords.forEach(item => {
+              if (item.id) {
+                deletePromises.push(database.ref('LCM/records/' + item.id).remove());
+                deletePromises.push(database.ref('LCM/mistakes/' + item.id).remove());
+              }
+            });
+
+            Promise.all(deletePromises).then(() => {
+              alert(`✅ 已成功刪除 ${targetDesc} 的 ${count} 筆作答紀錄！`);
+            }).catch(err => {
+              alert("❌ 刪除過程中發生錯誤：" + err.message);
+            });
+          } else {
+            let deleteIds = new Set(currentFilteredRecords.map(r => r.id));
+            let localRec = JSON.parse(localStorage.getItem('LCM_records') || '[]');
+            let localMis = JSON.parse(localStorage.getItem('LCM_mistakes') || '[]');
+
+            localRec = localRec.filter(r => !deleteIds.has(r.id));
+            localMis = localMis.filter(m => !deleteIds.has(m.id));
+
+            localStorage.setItem('LCM_records', JSON.stringify(localRec));
+            localStorage.setItem('LCM_mistakes', JSON.stringify(localMis));
+            alert(`✅ 已成功刪除本機 ${targetDesc} 的 ${count} 筆作答紀錄！`);
+            loadLocalData();
+          }
+        }
+      });
+    });
+
+    // --- 匯出已篩選資料至 Excel (SheetJS) 並以班級命名 ---
+    function exportToExcel() {
+      if (!currentFilteredRecords || currentFilteredRecords.length === 0) {
+        alert("目前篩選條件下沒有任何作答紀錄可供匯出！");
         return;
       }
 
-      if (isFirebaseActive) {
-        database.ref('LCM/leaderboard/' + id).remove()
-          .then(() => {
-            // Firebase on('value') 會自動同步畫面
-          })
-          .catch(err => {
-            alert("❌ 刪除失敗：" + err.message);
-          });
-      } else {
-        let list = JSON.parse(localStorage.getItem('LCM_leaderboard') || '[]');
-        list = list.filter((item, idx) => {
-          let itemId = item.id || ('loc_l_' + (item.timestamp || idx) + '_' + idx);
-          return itemId !== id;
+      let excelData = [];
+      currentFilteredRecords.forEach(item => {
+        let isItemCorrect = item.isCorrect === true || item.isCorrect === 'true';
+        let info = getStudentInfo(item);
+        let dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString() : '-';
+        let levelType = item.type || (item.mode === 'basic' ? '簡單' : (item.mode === 'advanced' ? '進階' : '困難'));
+
+        excelData.push({
+          '作答時間': dateStr,
+          '班級': info.classStr,
+          '座號': info.seatStr,
+          '姓名': info.nameStr,
+          '關卡類型': levelType,
+          '目標底數 / 題目': item.question || item.base || '-',
+          '學生作答': Array.isArray(item.userInput) ? item.userInput.join(', ') : (item.studentAnswer || item.userInputVal || '無'),
+          '正確答案': Array.isArray(item.expected) ? item.expected.join(', ') : (item.correctAnswer || item.expectedVal || '-'),
+          '結果': isItemCorrect ? '答對' : '答錯',
+          '錯誤分析': isItemCorrect ? '完全正確' : (item.errorType || '漏找或找錯')
         });
-        localStorage.setItem('LCM_leaderboard', JSON.stringify(list));
-        loadLocalData();
+      });
+
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "作答紀錄");
+
+      // 提取班級名稱以作為檔案名稱
+      const filterClass = document.getElementById('filter-class').value.trim();
+      let classTag = '';
+      if (filterClass) {
+        classTag = `${filterClass}班`;
+      } else {
+        let distinctClasses = Array.from(new Set(currentFilteredRecords.map(r => getStudentInfo(r).classStr).filter(c => c && c !== '-')));
+        if (distinctClasses.length === 1) {
+          classTag = `${distinctClasses[0]}班`;
+        } else {
+          classTag = '全部班級';
+        }
       }
+
+      const filterWrongOnly = document.getElementById('filter-wrong-only').checked;
+      const statusTag = filterWrongOnly ? '_錯題紀錄' : '';
+      const dateTag = new Date().toISOString().split('T')[0];
+
+      // 檔案名稱格式：農夫過河依序找倍數_[班級]_[日期]_作答成果.xlsx
+      const filename = `農夫過河依序找倍數_${classTag}${statusTag}_${dateTag}_作答成果.xlsx`;
+      XLSX.writeFile(wb, filename);
     }
 
-    // Filter Event Listeners
-    document.getElementById('filter-class').addEventListener('change', applyAllFilters);
-    document.getElementById('filter-date-start').addEventListener('change', applyAllFilters);
-    document.getElementById('filter-date-end').addEventListener('change', applyAllFilters);
-    document.getElementById('filter-keyword').addEventListener('input', applyAllFilters);
+    document.getElementById('btn-export-excel').addEventListener('click', exportToExcel);
+
+    // --- 篩選事件 ---
+    document.getElementById('filter-class').addEventListener('change', applyFilters);
+    document.getElementById('filter-date-start').addEventListener('change', applyFilters);
+    document.getElementById('filter-date-end').addEventListener('change', applyFilters);
+    document.getElementById('filter-keyword').addEventListener('input', applyFilters);
+    document.getElementById('filter-wrong-only').addEventListener('change', applyFilters);
+
     document.getElementById('btn-reset-filter').addEventListener('click', () => {
       document.getElementById('filter-date-start').value = '';
       document.getElementById('filter-date-end').value = '';
       document.getElementById('filter-class').value = '';
       document.getElementById('filter-keyword').value = '';
-      applyAllFilters();
+      document.getElementById('filter-wrong-only').checked = false;
+      applyFilters();
     });
 
-    document.getElementById('mistakes-table-body').addEventListener('click', (e) => {
+    document.getElementById('records-table-body').addEventListener('click', (e) => {
       const btn = e.target.closest('.btn-delete-row');
       if (btn && btn.dataset.id) {
-        deleteMistakeRecord(btn.dataset.id);
+        deleteSingleRecord(btn.dataset.id, btn.dataset.node);
       }
     });
-
-    document.getElementById('leaderboard-table-body').addEventListener('click', (e) => {
-      const btn = e.target.closest('.btn-delete-row');
-      if (btn && btn.dataset.id) {
-        deleteLeaderboardRecord(btn.dataset.id);
-      }
-    });
-
-    // --- Clean DB Action ---
-    document.getElementById('btn-clear-db').addEventListener('click', () => {
-      let pwd = prompt("🔒 請輸入管理者密碼以清除所有學生紀錄：");
-      if (pwd === null) return;
-      if (pwd !== "0987912307") {
-        alert("❌ 管理者密碼錯誤，拒絕清除數據！");
-        return;
-      }
-
-      let conf1 = confirm("⚠️ 警告：您即將清空所有的學生作答錯誤紀錄以及積分排行榜！此操作無法復原，是否繼續？");
-      if (conf1) {
-        let conf2 = confirm("🔒 請再次確認：是否確定清空 Firebase 中 LCM 資料庫節點的所有數據？");
-        if (conf2) {
-          if (isFirebaseActive) {
-            database.ref('LCM').remove()
-              .then(() => {
-                alert("✅ Firebase LCM 資料庫已成功清空！");
-              })
-              .catch(err => {
-                alert("❌ 清除失敗：" + err.message);
-              });
-          } else {
-            localStorage.removeItem('LCM_mistakes');
-            localStorage.removeItem('LCM_leaderboard');
-            alert("✅ 本機離線資料已成功清空！");
-            loadLocalData();
-          }
-        }
-      }
-    });
-
-    initDataLoad();
   </script>
 </body>
 </html>
