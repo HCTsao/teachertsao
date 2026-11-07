@@ -528,7 +528,7 @@ function refreshSimple() {
   for (const [k, b] of cells) {
     const has = run.mine.includes(k);
     b.classList.toggle('mine', has);
-    b.textContent = given.has(k) || has ? '■' : '';
+    b.textContent = '';
     b.setAttribute('aria-selected', String(has));
     b.classList.remove('wrong', 'missing', 'pair');
   }
@@ -549,7 +549,7 @@ function paintSimple(k, value) {
   const b = cells.get(k);
   if (b) {
     b.classList.toggle('mine', value);
-    b.textContent = value ? '■' : '';
+    b.textContent = '';
     b.classList.remove('wrong', 'missing', 'pair');
     b.setAttribute('aria-selected', String(value));
   }
@@ -1386,8 +1386,6 @@ $('checkBtn').onclick = check;
 $('hintBtn').onclick = hint;
 $('startBtn').onclick = () => start();
 $('menuBtn').onclick = menu;
-if ($('inGameMenuBtn')) $('inGameMenuBtn').onclick = menu;
-if ($('puzzleMenuBtn')) $('puzzleMenuBtn').onclick = menu;
 $('nextBtn').onclick = () => run.index === 4 ? result() : load(run.index + 1);
 $('againBtn').onclick = menu;
 
