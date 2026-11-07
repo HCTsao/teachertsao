@@ -1,0 +1,1684 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>線對稱圖形：海盜雙人連線對戰</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Noto+Serif+TC:wght@600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="treasure.css?v=12">
+  <style>
+    /* 對戰模式專屬樣式增強 */
+    .battle-hud {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .player-card {
+      background: linear-gradient(145deg, #1f120a 0%, #110904 100%);
+      border: 2px solid var(--brass-gold);
+      border-radius: 12px;
+      padding: 10px 14px;
+      color: #faecc9;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      position: relative;
+    }
+    .player-card.active-turn {
+      border-color: #facc15;
+      box-shadow: 0 0 14px rgba(250, 204, 21, 0.4);
+      background: linear-gradient(145deg, #2d1b0f 0%, #1a0e06 100%);
+    }
+    .player-card .p-role {
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: #c59b58;
+      letter-spacing: 0.5px;
+    }
+    .player-card .p-name {
+      font-size: 1.15rem;
+      font-weight: 900;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .player-card .p-score {
+      font-size: 1.35rem;
+      font-weight: 900;
+      color: #fde047;
+      font-family: 'Cinzel', serif;
+    }
+
+    /* 中央計時鐘與回合指示 */
+    .match-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .timer-ring-box {
+      width: 68px;
+      height: 68px;
+      position: relative;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(circle, #3d2313 0%, #1a0b04 100%);
+      border: 3px solid var(--brass-gold);
+      border-radius: 50%;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+    }
+    .timer-ring-box.urgent {
+      border-color: #ef4444;
+      animation: pulseUrgent 0.8s infinite ease-in-out;
+    }
+    @keyframes pulseUrgent {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 6px #ef4444; }
+      50% { transform: scale(1.08); box-shadow: 0 0 16px #ef4444; }
+    }
+    .timer-sec {
+      font-size: 1.55rem;
+      font-weight: 900;
+      color: #fff;
+      font-family: 'Cinzel', serif;
+    }
+    .round-pill {
+      background: #451a03;
+      border: 1px solid var(--brass-gold);
+      border-radius: 20px;
+      padding: 3px 12px;
+      font-size: 0.78rem;
+      font-weight: 900;
+      color: #fde047;
+      font-family: 'Cinzel', serif;
+    }
+
+    /* 角色階段引導橫幅 */
+    .phase-banner {
+      background: linear-gradient(90deg, rgba(69,26,3,0.9) 0%, rgba(120,53,15,0.95) 50%, rgba(69,26,3,0.9) 100%);
+      border: 2px solid #ca8a04;
+      border-radius: 10px;
+      padding: 10px 16px;
+      text-align: center;
+      color: #fff;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    .phase-banner strong {
+      font-size: 1.15rem;
+      color: #fef08a;
+      display: block;
+      margin-bottom: 2px;
+    }
+    .phase-banner span {
+      font-size: 0.88rem;
+      color: #faecc9;
+    }
+
+    /* 答題者遮罩等待畫面 */
+    .canvas-lock-overlay {
+      position: absolute;
+      inset: 8px;
+      background: rgba(18, 11, 7, 0.94);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      color: #faecc9;
+      z-index: 20;
+      text-align: center;
+      padding: 20px;
+      backdrop-filter: blur(4px);
+    }
+    .lock-skull {
+      font-size: 52px;
+      animation: spinHourglass 2s infinite ease-in-out;
+    }
+    @keyframes spinHourglass {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(180deg); }
+    }
+
+    /* 房號展示卡片 */
+    .room-code-display {
+      font-size: 3.2rem;
+      font-weight: 900;
+      font-family: 'Cinzel', serif;
+      letter-spacing: 12px;
+      color: #fde047;
+      background: #2a160c;
+      border: 3px solid var(--brass-gold);
+      border-radius: 14px;
+      padding: 10px 20px;
+      text-align: center;
+      margin: 16px auto;
+      width: fit-content;
+      text-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
+    }
+
+    /* 超時自動標示正解線條 */
+    .timeout-sol-line {
+      stroke: #eab308;
+      stroke-width: 4.5;
+      stroke-dasharray: 6 4;
+      animation: flashSol 1s infinite alternate;
+    }
+    @keyframes flashSol {
+      from { stroke: #eab308; stroke-width: 4; }
+      to { stroke: #f97316; stroke-width: 6; }
+    }
+
+    /* 限制出題半邊的高亮指示底色 */
+    .allowed-half-rect {
+      fill: rgba(34, 197, 94, 0.08);
+      stroke: rgba(34, 197, 94, 0.35);
+      stroke-dasharray: 4 3;
+    }
+    .disabled-half-rect {
+      fill: rgba(0, 0, 0, 0.04);
+    }
+
+    /* 結算排行榜彈窗 */
+    .battle-result-card {
+      background: #fdfaf2;
+      border: 3px solid #8c5d2e;
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+    }
+    .round-detail-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 16px 0;
+      text-align: left;
+    }
+    .round-detail-item {
+      background: #fff;
+      border: 1px solid #d4b886;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.9rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* 大廳分頁切換按鈕組 */
+    .lobby-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .lobby-tab-btn {
+      flex: 1;
+      background: #f5eedc;
+      border: 2px solid #8c5d2e;
+      border-radius: 8px;
+      padding: 10px;
+      font-weight: 800;
+      color: #451a03;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 1rem;
+    }
+    .lobby-tab-btn.active {
+      background: linear-gradient(180deg, #fef08a 0%, #eab308 100%);
+      border-color: #451a03;
+      box-shadow: 0 3px 0 #451a03;
+    }
+
+    .room-input {
+      font-size: 1.8rem;
+      font-weight: 900;
+      letter-spacing: 8px;
+      text-align: center;
+      font-family: 'Cinzel', serif;
+      padding: 10px;
+      border-radius: 10px;
+      border: 2.5px solid #8c5d2e;
+      width: 100%;
+      background: #fffdf9;
+      color: #3b1908;
+    }
+  </style>
+</head>
+<body>
+  <div class="sea-vignette"></div>
+
+  <main class="app">
+    <!-- Top Navigation -->
+    <nav class="topbar" aria-label="導覽">
+      <div class="topbar-left">
+        <a href="線對稱圖形尋寶圖.html" class="nav-btn">
+          <svg class="nav-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+          回單人探險
+        </a>
+        <button id="leaveRoomBtn" class="nav-btn" hidden>
+          🚪 離開房間
+        </button>
+      </div>
+      <div class="mode-badge" style="background:#b45309;color:#fff;padding:6px 14px;border-radius:20px;font-weight:800;font-size:0.85rem;border:1px solid #fde047;">
+        ⚔️ 雙人連線對戰版
+      </div>
+    </nav>
+
+    <!-- 🌟 畫面 1：大廳連線與開房畫面 (Lobby Screen) 🌟 -->
+    <section id="lobbyScreen" class="board parchment-board">
+      <div class="parchment-corner tl"></div>
+      <div class="parchment-corner tr"></div>
+      <div class="parchment-corner bl"></div>
+      <div class="parchment-corner br"></div>
+
+      <div class="hero-banner">
+        <div class="pirate-crest">
+          <svg viewBox="0 0 100 100" class="crest-svg">
+            <circle cx="50" cy="50" r="46" fill="#1c130b" stroke="#c59b58" stroke-width="3"/>
+            <path d="M 22 22 L 78 78 M 78 22 L 22 78" stroke="#e6cc9c" stroke-width="5" stroke-linecap="round"/>
+            <path d="M 30 35 L 70 35 L 60 75 L 40 75 Z" fill="#854d0e" stroke="#fde047" stroke-width="2"/>
+            <text x="50" y="62" font-size="20" fill="#fde047" text-anchor="middle" font-family="'Cinzel', serif" font-weight="900">VS</text>
+          </svg>
+        </div>
+        <h1 class="antique-title">SYMMETRY BATTLE</h1>
+        <div class="antique-subtitle">線對稱海盜智謀決鬥</div>
+        <p class="hero-lore">
+          兩位水手輪流出題！在限定半邊設計秘圖，對手解開圖形速度越快得分越高！<br>
+          三題決戰，總分高者登上西班牙海盜王寶座！
+        </p>
+      </div>
+
+      <!-- 玩家身分填寫 -->
+      <div class="player-form-card" style="margin-bottom:14px;">
+        <div class="form-title">
+          <span class="feather-quill">🪶</span> 水手登記入籍
+        </div>
+        <div class="fields">
+          <label>水手代號 / 姓名<input id="userName" maxlength="10" placeholder="例如：傑克船長" value="傑克船長"></label>
+          <label>班級 / 座號<input id="userClass" maxlength="10" placeholder="例如：501-12"></label>
+        </div>
+      </div>
+
+      <!-- 開房 / 加房 / 電腦對戰 Tab -->
+      <div class="lobby-tabs">
+        <button type="button" class="lobby-tab-btn active" id="tabCreate">🆕 建立房間</button>
+        <button type="button" class="lobby-tab-btn" id="tabJoin">🚪 加入房間</button>
+        <button type="button" class="lobby-tab-btn" id="tabAi">🤖 單機 vs 電腦</button>
+      </div>
+
+      <!-- 開房 Panel -->
+      <div id="panelCreate">
+        <p style="font-size:0.92rem;color:#78350f;margin-bottom:14px;line-height:1.5;">
+          點擊下方按鈕將建立一間海盜決鬥密室，並隨機生成 <strong>4 位數字房間代碼</strong>。把代碼告訴旁邊的同學即可開始對戰！
+        </p>
+        <button class="primary wide antique-gold-btn" id="btnDoCreate">
+          開闢決鬥房間 ⚓
+        </button>
+      </div>
+
+      <!-- 加房 Panel -->
+      <div id="panelJoin" hidden>
+        <p style="font-size:0.92rem;color:#78350f;margin-bottom:10px;">
+          請輸入同學建立的 <strong>4 位數字房間代碼</strong>：
+        </p>
+        <div style="margin-bottom:14px;">
+          <input type="text" id="inRoomCode" class="room-input" maxlength="4" placeholder="例如 8521" inputmode="numeric" pattern="[0-9]*">
+        </div>
+        <button class="primary wide antique-gold-btn" id="btnDoJoin">
+          加入房間開始決鬥 ⚔️
+        </button>
+      </div>
+
+      <!-- 電腦對戰 Panel -->
+      <div id="panelAi" hidden>
+        <p style="font-size:0.92rem;color:#78350f;margin-bottom:14px;line-height:1.5;">
+          找不到同學？沒關係！你可以與<strong>海盜島 AI 智能水手</strong>進行 3 題對戰，由你與 AI 輪流出題搶分！
+        </p>
+        <button class="primary wide antique-gold-btn" id="btnDoAi">
+          啟動單機 AI 對戰 🤖
+        </button>
+      </div>
+    </section>
+
+    <!-- 🌟 畫面 2：房主等待對手加入浮層 / 畫面 (Waiting Room) 🌟 -->
+    <section id="waitScreen" class="board parchment-board" hidden>
+      <div class="parchment-corner tl"></div>
+      <div class="parchment-corner tr"></div>
+      <div class="parchment-corner bl"></div>
+      <div class="parchment-corner br"></div>
+
+      <div class="hero-banner">
+        <h2 class="antique-title">ROOM CREATED</h2>
+        <div class="antique-subtitle">決鬥密室已開闢，等待水手登船...</div>
+        <div class="room-code-display" id="waitRoomCode">----</div>
+        <p style="font-size:0.95rem;color:#573315;line-height:1.6;">
+          請告訴對手輸入上方 <strong>4 位數字代碼</strong> 加入房間！<br>
+          <span style="color:#b45309;font-weight:900;">⚡ 對手連線後將自動開局！</span>
+        </p>
+        <div style="margin-top:20px;">
+          <button id="cancelWaitBtn" class="nav-btn" style="background:#573315;margin:auto;">取消開房，回大廳</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 🌟 畫面 3：核心對戰舞台 (Battle Stage) 🌟 -->
+    <section id="battleScreen" class="board parchment-board" hidden>
+      <div class="parchment-corner tl"></div>
+      <div class="parchment-corner tr"></div>
+      <div class="parchment-corner bl"></div>
+      <div class="parchment-corner br"></div>
+
+      <!-- 頂部 HUD：雙方玩家、中央計時器、回合 -->
+      <div class="battle-hud">
+        <!-- 玩家 1 (房主) -->
+        <div class="player-card" id="p1Card">
+          <div class="p-role" id="p1RoleTag">⚓ 房主</div>
+          <div class="p-name" id="p1NameLabel">水手 1</div>
+          <div class="p-score"><span id="p1ScoreVal">0</span> <small style="font-size:0.75rem;">PTS</small></div>
+        </div>
+
+        <!-- 中央計時鐘與回合 -->
+        <div class="match-center">
+          <div class="round-pill" id="roundPill">ROUND 1 / 3</div>
+          <div class="timer-ring-box" id="timerBox">
+            <span class="timer-sec" id="timerSec">90</span>
+          </div>
+        </div>
+
+        <!-- 玩家 2 (挑戰者) -->
+        <div class="player-card" id="p2Card">
+          <div class="p-role" id="p2RoleTag">⚔️ 挑戰者</div>
+          <div class="p-name" id="p2NameLabel">水手 2</div>
+          <div class="p-score"><span id="p2ScoreVal">0</span> <small style="font-size:0.75rem;">PTS</small></div>
+        </div>
+      </div>
+
+      <!-- 階段任務提示條 -->
+      <div class="phase-banner" id="phaseBanner">
+        <strong id="phaseTitle">🎨 輪到你出題！</strong>
+        <span id="phaseDesc">請在限定半邊設計圖形，完成後點擊送出。</span>
+      </div>
+
+      <!-- 圖例說明 -->
+      <div class="legend-bar">
+        <span class="lg-item"><span class="swatch swatch-given-line"></span> 黑色題目線</span>
+        <span class="lg-item"><span class="swatch swatch-mine-line"></span> 綠色你連的線</span>
+        <span class="lg-item red"><span class="swatch swatch-axis"></span> 紅色虛線對稱軸</span>
+      </div>
+
+      <!-- 作答棋盤容器 -->
+      <div id="gridWrap">
+        <div id="dotGridBox">
+          <!-- 答題者等待出題時的迷霧遮罩 -->
+          <div id="lockOverlay" class="canvas-lock-overlay" hidden>
+            <div class="lock-skull">⏳</div>
+            <h3 style="font-size:1.35rem;color:#fde047;">對手正在閉門設計秘圖中...</h3>
+            <p style="font-size:0.9rem;max-width:320px;line-height:1.5;">
+              出題者擁有 90 秒秘密設計時間。<br>
+              請耐心稍候，對手送出後將立即掀開神秘海圖供你破解！
+            </p>
+          </div>
+
+          <!-- 7x7 互動 SVG -->
+          <svg id="battleSvg" viewBox="0 0 420 420" role="img" aria-label="連線對戰畫布"></svg>
+          <div class="dot-instructions" id="battleInstructions">
+            💡 點選兩個格點即可連線；再點一下線段可刪除；亦可按住拖曳連線。
+          </div>
+        </div>
+      </div>
+
+      <!-- 工具列 (復原、清除) -->
+      <div class="tools" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 8px;">
+        <button id="bUndoBtn"><span class="tool-ic">↶</span> 復原上一步</button>
+        <button id="bClearBtn"><span class="tool-ic">🗑️</span> 全部清除</button>
+      </div>
+
+      <!-- 核心動作提交按鈕 -->
+      <div class="actions" style="margin-top:10px;">
+        <button class="primary wide btn-check antique-gold-btn" id="bSubmitBtn">
+          完成設計，送出題目 🚀
+        </button>
+      </div>
+
+      <div class="captain-log" id="bCaptainLog" style="margin-top:10px;">
+        <div class="log-avatar">💡</div>
+        <p id="bMsg">準備就緒，戰鬥開始！</p>
+      </div>
+    </section>
+
+    <!-- 🌟 畫面 4：單題結算浮層 (Round Result Modal) 🌟 -->
+    <div id="roundModal" class="puzzle-overlay" hidden>
+      <div class="battle-result-card">
+        <h2 id="roundModalTitle" style="color:#451a03;font-size:1.6rem;margin-bottom:6px;">第 1 題 結算</h2>
+        <div id="roundModalBadge" style="font-size:3rem;margin:10px 0;">🎉</div>
+        <p id="roundModalMsg" style="font-size:1.05rem;font-weight:700;color:#78350f;line-height:1.6;"></p>
+        <div id="roundScoreDetail" style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px;margin:14px 0;font-size:0.95rem;font-weight:800;color:#9a3412;"></div>
+        <button class="primary wide antique-gold-btn" id="roundNextBtn">
+          進入下一題 ⛵ (5s)
+        </button>
+      </div>
+    </div>
+
+    <!-- 🌟 畫面 5：終局大結算 (Final Game Over Screen) 🌟 -->
+    <section id="gameOverScreen" class="board parchment-board" hidden>
+      <div class="parchment-corner tl"></div>
+      <div class="parchment-corner tr"></div>
+      <div class="parchment-corner bl"></div>
+      <div class="parchment-corner br"></div>
+
+      <div class="hero-banner">
+        <div style="font-size:60px;" id="winnerTrophy">👑</div>
+        <h1 class="antique-title" id="winnerHeading">LEGENDARY CHAMPION</h1>
+        <div class="antique-subtitle" id="winnerSub">海盜對決 · 榮耀加冕</div>
+        
+        <div style="background:#2a160c;border:2.5px solid var(--brass-gold);border-radius:14px;padding:16px;margin:16px auto;max-width:440px;">
+          <div style="display:flex;justify-content:space-around;color:#fff;">
+            <div>
+              <div style="color:#c59b58;font-size:0.85rem;" id="finalP1Name">水手 1</div>
+              <div style="font-size:2rem;font-weight:900;color:#fde047;font-family:'Cinzel';" id="finalP1Score">0</div>
+            </div>
+            <div style="font-size:1.8rem;color:#c59b58;line-height:2;">VS</div>
+            <div>
+              <div style="color:#c59b58;font-size:0.85rem;" id="finalP2Name">水手 2</div>
+              <div style="font-size:2rem;font-weight:900;color:#fde047;font-family:'Cinzel';" id="finalP2Score">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3 題作答明細紀錄表 -->
+        <div class="round-detail-list" id="finalDetailsList"></div>
+
+        <div style="display:flex;gap:12px;justify-content:center;margin-top:20px;">
+          <button class="primary wide antique-gold-btn" id="playAgainBtn">
+            ⚔️ 再戰一局
+          </button>
+          <a href="線對稱圖形尋寶圖.html" class="nav-btn" style="display:inline-flex;align-items:center;padding:12px 18px;font-size:1rem;">
+            回單人探險
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Firebase Compatibility SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+  <!-- 連線對戰邏輯核心腳本 -->
+  <script>
+    'use strict';
+
+    // 1. 初始化 Firebase
+    const firebaseConfig = {
+      apiKey: 'AIzaSyCFNaVRETt862_As1hF7Mfyr22pKM5-lvk',
+      authDomain: 'chickenrabbit-ea442.firebaseapp.com',
+      databaseURL: 'https://chickenrabbit-ea442-default-rtdb.firebaseio.com',
+      projectId: 'chickenrabbit-ea442',
+      appId: '1:65728951973:web:efff912caf5f6f185abf4c'
+    };
+
+    let rtdb = null;
+    try {
+      if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      rtdb = firebase.database();
+    } catch(e) {
+      console.warn('Firebase 初始化：', e);
+    }
+
+    const $ = id => document.getElementById(id);
+
+    // 幾何輔助常數與函式 (7x7 格點)
+    const SVG_PAD = 30, SVG_STEP = 60;
+    const toSvgX = x => SVG_PAD + x * SVG_STEP;
+    const toSvgY = y => SVG_PAD + y * SVG_STEP;
+
+    const normSeg = (p1, p2) => {
+      const s1 = typeof p1 === 'string' ? p1 : `${p1[0]},${p1[1]}`;
+      const s2 = typeof p2 === 'string' ? p2 : `${p2[0]},${p2[1]}`;
+      return s1 < s2 ? `${s1}_${s2}` : `${s2}_${s1}`;
+    };
+
+    const mirrorDot = (pt, axis) => {
+      let [x, y] = typeof pt === 'string' ? pt.split(',').map(Number) : pt;
+      return axis === 'V' ? `${6 - x},${y}` : `${x},${6 - y}`;
+    };
+
+    const mirrorSeg = (seg, axis) => {
+      let [p1, p2] = seg.split('_');
+      return normSeg(mirrorDot(p1, axis), mirrorDot(p2, axis));
+    };
+
+    // 檢查點是否落在合法出題半邊
+    // side: 'left' (x<=3), 'right' (x>=3), 'top' (y<=3), 'bottom' (y>=3)
+    function isDotInAllowedSide(x, y, axis, side) {
+      if (axis === 'V') {
+        return side === 'left' ? x <= 3 : x >= 3;
+      } else {
+        return side === 'top' ? y <= 3 : y >= 3;
+      }
+    }
+
+    // 檢查線段是否完全落在合法半邊內
+    function isSegInAllowedSide(seg, axis, side) {
+      const [p1, p2] = seg.split('_');
+      const [x1, y1] = p1.split(',').map(Number);
+      const [x2, y2] = p2.split(',').map(Number);
+      return isDotInAllowedSide(x1, y1, axis, side) && isDotInAllowedSide(x2, y2, axis, side);
+    }
+
+    // 2. 對戰全域狀態
+    let gameState = {
+      isAi: false,
+      myRole: 'p1', // 'p1' or 'p2'
+      roomCode: '',
+      roomRef: null,
+      listener: null,
+      roomData: null,
+      // 本地作答線段
+      localUserSegs: new Set(),
+      localUndo: [],
+      activeDot: null,
+      dragStart: null,
+      // 本地計時器
+      timerInterval: null,
+      timeLeft: 90,
+      roundNextTimeout: null,
+      showingTimeoutSol: false
+    };
+
+    // 音效合成器 (Web Audio)
+    let audioCtx = null;
+    function playBeep(freq = 520, duration = 0.1, type = 'sine', vol = 0.15) {
+      try {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch(e) {}
+    }
+
+    function soundConnect() { playBeep(660, 0.08, 'triangle', 0.2); }
+    function soundCorrect() {
+      playBeep(523, 0.1, 'triangle', 0.2);
+      setTimeout(() => playBeep(659, 0.1, 'triangle', 0.2), 100);
+      setTimeout(() => playBeep(784, 0.2, 'triangle', 0.2), 200);
+    }
+    function soundWrong() { playBeep(220, 0.25, 'sawtooth', 0.2); }
+    function soundTick() { playBeep(880, 0.04, 'square', 0.08); }
+
+    // =========================================================
+    // 🌟 大廳 Tab 切換與開房 / 加房 🌟
+    // =========================================================
+    $('tabCreate').onclick = () => switchLobbyTab('create');
+    $('tabJoin').onclick = () => switchLobbyTab('join');
+    $('tabAi').onclick = () => switchLobbyTab('ai');
+
+    function switchLobbyTab(tab) {
+      $('tabCreate').classList.toggle('active', tab === 'create');
+      $('tabJoin').classList.toggle('active', tab === 'join');
+      $('tabAi').classList.toggle('active', tab === 'ai');
+      $('panelCreate').hidden = tab !== 'create';
+      $('panelJoin').hidden = tab !== 'join';
+      $('panelAi').hidden = tab !== 'ai';
+    }
+
+    // 隨機生成 4 碼數字房號
+    function gen4DigitCode() {
+      return String(Math.floor(1000 + Math.random() * 9000));
+    }
+
+    // 隨機決定該題的軸向與出題半邊
+    function pickRandomRoundSetup() {
+      const isV = Math.random() < 0.5;
+      if (isV) {
+        return {
+          axis: 'V',
+          side: Math.random() < 0.5 ? 'left' : 'right'
+        };
+      } else {
+        return {
+          axis: 'H',
+          side: Math.random() < 0.5 ? 'top' : 'bottom'
+        };
+      }
+    }
+
+    // 建立房間 (P1)
+    $('btnDoCreate').onclick = async () => {
+      if (!rtdb) { alert('Firebase 資料庫未就緒，請檢查網路連線。'); return; }
+      const myName = ($('userName').value || '').trim() || '水手一號';
+      const code = gen4DigitCode();
+      const setup = pickRandomRoundSetup();
+
+      const initialRoom = {
+        code: code,
+        phase: 'lobby', // lobby, design, solve, roundResult, gameOver
+        round: 1,
+        maxRounds: 3,
+        axis: setup.axis,
+        side: setup.side,
+        designer: 'p1', // 第 1 題由 P1 出題
+        solver: 'p2',   // 第 1 題由 P2 答題
+        p1: { name: myName, score: 0, connected: true },
+        p2: null,
+        designSegs: [],
+        targetSegs: [],
+        designDone: false,
+        solveDone: false,
+        phaseStartTime: Date.now(),
+        phaseDuration: 90,
+        roundStats: [],
+        updatedAt: Date.now()
+      };
+
+      try {
+        const ref = rtdb.ref('symmetryBattle/rooms/' + code);
+        await ref.set(initialRoom);
+        gameState.isAi = false;
+        gameState.myRole = 'p1';
+        gameState.roomCode = code;
+        gameState.roomRef = ref;
+
+        $('waitRoomCode').textContent = code;
+        $('lobbyScreen').hidden = true;
+        $('waitScreen').hidden = false;
+
+        listenRoom(ref);
+      } catch(e) {
+        alert('建立房間失敗：' + e.message);
+      }
+    };
+
+    $('cancelWaitBtn').onclick = () => {
+      if (gameState.roomRef) {
+        gameState.roomRef.remove().catch(()=>{});
+        if (gameState.listener) gameState.roomRef.off('value', gameState.listener);
+      }
+      gameState.roomRef = null;
+      $('waitScreen').hidden = true;
+      $('lobbyScreen').hidden = false;
+    };
+
+    // 加入房間 (P2)
+    $('btnDoJoin').onclick = async () => {
+      if (!rtdb) { alert('Firebase 資料庫未就緒，請檢查網路連線。'); return; }
+      const code = ($('inRoomCode').value || '').trim();
+      if (!/^\d{4}$/.test(code)) {
+        alert('請輸入 4 位純數字房間代碼！');
+        return;
+      }
+      const myName = ($('userName').value || '').trim() || '水手二號';
+
+      try {
+        const ref = rtdb.ref('symmetryBattle/rooms/' + code);
+        const snap = await ref.once('value');
+        const room = snap.val();
+
+        if (!room) {
+          alert('找不到此房間，請確認 4 位房號代碼是否正確！');
+          return;
+        }
+        if (room.p2 && room.p2.name) {
+          alert('此房間已經客滿！');
+          return;
+        }
+
+        // 加入成功：切換 phase 為 design，正式開局！
+        await ref.update({
+          p2: { name: myName, score: 0, connected: true },
+          phase: 'design',
+          phaseStartTime: Date.now(),
+          phaseDuration: 90,
+          updatedAt: Date.now()
+        });
+
+        gameState.isAi = false;
+        gameState.myRole = 'p2';
+        gameState.roomCode = code;
+        gameState.roomRef = ref;
+
+        $('lobbyScreen').hidden = true;
+        listenRoom(ref);
+      } catch(e) {
+        alert('加入房間失敗：' + e.message);
+      }
+    };
+
+    // 單機 AI 對戰
+    $('btnDoAi').onclick = () => {
+      const myName = ($('userName').value || '').trim() || '挑戰水手';
+      const setup = pickRandomRoundSetup();
+
+      const aiRoom = {
+        code: 'AI88',
+        phase: 'design',
+        round: 1,
+        maxRounds: 3,
+        axis: setup.axis,
+        side: setup.side,
+        designer: 'p1', // 第 1 題由玩家出題
+        solver: 'p2',   // AI 答題
+        p1: { name: myName, score: 0 },
+        p2: { name: '海盜島 AI 船長', score: 0 },
+        designSegs: [],
+        targetSegs: [],
+        designDone: false,
+        solveDone: false,
+        phaseStartTime: Date.now(),
+        phaseDuration: 90,
+        roundStats: [],
+        updatedAt: Date.now()
+      };
+
+      gameState.isAi = true;
+      gameState.myRole = 'p1';
+      gameState.roomCode = 'AI88';
+      gameState.roomData = aiRoom;
+
+      $('lobbyScreen').hidden = true;
+      $('waitScreen').hidden = true;
+      $('battleScreen').hidden = false;
+      $('leaveRoomBtn').hidden = false;
+
+      renderBattleStage(aiRoom);
+    };
+
+    // 監聽房間資料變化 (WebSocket 即時響應)
+    function listenRoom(ref) {
+      if (gameState.listener) ref.off('value', gameState.listener);
+
+      gameState.listener = ref.on('value', snap => {
+        const room = snap.val();
+        if (!room) {
+          // 房間被解散
+          alert('房間已解散，返回大廳。');
+          exitToLobby();
+          return;
+        }
+
+        gameState.roomData = room;
+
+        // 若在大廳等待且 p2 加入，自動進入戰場
+        if (room.phase !== 'lobby' && $('waitScreen').hidden === false) {
+          $('waitScreen').hidden = true;
+        }
+
+        if (room.phase === 'gameOver') {
+          renderGameOverScreen(room);
+        } else if (room.phase !== 'lobby') {
+          $('battleScreen').hidden = false;
+          $('leaveRoomBtn').hidden = false;
+          renderBattleStage(room);
+        }
+      });
+    }
+
+    $('leaveRoomBtn').onclick = () => {
+      if (confirm('確定要離開當前決鬥房間嗎？')) {
+        exitToLobby();
+      }
+    };
+
+    function exitToLobby() {
+      clearInterval(gameState.timerInterval);
+      clearTimeout(gameState.roundNextTimeout);
+      if (gameState.roomRef) {
+        if (gameState.listener) gameState.roomRef.off('value', gameState.listener);
+        if (gameState.myRole === 'p1') gameState.roomRef.remove().catch(()=>{});
+      }
+      gameState.roomRef = null;
+      gameState.roomData = null;
+      $('roundModal').hidden = true;
+      $('battleScreen').hidden = true;
+      $('waitScreen').hidden = true;
+      $('gameOverScreen').hidden = true;
+      $('leaveRoomBtn').hidden = true;
+      $('lobbyScreen').hidden = false;
+    }
+
+    // =========================================================
+    // 🌟 對戰主舞台核心邏輯 🌟
+    // =========================================================
+    function renderBattleStage(room) {
+      // 1. 更新玩家 HUD
+      $('p1NameLabel').textContent = room.p1?.name || '水手 1';
+      $('p1ScoreVal').textContent = room.p1?.score || 0;
+      $('p2NameLabel').textContent = room.p2?.name || '水手 2';
+      $('p2ScoreVal').textContent = room.p2?.score || 0;
+      $('roundPill').textContent = `ROUND ${room.round} / ${room.maxRounds}`;
+
+      const isDesigner = (gameState.myRole === room.designer);
+      const isSolver = (gameState.myRole === room.solver);
+
+      // 標註當前行動者卡片高亮
+      $('p1Card').classList.toggle('active-turn', (room.phase === 'design' && room.designer === 'p1') || (room.phase === 'solve' && room.solver === 'p1'));
+      $('p2Card').classList.toggle('active-turn', (room.phase === 'design' && room.designer === 'p2') || (room.phase === 'solve' && room.solver === 'p2'));
+
+      // 2. 依階段處理視圖
+      if (room.phase === 'design') {
+        $('roundModal').hidden = true;
+        gameState.showingTimeoutSol = false;
+
+        const sideNameMap = { left: '左半邊', right: '右半邊', top: '上半邊', bottom: '下半邊' };
+        const sideName = sideNameMap[room.side] || '';
+
+        if (isDesigner) {
+          $('lockOverlay').hidden = true;
+          $('phaseTitle').textContent = `🎨 輪到你出題！（限定 ${sideName}）`;
+          $('phaseDesc').textContent = `請在虛線的 ${sideName} 自由連出幾何折線（至少 2 條線段），完成後送出。`;
+          $('bSubmitBtn').textContent = '完成設計，送出題目 🚀';
+          $('bSubmitBtn').disabled = false;
+          $('bUndoBtn').disabled = false;
+          $('bClearBtn').disabled = false;
+          bMessage(`你是指揮官！請在 ${sideName} 繪製折線考倒對手。`);
+        } else {
+          // 答題者此時看不到題目，顯示迷霧遮罩
+          $('lockOverlay').hidden = false;
+          $('phaseTitle').textContent = `⏳ 對手正在設計秘圖中...`;
+          $('phaseDesc').textContent = `出題者擁有 90 秒時間，請耐心等候迷霧散開。`;
+          $('bSubmitBtn').disabled = true;
+          $('bUndoBtn').disabled = true;
+          $('bClearBtn').disabled = true;
+          bMessage('海霧瀰漫中，對手正在密謀繪製線對稱殘卷...');
+        }
+
+        buildBattleSvg(room, 'design');
+        startStageTimer(room, 90, onDesignTimeout);
+
+      } else if (room.phase === 'solve') {
+        $('roundModal').hidden = true;
+        $('lockOverlay').hidden = true;
+
+        if (isSolver) {
+          $('phaseTitle').textContent = `⚔️ 破解秘圖！完成對稱圖形！`;
+          $('phaseDesc').textContent = `觀察題目線段，在對稱側依序連出對稱線段！花的時間越短分數越高！`;
+          $('bSubmitBtn').textContent = '完成作答，送出檢查 🔍';
+          $('bSubmitBtn').disabled = false;
+          $('bUndoBtn').disabled = false;
+          $('bClearBtn').disabled = false;
+          bMessage('計時開始！找出各頂點的對稱點並連線，越快送出分數越高！');
+        } else {
+          // 出題者觀戰中
+          $('phaseTitle').textContent = `👀 對手正在破解你的題目...`;
+          $('phaseDesc').textContent = `對手有 90 秒答題時間，越慢答對你越有優勢！`;
+          $('bSubmitBtn').textContent = '對手作答中... ⏳';
+          $('bSubmitBtn').disabled = true;
+          $('bUndoBtn').disabled = true;
+          $('bClearBtn').disabled = true;
+          bMessage('對手正聚精會神尋找對稱點，靜待勝負揭曉...');
+        }
+
+        buildBattleSvg(room, 'solve');
+        startStageTimer(room, 90, onSolveTimeout);
+
+      } else if (room.phase === 'roundResult') {
+        showRoundResultModal(room);
+      }
+    }
+
+    // 倒數計時器
+    function startStageTimer(room, durationSec, onTimeoutCallback) {
+      clearInterval(gameState.timerInterval);
+      const elapsed = Math.floor((Date.now() - (room.phaseStartTime || Date.now())) / 1000);
+      gameState.timeLeft = Math.max(0, durationSec - elapsed);
+      updateTimerDisplay();
+
+      gameState.timerInterval = setInterval(() => {
+        gameState.timeLeft--;
+        updateTimerDisplay();
+
+        if (gameState.timeLeft <= 10 && gameState.timeLeft > 0) {
+          soundTick();
+        }
+
+        if (gameState.timeLeft <= 0) {
+          clearInterval(gameState.timerInterval);
+          onTimeoutCallback();
+        }
+      }, 1000);
+    }
+
+    function updateTimerDisplay() {
+      const el = $('timerSec');
+      if (el) el.textContent = gameState.timeLeft;
+      const box = $('timerBox');
+      if (box) box.classList.toggle('urgent', gameState.timeLeft <= 15);
+    }
+
+    // =========================================================
+    // 🌟 SVG 畫布渲染與半邊互動 🌟
+    // =========================================================
+    function buildBattleSvg(room, mode) {
+      const svg = $('battleSvg');
+      svg.replaceChildren();
+
+      const { axis, side } = room;
+
+      // 1. 半邊高亮陰影 (標出允許出題或答題的半邊)
+      const allowedRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      allowedRect.setAttribute('class', 'allowed-half-rect');
+      if (axis === 'V') {
+        if (side === 'left') {
+          allowedRect.setAttribute('x', 14); allowedRect.setAttribute('y', 14);
+          allowedRect.setAttribute('width', toSvgX(3) - 14); allowedRect.setAttribute('height', 392);
+        } else {
+          allowedRect.setAttribute('x', toSvgX(3)); allowedRect.setAttribute('y', 14);
+          allowedRect.setAttribute('width', 392 - toSvgX(3) + 14); allowedRect.setAttribute('height', 392);
+        }
+      } else {
+        if (side === 'top') {
+          allowedRect.setAttribute('x', 14); allowedRect.setAttribute('y', 14);
+          allowedRect.setAttribute('width', 392); allowedRect.setAttribute('height', toSvgY(3) - 14);
+        } else {
+          allowedRect.setAttribute('x', 14); allowedRect.setAttribute('y', toSvgY(3));
+          allowedRect.setAttribute('width', 392); allowedRect.setAttribute('height', 392 - toSvgY(3) + 14);
+        }
+      }
+      svg.appendChild(allowedRect);
+
+      // 2. 底層細網格線
+      const gridG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      for (let i = 0; i < 7; i++) {
+        const hl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        hl.setAttribute('x1', toSvgX(0)); hl.setAttribute('y1', toSvgY(i));
+        hl.setAttribute('x2', toSvgX(6)); hl.setAttribute('y2', toSvgY(i));
+        hl.setAttribute('stroke', '#e2d5bd'); hl.setAttribute('stroke-width', '1'); hl.setAttribute('stroke-dasharray', '2 4');
+        gridG.appendChild(hl);
+
+        const vl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        vl.setAttribute('x1', toSvgX(i)); vl.setAttribute('y1', toSvgY(0));
+        vl.setAttribute('x2', toSvgX(i)); vl.setAttribute('y2', toSvgY(6));
+        vl.setAttribute('stroke', '#e2d5bd'); vl.setAttribute('stroke-width', '1'); vl.setAttribute('stroke-dasharray', '2 4');
+        gridG.appendChild(vl);
+      }
+      svg.appendChild(gridG);
+
+      // 3. 紅色虛線對稱軸
+      const axisLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      axisLine.setAttribute('class', 'axis-svg-line');
+      if (axis === 'V') {
+        axisLine.setAttribute('x1', toSvgX(3)); axisLine.setAttribute('y1', 12);
+        axisLine.setAttribute('x2', toSvgX(3)); axisLine.setAttribute('y2', 408);
+      } else {
+        axisLine.setAttribute('x1', 12); axisLine.setAttribute('y1', toSvgY(3));
+        axisLine.setAttribute('x2', 408); axisLine.setAttribute('y2', toSvgY(3));
+      }
+      svg.appendChild(axisLine);
+
+      // 4. 題目線段層 (在 solve 階段時顯示出題者的線段)
+      const givenG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      const givenPts = new Set();
+      if (mode === 'solve' && Array.isArray(room.designSegs)) {
+        room.designSegs.forEach(seg => {
+          const [p1, p2] = seg.split('_');
+          const [x1, y1] = p1.split(',').map(Number);
+          const [x2, y2] = p2.split(',').map(Number);
+          givenPts.add(p1); givenPts.add(p2);
+
+          const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          l.setAttribute('x1', toSvgX(x1)); l.setAttribute('y1', toSvgY(y1));
+          l.setAttribute('x2', toSvgX(x2)); l.setAttribute('y2', toSvgY(y2));
+          l.setAttribute('class', 'given-line');
+          givenG.appendChild(l);
+        });
+        for (const pt of givenPts) {
+          const [x, y] = pt.split(',').map(Number);
+          const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          c.setAttribute('cx', toSvgX(x)); c.setAttribute('cy', toSvgY(y)); c.setAttribute('r', '5');
+          c.setAttribute('class', 'given-vertex');
+          givenG.appendChild(c);
+        }
+      }
+      svg.appendChild(givenG);
+
+      // 5. 玩家連線層
+      const userG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      userG.setAttribute('id', 'bUserLinesG');
+      svg.appendChild(userG);
+
+      // 6. 逾時正解展示層 (Timeout Solution)
+      const solG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      solG.setAttribute('id', 'bSolLinesG');
+      svg.appendChild(solG);
+
+      // 7. 預覽拉線
+      const prevL = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      prevL.setAttribute('id', 'bPreviewLine');
+      prevL.setAttribute('class', 'preview-line');
+      prevL.setAttribute('hidden', '');
+      svg.appendChild(prevL);
+
+      // 8. 49 個格點與熱區
+      const dotsG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      for (let y = 0; y < 7; y++) {
+        for (let x = 0; x < 7; x++) {
+          const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          const pt = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          pt.setAttribute('cx', toSvgX(x)); pt.setAttribute('cy', toSvgY(y)); pt.setAttribute('r', '3.5');
+          pt.setAttribute('class', 'dot-point');
+          pt.setAttribute('id', `bDot_${x}_${y}`);
+
+          const hit = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          hit.setAttribute('cx', toSvgX(x)); hit.setAttribute('cy', toSvgY(y)); hit.setAttribute('r', '22');
+          hit.setAttribute('class', 'dot-hit');
+          hit.dataset.dot = `${x},${y}`;
+
+          g.appendChild(pt);
+          g.appendChild(hit);
+          dotsG.appendChild(g);
+        }
+      }
+      svg.appendChild(dotsG);
+
+      // 重設或渲染玩家本地線段
+      renderBattleUserLines();
+    }
+
+    function renderBattleUserLines() {
+      const userG = $('bUserLinesG');
+      if (!userG) return;
+      userG.replaceChildren();
+
+      const userPts = new Set();
+      gameState.localUserSegs.forEach(seg => {
+        const [p1, p2] = seg.split('_');
+        const [x1, y1] = p1.split(',').map(Number);
+        const [x2, y2] = p2.split(',').map(Number);
+        userPts.add(p1); userPts.add(p2);
+
+        const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        l.setAttribute('x1', toSvgX(x1)); l.setAttribute('y1', toSvgY(y1));
+        l.setAttribute('x2', toSvgX(x2)); l.setAttribute('y2', toSvgY(y2));
+        l.setAttribute('class', 'user-line');
+        l.dataset.seg = seg;
+        l.addEventListener('click', e => {
+          e.stopPropagation();
+          deleteBattleSegment(seg);
+        });
+        userG.appendChild(l);
+      });
+
+      for (const pt of userPts) {
+        const [x, y] = pt.split(',').map(Number);
+        const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        c.setAttribute('cx', toSvgX(x)); c.setAttribute('cy', toSvgY(y)); c.setAttribute('r', '5.5');
+        c.setAttribute('class', 'user-vertex');
+        userG.appendChild(c);
+      }
+
+      renderBattleActiveRing();
+    }
+
+    function renderBattleActiveRing() {
+      const old = $('bActRing');
+      if (old) old.remove();
+
+      if (gameState.activeDot) {
+        const [x, y] = gameState.activeDot.split(',').map(Number);
+        const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        ring.setAttribute('id', 'bActRing');
+        ring.setAttribute('cx', toSvgX(x)); ring.setAttribute('cy', toSvgY(y));
+        ring.setAttribute('class', 'dot-active-ring');
+        $('battleSvg').appendChild(ring);
+      }
+    }
+
+    // 逾時顯示標準完成正解
+    function renderTimeoutSolution(solSegs) {
+      const solG = $('bSolLinesG');
+      if (!solG) return;
+      solG.replaceChildren();
+
+      solSegs.forEach(seg => {
+        const [p1, p2] = seg.split('_');
+        const [x1, y1] = p1.split(',').map(Number);
+        const [x2, y2] = p2.split(',').map(Number);
+
+        const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        l.setAttribute('x1', toSvgX(x1)); l.setAttribute('y1', toSvgY(y1));
+        l.setAttribute('x2', toSvgX(x2)); l.setAttribute('y2', toSvgY(y2));
+        l.setAttribute('class', 'timeout-sol-line');
+        solG.appendChild(l);
+      });
+    }
+
+    // 連線新增或刪除
+    function toggleBattleSegment(p1, p2) {
+      if (p1 === p2) return;
+      const room = gameState.roomData;
+      if (!room) return;
+
+      const isDesigner = (gameState.myRole === room.designer);
+      const isSolver = (gameState.myRole === room.solver);
+
+      // 檢查半邊限制：
+      // 出題者只能在 room.side 連線
+      // 答題者只能在相反半邊連線
+      if (room.phase === 'design' && isDesigner) {
+        if (!isDotInAllowedSide(p1.split(',')[0], p1.split(',')[1], room.axis, room.side) ||
+            !isDotInAllowedSide(p2.split(',')[0], p2.split(',')[1], room.axis, room.side)) {
+          bMessage('⚠️ 只能在指定的半邊出題喔！請勿越界連線。');
+          playBeep(200, 0.15, 'sawtooth', 0.2);
+          return;
+        }
+      } else if (room.phase === 'solve' && isSolver) {
+        // 答題者對稱半邊
+        const oppSideMap = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' };
+        const oppSide = oppSideMap[room.side];
+        if (!isDotInAllowedSide(p1.split(',')[0], p1.split(',')[1], room.axis, oppSide) ||
+            !isDotInAllowedSide(p2.split(',')[0], p2.split(',')[1], room.axis, oppSide)) {
+          bMessage('⚠️ 請在對稱的另一半邊連線答題！');
+          playBeep(200, 0.15, 'sawtooth', 0.2);
+          return;
+        }
+      } else {
+        return;
+      }
+
+      const seg = normSeg(p1, p2);
+      gameState.localUndo.push(new Set(gameState.localUserSegs));
+
+      if (gameState.localUserSegs.has(seg)) {
+        gameState.localUserSegs.delete(seg);
+        bMessage(`已清除線段 (${p1}) 至 (${p2})。`);
+      } else {
+        gameState.localUserSegs.add(seg);
+        soundConnect();
+        bMessage(`已連線 (${p1}) 至 (${p2})！可接續點選下一個點。`);
+      }
+
+      renderBattleUserLines();
+    }
+
+    function deleteBattleSegment(seg) {
+      gameState.localUndo.push(new Set(gameState.localUserSegs));
+      gameState.localUserSegs.delete(seg);
+      renderBattleUserLines();
+      bMessage('已刪除該條線段。');
+    }
+
+    // 綁定 SVG 互動
+    (function bindBattleSvg() {
+      const svg = $('battleSvg');
+      if (!svg) return;
+
+      function getHitDot(e) {
+        return document.elementFromPoint(e.clientX, e.clientY)?.closest('.dot-hit')?.dataset.dot;
+      }
+      function getSvgPt(e) {
+        const rect = svg.getBoundingClientRect();
+        const scale = 420 / rect.width;
+        return { x: (e.clientX - rect.left) * scale, y: (e.clientY - rect.top) * scale };
+      }
+
+      svg.addEventListener('pointerdown', e => {
+        const room = gameState.roomData;
+        if (!room) return;
+        const isTurn = (room.phase === 'design' && gameState.myRole === room.designer) ||
+                       (room.phase === 'solve' && gameState.myRole === room.solver);
+        if (!isTurn || e.button > 0) return;
+
+        const hitDot = getHitDot(e);
+        if (!hitDot) return;
+
+        gameState.dragStart = { dot: hitDot, pointerId: e.pointerId };
+        svg.setPointerCapture(e.pointerId);
+
+        const prev = $('bPreviewLine');
+        if (prev) {
+          const [x, y] = hitDot.split(',').map(Number);
+          prev.setAttribute('x1', toSvgX(x)); prev.setAttribute('y1', toSvgY(y));
+          prev.setAttribute('x2', toSvgX(x)); prev.setAttribute('y2', toSvgY(y));
+          prev.removeAttribute('hidden');
+        }
+      });
+
+      svg.addEventListener('pointermove', e => {
+        if (!gameState.dragStart || gameState.dragStart.pointerId !== e.pointerId) return;
+        const prev = $('bPreviewLine');
+        if (prev) {
+          const pt = getSvgPt(e);
+          prev.setAttribute('x2', pt.x); prev.setAttribute('y2', pt.y);
+        }
+      });
+
+      function endDrag(e) {
+        if (!gameState.dragStart || gameState.dragStart.pointerId !== e.pointerId) return;
+        const startDot = gameState.dragStart.dot;
+        gameState.dragStart = null;
+
+        const prev = $('bPreviewLine');
+        if (prev) prev.setAttribute('hidden', '');
+
+        const endDot = getHitDot(e);
+        if (endDot && endDot !== startDot) {
+          toggleBattleSegment(startDot, endDot);
+          gameState.activeDot = endDot;
+          renderBattleActiveRing();
+        } else {
+          // 原地點擊
+          if (!gameState.activeDot) {
+            gameState.activeDot = startDot;
+            renderBattleActiveRing();
+            bMessage(`已選取起點 (${startDot})，請點選另一個點連線。`);
+          } else if (gameState.activeDot === startDot) {
+            gameState.activeDot = null;
+            renderBattleActiveRing();
+            bMessage('已取消起點。');
+          } else {
+            toggleBattleSegment(gameState.activeDot, startDot);
+            gameState.activeDot = startDot;
+            renderBattleActiveRing();
+          }
+        }
+      }
+
+      svg.addEventListener('pointerup', endDrag);
+      svg.addEventListener('pointercancel', endDrag);
+    })();
+
+    // 復原與清除
+    $('bUndoBtn').onclick = () => {
+      if (!gameState.localUndo.length) return;
+      gameState.localUserSegs = gameState.localUndo.pop();
+      gameState.activeDot = null;
+      renderBattleUserLines();
+      bMessage('已復原上一步。');
+    };
+
+    $('bClearBtn').onclick = () => {
+      if (!gameState.localUserSegs.size) return;
+      gameState.localUndo.push(new Set(gameState.localUserSegs));
+      gameState.localUserSegs.clear();
+      gameState.activeDot = null;
+      renderBattleUserLines();
+      bMessage('已全部清除。');
+    };
+
+    function bMessage(txt) {
+      const el = $('bMsg');
+      if (el) el.textContent = txt;
+    }
+
+    // =========================================================
+    // 🌟 提交出題 / 提交答題 🌟
+    // =========================================================
+    $('bSubmitBtn').onclick = () => {
+      const room = gameState.roomData;
+      if (!room) return;
+
+      if (room.phase === 'design' && gameState.myRole === room.designer) {
+        // 出題者提交
+        if (gameState.localUserSegs.size < 2) {
+          alert('請至少連出 2 條線段再送出題目！');
+          return;
+        }
+
+        const designArr = [...gameState.localUserSegs];
+        // 計算標準對稱目標線段
+        const targetArr = designArr.map(s => mirrorSeg(s, room.axis));
+
+        submitDesign(designArr, targetArr);
+
+      } else if (room.phase === 'solve' && gameState.myRole === room.solver) {
+        // 答題者提交檢查
+        submitSolveAttempt();
+      }
+    };
+
+    // 出題者送出題目
+    async function submitDesign(designArr, targetArr) {
+      const room = gameState.roomData;
+      gameState.localUserSegs.clear();
+      gameState.localUndo = [];
+      gameState.activeDot = null;
+
+      if (gameState.isAi) {
+        // 單機 AI 模式
+        room.phase = 'solve';
+        room.designSegs = designArr;
+        room.targetSegs = targetArr;
+        room.phaseStartTime = Date.now();
+        renderBattleStage(room);
+        // AI 答題模擬 (若當前 solver 是 AI)
+        simulateAiSolving(room);
+      } else {
+        // Firebase 雙人連線更新
+        try {
+          await gameState.roomRef.update({
+            phase: 'solve',
+            designSegs: designArr,
+            targetSegs: targetArr,
+            phaseStartTime: Date.now(),
+            updatedAt: Date.now()
+          });
+        } catch(e) {
+          alert('送出失敗：' + e.message);
+        }
+      }
+    }
+
+    // 答題者送出檢查
+    async function submitSolveAttempt() {
+      const room = gameState.roomData;
+      const targetSet = new Set(room.targetSegs || []);
+      const userSet = gameState.localUserSegs;
+
+      const wrong = [...userSet].filter(s => !targetSet.has(s));
+      const missing = [...targetSet].filter(s => !userSet.has(s));
+
+      if (wrong.length === 0 && missing.length === 0) {
+        // 恭喜完全正確！
+        clearInterval(gameState.timerInterval);
+        soundCorrect();
+
+        const timeUsed = 90 - gameState.timeLeft;
+        // 分數公式：10 + 剩餘秒數 (最高 100 分，越快分數越高)
+        const roundScore = Math.max(10, 10 + gameState.timeLeft);
+
+        finishRound(true, timeUsed, roundScore);
+      } else {
+        soundWrong();
+        bMessage(`⚠️ 還差一點喔！多連了 ${wrong.length} 條線，漏連了 ${missing.length} 條線。請繼續修正！`);
+      }
+    }
+
+    // 90 秒出題時間到
+    function onDesignTimeout() {
+      const room = gameState.roomData;
+      if (!room || room.phase !== 'design') return;
+
+      if (gameState.myRole === room.designer) {
+        // 若完全沒畫，系統自動備援出一組題
+        let designArr = [...gameState.localUserSegs];
+        if (designArr.length < 2) {
+          designArr = genFallbackDesign(room.axis, room.side);
+        }
+        const targetArr = designArr.map(s => mirrorSeg(s, room.axis));
+        alert('⏰ 出題 90 秒時間到！系統已為你送出題目。');
+        submitDesign(designArr, targetArr);
+      }
+    }
+
+    // 90 秒答題時間到
+    function onSolveTimeout() {
+      const room = gameState.roomData;
+      if (!room || room.phase !== 'solve') return;
+
+      // 逾時無法得分，系統自動跳出完成答案
+      renderTimeoutSolution(room.targetSegs || []);
+      soundWrong();
+      bMessage('⏰ 90 秒時間到！未能完成對稱圖形，本題獲得 0 分。正解以金色虛線顯示。');
+
+      if (gameState.myRole === room.solver || gameState.isAi) {
+        setTimeout(() => {
+          finishRound(false, 90, 0);
+        }, 3500);
+      }
+    }
+
+    // 自動備援題目生成 (避免出題者發呆)
+    function genFallbackDesign(axis, side) {
+      if (axis === 'V') {
+        return side === 'left'
+          ? [normSeg('3,1','1,3'), normSeg('1,3','3,5')]
+          : [normSeg('3,1','5,3'), normSeg('5,3','3,5')];
+      } else {
+        return side === 'top'
+          ? [normSeg('1,3','3,1'), normSeg('3,1','5,3')]
+          : [normSeg('1,3','3,5'), normSeg('3,5','5,3')];
+      }
+    }
+
+    // 完成本題結算
+    async function finishRound(success, timeUsed, earnedScore) {
+      const room = gameState.roomData;
+      const solverRole = room.solver;
+      const designerRole = room.designer;
+
+      // 更新得分
+      const newP1Score = (room.p1?.score || 0) + (solverRole === 'p1' ? earnedScore : 0);
+      const newP2Score = (room.p2?.score || 0) + (solverRole === 'p2' ? earnedScore : 0);
+
+      const roundStatItem = {
+        round: room.round,
+        designer: designerRole,
+        solver: solverRole,
+        solverName: room[solverRole]?.name || '',
+        success: success,
+        timeUsed: timeUsed,
+        score: earnedScore
+      };
+
+      const updatedStats = [...(room.roundStats || []), roundStatItem];
+
+      if (gameState.isAi) {
+        room.p1.score = newP1Score;
+        room.p2.score = newP2Score;
+        room.roundStats = updatedStats;
+        room.phase = 'roundResult';
+        renderBattleStage(room);
+      } else {
+        try {
+          await gameState.roomRef.update({
+            'p1/score': newP1Score,
+            'p2/score': newP2Score,
+            roundStats: updatedStats,
+            phase: 'roundResult',
+            updatedAt: Date.now()
+          });
+        } catch(e) {
+          console.error(e);
+        }
+      }
+    }
+
+    // 單題結算彈窗展示
+    function showRoundResultModal(room) {
+      const modal = $('roundModal');
+      const latestStat = room.roundStats?.[room.roundStats.length - 1];
+      if (!latestStat) return;
+
+      $('roundModalTitle').textContent = `⚔️ 第 ${latestStat.round} 題 結算`;
+
+      if (latestStat.success) {
+        $('roundModalBadge').textContent = '🎉 破解成功！';
+        $('roundModalMsg').innerHTML = `
+          水手 <strong>${latestStat.solverName}</strong> 僅耗時 <strong>${latestStat.timeUsed} 秒</strong> 即完美對稱！<br>
+          奪得高達 <strong>${latestStat.score} 分</strong>！
+        `;
+      } else {
+        $('roundModalBadge').textContent = '⏳ 時間耗盡！';
+        $('roundModalMsg').innerHTML = `
+          水手 <strong>${latestStat.solverName}</strong> 超過 90 秒未能完成圖形，獲得 0 分。<br>
+          下次要看準對稱軸更快出招喔！
+        `;
+      }
+
+      $('roundScoreDetail').innerHTML = `
+        當前總比分：<br>
+        👑 ${room.p1?.name}：${room.p1?.score || 0} 分 ｜ ⚔️ ${room.p2?.name}：${room.p2?.score || 0} 分
+      `;
+
+      modal.hidden = false;
+
+      // 5 秒自動跳往下一題或結束
+      let secCountdown = 5;
+      $('roundNextBtn').textContent = `進入下一題 ⛵ (${secCountdown}s)`;
+      clearInterval(gameState.roundNextTimeout);
+
+      gameState.roundNextTimeout = setInterval(() => {
+        secCountdown--;
+        $('roundNextBtn').textContent = `進入下一題 ⛵ (${secCountdown}s)`;
+
+        if (secCountdown <= 0) {
+          clearInterval(gameState.roundNextTimeout);
+          modal.hidden = true;
+          advanceNextRoundOrGameOver();
+        }
+      }, 1000);
+
+      $('roundNextBtn').onclick = () => {
+        clearInterval(gameState.roundNextTimeout);
+        modal.hidden = true;
+        advanceNextRoundOrGameOver();
+      };
+    }
+
+    // 前往下一題或進入終局結算
+    async function advanceNextRoundOrGameOver() {
+      const room = gameState.roomData;
+      if (!room) return;
+
+      // 只有房主或單機由本地推進
+      if (gameState.myRole !== 'p1' && !gameState.isAi) return;
+
+      if (room.round >= 3) {
+        // 3 題全滿，結束！
+        if (gameState.isAi) {
+          room.phase = 'gameOver';
+          renderGameOverScreen(room);
+        } else {
+          await gameState.roomRef.update({ phase: 'gameOver', updatedAt: Date.now() });
+        }
+      } else {
+        // 進入下一題：輪流出題！
+        const nextRound = room.round + 1;
+        // 輪替出題者與答題者
+        const nextDesigner = (room.designer === 'p1') ? 'p2' : 'p1';
+        const nextSolver = (nextDesigner === 'p1') ? 'p2' : 'p1';
+        const setup = pickRandomRoundSetup();
+
+        gameState.localUserSegs.clear();
+        gameState.localUndo = [];
+
+        if (gameState.isAi) {
+          room.round = nextRound;
+          room.axis = setup.axis;
+          room.side = setup.side;
+          room.designer = nextDesigner;
+          room.solver = nextSolver;
+          room.designSegs = [];
+          room.targetSegs = [];
+          room.phase = 'design';
+          room.phaseStartTime = Date.now();
+          renderBattleStage(room);
+
+          // 若輪到 AI 出題
+          if (nextDesigner === 'p2') {
+            simulateAiDesigning(room);
+          }
+        } else {
+          await gameState.roomRef.update({
+            round: nextRound,
+            axis: setup.axis,
+            side: setup.side,
+            designer: nextDesigner,
+            solver: nextSolver,
+            designSegs: [],
+            targetSegs: [],
+            phase: 'design',
+            phaseStartTime: Date.now(),
+            updatedAt: Date.now()
+          });
+        }
+      }
+    }
+
+    // =========================================================
+    // 🌟 AI 單機對戰模擬行為 (出題與答題) 🌟
+    // =========================================================
+    function simulateAiDesigning(room) {
+      setTimeout(() => {
+        if (room.phase !== 'design') return;
+        const aiSegs = genFallbackDesign(room.axis, room.side);
+        const targetArr = aiSegs.map(s => mirrorSeg(s, room.axis));
+        submitDesign(aiSegs, targetArr);
+      }, 4000);
+    }
+
+    function simulateAiSolving(room) {
+      // 模擬 AI 在 8~18 秒內答對
+      const solveSeconds = Math.floor(8 + Math.random() * 10);
+      setTimeout(() => {
+        if (room.phase !== 'solve') return;
+        const score = 10 + (90 - solveSeconds);
+        finishRound(true, solveSeconds, score);
+      }, solveSeconds * 1000);
+    }
+
+    // =========================================================
+    // 🌟 終局大結算 (Final Game Over) 🌟
+    // =========================================================
+    function renderGameOverScreen(room) {
+      $('roundModal').hidden = true;
+      $('battleScreen').hidden = true;
+      $('gameOverScreen').hidden = false;
+
+      const p1Score = room.p1?.score || 0;
+      const p2Score = room.p2?.score || 0;
+      const p1Name = room.p1?.name || '水手 1';
+      const p2Name = room.p2?.name || '水手 2';
+
+      $('finalP1Name').textContent = p1Name;
+      $('finalP1Score').textContent = p1Score;
+      $('finalP2Name').textContent = p2Name;
+      $('finalP2Score').textContent = p2Score;
+
+      if (p1Score > p2Score) {
+        $('winnerTrophy').textContent = '👑';
+        $('winnerHeading').textContent = `🏆 ${p1Name} 榮耀奪冠！`;
+        $('winnerSub').textContent = `以 ${p1Score} 分強大優勢奪得大西洋海盜王！`;
+      } else if (p2Score > p1Score) {
+        $('winnerTrophy').textContent = '👑';
+        $('winnerHeading').textContent = `🏆 ${p2Name} 榮耀奪冠！`;
+        $('winnerSub').textContent = `以 ${p2Score} 分強大優勢奪得大西洋海盜王！`;
+      } else {
+        $('winnerTrophy').textContent = '⚔️';
+        $('winnerHeading').textContent = '平分秋色 · 雙雄爭霸！';
+        $('winnerSub').textContent = `兩位水手均奪得 ${p1Score} 分，實力旗鼓相當！`;
+      }
+
+      // 明細表
+      const listEl = $('finalDetailsList');
+      listEl.replaceChildren();
+
+      (room.roundStats || []).forEach(st => {
+        const item = document.createElement('div');
+        item.className = 'round-detail-item';
+        item.innerHTML = `
+          <div>
+            <strong>第 ${st.round} 題</strong> · 出題：${st.designer === 'p1' ? p1Name : p2Name} ➔ 答題：<strong>${st.solverName}</strong>
+          </div>
+          <div style="font-weight:900;color:${st.success ? '#15803d' : '#b91c1c'};">
+            ${st.success ? `✓ 耗時 ${st.timeUsed}s (+${st.score}分)` : '✕ 逾時未完成 (0分)'}
+          </div>
+        `;
+        listEl.appendChild(item);
+      });
+    }
+
+    $('playAgainBtn').onclick = () => {
+      exitToLobby();
+    };
+  </script>
+</body>
+</html>
