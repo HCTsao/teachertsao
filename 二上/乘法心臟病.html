@@ -418,30 +418,19 @@
                 setTimeout(() => setSlapHands(prev => prev.filter(h => h.id !== id)), 750);
             };
 
-            // 跨平台（Windows / iOS / iPad / Android）高相容語音包智慧選取
-            const findBestVoice = () => {
-                if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
-                const voices = window.speechSynthesis.getVoices() || [];
-                if (!voices || voices.length === 0) return null;
-
-                // 優先匹配臺灣國語（iOS: Mei-Jia, Windows: Hanhan/Yating, Android: cmn-tw / Taiwan）
-                const twVoice = voices.find(v => {
-                    const l = (v.lang || '').toLowerCase().replace('_', '-');
-                    const n = (v.name || '').toLowerCase();
-                    return (l === 'zh-tw' || l === 'cmn-tw' || l === 'zh-hant-tw') && 
-                           (n.includes('mei-jia') || n.includes('hanhan') || n.includes('yating') || n.includes('taiwan') || n.includes('國語') || n.includes('臺灣') || n.includes('台灣'));
-                }) || voices.find(v => {
-                    const l = (v.lang || '').toLowerCase().replace('_', '-');
-                    return l === 'zh-tw' || l === 'cmn-tw' || l === 'zh-hant-tw';
-                }) || voices.find(v => {
-                    const n = (v.name || '').toLowerCase();
-                    return n.includes('taiwan') || n.includes('台灣') || n.includes('臺灣') || n.includes('mei-jia');
-                }) || voices.find(v => {
-                    const l = (v.lang || '').toLowerCase().replace('_', '-');
-                    return l.startsWith('zh') || l.startsWith('cmn');
-                });
-
-                return twVoice || null;
+            // 預載 Google TTS 自然語音串流 (提早於瀏覽器快取，實現零延遲流暢朗讀)
+            const preloadChants = (m) => {
+                if (!m) return;
+                try {
+                    for (let s = 1; s <= 9; s++) {
+                        const t = getChantText(m, s, m * s);
+                        const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=zh-TW&client=tw-ob&q=${encodeURIComponent(t)}`;
+                        const a = new Audio();
+                        a.referrerPolicy = "no-referrer";
+                        a.preload = "auto";
+                        a.src = url;
+                    }
+                } catch(e) {}
             };
 
             const initAudio = () => {
@@ -457,91 +446,47 @@
                         source.start(0);
                     }
 
-                    // 2. 解鎖專門用於手機與平板（iOS Safari / Android Chrome）的 Audio 播放器
-                    if (chantAudioRef.current) {
-                        chantAudioRef.current.play().then(() => {
-                            chantAudioRef.current.pause();
-                        }).catch(() => {});
-                    }
-
-                    // 3. Web Speech API 解鎖（在使用者手勢中觸發一次空白語音以喚醒 iOS/Android/Windows 語音核心）
-                    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-                        window.speechSynthesis.resume();
-                        window.speechSynthesis.getVoices();
-                        try {
-                            const dummy = new SpeechSynthesisUtterance('');
-                            window.speechSynthesis.speak(dummy);
-                        } catch(e) {}
+                    // 2. 解鎖並預熱專用 Audio 播放器 (iOS/iPadOS/Android/PC 全平臺統一使用 Google TTS 自然語音)
+                    if (chantAudioRef.current && !chantAudioRef.current.dataset.unlocked) {
+                        chantAudioRef.current.dataset.unlocked = "true";
+                        chantAudioRef.current.volume = 0.01;
+                        const p = chantAudioRef.current.play();
+                        if (p !== undefined) {
+                            p.then(() => {
+                                chantAudioRef.current.pause();
+                                chantAudioRef.current.currentTime = 0;
+                                chantAudioRef.current.volume = 1.0;
+                            }).catch(() => {});
+                        }
                     }
                 } catch(e) {}
             };
 
-            const playSpeechSynthesisFallback = (text) => {
-                if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-                try {
-                    window.speechSynthesis.resume();
-
-                    const u = new SpeechSynthesisUtterance(text);
-                    u.lang = 'zh-TW';
-                    u.rate = 1.0;
-                    u.pitch = 1.0;
-
-                    const voice = findBestVoice();
-                    if (voice) {
-                        u.voice = voice;
-                    }
-
-                    window._activeUtterance = u;
-                    u.onend = () => { window._activeUtterance = null; };
-                    u.onerror = (e) => {
-                        console.warn("SpeechSynthesis error:", e);
-                        window._activeUtterance = null;
-                    };
-
-                    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
-                        window.speechSynthesis.cancel();
-                    }
-                    window.speechSynthesis.speak(u);
-                } catch(e) {
-                    console.error("SpeechSynthesis error:", e);
-                }
-            };
-
-            // 全平台（電腦、手機、平板）雙引擎高相容語音報讀函式
+            // 全平台（電腦、手機、平板）統一使用高品質 Google TTS 自然國語串流 (不再使用生硬本機機械音)
             const playChantVoice = (text) => {
                 if (isMuted) return;
 
-                // 檢測是否為行動裝置或平板 (iPad, iPhone, Android, iPadOS 等)
-                const isMobileDevice = typeof navigator !== 'undefined' && (
-                    /iPad|iPhone|iPod|Android/i.test(navigator.userAgent) ||
-                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-                );
-
-                // 行動端（手機與平板）優先使用預先在使用者手勢中解鎖的標準音訊串流，徹底突破 iOS/iPadOS 對定時器 TTS 的限制
-                if (isMobileDevice && chantAudioRef.current) {
+                if (chantAudioRef.current) {
                     try {
+                        const audio = chantAudioRef.current;
                         const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=zh-TW&client=tw-ob&q=${encodeURIComponent(text)}`;
-                        chantAudioRef.current.src = url;
-                        const p = chantAudioRef.current.play();
+                        audio.pause();
+                        audio.src = url;
+                        audio.currentTime = 0;
+                        audio.load();
+                        const p = audio.play();
                         if (p !== undefined) {
                             p.catch((err) => {
-                                console.warn("Mobile audio play failed, falling back to SpeechSynthesis:", err);
-                                playSpeechSynthesisFallback(text);
+                                console.warn("Chant audio wait for canplay:", err);
+                                const onCanPlay = () => {
+                                    audio.removeEventListener('canplay', onCanPlay);
+                                    audio.play().catch(() => {});
+                                };
+                                audio.addEventListener('canplay', onCanPlay);
                             });
                         }
-                        return;
                     } catch(e) {
-                        console.warn("Mobile audio element exception:", e);
-                    }
-                }
-
-                // 電腦端直接使用本機 SpeechSynthesis，若異常則回退至 Audio 串流
-                try {
-                    playSpeechSynthesisFallback(text);
-                } catch(e) {
-                    if (chantAudioRef.current) {
-                        chantAudioRef.current.src = `https://translate.google.com/translate_tts?ie=UTF-8&tl=zh-TW&client=tw-ob&q=${encodeURIComponent(text)}`;
-                        chantAudioRef.current.play().catch(() => {});
+                        console.warn("Chant audio element exception:", e);
                     }
                 }
             };
@@ -1123,6 +1068,9 @@
             // 發牌循環效果 (平均分給 2 人各 27 張，或 3 人各 18 張)
             useEffect(() => {
                 if (gameState === 'dealing') {
+                    if (dealingProgress === 0) {
+                        preloadChants(multiplierRef.current);
+                    }
                     if (dealingProgress < 54 && mainDeck.length > 0) {
                         const timer = setTimeout(() => {
                             playSoundEffect('deal');
@@ -1141,16 +1089,16 @@
                         const firstPlayer = playersRef.current[turnRef.current];
                         const firstName = firstPlayer?.name || "玩家";
                         setStartPrompt(`由 ${firstName} 先出牌！`);
-                        setTimeout(() => setStartPrompt("3"), 800);
-                        setTimeout(() => setStartPrompt("2"), 1500);
-                        setTimeout(() => setStartPrompt("1"), 2200);
+                        setTimeout(() => setStartPrompt("3"), 1000);
+                        setTimeout(() => setStartPrompt("2"), 1700);
+                        setTimeout(() => setStartPrompt("1"), 2400);
                         setTimeout(() => {
                             setStartPrompt("開始！");
                             setTimeout(() => {
                                 setGameState('playing');
                                 setStartPrompt("");
-                            }, 500);
-                        }, 2900);
+                            }, 600);
+                        }, 3100);
                     }
                 }
             }, [gameState, dealingProgress, mainDeck, players, playerCount]);
@@ -1374,6 +1322,7 @@
             const executeSlapAction = (playerIndex) => {
                 if (punishingCardRef.current || isPenaltyCoolingRef.current) return;
                 if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+                if (chantAudioRef.current) { chantAudioRef.current.pause(); }
                 const curPile = centerPileRef.current;
                 const curCardVal = flyingCard ? flyingCard.value : (curPile.length > 0 ? curPile[curPile.length - 1].value : (flippedCardRef.current ? flippedCardRef.current.value : null));
                 if (curCardVal === null) return;
@@ -2067,14 +2016,21 @@
                     </div>
                 )}
 
-                {/* 開局倒數 3, 2, 1 */}
+                {/* 開局出牌順序提示與倒數 (原地柔和閃爍，不放大向外飛出) */}
                 {gameState === 'starting' && (
-                            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm pointer-events-none">
-                                <h2 className="text-9xl font-black text-yellow-400 animate-ping">
-                                    {startPrompt}
-                                </h2>
+                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm pointer-events-none">
+                        {startPrompt.includes("先出牌") ? (
+                            <div className="bg-slate-900/90 border-4 border-amber-400 text-amber-300 px-8 py-5 rounded-3xl text-3xl sm:text-4xl md:text-5xl font-black shadow-2xl animate-pulse text-center flex items-center gap-3">
+                                <span>🎯</span>
+                                <span>{startPrompt}</span>
                             </div>
+                        ) : (
+                            <h2 className="text-8xl md:text-9xl font-black text-yellow-400 animate-pulse drop-shadow-2xl">
+                                {startPrompt}
+                            </h2>
                         )}
+                    </div>
+                )}
 
                         {/* 遊戲結束勝利畫面 */}
                         {gameState === 'gameOver' && winner && (
@@ -2123,7 +2079,7 @@
                         <audio 
                             ref={chantAudioRef} 
                             referrerPolicy="no-referrer"
-                            src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA" 
+                            src="https://translate.google.com/translate_tts?ie=UTF-8&tl=zh-TW&client=tw-ob&q=%E4%BA%8C" 
                             playsInline 
                             preload="auto" 
                             className="hidden" 
