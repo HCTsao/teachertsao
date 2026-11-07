@@ -163,6 +163,7 @@
 
     input[type="date"],
     input[type="text"],
+    input[type="password"],
     select {
       font-size: 1.05rem;
       font-family: inherit;
@@ -175,8 +176,15 @@
       transition: all 0.2s;
     }
 
+    /* 密碼輸入框強制使用圓形黑點屏蔽 */
+    input[type="password"] {
+      -webkit-text-security: disc !important;
+      letter-spacing: 5px;
+    }
+
     input[type="date"]:focus,
     input[type="text"]:focus,
+    input[type="password"]:focus,
     select:focus {
       outline: none;
       border-color: var(--color-accent) !important;
@@ -376,7 +384,45 @@
   </style>
 </head>
 <body>
-  <div class="dashboard-container">
+  <!-- 🔒 進入後台密碼驗證遮罩 (黑點屏蔽) 🔒 -->
+  <div id="login-overlay" style="position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(5px); display: none; justify-content: center; align-items: center; z-index: 9999;">
+    <div style="background: #ffffff; border-radius: 20px; padding: 36px 30px; max-width: 440px; width: 90%; text-align: center; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);">
+      <h2 style="font-size: 1.8rem; font-weight: 900; color: var(--color-primary); margin-bottom: 10px;">👨‍🏫 教師管理登入</h2>
+      <p style="color: var(--color-text-muted); font-size: 1.05rem; margin-bottom: 22px;">請輸入教師管理密碼以查閱學生作答紀錄：</p>
+      <form id="teacher-login-form" onsubmit="handleTeacherLogin(event)">
+        <div style="margin-bottom: 16px;">
+          <input type="password" id="teacher-login-pwd" placeholder="請輸入密碼" autocomplete="current-password" required
+                 style="-webkit-text-security: disc; font-size: 1.4rem; letter-spacing: 6px; text-align: center; width: 100%; max-width: 300px; padding: 12px 18px; border-radius: 12px; border: 2px solid var(--color-border); font-family: inherit;">
+          <p id="teacher-login-error" style="color: var(--color-danger); font-size: 1rem; font-weight: 800; margin-top: 8px; min-height: 24px;"></p>
+        </div>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+          <a href="鵲橋相會：配對法找因數.html" class="btn" style="background: #e2e8f0; color: #334155; text-decoration: none;">🎮 回遊戲</a>
+          <button type="submit" class="btn btn-success" style="padding: 12px 28px;">進入後台 ➔</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 🔒 管理者安全確認彈窗 (黑點屏蔽) 🔒 -->
+  <div id="admin-modal" style="position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); display: none; justify-content: center; align-items: center; z-index: 10000;">
+    <div style="background: #ffffff; border-radius: 20px; padding: 32px 28px; max-width: 440px; width: 90%; text-align: center; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);">
+      <h3 id="admin-modal-title" style="font-size: 1.6rem; font-weight: 900; color: var(--color-danger); margin-bottom: 10px;">⚠️ 管理者安全驗證</h3>
+      <p id="admin-modal-desc" style="color: var(--color-text-main); font-size: 1.05rem; margin-bottom: 20px;">請輸入管理者密碼確認此項敏感操作：</p>
+      <form id="admin-modal-form" onsubmit="handleAdminModalSubmit(event)">
+        <div style="margin-bottom: 16px;">
+          <input type="password" id="admin-modal-pwd" placeholder="請輸入管理者密碼" autocomplete="off" required
+                 style="-webkit-text-security: disc; font-size: 1.4rem; letter-spacing: 6px; text-align: center; width: 100%; padding: 12px 18px; border-radius: 12px; border: 2px solid var(--color-border); font-family: inherit;">
+          <p id="admin-modal-error" style="color: var(--color-danger); font-size: 1rem; font-weight: 800; margin-top: 8px; min-height: 24px;"></p>
+        </div>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+          <button type="button" class="btn" style="background: #e2e8f0; color: #334155;" onclick="closeAdminModal()">取消</button>
+          <button type="submit" class="btn btn-danger" id="admin-modal-confirm-btn">確認執行</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="dashboard-container" id="main-content" style="display: none;">
     <!-- Top Left Nav -->
     <div class="top-left-nav">
       <a href="鵲橋相會：配對法找因數.html">🎮 回到遊戲</a>
@@ -506,9 +552,9 @@
 
   <script>
     // ==========================================
-    // 進入教師後台密碼驗證 (8888)
+    // 進入教師後台密碼驗證 (以黑點屏蔽輸入框驗證)
     // ==========================================
-    function verifyTeacherAccess() {
+    function checkTeacherAccess() {
       const urlParams = new URLSearchParams(window.location.search);
       const isParamAuthed = urlParams.get('auth') === '8888';
       let isSessionAuthed = false;
@@ -523,26 +569,45 @@
         if (isParamAuthed) {
           window.history.replaceState({}, document.title, window.location.pathname);
         }
-        return true;
+        unlockDashboard();
+        return;
       }
 
-      const inputPwd = prompt("🔒 請輸入教師後台密碼：");
-      if (inputPwd === "8888") {
-        try {
-          sessionStorage.setItem('gcd_teacher_authed', 'true');
-        } catch (e) {}
-        return true;
-      } else {
-        if (inputPwd !== null) {
-          alert("❌ 密碼錯誤，無法進入教師後台！");
-        }
-        window.location.href = "鵲橋相會：配對法找因數.html";
-        return false;
+      // 未驗證時顯示黑點屏蔽登入彈窗
+      const overlay = document.getElementById('login-overlay');
+      if (overlay) {
+        overlay.style.display = 'flex';
+        setTimeout(() => {
+          document.getElementById('teacher-login-pwd')?.focus();
+        }, 150);
       }
     }
 
-    if (!verifyTeacherAccess()) {
-      throw new Error("Teacher authentication failed");
+    function handleTeacherLogin(e) {
+      e.preventDefault();
+      const pwdInput = document.getElementById('teacher-login-pwd');
+      const errEl = document.getElementById('teacher-login-error');
+      if (pwdInput.value.trim() === '8888') {
+        try {
+          sessionStorage.setItem('gcd_teacher_authed', 'true');
+        } catch (err) {}
+        document.getElementById('login-overlay').style.display = 'none';
+        unlockDashboard();
+      } else {
+        errEl.innerText = '❌ 密碼錯誤，請重新輸入！';
+        pwdInput.value = '';
+        pwdInput.focus();
+      }
+    }
+
+    let isAppInitialized = false;
+    function unlockDashboard() {
+      document.getElementById('login-overlay').style.display = 'none';
+      document.getElementById('main-content').style.display = 'block';
+      if (!isAppInitialized) {
+        isAppInitialized = true;
+        initDataLoad();
+      }
     }
 
     // ==========================================
@@ -646,7 +711,6 @@
       rawMistakes.forEach(m => {
         let key = m.id || (m.timestamp + '_' + (m.studentName || '') + '_' + (m.base || ''));
         if (!map.has(key)) {
-          // 檢查是否有同 timestamp 的已存在
           let exists = rawRecords.some(r => Math.abs((r.timestamp || 0) - (m.timestamp || 0)) < 1000 && r.studentName === m.studentName);
           if (!exists) {
             map.set(key, m);
@@ -741,7 +805,6 @@
       let studentNums = extractNumbers(userInputVal);
       let correctNums = extractNumbers(expectedVal);
 
-      // 若完全無數字輸入
       if (studentNums.length === 0) {
         let studentText = userInputVal ? String(userInputVal) : '未填 / 超時';
         let studentHtml = `<span style="color: var(--color-danger); font-weight: bold;">${studentText}</span>`;
@@ -751,7 +814,6 @@
         return { studentHtml, correctHtml };
       }
 
-      // 若正解無法提取數字，退回純文字
       if (correctNums.length === 0) {
         return {
           studentHtml: String(userInputVal || '-'),
@@ -875,7 +937,6 @@
     }
 
     function updateStatisticsDisplay(list) {
-      // 1. 累計人數 (以班級+座號/姓名去重)
       let studentSet = new Set();
       list.forEach(item => {
         let info = getStudentInfo(item);
@@ -883,10 +944,8 @@
       });
       document.getElementById('stats-total-players').innerText = studentSet.size;
 
-      // 2. 總題數
       document.getElementById('stats-total-attempts').innerText = list.length;
 
-      // 3. 錯題數與答對率
       let correctCount = list.filter(item => item.isCorrect === true || item.isCorrect === 'true').length;
       let wrongCount = list.length - correctCount;
       document.getElementById('stats-total-wrong').innerText = wrongCount;
@@ -894,7 +953,6 @@
       let acc = list.length > 0 ? Math.round((correctCount / list.length) * 100) : 0;
       document.getElementById('stats-avg-accuracy').innerText = acc + '%';
 
-      // 4. 高頻出錯數字
       let wrongList = list.filter(item => !(item.isCorrect === true || item.isCorrect === 'true'));
       let freq = {};
       wrongList.forEach(m => {
@@ -913,57 +971,89 @@
       document.getElementById('stats-most-failed-base').innerText = maxBase !== '-' ? `${maxBase} (${maxCount}次)` : '-';
     }
 
+    // ==========================================
+    // 管理者操作彈窗邏輯 (黑點屏蔽輸入)
+    // ==========================================
+    let currentAdminAction = null;
+
+    function openAdminModal(options) {
+      currentAdminAction = options.onConfirm;
+      document.getElementById('admin-modal-title').innerText = options.title || '⚠️ 管理者安全驗證';
+      document.getElementById('admin-modal-desc').innerText = options.desc || '請輸入管理者密碼確認操作：';
+      document.getElementById('admin-modal-confirm-btn').innerText = options.btnText || '確認執行';
+      const pwdInput = document.getElementById('admin-modal-pwd');
+      pwdInput.value = '';
+      document.getElementById('admin-modal-error').innerText = '';
+      document.getElementById('admin-modal').style.display = 'flex';
+      setTimeout(() => pwdInput.focus(), 150);
+    }
+
+    function closeAdminModal() {
+      document.getElementById('admin-modal').style.display = 'none';
+      document.getElementById('admin-modal-pwd').value = '';
+      currentAdminAction = null;
+    }
+
+    function handleAdminModalSubmit(e) {
+      e.preventDefault();
+      const pwd = document.getElementById('admin-modal-pwd').value.trim();
+      const errEl = document.getElementById('admin-modal-error');
+
+      if (pwd === '0987912307') {
+        const action = currentAdminAction;
+        closeAdminModal();
+        if (action) action();
+      } else {
+        errEl.innerText = '❌ 管理者密碼錯誤，請重新輸入！';
+        document.getElementById('admin-modal-pwd').value = '';
+        document.getElementById('admin-modal-pwd').focus();
+      }
+    }
+
     // --- 單筆刪除 ---
     function deleteSingleRecord(id, node) {
       if (!id) return;
       const target = combinedRecords.find(r => r.id === id);
       const studentName = target ? (getStudentInfo(target).nameStr || '該學生') : '該學生';
 
-      const pwd = prompt(`⚠️ 準備刪除「${studentName}」的這筆作答紀錄。\n請輸入管理者密碼確認刪除：`);
-      if (pwd === null) return;
-      if (pwd !== "0987912307") {
-        alert("❌ 管理者密碼錯誤，無法刪除！");
-        return;
-      }
+      openAdminModal({
+        title: '🗑️ 刪除紀錄確認',
+        desc: `準備刪除「${studentName}」的這筆作答紀錄。請輸入管理者密碼確認：`,
+        btnText: '確認刪除',
+        onConfirm: () => {
+          if (isFirebaseActive) {
+            let path = (node === 'mistakes') ? ('GCD/mistakes/' + id) : ('GCD/records/' + id);
+            database.ref(path).remove()
+              .then(() => {
+                if (node === 'records') {
+                  database.ref('GCD/mistakes/' + id).remove().catch(() => {});
+                }
+              })
+              .catch(err => {
+                alert("❌ 刪除失敗：" + err.message);
+              });
+          } else {
+            let localRec = JSON.parse(localStorage.getItem('GCD_records') || '[]');
+            let localMis = JSON.parse(localStorage.getItem('GCD_mistakes') || '[]');
 
-      if (isFirebaseActive) {
-        let path = (node === 'mistakes') ? ('GCD/mistakes/' + id) : ('GCD/records/' + id);
-        database.ref(path).remove()
-          .then(() => {
-            // 同步清理另一個節點若有對應 id
-            if (node === 'records') {
-              database.ref('GCD/mistakes/' + id).remove().catch(() => {});
-            }
-          })
-          .catch(err => {
-            alert("❌ 刪除失敗：" + err.message);
-          });
-      } else {
-        let localRec = JSON.parse(localStorage.getItem('GCD_records') || '[]');
-        let localMis = JSON.parse(localStorage.getItem('GCD_mistakes') || '[]');
+            localRec = localRec.filter(r => r.id !== id);
+            localMis = localMis.filter(m => m.id !== id);
 
-        localRec = localRec.filter(r => r.id !== id);
-        localMis = localMis.filter(m => m.id !== id);
-
-        localStorage.setItem('GCD_records', JSON.stringify(localRec));
-        localStorage.setItem('GCD_mistakes', JSON.stringify(localMis));
-        loadLocalData();
-      }
+            localStorage.setItem('GCD_records', JSON.stringify(localRec));
+            localStorage.setItem('GCD_mistakes', JSON.stringify(localMis));
+            loadLocalData();
+          }
+        }
+      });
     }
 
     // --- 清除全班紀錄 ---
     document.getElementById('btn-clear-db').addEventListener('click', () => {
-      let pwd = prompt("🔒 請輸入管理者密碼以清除所有數據：");
-      if (pwd === null) return;
-      if (pwd !== "0987912307") {
-        alert("❌ 管理者密碼錯誤，拒絕清除數據！");
-        return;
-      }
-
-      let conf1 = confirm("⚠️ 警告：您即將清空所有的學生作答紀錄！此操作無法復原，是否繼續？");
-      if (conf1) {
-        let conf2 = confirm("🔒 請再次確認：是否確定清空 GCD 資料庫節點下的所有作答紀錄？");
-        if (conf2) {
+      openAdminModal({
+        title: '🧹 清除所有紀錄確認',
+        desc: '⚠️ 警告：您即將清空所有的學生作答紀錄！請輸入管理者密碼確認：',
+        btnText: '確定全部清空',
+        onConfirm: () => {
           if (isFirebaseActive) {
             Promise.all([
               database.ref('GCD/records').remove(),
@@ -980,12 +1070,11 @@
             loadLocalData();
           }
         }
-      }
+      });
     });
 
     // --- 匯出 Excel (SheetJS) ---
     function exportToExcel() {
-      // 提取目前篩選後的資料
       const tbody = document.getElementById('records-table-body');
       const rows = tbody.querySelectorAll('tr');
       if (rows.length === 0 || rows[0].querySelector('td[colspan]')) {
@@ -1057,7 +1146,7 @@
       }
     });
 
-    initDataLoad();
+    checkTeacherAccess();
   </script>
 </body>
 </html>

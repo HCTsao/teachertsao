@@ -1003,7 +1003,7 @@
         </div>
 
         <button class="btn-primary" id="btn-start-game">啟動鵲橋大冒險 🌠</button>
-        <button class="btn-primary" id="btn-open-leaderboard-menu" type="button" style="margin-top: 10px; background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4); border: none; cursor: pointer;">🏆 查看全班英雄榜 🏆</button>
+        <button class="btn-primary" id="btn-open-leaderboard-menu" type="button" style="margin-top: 10px; background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4); border: none; cursor: pointer;">🏆 英雄榜</button>
         <div style="margin-top: 15px; text-align: center;">
           <a href="javascript:void(0)" id="btn-open-teacher-admin" style="color: #94a3b8; text-decoration: none; font-size: 0.9rem; font-weight: bold; opacity: 0.8; transition: opacity 0.2s; cursor: pointer;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">⚙️ 教師管理後台</a>
         </div>
@@ -1031,6 +1031,25 @@
         <div style="display: flex; justify-content: center; gap: 15px; width: 100%;">
           <button class="btn-primary" id="btn-submit-cf-overlay" style="padding: 10px 30px; font-size: 1.1rem;">確認公因數 ➔</button>
         </div>
+      </div>
+    </div>
+
+    <!-- 🔒 教師後台密碼驗證彈窗 (黑點屏蔽) 🔒 -->
+    <div class="overlay" id="teacher-auth-overlay" style="z-index: 100;">
+      <div class="modal-card" style="max-width: 420px; width: 90%; text-align: center; padding: 30px 24px;">
+        <h3 style="color: #ffd043; font-size: 1.5rem; margin-bottom: 8px;">🔒 教師管理後台驗證</h3>
+        <p style="color: #cbd5e1; font-size: 0.95rem; margin-bottom: 18px;">請輸入教師管理密碼以開啟後台：</p>
+        <form id="teacher-auth-form" onsubmit="handleTeacherAuthSubmit(event)">
+          <div style="margin-bottom: 14px;">
+            <input type="password" id="teacher-auth-pwd" placeholder="請輸入密碼" autocomplete="current-password" required
+                   style="-webkit-text-security: disc; font-size: 1.3rem; letter-spacing: 5px; text-align: center; width: 100%; padding: 12px 16px; border-radius: 12px; border: 2px solid #475569; background: #0f172a; color: #fff; font-family: var(--font-body); font-weight: bold; outline: none; transition: border-color 0.2s;">
+            <p id="teacher-auth-error" style="color: #ef4444; font-size: 0.95rem; font-weight: bold; margin-top: 8px; min-height: 22px;"></p>
+          </div>
+          <div style="display: flex; gap: 12px; justify-content: center;">
+            <button type="button" id="btn-cancel-teacher-auth" class="btn-primary" style="background: #475569; border-color: #64748b; padding: 10px 22px; font-size: 1rem; cursor: pointer;">取消</button>
+            <button type="submit" class="btn-primary" style="padding: 10px 26px; font-size: 1rem; cursor: pointer;">進入後台 ➔</button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -2590,7 +2609,7 @@
           <li>載入中...</li>
         </ol>
         <div style="text-align: center; margin-top: 10px;">
-          <button type="button" id="btn-show-full-lb-clear" style="background: rgba(245, 158, 11, 0.25); border: 1px solid #f59e0b; color: #ffd043; padding: 6px 14px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 0.85rem;">🏆 查看完整全班英雄榜 ➔</button>
+          <button type="button" id="btn-show-full-lb-clear" style="background: rgba(245, 158, 11, 0.25); border: 1px solid #f59e0b; color: #ffd043; padding: 6px 14px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 0.85rem;">🏆 英雄榜 ➔</button>
         </div>
       </div>`;
       
@@ -2927,19 +2946,50 @@
     }
 
     const btnOpenTeacherAdmin = document.getElementById('btn-open-teacher-admin');
+    const teacherAuthOverlay = document.getElementById('teacher-auth-overlay');
+    const teacherAuthPwd = document.getElementById('teacher-auth-pwd');
+    const teacherAuthError = document.getElementById('teacher-auth-error');
+    const btnCancelTeacherAuth = document.getElementById('btn-cancel-teacher-auth');
+
     if (btnOpenTeacherAdmin) {
       btnOpenTeacherAdmin.addEventListener('click', (e) => {
         e.preventDefault();
-        const pwd = prompt("🔒 請輸入教師後台密碼以開啟管理後台：");
-        if (pwd === null) return;
-        if (pwd === "8888") {
-          try { sessionStorage.setItem('gcd_teacher_authed', 'true'); } catch (err) {}
-          window.open("彩虹拱橋連接戰_教師後台.html?auth=8888", "_blank");
-        } else {
-          alert("❌ 密碼錯誤，無法開啟管理後台！");
+        try {
+          if (sessionStorage.getItem('gcd_teacher_authed') === 'true') {
+            window.open("彩虹拱橋連接戰_教師後台.html?auth=8888", "_blank");
+            return;
+          }
+        } catch (err) {}
+
+        if (teacherAuthError) teacherAuthError.innerText = '';
+        if (teacherAuthPwd) teacherAuthPwd.value = '';
+        if (teacherAuthOverlay) {
+          teacherAuthOverlay.classList.add('active');
+          setTimeout(() => teacherAuthPwd.focus(), 150);
         }
       });
     }
+
+    if (btnCancelTeacherAuth) {
+      btnCancelTeacherAuth.addEventListener('click', () => {
+        teacherAuthOverlay.classList.remove('active');
+      });
+    }
+
+    window.handleTeacherAuthSubmit = function(e) {
+      e.preventDefault();
+      const val = teacherAuthPwd.value.trim();
+      if (val === '8888') {
+        try { sessionStorage.setItem('gcd_teacher_authed', 'true'); } catch (err) {}
+        teacherAuthOverlay.classList.remove('active');
+        teacherAuthPwd.value = '';
+        window.open("彩虹拱橋連接戰_教師後台.html?auth=8888", "_blank");
+      } else {
+        teacherAuthError.innerText = '❌ 密碼錯誤，請重新輸入！';
+        teacherAuthPwd.value = '';
+        teacherAuthPwd.focus();
+      }
+    };
 
     btnStartGame.addEventListener('click', () => {
       sound.playClick();
