@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Noto+Serif+TC:wght@600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="treasure.css?v=7">
+  <link rel="stylesheet" href="treasure.css?v=9">
 </head>
 <body>
   <!-- 背景海浪暗潮暗影層 -->
@@ -40,7 +40,7 @@
           <svg viewBox="0 0 24 24" class="hud-svg"><path fill="#facc15" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
         </div>
         <div>
-          <small>CURRENT ISLAND</small>
+          <small id="hudModeLabel">SIMPLE MODE</small>
           <strong id="levelLabel">航海準備</strong>
         </div>
       </div>
@@ -108,6 +108,25 @@
         </p>
       </div>
 
+      <!-- 探險難度模式選擇 -->
+      <div class="mode-select-card">
+        <div class="form-title">
+          <span class="feather-quill">🗺️</span> 選擇探險難度模式
+        </div>
+        <div class="mode-options-grid">
+          <button type="button" class="mode-option-btn active" id="modeBtnSimple" data-mode="simple">
+            <div class="mode-badge-pill">簡單</div>
+            <div class="mode-option-title">🧩 簡單模式</div>
+            <div class="mode-option-desc">方格填色：觀察黑色格子與對稱軸，在對稱側點選填入相同形狀的方格。</div>
+          </button>
+          <button type="button" class="mode-option-btn" id="modeBtnAdvanced" data-mode="advanced">
+            <div class="mode-badge-pill adv">進階</div>
+            <div class="mode-option-title">📐 進階模式</div>
+            <div class="mode-option-desc">點線繪圖：觀察對稱頂點與垂直距離，點選格點連出對稱線段。</div>
+          </button>
+        </div>
+      </div>
+
       <div class="player-form-card">
         <div class="form-title">
           <span class="feather-quill">🪶</span> 航海日誌簽署
@@ -143,17 +162,29 @@
       </div>
 
       <!-- 圖例說明 -->
-      <div class="legend-bar">
+      <div class="legend-bar" id="legendSimple">
         <span class="lg-item"><span class="swatch swatch-given"></span> 黑色題目格</span>
         <span class="lg-item"><span class="swatch swatch-mine"></span> 綠色你畫的</span>
         <span class="lg-item red"><span class="swatch swatch-axis"></span> 紅色對稱軸</span>
       </div>
+      <div class="legend-bar" id="legendAdvanced" hidden>
+        <span class="lg-item"><span class="swatch swatch-given-line"></span> 黑色題目線</span>
+        <span class="lg-item"><span class="swatch swatch-mine-line"></span> 綠色你連的線</span>
+        <span class="lg-item red"><span class="swatch swatch-axis"></span> 紅色虛線對稱軸</span>
+      </div>
 
-      <!-- 作答棋盤 -->
+      <!-- 作答棋盤容器 -->
       <div id="gridWrap">
+        <!-- 簡單模式：12x10 方格填色棋盤 -->
         <div id="gridBox">
           <div id="grid" role="grid" aria-label="線對稱作答棋盤"></div>
           <div id="axisLine" aria-hidden="true"></div>
+        </div>
+
+        <!-- 進階模式：7x7 課本格點幾何連線畫布 -->
+        <div id="dotGridBox" hidden>
+          <svg id="dotSvg" viewBox="0 0 420 420" role="img" aria-label="線對稱點線繪圖畫布"></svg>
+          <div class="dot-instructions">💡 點選兩個格點即可連線；再點一下線段端點可刪除；亦可按住格點拖曳連線。</div>
         </div>
       </div>
 
@@ -185,9 +216,14 @@
         <p id="msg" role="status" aria-live="polite">先找出對應格，再開始畫。</p>
       </div>
 
-      <button id="nextBtn" class="primary wide antique-gold-btn" hidden>
-        下一關 →
-      </button>
+      <div class="game-footer-ctrls">
+        <button id="nextBtn" class="primary wide antique-gold-btn" hidden>
+          下一關 →
+        </button>
+        <button id="inGameMenuBtn" class="btn-menu-back">
+          📋 回主選單（切換模式）
+        </button>
+      </div>
     </section>
 
     <!-- 🌟 每題答對時：精裝撕碎藏寶圖拼貼展開浮層 (Puzzle Modal) 🌟 -->
@@ -243,9 +279,14 @@
           <div class="pieces-status-text" id="piecesStatusText">
             已拼齊 1 / 5 塊碎片 · 尚餘 4 塊隱沒於海霧之中
           </div>
-          <button id="closePuzzleBtn" class="primary antique-gold-btn">
-            收起藏寶圖，前往下一關 ⛵
-          </button>
+          <div class="puzzle-btn-group">
+            <button id="closePuzzleBtn" class="primary antique-gold-btn">
+              收起藏寶圖，前往下一關 ⛵
+            </button>
+            <button id="puzzleMenuBtn" class="btn-puzzle-menu">
+              📋 回主選單
+            </button>
+          </div>
         </div>
 
         <div class="scroll-wood bottom"></div>
@@ -410,9 +451,9 @@
   </script>
 
   <!-- Game Scripts -->
-  <script src="treasure.js?v=7"></script>
+  <script src="treasure.js?v=9"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-  <script src="cloud.js?v=7"></script>
+  <script src="cloud.js?v=9"></script>
 </body>
 </html>

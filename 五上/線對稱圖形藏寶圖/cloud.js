@@ -62,6 +62,8 @@
         level: Number(detail.level) || 1,
         shapeName: detail.shapeName || `圖形 ${detail.level || 1}`,
         kind: detail.kind || 'check', // check, complete, hint
+        mode: detail.mode || 'simple',
+        modeLabel: detail.modeLabel || (detail.mode === 'advanced' ? '進階模式(格點連線)' : '簡單模式(方格填色)'),
         axis: isAxisV ? '左右對稱 (鉛直軸)' : '上下對稱 (水平軸)',
         axisRaw: axisRaw,
         attempts: Number(detail.attempts) || 0,

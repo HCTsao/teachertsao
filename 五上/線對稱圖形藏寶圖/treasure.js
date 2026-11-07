@@ -1,16 +1,19 @@
 'use strict';
 
-const W = 12, H = 10, VERSION = 3, HISTORY = 'symmetryTreasure.records.v2';
+const W = 12, H = 10, VERSION = 4, HISTORY = 'symmetryTreasure.records.v2';
 const $ = id => document.getElementById(id);
 
-// 座標鏡像運算
+// 模式狀態：'simple' (方格填色) 或 'advanced' (格點連線)
+let selectedMode = 'simple';
+
+// 座標鏡像運算 (簡單模式方格 12x10)
 const mirror = (key, axis) => {
   let [r, c] = key.split(',').map(Number);
   return axis === 'V' ? `${r},${W - 1 - c}` : `${H - 1 - r},${c}`;
 };
 
 // =========================================================
-// 🌟 豐富多元題庫庫存 (35+ 組精緻題型，分 5 個難度階梯) 🌟
+// 🌟 簡單模式題庫庫存 (35+ 組精緻題型，分 5 個難度階梯) 🌟
 // =========================================================
 
 // 鉛直對稱軸題庫 (左半題目前景：c < 6，右半玩家作答：c >= 6)
@@ -79,38 +82,231 @@ const H_BANK = [
   { name: '終極西班牙冠冕', tier: 5, axis: 'H', given: ['1,2','1,5','1,6','1,9','2,2','2,3','2,5','2,6','2,8','2,9','3,1','3,3','3,4','3,7','3,8','3,10','4,1','4,2','4,3','4,8','4,9','4,10'] }
 ];
 
-// 隨機選題：保證每次遊玩均由題庫池隨機抽取 5 題，難度階梯逐級遞增
-function makeLevels() {
+// =========================================================
+// 🌟 進階模式：7x7 格點連線題庫 🌟
+// =========================================================
+// 格點範圍：x in 0..6, y in 0..6
+// 垂直對稱軸：x = 3 (正中央第 4 欄格點)
+// 水平對稱軸：y = 3 (正中央第 4 列格點)
+
+const normSeg = (p1, p2) => {
+  const s1 = typeof p1 === 'string' ? p1 : `${p1[0]},${p1[1]}`;
+  const s2 = typeof p2 === 'string' ? p2 : `${p2[0]},${p2[1]}`;
+  return s1 < s2 ? `${s1}_${s2}` : `${s2}_${s1}`;
+};
+
+const mirrorDotAdv = (pt, axis) => {
+  let [x, y] = typeof pt === 'string' ? pt.split(',').map(Number) : pt;
+  return axis === 'V' ? `${6 - x},${y}` : `${x},${6 - y}`;
+};
+
+const mirrorSegAdv = (seg, axis) => {
+  let [p1, p2] = seg.split('_');
+  return normSeg(mirrorDotAdv(p1, axis), mirrorDotAdv(p2, axis));
+};
+
+function getSegmentsFromPath(path) {
+  const segs = [];
+  for (let i = 0; i < path.length - 1; i++) {
+    segs.push(normSeg(path[i], path[i + 1]));
+  }
+  return segs;
+}
+
+const ADV_BANK = [
+  // Tier 1 (入門：2~3 條線段，基礎折線)
+  {
+    name: '秘島三角峰',
+    tier: 1,
+    axis: 'V',
+    path: [[3,1],[5,3],[3,5]]
+  },
+  {
+    name: '黃金指南針',
+    tier: 1,
+    axis: 'V',
+    path: [[3,0],[6,3],[3,6]]
+  },
+  {
+    name: '波浪帆影',
+    tier: 1,
+    axis: 'H',
+    path: [[1,3],[3,1],[5,3]]
+  },
+  {
+    name: '西班牙古亭頂',
+    tier: 1,
+    axis: 'H',
+    path: [[1,3],[2,1],[4,1],[5,3]]
+  },
+
+  // Tier 2 (初階：3~4 條線段)
+  {
+    name: '閃電航路',
+    tier: 2,
+    axis: 'V',
+    path: [[3,1],[5,2],[4,3],[6,5],[3,5]]
+  },
+  {
+    name: '海盜先鋒箭',
+    tier: 2,
+    axis: 'V',
+    path: [[3,1],[6,3],[4,3],[4,6],[3,6]]
+  },
+  {
+    name: '古海錨尖端',
+    tier: 2,
+    axis: 'H',
+    path: [[2,3],[2,1],[4,1],[4,3]]
+  },
+  {
+    name: '秘寶菱石半面',
+    tier: 2,
+    axis: 'V',
+    path: [[3,0],[5,1],[6,3],[5,5],[3,6]]
+  },
+
+  // Tier 3 (中階：4~5 條線段)
+  {
+    name: '雙峰海岬',
+    tier: 3,
+    axis: 'H',
+    path: [[1,3],[3,1],[4,1],[5,2],[6,1],[6,3]]
+  },
+  {
+    name: '海燕凌空展翅',
+    tier: 3,
+    axis: 'H',
+    path: [[0,1],[2,2],[3,3],[4,2],[6,1]]
+  },
+  {
+    name: '高腳金聖杯',
+    tier: 3,
+    axis: 'V',
+    path: [[3,1],[5,1],[4,3],[4,5],[5,6],[3,6]]
+  },
+  {
+    name: '海馬圖騰折角',
+    tier: 3,
+    axis: 'V',
+    path: [[3,1],[4,0],[5,1],[4,3],[5,5],[3,5]]
+  },
+
+  // Tier 4 (高階：5~6 條線段)
+  {
+    name: '古城堡城垛',
+    tier: 4,
+    axis: 'V',
+    path: [[3,0],[5,0],[5,2],[4,2],[4,4],[6,4],[6,6],[3,6]]
+  },
+  {
+    name: '西班牙大戰艦',
+    tier: 4,
+    axis: 'H',
+    path: [[0,3],[1,2],[3,2],[3,0],[4,2],[5,2],[6,3]]
+  },
+  {
+    name: '大西洋燈塔輪廓',
+    tier: 4,
+    axis: 'V',
+    path: [[3,0],[4,0],[4,1],[5,2],[4,2],[5,5],[6,6],[3,6]]
+  },
+  {
+    name: '深海海星尖端',
+    tier: 4,
+    axis: 'H',
+    path: [[1,3],[0,1],[2,2],[3,0],[4,2],[6,1],[5,3]]
+  },
+
+  // Tier 5 (大師終極：6~7 條線段)
+  {
+    name: '終極西班牙王冠',
+    tier: 5,
+    axis: 'H',
+    path: [[0,3],[1,1],[2,2],[3,0],[4,2],[5,1],[6,3]]
+  },
+  {
+    name: '骷髏雙刃戰刀',
+    tier: 5,
+    axis: 'V',
+    path: [[3,1],[5,0],[6,2],[4,3],[6,4],[5,6],[3,5]]
+  },
+  {
+    name: '皇家龍雀圖騰',
+    tier: 5,
+    axis: 'V',
+    path: [[3,0],[4,1],[6,1],[5,2],[6,4],[4,4],[5,6],[3,6]]
+  }
+];
+
+// =========================================================
+// 🌟 關卡抽籤生成器 (支援簡單模式與進階模式) 🌟
+// =========================================================
+function makeLevels(mode) {
   const chosen = [];
-  // 5 個關卡分別對應 Tier 1 ~ Tier 5，交替抽垂直與水平對稱
-  for (let tier = 1; tier <= 5; tier++) {
-    // 依據關卡設定軸向（例：1=V, 2=H, 3=V, 4=H, 5=V，或隨機抽取）
-    const preferAxis = (tier % 2 === 1) ? 'V' : 'H';
-    const primaryPool = (preferAxis === 'V' ? V_BANK : H_BANK).filter(item => item.tier === tier);
-    const fallbackPool = (preferAxis === 'V' ? H_BANK : V_BANK).filter(item => item.tier === tier);
-
-    const pool = primaryPool.length ? primaryPool : fallbackPool;
-    const item = pool[Math.floor(Math.random() * pool.length)];
-
-    chosen.push({
-      id: `v3-t${tier}-${Math.random().toString(36).slice(2, 6)}`,
-      tier: tier,
-      name: item.name,
-      axis: item.axis,
-      given: [...item.given]
-    });
+  if (mode === 'advanced') {
+    // 進階模式：5 個關卡分別對應 Tier 1 ~ Tier 5
+    for (let tier = 1; tier <= 5; tier++) {
+      const pool = ADV_BANK.filter(item => item.tier === tier);
+      const item = pool.length ? pool[Math.floor(Math.random() * pool.length)] : ADV_BANK[0];
+      const givenSegs = getSegmentsFromPath(item.path);
+      chosen.push({
+        id: `adv-t${tier}-${Math.random().toString(36).slice(2, 6)}`,
+        tier: tier,
+        name: item.name,
+        axis: item.axis,
+        path: item.path,
+        given: givenSegs // 線段陣列：'x1,y1_x2,y2'
+      });
+    }
+  } else {
+    // 簡單模式：方格填色
+    for (let tier = 1; tier <= 5; tier++) {
+      const preferAxis = (tier % 2 === 1) ? 'V' : 'H';
+      const primaryPool = (preferAxis === 'V' ? V_BANK : H_BANK).filter(item => item.tier === tier);
+      const fallbackPool = (preferAxis === 'V' ? H_BANK : V_BANK).filter(item => item.tier === tier);
+      const pool = primaryPool.length ? primaryPool : fallbackPool;
+      const item = pool[Math.floor(Math.random() * pool.length)];
+      chosen.push({
+        id: `v3-t${tier}-${Math.random().toString(36).slice(2, 6)}`,
+        tier: tier,
+        name: item.name,
+        axis: item.axis,
+        given: [...item.given]
+      });
+    }
   }
   return chosen;
 }
 
-let run = null, undo = [], stroke = null, lastCheck = null, hintTarget = null;
+// =========================================================
+// 🌟 遊戲執行階段變數 🌟
+// =========================================================
+let run = null;
+let undo = [];
+let stroke = null; // 簡單模式拖曳畫筆
+let lastCheck = null;
+let hintTarget = null;
+
+// 簡單模式方格快取
 const cells = new Map();
 
-function answer() {
+// 進階模式點線快取與互動狀態
+let advActiveDot = null; // 目前選中格點 'x,y'
+let advDragStart = null; // 拖曳連線起點 'x,y'
+let advHintPair = null;  // 提示點對高亮
+let advHintProj = null;  // 提示投影線
+
+function answerSimple() {
   return new Set(run.levels[run.index].given.map(k => mirror(k, run.levels[run.index].axis)));
 }
 
-function editable(key) {
+function answerAdvanced() {
+  const lv = run.levels[run.index];
+  return new Set(lv.given.map(seg => mirrorSegAdv(seg, lv.axis)));
+}
+
+function editableSimple(key) {
   let [r, c] = key.split(',').map(Number);
   return r >= 0 && r < H && c >= 0 && c < W && (run.levels[run.index].axis === 'V' ? c >= W / 2 : r >= H / 2);
 }
@@ -128,22 +324,23 @@ function message(text) {
 function record(kind, extra = {}) {
   if (!run) return;
   const curLevel = run.levels[run.index];
-  const ansSet = answer();
+  const isAdv = run.mode === 'advanced';
 
   const row = {
     id: crypto.randomUUID(),
     runId: run.id,
     at: new Date().toISOString(),
     kind,
-    mode: 'challenge',
+    mode: isAdv ? 'advanced' : 'simple',
+    modeLabel: isAdv ? '進階模式(格點連線)' : '簡單模式(方格填色)',
     level: run.index + 1,
     shapeName: curLevel.name,
     axis: curLevel.axis,
     bankVersion: VERSION,
     given: [...curLevel.given],
     student: { ...run.student },
-    cells: [...run.mine],
-    target: [...ansSet],
+    cells: isAdv ? [...(run.segments || [])] : [...run.mine],
+    target: isAdv ? [...answerAdvanced()] : [...answerSimple()],
     attempts: run.failures,
     hints: run.hints,
     elapsed: Math.round((Date.now() - run.startedAt) / 1000),
@@ -159,19 +356,23 @@ function record(kind, extra = {}) {
   window.dispatchEvent(new CustomEvent('treasure-record', { detail: row }));
 }
 
+// =========================================================
+// 🌟 遊戲啟動與載入流程 🌟
+// =========================================================
 function start() {
   run = {
     version: VERSION,
     id: crypto.randomUUID(),
-    mode: 'challenge',
+    mode: selectedMode,
     student: {
       className: ($('inClass').value || '').trim() || '未分班',
       name: ($('inName').value || '').trim() || '王小明',
       seat: ($('inSeat').value || '').trim() || '-'
     },
-    levels: makeLevels(),
+    levels: makeLevels(selectedMode),
     index: 0,
-    mine: [],
+    mine: [], // 簡單模式：填色方格集合
+    segments: [], // 進階模式：玩家線段陣列
     results: {},
     failures: 0,
     hints: 0,
@@ -186,15 +387,37 @@ function start() {
   $('endScreen').hidden = true;
   $('menuBtn').hidden = false;
 
+  // 切換棋盤容器與圖例顯示
+  if (run.mode === 'advanced') {
+    $('gridBox').hidden = true;
+    $('dotGridBox').hidden = false;
+    $('legendSimple').hidden = true;
+    $('legendAdvanced').hidden = false;
+    $('hudModeLabel').textContent = 'ADVANCED (DOT-LINE)';
+    $('drawBtn').innerHTML = '<span class="tool-ic">✏️</span> 連線筆';
+  } else {
+    $('gridBox').hidden = false;
+    $('dotGridBox').hidden = true;
+    $('legendSimple').hidden = false;
+    $('legendAdvanced').hidden = true;
+    $('hudModeLabel').textContent = 'SIMPLE (GRID-FILL)';
+    $('drawBtn').innerHTML = '<span class="tool-ic">🖌️</span> 畫筆';
+  }
+
   undo = [];
   lastCheck = null;
   hintTarget = null;
+  advActiveDot = null;
+  advHintPair = null;
+  advHintProj = null;
+
   build();
   refresh();
 }
 
 function menu() {
   stroke = null;
+  advActiveDot = null;
   if ($('puzzleModal')) $('puzzleModal').hidden = true;
   $('startScreen').hidden = false;
   $('gameScreen').hidden = true;
@@ -211,7 +434,11 @@ function choose(i) {
 function load(i) {
   stroke = null;
   run.index = i;
-  run.mine = run.results[i]?.cells ? [...run.results[i].cells] : [];
+  if (run.mode === 'advanced') {
+    run.segments = run.results[i]?.segments ? [...run.results[i].segments] : [];
+  } else {
+    run.mine = run.results[i]?.cells ? [...run.results[i].cells] : [];
+  }
   run.passed = Boolean(run.results[i]);
   run.failures = 0;
   run.hints = 0;
@@ -220,12 +447,42 @@ function load(i) {
   undo = [];
   lastCheck = null;
   hintTarget = null;
+  advActiveDot = null;
+  advHintPair = null;
+  advHintProj = null;
+
   build();
   refresh();
-  message(run.passed ? '🎉 此關卡殘卷已收穫！' : '先找出對應格，再開始畫。');
+  if (run.mode === 'advanced') {
+    message(run.passed ? '🎉 此關卡殘卷已收穫！' : '找出題目頂點的對稱點，點選格點連成對稱線段。');
+  } else {
+    message(run.passed ? '🎉 此關卡殘卷已收穫！' : '先找出對應格，再開始畫。');
+  }
 }
 
+// 根據模式建立畫布
 function build() {
+  if (run.mode === 'advanced') {
+    buildAdvanced();
+  } else {
+    buildSimple();
+  }
+}
+
+// 根據模式重繪介面狀態
+function refresh() {
+  if (!run) return;
+  if (run.mode === 'advanced') {
+    refreshAdvanced();
+  } else {
+    refreshSimple();
+  }
+}
+
+// =========================================================
+// 🌟 簡單模式：方格填色實作 🌟
+// =========================================================
+function buildSimple() {
   const g = $('grid');
   g.replaceChildren();
   cells.clear();
@@ -240,7 +497,7 @@ function build() {
       b.className = 'cell';
       b.setAttribute('role', 'gridcell');
       b.setAttribute('aria-label', `第 ${r + 1} 列，第 ${c + 1} 欄${given.has(k) ? '，題目格' : ''}`);
-      b.disabled = !editable(k);
+      b.disabled = !editableSimple(k);
       if (given.has(k)) b.classList.add('given');
 
       b.addEventListener('keydown', e => {
@@ -252,9 +509,9 @@ function build() {
         } else if (e.key === ' ' || e.key === 'Enter') {
           e.preventDefault();
           if (!e.repeat && !run.passed) {
-            remember();
-            paint(k, !run.mine.includes(k));
-            commitStroke();
+            rememberSimple();
+            paintSimple(k, !run.mine.includes(k));
+            commitStrokeSimple();
           }
         }
       });
@@ -265,8 +522,7 @@ function build() {
   }
 }
 
-function refresh() {
-  if (!run) return;
+function refreshSimple() {
   const lv = run.levels[run.index];
   const given = new Set(lv.given);
   for (const [k, b] of cells) {
@@ -277,6 +533,447 @@ function refresh() {
     b.classList.remove('wrong', 'missing', 'pair');
   }
 
+  updateCommonHud();
+}
+
+function rememberSimple() {
+  undo.push([...run.mine]);
+  if (undo.length > 40) undo.shift();
+}
+
+function paintSimple(k, value) {
+  if (!editableSimple(k) || run.passed) return;
+  const m = new Set(run.mine);
+  value ? m.add(k) : m.delete(k);
+  run.mine = [...m];
+  const b = cells.get(k);
+  if (b) {
+    b.classList.toggle('mine', value);
+    b.textContent = value ? '■' : '';
+    b.classList.remove('wrong', 'missing', 'pair');
+    b.setAttribute('aria-selected', String(value));
+  }
+}
+
+function commitStrokeSimple() {
+  stroke = null;
+  $('undoBtn').disabled = !undo.length;
+}
+
+function hitSimple(e) {
+  return document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-key]')?.dataset.key;
+}
+
+function beginSimple(e) {
+  if (!run || run.mode !== 'simple' || run.passed || stroke || e.button > 0) return;
+  const k = hitSimple(e);
+  if (!k || !editableSimple(k)) return;
+  e.preventDefault();
+  rememberSimple();
+  stroke = {
+    id: e.pointerId,
+    value: !run.mine.includes(k),
+    last: k,
+    seen: new Set([k])
+  };
+  $('grid').setPointerCapture(e.pointerId);
+  paintSimple(k, stroke.value);
+}
+
+function moveSimple(e) {
+  if (!stroke || stroke.id !== e.pointerId) return;
+  e.preventDefault();
+  const k = hitSimple(e);
+  if (!k || !editableSimple(k)) return;
+  const [a, b] = stroke.last.split(',').map(Number), [r, c] = k.split(',').map(Number);
+  const steps = Math.max(Math.abs(r - a), Math.abs(c - b));
+  for (let n = 1; n <= steps; n++) {
+    let cell = `${Math.round(a + (r - a) * n / steps)},${Math.round(b + (c - b) * n / steps)}`;
+    if (!stroke.seen.has(cell)) {
+      paintSimple(cell, stroke.value);
+      stroke.seen.add(cell);
+    }
+  }
+  stroke.last = k;
+}
+
+function finishSimple(e) {
+  if (stroke && stroke.id === e.pointerId) commitStrokeSimple();
+}
+
+// =========================================================
+// 🌟 進階模式：7x7 格點連線幾何繪圖實作 (SVG) 🌟
+// =========================================================
+const SVG_PAD = 30, SVG_STEP = 60;
+const toSvgX = x => SVG_PAD + x * SVG_STEP;
+const toSvgY = y => SVG_PAD + y * SVG_STEP;
+
+function buildAdvanced() {
+  const svg = $('dotSvg');
+  svg.replaceChildren();
+
+  const lv = run.levels[run.index];
+
+  // 1. 底層格線與背景裝飾
+  const gridGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  gridGroup.setAttribute('id', 'svgGridLines');
+  // 細虛線底網格 (方便孩子垂直水平對齊)
+  for (let i = 0; i < 7; i++) {
+    // 橫線
+    const hl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    hl.setAttribute('x1', toSvgX(0));
+    hl.setAttribute('y1', toSvgY(i));
+    hl.setAttribute('x2', toSvgX(6));
+    hl.setAttribute('y2', toSvgY(i));
+    hl.setAttribute('stroke', '#e2d5bd');
+    hl.setAttribute('stroke-width', '1');
+    hl.setAttribute('stroke-dasharray', '2 4');
+    gridGroup.appendChild(hl);
+
+    // 直線
+    const vl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    vl.setAttribute('x1', toSvgX(i));
+    vl.setAttribute('y1', toSvgY(0));
+    vl.setAttribute('x2', toSvgX(i));
+    vl.setAttribute('y2', toSvgY(6));
+    vl.setAttribute('stroke', '#e2d5bd');
+    vl.setAttribute('stroke-width', '1');
+    vl.setAttribute('stroke-dasharray', '2 4');
+    gridGroup.appendChild(vl);
+  }
+  svg.appendChild(gridGroup);
+
+  // 2. 紅色虛線對稱軸
+  const axisGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  axisGroup.setAttribute('id', 'svgAxis');
+  const axisLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  axisLine.setAttribute('class', 'axis-svg-line');
+  if (lv.axis === 'V') {
+    axisLine.setAttribute('x1', toSvgX(3));
+    axisLine.setAttribute('y1', 12);
+    axisLine.setAttribute('x2', toSvgX(3));
+    axisLine.setAttribute('y2', 408);
+  } else {
+    axisLine.setAttribute('x1', 12);
+    axisLine.setAttribute('y1', toSvgY(3));
+    axisLine.setAttribute('x2', 408);
+    axisLine.setAttribute('y2', toSvgY(3));
+  }
+  axisGroup.appendChild(axisLine);
+  svg.appendChild(axisGroup);
+
+  // 3. 提示輔助層
+  const hintGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  hintGroup.setAttribute('id', 'svgHintLayer');
+  svg.appendChild(hintGroup);
+
+  // 4. 題目線段層
+  const givenGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  givenGroup.setAttribute('id', 'svgGivenLines');
+  const givenPointsSet = new Set();
+  lv.given.forEach(seg => {
+    const [p1, p2] = seg.split('_');
+    const [x1, y1] = p1.split(',').map(Number);
+    const [x2, y2] = p2.split(',').map(Number);
+    givenPointsSet.add(p1);
+    givenPointsSet.add(p2);
+
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', toSvgX(x1));
+    l.setAttribute('y1', toSvgY(y1));
+    l.setAttribute('x2', toSvgX(x2));
+    l.setAttribute('y2', toSvgY(y2));
+    l.setAttribute('class', 'given-line');
+    givenGroup.appendChild(l);
+  });
+  // 題目頂點圓
+  for (const pt of givenPointsSet) {
+    const [x, y] = pt.split(',').map(Number);
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', toSvgX(x));
+    c.setAttribute('cy', toSvgY(y));
+    c.setAttribute('r', '5');
+    c.setAttribute('class', 'given-vertex');
+    givenGroup.appendChild(c);
+  }
+  svg.appendChild(givenGroup);
+
+  // 5. 玩家連線層
+  const userGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  userGroup.setAttribute('id', 'svgUserLines');
+  svg.appendChild(userGroup);
+
+  // 6. 預覽橡皮筋拉線
+  const prevLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  prevLine.setAttribute('id', 'svgPreviewLine');
+  prevLine.setAttribute('class', 'preview-line');
+  prevLine.setAttribute('hidden', '');
+  svg.appendChild(prevLine);
+
+  // 7. 格點本體與點擊熱區層 (7x7 = 49 點)
+  const dotsGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  dotsGroup.setAttribute('id', 'svgDots');
+  for (let y = 0; y < 7; y++) {
+    for (let x = 0; x < 7; x++) {
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.setAttribute('class', 'dot-unit');
+      g.dataset.dot = `${x},${y}`;
+
+      // 實心點
+      const pt = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      pt.setAttribute('cx', toSvgX(x));
+      pt.setAttribute('cy', toSvgY(y));
+      pt.setAttribute('r', '3.5');
+      pt.setAttribute('class', 'dot-point');
+      pt.setAttribute('id', `dotPoint_${x}_${y}`);
+
+      // 點擊判定大熱區 (半徑 22px，極好點選)
+      const hit = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      hit.setAttribute('cx', toSvgX(x));
+      hit.setAttribute('cy', toSvgY(y));
+      hit.setAttribute('r', '22');
+      hit.setAttribute('class', 'dot-hit');
+      hit.dataset.dot = `${x},${y}`;
+
+      g.appendChild(pt);
+      g.appendChild(hit);
+      dotsGroup.appendChild(g);
+    }
+  }
+  svg.appendChild(dotsGroup);
+
+  renderAdvancedUserLines();
+}
+
+// 繪製玩家目前畫好的線段
+function renderAdvancedUserLines() {
+  const userGroup = $('svgUserLines');
+  if (!userGroup) return;
+  userGroup.replaceChildren();
+
+  const userPts = new Set();
+  (run.segments || []).forEach(seg => {
+    const [p1, p2] = seg.split('_');
+    const [x1, y1] = p1.split(',').map(Number);
+    const [x2, y2] = p2.split(',').map(Number);
+    userPts.add(p1);
+    userPts.add(p2);
+
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', toSvgX(x1));
+    l.setAttribute('y1', toSvgY(y1));
+    l.setAttribute('x2', toSvgX(x2));
+    l.setAttribute('y2', toSvgY(y2));
+    l.setAttribute('class', 'user-line');
+    l.dataset.seg = seg;
+    // 點擊已畫好的線段可直接刪除
+    l.addEventListener('click', e => {
+      e.stopPropagation();
+      if (run.passed) return;
+      deleteAdvancedSegment(seg);
+    });
+    userGroup.appendChild(l);
+  });
+
+  // 玩家連線的頂點
+  for (const pt of userPts) {
+    const [x, y] = pt.split(',').map(Number);
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', toSvgX(x));
+    c.setAttribute('cy', toSvgY(y));
+    c.setAttribute('r', '5.5');
+    c.setAttribute('class', 'user-vertex');
+    userGroup.appendChild(c);
+  }
+
+  // 渲染高亮或活動點光環
+  renderActiveDotRing();
+}
+
+// 渲染當前選取點的光環與提示線
+function renderActiveDotRing() {
+  const hintGroup = $('svgHintLayer');
+  if (!hintGroup) return;
+  hintGroup.replaceChildren();
+
+  // 1. 若有分步提示的光環與投影輔助線
+  if (advHintPair) {
+    const { pGiven, pTarget } = advHintPair;
+    const [gx, gy] = pGiven.split(',').map(Number);
+    const [tx, ty] = pTarget.split(',').map(Number);
+
+    // 投影虛線連接對稱點
+    const projLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    projLine.setAttribute('x1', toSvgX(gx));
+    projLine.setAttribute('y1', toSvgY(gy));
+    projLine.setAttribute('x2', toSvgX(tx));
+    projLine.setAttribute('y2', toSvgY(ty));
+    projLine.setAttribute('class', 'hint-proj-line');
+    hintGroup.appendChild(projLine);
+
+    // 紫色提示光圈
+    [pGiven, pTarget].forEach(p => {
+      const [x, y] = p.split(',').map(Number);
+      const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      ring.setAttribute('cx', toSvgX(x));
+      ring.setAttribute('cy', toSvgY(y));
+      ring.setAttribute('class', 'dot-pair-ring');
+      hintGroup.appendChild(ring);
+    });
+  }
+
+  // 2. 若玩家有點選一個起點
+  if (advActiveDot) {
+    const [ax, ay] = advActiveDot.split(',').map(Number);
+    const actRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    actRing.setAttribute('cx', toSvgX(ax));
+    actRing.setAttribute('cy', toSvgY(ay));
+    actRing.setAttribute('class', 'dot-active-ring');
+    hintGroup.appendChild(actRing);
+  }
+}
+
+function refreshAdvanced() {
+  renderAdvancedUserLines();
+  updateCommonHud();
+}
+
+function rememberAdvanced() {
+  undo.push([...(run.segments || [])]);
+  if (undo.length > 40) undo.shift();
+}
+
+// 切換或新增一條線段
+function toggleAdvancedSegment(p1, p2) {
+  if (p1 === p2 || run.passed) return;
+  const seg = normSeg(p1, p2);
+  const currentSegs = new Set(run.segments || []);
+  rememberAdvanced();
+
+  if (currentSegs.has(seg)) {
+    currentSegs.delete(seg);
+    message(`已清除線段 (${p1}) 至 (${p2})。`);
+  } else {
+    currentSegs.add(seg);
+    message(`已連線 (${p1}) 至 (${p2})！可接續點選下一個點。`);
+  }
+
+  run.segments = [...currentSegs];
+  refreshAdvanced();
+}
+
+// 刪除指定線段
+function deleteAdvancedSegment(seg) {
+  if (run.passed) return;
+  rememberAdvanced();
+  const currentSegs = new Set(run.segments || []);
+  currentSegs.delete(seg);
+  run.segments = [...currentSegs];
+  refreshAdvanced();
+  message('已刪除該條線段。');
+}
+
+// 處理點選格點
+function handleDotClick(dotKey) {
+  if (run.passed) return;
+
+  if (!advActiveDot) {
+    advActiveDot = dotKey;
+    renderActiveDotRing();
+    message(`已選取起點 (${dotKey})，請點選另一個格點進行連線。`);
+  } else if (advActiveDot === dotKey) {
+    // 點擊同一點取消選取
+    advActiveDot = null;
+    renderActiveDotRing();
+    message('已取消選取起點。');
+  } else {
+    // 點選第二個點：連線！
+    toggleAdvancedSegment(advActiveDot, dotKey);
+    // 連線後，自動把當前點設為新的活動點，方便學童順暢接續連折線！
+    advActiveDot = dotKey;
+    renderActiveDotRing();
+  }
+}
+
+// 綁定 SVG 互動事件 (點擊與拖曳連線)
+(function bindDotSvgEvents() {
+  const svg = $('dotSvg');
+  if (!svg) return;
+
+  function getHitDotFromEvent(e) {
+    return document.elementFromPoint(e.clientX, e.clientY)?.closest('.dot-hit')?.dataset.dot;
+  }
+
+  function getSvgCoords(e) {
+    const rect = svg.getBoundingClientRect();
+    const scale = 420 / rect.width;
+    return {
+      x: (e.clientX - rect.left) * scale,
+      y: (e.clientY - rect.top) * scale
+    };
+  }
+
+  svg.addEventListener('pointerdown', e => {
+    if (!run || run.mode !== 'advanced' || run.passed || e.button > 0) return;
+    const hitDot = getHitDotFromEvent(e);
+    if (!hitDot) return;
+
+    advDragStart = {
+      dot: hitDot,
+      pointerId: e.pointerId
+    };
+    svg.setPointerCapture(e.pointerId);
+
+    const prev = $('svgPreviewLine');
+    if (prev) {
+      const [x, y] = hitDot.split(',').map(Number);
+      prev.setAttribute('x1', toSvgX(x));
+      prev.setAttribute('y1', toSvgY(y));
+      prev.setAttribute('x2', toSvgX(x));
+      prev.setAttribute('y2', toSvgY(y));
+      prev.removeAttribute('hidden');
+    }
+  });
+
+  svg.addEventListener('pointermove', e => {
+    if (!advDragStart || advDragStart.pointerId !== e.pointerId) return;
+    const prev = $('svgPreviewLine');
+    if (prev) {
+      const pt = getSvgCoords(e);
+      prev.setAttribute('x2', pt.x);
+      prev.setAttribute('y2', pt.y);
+    }
+  });
+
+  function endDrag(e) {
+    if (!advDragStart || advDragStart.pointerId !== e.pointerId) return;
+    const startDot = advDragStart.dot;
+    advDragStart = null;
+
+    const prev = $('svgPreviewLine');
+    if (prev) prev.setAttribute('hidden', '');
+
+    const endDot = getHitDotFromEvent(e);
+    if (endDot && endDot !== startDot) {
+      // 拖曳成功連線
+      toggleAdvancedSegment(startDot, endDot);
+      advActiveDot = endDot;
+      renderActiveDotRing();
+    } else {
+      // 若是原地放開，視為純點擊行為
+      handleDotClick(startDot);
+    }
+  }
+
+  svg.addEventListener('pointerup', endDrag);
+  svg.addEventListener('pointercancel', endDrag);
+})();
+
+// =========================================================
+// 🌟 通用 HUD 與進度更新 🌟
+// =========================================================
+function updateCommonHud() {
+  const lv = run.levels[run.index];
   const solvedCount = Object.keys(run.results).length;
 
   $('levelTitle').textContent = `第 ${run.index + 1} 關 · ${lv.name} (${lv.axis === 'V' ? '左右對稱' : '上下對稱'})`;
@@ -294,7 +991,7 @@ function refresh() {
   $('nextBtn').hidden = !run.passed;
   $('nextBtn').innerHTML = run.index === 4 ? '前往秘寶島洞窟 👑 →' : '前往下一關 ⛵ →';
 
-  // 關卡進度列
+  // 關卡進度指示
   $('islands').replaceChildren();
   run.levels.forEach((_, i) => {
     let b = document.createElement('button');
@@ -307,70 +1004,191 @@ function refresh() {
   });
 }
 
-function remember() {
-  undo.push([...run.mine]);
-  if (undo.length > 40) undo.shift();
-}
+// =========================================================
+// 🌟 檢查藏寶圖 (Check) 🌟
+// =========================================================
+function check() {
+  if (!run || run.passed) return;
 
-function paint(k, value) {
-  if (!editable(k) || run.passed) return;
-  const m = new Set(run.mine);
-  value ? m.add(k) : m.delete(k);
-  run.mine = [...m];
-  const b = cells.get(k);
-  if (b) {
-    b.classList.toggle('mine', value);
-    b.textContent = value ? '■' : '';
-    b.classList.remove('wrong', 'missing', 'pair');
-    b.setAttribute('aria-selected', String(value));
+  if (run.mode === 'advanced') {
+    checkAdvanced();
+  } else {
+    checkSimple();
   }
 }
 
-function commitStroke() {
-  stroke = null;
-  $('undoBtn').disabled = !undo.length;
+function checkSimple() {
+  if (!run.mine.length) {
+    message('⚠️ 先試著在對稱側填入格子，再來檢查吧！');
+    return;
+  }
+  const signature = [...run.mine].sort().join(';');
+  if (signature === lastCheck) {
+    message('⚠️ 圖形尚未改動，調整後再行檢查！');
+    return;
+  }
+  lastCheck = signature;
+
+  const ans = answerSimple();
+  const wrong = run.mine.filter(k => !ans.has(k));
+  const missing = [...ans].filter(k => !run.mine.includes(k));
+
+  if (wrong.length || missing.length) run.failures++;
+
+  record('check', { wrong, missing, correct: !wrong.length && !missing.length });
+
+  if (!wrong.length && !missing.length) {
+    onLevelPassed();
+    return;
+  }
+
+  refreshSimple();
+  message(`⚠️ 還不太對稱：多畫了 ${wrong.length} 格，漏畫了 ${missing.length} 格。請仔細檢查與對稱軸的距離！`);
 }
 
-function hit(e) {
-  return document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-key]')?.dataset.key;
+function checkAdvanced() {
+  const currentSegs = run.segments || [];
+  if (!currentSegs.length) {
+    message('⚠️ 先試著點選格點連出對稱線段，再來檢查吧！');
+    return;
+  }
+  const signature = [...currentSegs].sort().join(';');
+  if (signature === lastCheck) {
+    message('⚠️ 線段尚未改動，調整後再行檢查！');
+    return;
+  }
+  lastCheck = signature;
+
+  const ans = answerAdvanced();
+  const userSet = new Set(currentSegs);
+  const wrong = currentSegs.filter(s => !ans.has(s));
+  const missing = [...ans].filter(s => !userSet.has(s));
+
+  if (wrong.length || missing.length) run.failures++;
+
+  record('check', { wrong, missing, correct: !wrong.length && !missing.length });
+
+  if (!wrong.length && !missing.length) {
+    onLevelPassed();
+    return;
+  }
+
+  refreshAdvanced();
+  message(`⚠️ 還差一點點喔！多連了 ${wrong.length} 條線，漏連了 ${missing.length} 條線。請仔細比對各頂點到對稱軸的垂直距離！`);
 }
 
-// 畫筆交互：點擊空白格塗色，點擊已填格抹除；拖曳跟隨初始點擊狀態
-function begin(e) {
-  if (!run || run.passed || stroke || e.button > 0) return;
-  const k = hit(e);
-  if (!k || !editable(k)) return;
-  e.preventDefault();
-  remember();
-  stroke = {
-    id: e.pointerId,
-    value: !run.mine.includes(k),
-    last: k,
-    seen: new Set([k])
-  };
-  $('grid').setPointerCapture(e.pointerId);
-  paint(k, stroke.value);
+function onLevelPassed() {
+  run.passed = true;
+  advActiveDot = null;
+  advHintPair = null;
+  const isFirstTime = !progress();
+  if (isFirstTime) {
+    run.results[run.index] = {
+      cells: [...run.mine],
+      segments: [...(run.segments || [])],
+      gold: 50,
+      attempts: run.failures,
+      hints: run.hints,
+      seconds: Math.round((Date.now() - run.startedAt) / 1000),
+      independent: run.hints === 0
+    };
+  }
+  record('complete', { correct: true, wrong: [], missing: [] });
+  refresh();
+
+  const solvedPieceNum = run.index + 1;
+  showTornMapPuzzleModal(solvedPieceNum);
+  message(`🎉 完全正確！獲得 50 枚金幣與第 ${solvedPieceNum} 塊藏寶圖殘卷！`);
 }
 
-function move(e) {
-  if (!stroke || stroke.id !== e.pointerId) return;
-  e.preventDefault();
-  const k = hit(e);
-  if (!k || !editable(k)) return;
-  const [a, b] = stroke.last.split(',').map(Number), [r, c] = k.split(',').map(Number);
-  const steps = Math.max(Math.abs(r - a), Math.abs(c - b));
-  for (let n = 1; n <= steps; n++) {
-    let cell = `${Math.round(a + (r - a) * n / steps)},${Math.round(b + (c - b) * n / steps)}`;
-    if (!stroke.seen.has(cell)) {
-      paint(cell, stroke.value);
-      stroke.seen.add(cell);
+// =========================================================
+// 🌟 分步提示 (Hint) 🌟
+// =========================================================
+function hint() {
+  if (run.passed || run.failures < 2) return;
+  run.hints++;
+  run.hintStage = Math.min(3, run.hintStage + 1);
+
+  if (run.mode === 'advanced') {
+    hintAdvanced();
+  } else {
+    hintSimple();
+  }
+}
+
+function hintSimple() {
+  const ans = answerSimple();
+  const missing = [...ans].filter(k => !run.mine.includes(k));
+  const wrong = run.mine.filter(k => !ans.has(k));
+  refreshSimple();
+
+  if (run.hintStage === 1) {
+    message('💡 提示：對稱兩格與紅線的垂直距離完全相等！先觀察最貼近紅線的格子。');
+  } else if (run.hintStage === 2) {
+    hintTarget = missing[0] || wrong[0];
+    if (hintTarget) {
+      cells.get(hintTarget)?.classList.add('pair');
+      cells.get(mirror(hintTarget, run.levels[run.index].axis))?.classList.add('pair');
+    }
+    message('💡 紫色格子是一組對稱位置！算算看它們各自距離紅線幾格？');
+  } else {
+    rememberSimple();
+    if (missing.length) {
+      paintSimple(missing[0], true);
+      message('💡 已為你填入一格對應格，剩下請自行完成！');
+    } else if (wrong.length) {
+      paintSimple(wrong[0], false);
+      message('💡 已幫你清除一個多畫的錯誤格，再次檢查吧！');
+    } else {
+      message('💡 已經完全對稱，快按下檢查藏寶圖吧！');
     }
   }
-  stroke.last = k;
+
+  record('hint', { stage: run.hintStage, wrong, missing });
 }
 
-function finish(e) {
-  if (stroke && stroke.id === e.pointerId) commitStroke();
+function hintAdvanced() {
+  const ans = answerAdvanced();
+  const userSet = new Set(run.segments || []);
+  const missing = [...ans].filter(s => !userSet.has(s));
+  const wrong = (run.segments || []).filter(s => !ans.has(s));
+  const lv = run.levels[run.index];
+
+  if (run.hintStage === 1) {
+    message('💡 提示：先找出題目黑色折線的轉折點，數數看每個點距離紅色對稱軸幾格！在另一側相同格數處標出對稱點。');
+  } else if (run.hintStage === 2) {
+    // 找出一個尚未完成的目標線段，挑選其中一個端點作為對應提示
+    if (missing.length) {
+      const [tp1] = missing[0].split('_');
+      const gp1 = mirrorDotAdv(tp1, lv.axis);
+      advHintPair = { pGiven: gp1, pTarget: tp1 };
+      renderActiveDotRing();
+      message(`💡 紫色虛線與光圈是一組對稱頂點！算算看它們各自距離紅色對稱軸幾格？`);
+    } else if (wrong.length) {
+      const [wp1, wp2] = wrong[0].split('_');
+      message(`💡 注意：線段 (${wp1}) 至 (${wp2}) 不是對稱線段喔，請點擊它將其刪除。`);
+    }
+  } else {
+    // 第三階段直接幫忙補上一條線段或移除錯誤線段
+    rememberAdvanced();
+    if (missing.length) {
+      const targetSeg = missing[0];
+      const newSegs = new Set(run.segments || []);
+      newSegs.add(targetSeg);
+      run.segments = [...newSegs];
+      advHintPair = null;
+      refreshAdvanced();
+      message('💡 已為你連上一條正確的對稱線段，剩下的請試著完成！');
+    } else if (wrong.length) {
+      deleteAdvancedSegment(wrong[0]);
+      advHintPair = null;
+      message('💡 已幫你清除一條多連的錯誤線段，再次檢查吧！');
+    } else {
+      message('💡 已經完全對稱，快按下檢查藏寶圖吧！');
+    }
+  }
+
+  record('hint', { stage: run.hintStage, wrong, missing });
 }
 
 // =========================================================
@@ -426,86 +1244,6 @@ function showTornMapPuzzleModal(newlySolvedPieceIndex) {
   modal.hidden = false;
 }
 
-function check() {
-  if (!run || run.passed) return;
-  if (!run.mine.length) {
-    message('⚠️ 先試著在對稱側填入格子，再來檢查吧！');
-    return;
-  }
-  const signature = [...run.mine].sort().join(';');
-  if (signature === lastCheck) {
-    message('⚠️ 圖形尚未改動，調整後再行檢查！');
-    return;
-  }
-  lastCheck = signature;
-
-  const ans = answer();
-  const wrong = run.mine.filter(k => !ans.has(k));
-  const missing = [...ans].filter(k => !run.mine.includes(k));
-
-  if (wrong.length || missing.length) run.failures++;
-
-  record('check', { wrong, missing, correct: !wrong.length && !missing.length });
-
-  if (!wrong.length && !missing.length) {
-    run.passed = true;
-    const isFirstTime = !progress();
-    if (isFirstTime) {
-      run.results[run.index] = {
-        cells: [...run.mine],
-        gold: 50,
-        attempts: run.failures,
-        hints: run.hints,
-        seconds: Math.round((Date.now() - run.startedAt) / 1000),
-        independent: run.hints === 0
-      };
-    }
-    record('complete', { correct: true, wrong: [], missing: [] });
-    refresh();
-
-    const solvedPieceNum = run.index + 1;
-    showTornMapPuzzleModal(solvedPieceNum);
-
-    message(`🎉 完全正確！獲得 50 枚金幣與第 ${solvedPieceNum} 塊藏寶圖殘卷！`);
-    return;
-  }
-
-  refresh();
-  message(`⚠️ 還不太對稱：多畫了 ${wrong.length} 格，漏畫了 ${missing.length} 格。請仔細檢查與對稱軸的距離！`);
-}
-
-function hint() {
-  if (run.passed || run.failures < 2) return;
-  run.hints++;
-  run.hintStage = Math.min(3, run.hintStage + 1);
-  const ans = answer(), missing = [...ans].filter(k => !run.mine.includes(k)), wrong = run.mine.filter(k => !ans.has(k));
-  refresh();
-
-  if (run.hintStage === 1) {
-    message('💡 提示：對稱兩格與紅線的垂直距離完全相等！先觀察最貼近紅線的格子。');
-  } else if (run.hintStage === 2) {
-    hintTarget = missing[0] || wrong[0];
-    if (hintTarget) {
-      cells.get(hintTarget)?.classList.add('pair');
-      cells.get(mirror(hintTarget, run.levels[run.index].axis))?.classList.add('pair');
-    }
-    message('💡 紫色格子是一組對稱位置！算算看它們各自距離紅線幾格？');
-  } else {
-    remember();
-    if (missing.length) {
-      paint(missing[0], true);
-      message('💡 已為你填入一格對應格，剩下請自行完成！');
-    } else if (wrong.length) {
-      paint(wrong[0], false);
-      message('💡 已幫你清除一個多畫的錯誤格，再次檢查吧！');
-    } else {
-      message('💡 已經完全對稱，快按下檢查藏寶圖吧！');
-    }
-  }
-
-  record('hint', { stage: run.hintStage, wrong, missing });
-}
-
 // =========================================================
 // 🌟 破關：古老海盜風格「獵人出發找到寶藏」史詩動畫 🌟
 // =========================================================
@@ -554,12 +1292,14 @@ function playEpicPirateTreasureCinematic() {
 
 function result() {
   stroke = null;
+  advActiveDot = null;
   if ($('puzzleModal')) $('puzzleModal').hidden = true;
   $('gameScreen').hidden = true;
   $('endScreen').hidden = false;
   $('summary').replaceChildren();
   let completed = Object.entries(run.results);
-  $('finalScore').textContent = `收集了全部 ${completed.length} 塊藏寶圖殘卷 · 共奪得 ${completed.reduce((n, [, r]) => n + r.gold, 0)} 枚金幣！`;
+  const modeName = run.mode === 'advanced' ? '進階模式（點線繪圖）' : '簡單模式（方格填色）';
+  $('finalScore').textContent = `【${modeName}】收集了全部 ${completed.length} 塊藏寶圖殘卷 · 共奪得 ${completed.reduce((n, [, r]) => n + r.gold, 0)} 枚金幣！`;
 
   for (const [i, r] of completed) {
     let p = document.createElement('div');
@@ -571,37 +1311,83 @@ function result() {
   playEpicPirateTreasureCinematic();
 }
 
-// 綁定棋盤事件
-$('grid').addEventListener('pointerdown', begin);
-$('grid').addEventListener('pointermove', move);
-for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-  $('grid').addEventListener(type, finish);
+// =========================================================
+// 🌟 事件綁定與初始化 🌟
+// =========================================================
+
+// 模式切換按鈕
+const modeSimpleBtn = $('modeBtnSimple');
+const modeAdvBtn = $('modeBtnAdvanced');
+
+if (modeSimpleBtn && modeAdvBtn) {
+  modeSimpleBtn.onclick = () => {
+    selectedMode = 'simple';
+    modeSimpleBtn.classList.add('active');
+    modeAdvBtn.classList.remove('active');
+  };
+  modeAdvBtn.onclick = () => {
+    selectedMode = 'advanced';
+    modeAdvBtn.classList.add('active');
+    modeSimpleBtn.classList.remove('active');
+  };
 }
 
-// 單一畫筆工具 (點擊已填格即自動清除，拖曳順暢塗繪)
+// 簡單模式棋盤事件
+$('grid').addEventListener('pointerdown', beginSimple);
+$('grid').addEventListener('pointermove', moveSimple);
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+  $('grid').addEventListener(type, finishSimple);
+}
+
+// 工具列按鈕
 $('drawBtn').onclick = () => {
   $('drawBtn').setAttribute('aria-pressed', 'true');
+  if (run && run.mode === 'advanced') {
+    advActiveDot = null;
+    renderActiveDotRing();
+    message('連線筆已備妥：點選格點即可連線。');
+  }
 };
 
 $('undoBtn').onclick = () => {
   if (run.passed || !undo.length) return;
-  run.mine = undo.pop();
-  refresh();
+  if (run.mode === 'advanced') {
+    run.segments = undo.pop();
+    advActiveDot = null;
+    advHintPair = null;
+    refreshAdvanced();
+  } else {
+    run.mine = undo.pop();
+    refreshSimple();
+  }
   message('已復原上一步。');
 };
 
 $('clearBtn').onclick = () => {
-  if (run.passed || !run.mine.length) return;
-  remember();
-  run.mine = [];
-  refresh();
-  message('卷面已全部清除。');
+  if (run.passed) return;
+  if (run.mode === 'advanced') {
+    if (!run.segments || !run.segments.length) return;
+    rememberAdvanced();
+    run.segments = [];
+    advActiveDot = null;
+    advHintPair = null;
+    refreshAdvanced();
+    message('畫布已全部清除。');
+  } else {
+    if (!run.mine.length) return;
+    rememberSimple();
+    run.mine = [];
+    refreshSimple();
+    message('卷面已全部清除。');
+  }
 };
 
 $('checkBtn').onclick = check;
 $('hintBtn').onclick = hint;
 $('startBtn').onclick = () => start();
 $('menuBtn').onclick = menu;
+if ($('inGameMenuBtn')) $('inGameMenuBtn').onclick = menu;
+if ($('puzzleMenuBtn')) $('puzzleMenuBtn').onclick = menu;
 $('nextBtn').onclick = () => run.index === 4 ? result() : load(run.index + 1);
 $('againBtn').onclick = menu;
 
