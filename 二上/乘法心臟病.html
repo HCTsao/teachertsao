@@ -159,6 +159,54 @@
             return pairs.some(p => p[0] === cardVal && p[1] === targetVal);
         };
 
+        // 猜拳勝負判定函式 (剪刀、石頭、布)
+        // 回傳獲勝者的 seatIndex；若平手則回傳 null
+        const evaluateRps = (choices) => {
+            const n = choices.length;
+            if (n === 2) {
+                const c0 = choices[0];
+                const c1 = choices[1];
+                if (c0 === c1) return null;
+                if (
+                    (c0 === 'rock' && c1 === 'scissors') ||
+                    (c0 === 'scissors' && c1 === 'paper') ||
+                    (c0 === 'paper' && c1 === 'rock')
+                ) {
+                    return 0;
+                } else {
+                    return 1;
+                }
+            } else if (n === 3) {
+                const unique = Array.from(new Set(choices));
+                if (unique.length === 1 || unique.length === 3) {
+                    return null; // 全同或三者互剋為平手
+                }
+                const u1 = unique[0];
+                const u2 = unique[1];
+                let winningChoice = null;
+                if (
+                    (u1 === 'rock' && u2 === 'scissors') ||
+                    (u1 === 'scissors' && u2 === 'paper') ||
+                    (u1 === 'paper' && u2 === 'rock')
+                ) {
+                    winningChoice = u1;
+                } else {
+                    winningChoice = u2;
+                }
+                const winners = [];
+                choices.forEach((c, idx) => {
+                    if (c === winningChoice) winners.push(idx);
+                });
+                if (winners.length === 1) {
+                    return winners[0];
+                } else {
+                    return winners[Math.floor(Math.random() * winners.length)];
+                }
+            }
+            return 0;
+        };
+
+
         // 中文數字轉換 (使用 Unicode 跳脫字元，徹底避免任何檔案編碼問題)
         const toChineseNum = (n) => {
             const mapping = { 
@@ -251,6 +299,14 @@
             const [slapRipple, setSlapRipple] = useState(false);
             const [slapHands, setSlapHands] = useState([]);
             const [scale, setScale] = useState(1);
+
+            // 猜拳相關狀態 (剪刀石頭布決定出牌順序)
+            const [rpsChoices, setRpsChoices] = useState({}); // { [seat]: 'scissors' | 'rock' | 'paper' }
+            const [rpsStatus, setRpsStatus] = useState('waiting'); // 'waiting' | 'tie' | 'winner'
+            const [rpsWinner, setRpsWinner] = useState(null); // winner seat index
+            const [isRpsProcessing, setIsRpsProcessing] = useState(false);
+            const rpsChoicesRef = useRef({});
+
 
             const timeoutRef = useRef(null);
             const idleTimerRef = useRef(null);
@@ -480,6 +536,11 @@
                 setRoomCode('');
                 setRoomPlayers([]);
                 setConnStatus('');
+                setRpsChoices({});
+                setRpsStatus('waiting');
+                setRpsWinner(null);
+                setIsRpsProcessing(false);
+                rpsChoicesRef.current = {};
             };
 
             // 廣播給所有連線客戶端 (Host 專用)
@@ -582,6 +643,8 @@
                 } else if (data.type === 'CLIENT_SLAP') {
                     if (punishingCardRef.current || isPenaltyCoolingRef.current) return;
                     executeSlapAction(data.seatIndex);
+                } else if (data.type === 'CLIENT_RPS_CHOICE') {
+                    handleHostRpsChoice(data.seatIndex, data.choice);
                 }
             };
 
@@ -646,6 +709,32 @@
                     setGameState('menu');
                 } else if (data.type === 'SYNC_LOBBY_PLAYERS') {
                     setRoomPlayers(data.players);
+                } else if (data.type === 'START_RPS_SYNC') {
+                    setPlayers(data.players);
+                    playersRef.current = data.players;
+                    setMultiplier(data.multiplier);
+                    setDifficulty(data.difficulty);
+                    setRpsChoices({});
+                    rpsChoicesRef.current = {};
+                    setRpsStatus('waiting');
+                    setRpsWinner(null);
+                    setIsRpsProcessing(false);
+                    setGameState('rps');
+                } else if (data.type === 'SYNC_RPS_RESULT') {
+                    setRpsChoices(data.choices);
+                    if (data.result === 'tie') {
+                        setRpsStatus('tie');
+                        playSoundEffect('flip');
+                    } else {
+                        setRpsStatus('winner');
+                        setRpsWinner(data.winnerIndex);
+                        playSoundEffect('win');
+                    }
+                } else if (data.type === 'SYNC_RPS_RESET') {
+                    setRpsChoices({});
+                    rpsChoicesRef.current = {};
+                    setRpsStatus('waiting');
+                    setIsRpsProcessing(false);
                 } else if (data.type === 'START_GAME_SYNC') {
                     setPlayers(data.players);
                     setMainDeck(data.mainDeck);
@@ -685,14 +774,13 @@
                 }
             };
 
-            // 開始單機遊戲 (免打名字，專為二年級學生設計)
+            // 開始單機遊戲 (專為二年級學生設計，進入猜拳決定出牌順序)
             const startLocalGame = (num) => {
                 cleanupPeer();
                 initAudio();
 
                 setMultiplier(num);
                 multiplierRef.current = num;
-                const deck = createDeck(num);
 
                 // 2人模式：你 (🙋) vs 電腦 (🤖)
                 // 3人模式：你 (🙋) vs 電腦 1 (🤖) vs 電腦 2 (🐰)
@@ -711,11 +799,9 @@
                 }));
 
                 setPlayers(initialPlayers);
-                setMainDeck(deck);
+                playersRef.current = initialPlayers;
                 setCenterPile([]);
                 centerPileRef.current = [];
-                setCurrentStep(difficulty === 'easy' ? 1 : 9);
-                currentStepRef.current = difficulty === 'easy' ? 1 : 9;
                 setCurrentCall(null);
                 setSlapResults([]);
                 setWinner(null);
@@ -723,20 +809,22 @@
                 setIsPenaltyCooling(false);
                 setErrorMsg("");
                 setShowIdleHint(false);
-                setTurn(0);
-                turnRef.current = 0;
                 aiSlapScheduledRef.current = false;
                 penaltyScheduledRef.current = false;
-                setGameState('dealing');
-                setDealingProgress(0);
+
+                // 進入猜拳流程
+                setRpsChoices({});
+                rpsChoicesRef.current = {};
+                setRpsStatus('waiting');
+                setRpsWinner(null);
+                setIsRpsProcessing(false);
+                setGameState('rps');
             };
 
-            // 連線模式：房主開始遊戲
+            // 連線模式：房主開始猜拳決定出牌順序
             const startOnlineGame = () => {
                 if (!isHost) return;
                 initAudio();
-                const curMult = multiplierRef.current;
-                const deck = createDeck(curMult);
 
                 const initialPlayers = roomPlayers.map((rp, idx) => ({
                     id: idx,
@@ -746,15 +834,10 @@
                     isAI: false
                 }));
 
-                const initialStepVal = difficultyRef.current === 'easy' ? 1 : 9;
-                const startingTurnVal = 0;
-
                 setPlayers(initialPlayers);
-                setMainDeck(deck);
+                playersRef.current = initialPlayers;
                 setCenterPile([]);
                 centerPileRef.current = [];
-                setCurrentStep(initialStepVal);
-                currentStepRef.current = initialStepVal;
                 setCurrentCall(null);
                 setSlapResults([]);
                 setWinner(null);
@@ -762,18 +845,168 @@
                 setIsPenaltyCooling(false);
                 setErrorMsg("");
                 setShowIdleHint(false);
-                setTurn(startingTurnVal);
-                turnRef.current = startingTurnVal;
-                setGameState('dealing');
-                setDealingProgress(0);
+                aiSlapScheduledRef.current = false;
+                penaltyScheduledRef.current = false;
+
+                // 進入猜拳流程
+                setRpsChoices({});
+                rpsChoicesRef.current = {};
+                setRpsStatus('waiting');
+                setRpsWinner(null);
+                setIsRpsProcessing(false);
+                setGameState('rps');
 
                 broadcastToClients({
-                    type: 'START_GAME_SYNC',
+                    type: 'START_RPS_SYNC',
                     players: initialPlayers,
-                    mainDeck: deck,
-                    initialStep: initialStepVal,
-                    startingTurn: startingTurnVal
+                    multiplier: multiplierRef.current,
+                    difficulty: difficultyRef.current
                 });
+            };
+
+            // 本地猜拳處理 (單機模式)
+            const handleLocalRpsChoice = (myChoice) => {
+                if (isRpsProcessing || gameState !== 'rps') return;
+                setIsRpsProcessing(true);
+                initAudio();
+
+                const options = ['scissors', 'rock', 'paper'];
+                const currentPls = playersRef.current;
+                const choicesArr = [myChoice];
+                const choicesMap = { 0: myChoice };
+
+                // 為電腦玩家隨機產生拳型
+                for (let i = 1; i < currentPls.length; i++) {
+                    const aiChoice = options[Math.floor(Math.random() * options.length)];
+                    choicesArr.push(aiChoice);
+                    choicesMap[i] = aiChoice;
+                }
+
+                setRpsChoices(choicesMap);
+                rpsChoicesRef.current = choicesMap;
+
+                const winnerSeat = evaluateRps(choicesArr);
+
+                if (winnerSeat === null) {
+                    // 平手
+                    setRpsStatus('tie');
+                    playSoundEffect('flip');
+                    setTimeout(() => {
+                        setRpsChoices({});
+                        rpsChoicesRef.current = {};
+                        setRpsStatus('waiting');
+                        setIsRpsProcessing(false);
+                    }, 1200);
+                } else {
+                    // 獲勝者產生
+                    setRpsStatus('winner');
+                    setRpsWinner(winnerSeat);
+                    playSoundEffect('win');
+
+                    setTimeout(() => {
+                        // 猜拳結束，準備發牌
+                        const deck = createDeck(multiplierRef.current);
+                        const initialStepVal = difficultyRef.current === 'easy' ? 1 : 9;
+
+                        setMainDeck(deck);
+                        setCurrentStep(initialStepVal);
+                        currentStepRef.current = initialStepVal;
+                        setTurn(winnerSeat);
+                        turnRef.current = winnerSeat;
+                        setIsRpsProcessing(false);
+                        setGameState('dealing');
+                        setDealingProgress(0);
+                    }, 1600);
+                }
+            };
+
+            // 房主連線猜拳處理
+            const handleHostRpsChoice = (seatIndex, choice) => {
+                rpsChoicesRef.current = { ...rpsChoicesRef.current, [seatIndex]: choice };
+                setRpsChoices({ ...rpsChoicesRef.current });
+
+                const totalCount = playersRef.current.length || playerCountRef.current;
+                let allChosen = true;
+                const choicesArr = [];
+                for (let i = 0; i < totalCount; i++) {
+                    if (!rpsChoicesRef.current[i]) {
+                        allChosen = false;
+                        break;
+                    }
+                    choicesArr.push(rpsChoicesRef.current[i]);
+                }
+
+                if (allChosen && !isRpsProcessing) {
+                    setIsRpsProcessing(true);
+                    const winnerSeat = evaluateRps(choicesArr);
+
+                    if (winnerSeat === null) {
+                        setRpsStatus('tie');
+                        playSoundEffect('flip');
+                        broadcastToClients({
+                            type: 'SYNC_RPS_RESULT',
+                            result: 'tie',
+                            choices: rpsChoicesRef.current
+                        });
+
+                        setTimeout(() => {
+                            setRpsChoices({});
+                            rpsChoicesRef.current = {};
+                            setRpsStatus('waiting');
+                            setIsRpsProcessing(false);
+                            broadcastToClients({ type: 'SYNC_RPS_RESET' });
+                        }, 1200);
+                    } else {
+                        setRpsStatus('winner');
+                        setRpsWinner(winnerSeat);
+                        playSoundEffect('win');
+                        broadcastToClients({
+                            type: 'SYNC_RPS_RESULT',
+                            result: 'winner',
+                            winnerIndex: winnerSeat,
+                            choices: rpsChoicesRef.current
+                        });
+
+                        setTimeout(() => {
+                            const deck = createDeck(multiplierRef.current);
+                            const initialStepVal = difficultyRef.current === 'easy' ? 1 : 9;
+                            const startingTurnVal = winnerSeat;
+
+                            setMainDeck(deck);
+                            setCurrentStep(initialStepVal);
+                            currentStepRef.current = initialStepVal;
+                            setTurn(startingTurnVal);
+                            turnRef.current = startingTurnVal;
+                            setIsRpsProcessing(false);
+                            setGameState('dealing');
+                            setDealingProgress(0);
+
+                            broadcastToClients({
+                                type: 'START_GAME_SYNC',
+                                players: playersRef.current,
+                                mainDeck: deck,
+                                initialStep: initialStepVal,
+                                startingTurn: startingTurnVal
+                            });
+                        }, 1600);
+                    }
+                }
+            };
+
+            // 玩家點擊出拳 (整合單機與連線)
+            const handleRpsChoice = (choice) => {
+                if (isRpsProcessing || gameState !== 'rps') return;
+                initAudio();
+                if (isOnline) {
+                    if (isHost) {
+                        handleHostRpsChoice(0, choice);
+                    } else {
+                        setRpsChoices(prev => ({ ...prev, [mySeatIndex]: choice }));
+                        sendToHost({ type: 'CLIENT_RPS_CHOICE', seatIndex: mySeatIndex, choice: choice });
+                    }
+                } else {
+                    handleLocalRpsChoice(choice);
+                }
             };
 
             // 發牌循環效果 (平均分給 2 人各 27 張，或 3 人各 18 張)
@@ -918,13 +1151,13 @@
 
                 // 教學邏輯：輪到自己出牌時不唸出聲音、不顯示乘法算式（訓練學生自行心算背誦）；
                 // 只有別人（電腦或對手）出牌時，才會出現語音朗讀與口訣算式氣泡
+                // 教學邏輯：自己出牌時不出聲、不顯示乘法算式（訓練學生自行心算默唸）；
+                // 只有別人（電腦或對手）出牌時，才會出現語音朗讀與氣泡算式！
                 if (!isMyCard) {
                     setCurrentCall({ playerIdx: data.fromSeat, text: data.callText });
                     playChantVoice(data.chantText);
                 } else {
-                    if ('speechSynthesis' in window) {
-                        try { window.speechSynthesis.cancel(); } catch(e){}
-                    }
+                    // 自己出牌：靜音不唸、清除先前氣泡，切勿呼叫 cancel() 以免破壞 Chromium 後續朗讀隊列
                     setCurrentCall(null);
                 }
 
@@ -1555,6 +1788,123 @@
                                         </button>
                                     </div>
                                 </div>
+                                {gameState === 'rps' ? (
+                                    <div className="relative w-full h-full flex flex-col items-center justify-between pt-16 pb-10 px-8 z-30 select-none">
+                                        {/* 標題與引導提示 */}
+                                        <div className="flex flex-col items-center text-center mt-2">
+                                            <div className="text-amber-300 text-3xl md:text-4xl font-black drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] tracking-wider mb-3 flex items-center gap-3">
+                                                <span className="animate-bounce">✊</span> 猜拳決定出牌順序 <span className="animate-bounce">🖐️</span>
+                                            </div>
+                                            
+                                            {/* 狀態橫幅 */}
+                                            {rpsStatus === 'waiting' && (
+                                                <div className="bg-emerald-950/80 text-white px-8 py-2.5 rounded-full text-xl md:text-2xl font-bold border-2 border-emerald-400/60 shadow-lg flex items-center gap-2">
+                                                    {rpsChoices[mySeatIndex] ? (
+                                                        <>
+                                                            <span className="text-amber-300 animate-spin">⏳</span>
+                                                            <span>等待其他玩家出拳...</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span className="animate-pulse">👉</span>
+                                                            <span>請點擊下方按鈕出拳！</span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {rpsStatus === 'tie' && (
+                                                <div className="bg-amber-500 text-slate-900 px-8 py-3 rounded-full text-2xl md:text-3xl font-black border-4 border-white shadow-2xl animate-bounce flex items-center gap-2">
+                                                    <span>🤝</span> 平手！再來一次！
+                                                </div>
+                                            )}
+                                            {rpsStatus === 'winner' && (
+                                                <div className="bg-yellow-400 text-slate-900 px-8 py-3 rounded-full text-2xl md:text-3xl font-black border-4 border-white shadow-2xl animate-bounce flex items-center gap-2">
+                                                    <span>🎉</span> {players[rpsWinner]?.name || "獲勝者"} 獲勝！由 {players[rpsWinner]?.name || "獲勝者"} 先出牌！
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* 玩家出拳展示區 */}
+                                        <div className="flex items-center justify-center gap-8 md:gap-16 my-auto">
+                                            {players.map((p, idx) => {
+                                                const choice = rpsChoices[idx];
+                                                const isWinner = (rpsStatus === 'winner' && rpsWinner === idx);
+                                                const isMe = (idx === mySeatIndex);
+                                                const handEmoji = choice === 'scissors' ? '✌️' : (choice === 'rock' ? '✊' : (choice === 'paper' ? '🖐️' : null));
+                                                const handName = choice === 'scissors' ? '剪刀' : (choice === 'rock' ? '石頭' : (choice === 'paper' ? '布' : ''));
+
+                                                return (
+                                                    <div key={p.id || idx} className="flex flex-col items-center">
+                                                        {/* 玩家頭像與姓名標籤 */}
+                                                        <div className="flex items-center gap-2 mb-4 bg-slate-900/90 backdrop-blur px-5 py-2 rounded-full border-2 border-white/30 shadow-lg">
+                                                            <span className="text-3xl">{p.avatar}</span>
+                                                            <span className="text-white font-black text-xl">{p.name}{isMe ? " (你)" : ""}</span>
+                                                        </div>
+
+                                                        {/* 出拳圓形大徽章 */}
+                                                        <div className={`w-36 h-36 md:w-44 md:h-44 rounded-full border-4 flex flex-col items-center justify-center shadow-2xl transition-all duration-300 ${
+                                                            isWinner 
+                                                                ? 'bg-gradient-to-br from-yellow-300 to-amber-500 border-white ring-8 ring-yellow-400/80 scale-110 animate-bounce' 
+                                                                : (choice 
+                                                                    ? 'bg-slate-800/95 border-amber-400/80 ring-4 ring-white/20' 
+                                                                    : 'bg-slate-900/80 border-slate-600')
+                                                        }`}>
+                                                            {choice ? (
+                                                                <>
+                                                                    <span className="text-6xl md:text-7xl drop-shadow-md select-none">{handEmoji}</span>
+                                                                    <span className={`text-xl font-black mt-2 ${isWinner ? 'text-slate-950' : 'text-amber-300'}`}>
+                                                                        {handName}
+                                                                    </span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <span className="text-5xl text-amber-300/80 animate-pulse select-none">❓</span>
+                                                                    <span className="text-sm text-slate-300 mt-2 font-bold">
+                                                                        {isMe ? "請選擇" : "思考中..."}
+                                                                    </span>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* 底部出拳按鈕區 (3顆超大按鈕，專為小朋友好點擊) */}
+                                        <div className="mb-2 flex flex-col items-center">
+                                            {rpsStatus === 'waiting' && !rpsChoices[mySeatIndex] && (
+                                                <div className="flex items-center gap-6">
+                                                    <button
+                                                        onClick={() => handleRpsChoice('scissors')}
+                                                        className="px-8 py-5 bg-gradient-to-b from-sky-400 to-blue-600 hover:from-sky-300 hover:to-blue-500 text-white font-black text-3xl rounded-3xl shadow-[0_8px_0_#1d4ed8] active:translate-y-2 active:shadow-none transition border-4 border-white flex items-center gap-3 cursor-pointer select-none"
+                                                    >
+                                                        <span className="text-4xl">✌️</span> 剪刀
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleRpsChoice('rock')}
+                                                        className="px-8 py-5 bg-gradient-to-b from-amber-400 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-white font-black text-3xl rounded-3xl shadow-[0_8px_0_#b45309] active:translate-y-2 active:shadow-none transition border-4 border-white flex items-center gap-3 cursor-pointer select-none"
+                                                    >
+                                                        <span className="text-4xl">✊</span> 石頭
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleRpsChoice('paper')}
+                                                        className="px-8 py-5 bg-gradient-to-b from-purple-400 to-indigo-600 hover:from-purple-300 hover:to-indigo-500 text-white font-black text-3xl rounded-3xl shadow-[0_8px_0_#4338ca] active:translate-y-2 active:shadow-none transition border-4 border-white flex items-center gap-3 cursor-pointer select-none"
+                                                    >
+                                                        <span className="text-4xl">🖐️</span> 布
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {rpsStatus === 'waiting' && rpsChoices[mySeatIndex] && (
+                                                <div className="text-white text-xl font-bold bg-slate-950/70 px-8 py-4 rounded-full border-2 border-emerald-400/50 shadow-lg animate-pulse flex items-center gap-2">
+                                                    <span className="text-2xl">✅</span> 你已出拳，等待對手揭曉中...
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <Fragment>
+
 
                                 {/* 各玩家座位與卡牌 (120度 Y型對稱分佈，手牌與姓名方框徹底分離不重疊) */}
                                 {players.map((p, idx) => {
@@ -1691,6 +2041,9 @@
                                     <div className="absolute bottom-36 left-1/2 -translate-x-1/2 z-[100] bg-white text-emerald-800 px-8 py-3.5 rounded-full font-black text-2xl shadow-2xl border-4 border-yellow-400 animate-bounce flex items-center gap-3 whitespace-nowrap">
                                         <AlertCircle className="text-yellow-500" size={28} /> 輪到你出牌囉！點擊你的手牌！
                                     </div>
+
+                                    </Fragment>
+                                )}
                                 )}
                             </div>
                         )}
