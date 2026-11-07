@@ -314,6 +314,7 @@
             const aiSlapScheduledRef = useRef(false);
             const flippedCardRef = useRef(null);
             const isFlipResolvedRef = useRef(false);
+            const isAnimatingRef = useRef(false);
 
             // PeerJS 連線 Refs
             const peerRef = useRef(null);
@@ -353,8 +354,9 @@
             useEffect(() => { roomCodeRef.current = roomCode; }, [roomCode]);
             useEffect(() => { punishingCardRef.current = punishingCard; }, [punishingCard]);
             useEffect(() => { isPenaltyCoolingRef.current = isPenaltyCooling; }, [isPenaltyCooling]);
+            useEffect(() => { isAnimatingRef.current = isAnimating; }, [isAnimating]);
 
-            // 預載 Windows / Chrome 語音包
+            // 預載 Windows / Chrome 語音包，並在首次使用者互動時全面解鎖 AudioContext 與 SpeechSynthesis
             useEffect(() => {
                 if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
                     window.speechSynthesis.getVoices();
@@ -362,6 +364,21 @@
                         window.speechSynthesis.getVoices();
                     };
                 }
+
+                const unlockHandler = () => {
+                    initAudio();
+                    window.removeEventListener('pointerdown', unlockHandler);
+                    window.removeEventListener('click', unlockHandler);
+                    window.removeEventListener('touchstart', unlockHandler);
+                };
+                window.addEventListener('pointerdown', unlockHandler);
+                window.addEventListener('click', unlockHandler);
+                window.addEventListener('touchstart', unlockHandler);
+                return () => {
+                    window.removeEventListener('pointerdown', unlockHandler);
+                    window.removeEventListener('click', unlockHandler);
+                    window.removeEventListener('touchstart', unlockHandler);
+                };
             }, []);
 
             // 自動檢測網址是否有 ?room=XXXX 邀請碼
@@ -409,11 +426,18 @@
             };
 
             const initAudio = () => {
-                if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
-                if (audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
-                if ('speechSynthesis' in window) {
-                    window.speechSynthesis.resume();
-                }
+                try {
+                    if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                    if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
+                    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                        window.speechSynthesis.resume();
+                        // 關鍵：在使用者點擊手勢中同步觸發一次極短無聲語音，解鎖瀏覽器 Autoplay Policy，允許後續 AI 定時器出牌自動朗讀
+                        const dummy = new SpeechSynthesisUtterance(' ');
+                        dummy.volume = 0.01;
+                        dummy.rate = 10;
+                        window.speechSynthesis.speak(dummy);
+                    }
+                } catch(e) {}
             };
 
             // 專屬 Windows 電腦的高相容語音報讀函式
@@ -429,7 +453,7 @@
 
                     const voices = window.speechSynthesis.getVoices();
                     if (voices && voices.length > 0) {
-                        const twVoice = voices.find(v => (v.lang === 'zh-TW' || v.lang === 'zh_TW') && (v.name.includes('Hanhan') || v.name.includes('Taiwan') || v.name.includes('臺灣') || v.name.includes('國語')))
+                        const twVoice = voices.find(v => (v.lang === 'zh-TW' || v.lang === 'zh_TW') && (v.name.includes('Hanhan') || v.name.includes('Taiwan') || v.name.includes('臺灣') || v.name.includes('國語') || v.name.includes('HsiaoChen') || v.name.includes('Yating')))
                                      || voices.find(v => v.lang === 'zh-TW' || v.lang === 'zh_TW')
                                      || voices.find(v => v.lang.toLowerCase().startsWith('zh'));
                         if (twVoice) {
@@ -439,14 +463,17 @@
 
                     activeUtteranceRef = u;
                     u.onend = () => { activeUtteranceRef = null; };
-                    u.onerror = () => { activeUtteranceRef = null; };
+                    u.onerror = (e) => {
+                        console.warn("SpeechSynthesis error:", e);
+                        activeUtteranceRef = null;
+                    };
 
-                    if (window.speechSynthesis.speaking) {
+                    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
                         window.speechSynthesis.cancel();
                         setTimeout(() => {
                             window.speechSynthesis.resume();
                             window.speechSynthesis.speak(u);
-                        }, 40);
+                        }, 50);
                     } else {
                         window.speechSynthesis.speak(u);
                     }
@@ -637,7 +664,7 @@
 
                     broadcastToClients({ type: 'SYNC_LOBBY_PLAYERS', players: updated });
                 } else if (data.type === 'CLIENT_PLAY_CARD') {
-                    if (gameStateRef.current === 'playing' && turnRef.current === data.seatIndex && !isAnimating && !punishingCardRef.current && !isPenaltyCoolingRef.current) {
+                    if (gameStateRef.current === 'playing' && turnRef.current === data.seatIndex && !isAnimatingRef.current && !punishingCardRef.current && !isPenaltyCoolingRef.current) {
                         executeCardPlay(data.seatIndex);
                     }
                 } else if (data.type === 'CLIENT_SLAP') {
@@ -807,6 +834,9 @@
                 setWinner(null);
                 setPunishingCard(null);
                 setIsPenaltyCooling(false);
+                isPenaltyCoolingRef.current = false;
+                setIsAnimating(false);
+                isAnimatingRef.current = false;
                 setErrorMsg("");
                 setShowIdleHint(false);
                 aiSlapScheduledRef.current = false;
@@ -843,6 +873,9 @@
                 setWinner(null);
                 setPunishingCard(null);
                 setIsPenaltyCooling(false);
+                isPenaltyCoolingRef.current = false;
+                setIsAnimating(false);
+                isAnimatingRef.current = false;
                 setErrorMsg("");
                 setShowIdleHint(false);
                 aiSlapScheduledRef.current = false;
@@ -1057,6 +1090,8 @@
             const applyPenalty = (loserIndex, pileSnapshot, nextTurn, nextStep, updatedPlayers) => {
                 if (punishingCardRef.current) return;
                 playSoundEffect('slap');
+                isAnimatingRef.current = false;
+                setIsAnimating(false);
                 setPunishingCard({ toPlayer: loserIndex, pileSnapshot: pileSnapshot.slice(-8) });
                 setCurrentCall(null);
 
@@ -1089,16 +1124,23 @@
 
             // 執行出牌 (統一路徑)
             const executeCardPlay = (fromSeat) => {
-                if (gameStateRef.current !== 'playing' || isAnimating || punishingCardRef.current || isPenaltyCoolingRef.current) return;
+                if (gameStateRef.current !== 'playing' || isAnimatingRef.current || punishingCardRef.current || isPenaltyCoolingRef.current) return;
                 const currentPls = playersRef.current;
                 if (!currentPls[fromSeat] || currentPls[fromSeat].cards.length === 0) return;
 
                 playSoundEffect('flip');
+                isAnimatingRef.current = true;
                 setIsAnimating(true);
                 setShowIdleHint(false);
 
-                const newPlayers = [...currentPls];
-                const card = newPlayers[fromSeat].cards.pop();
+                // 非破壞性抽取卡牌，確保陣列不可變性
+                const targetPlayer = currentPls[fromSeat];
+                const card = targetPlayer.cards[targetPlayer.cards.length - 1];
+                const newPlayers = currentPls.map((p, idx) => 
+                    idx === fromSeat 
+                        ? { ...p, cards: p.cards.slice(0, -1) } 
+                        : p
+                );
                 flippedCardRef.current = card;
                 isFlipResolvedRef.current = false;
 
@@ -1141,6 +1183,7 @@
             // 客端與本機共用出牌動畫與語音
             const applyCardFlipped = (data) => {
                 playSoundEffect('flip');
+                isAnimatingRef.current = true;
                 setIsAnimating(true);
                 setShowIdleHint(false);
                 flippedCardRef.current = data.card;
@@ -1149,15 +1192,13 @@
                 // 判斷是否為自己出牌 (單機模式下自己是 seat 0，連線模式下對應自己的座位 mySeatIndexRef.current)
                 const isMyCard = (data.fromSeat === mySeatIndexRef.current);
 
-                // 教學邏輯：輪到自己出牌時不唸出聲音、不顯示乘法算式（訓練學生自行心算背誦）；
-                // 只有別人（電腦或對手）出牌時，才會出現語音朗讀與口訣算式氣泡
-                // 教學邏輯：自己出牌時不出聲、不顯示乘法算式（訓練學生自行心算默唸）；
+                // 教學邏輯：輪到自己出牌時不唸出聲音、不顯示乘法算式（訓練學生自行心算默唸）；
                 // 只有別人（電腦或對手）出牌時，才會出現語音朗讀與氣泡算式！
                 if (!isMyCard) {
                     setCurrentCall({ playerIdx: data.fromSeat, text: data.callText });
                     playChantVoice(data.chantText);
                 } else {
-                    // 自己出牌：靜音不唸、清除先前氣泡，切勿呼叫 cancel() 以免破壞 Chromium 後續朗讀隊列
+                    // 自己出牌：靜音不唸、清除氣泡
                     setCurrentCall(null);
                 }
 
@@ -1207,35 +1248,42 @@
                     setCenterPile(prev => [...prev, data.card]);
                     centerPileRef.current = [...centerPileRef.current, data.card];
                     setFlyingCard(null);
+                    setCurrentCall(null); // 重要：翻牌動畫落地後，清除對手算式口訣氣泡！
                     setPlayers(data.updatedPlayers);
+                    playersRef.current = data.updatedPlayers;
 
                     if (data.isMatch) {
                         setGameState('slapping');
+                        isAnimatingRef.current = false;
                         setIsAnimating(false);
                     } else {
                         setTurn(data.nextTurn);
+                        turnRef.current = data.nextTurn;
                         setCurrentStep(data.nextStep);
+                        currentStepRef.current = data.nextStep;
+                        isAnimatingRef.current = false;
                         setIsAnimating(false);
                     }
                 };
 
-                // 留出 600ms 翻牌與口訣誦讀時間，隨後進入下一動
+                // 留出 650ms 翻牌與口訣誦讀時間，隨後進入下一動
                 setTimeout(advanceTurn, 650);
             };
 
             // 點卡牌出牌
             const playTurn = (isManual = false) => {
-                if (gameState !== 'playing' || isAnimating || punishingCardRef.current || isPenaltyCoolingRef.current) return;
-                if (isManual && turn !== mySeatIndex) return;
+                initAudio();
+                if (gameStateRef.current !== 'playing' || isAnimatingRef.current || punishingCardRef.current || isPenaltyCoolingRef.current) return;
+                if (isManual && turnRef.current !== mySeatIndexRef.current) return;
 
-                if (isOnline) {
-                    if (isHost) {
+                if (isOnlineRef.current) {
+                    if (isHostRef.current) {
                         executeCardPlay(0);
                     } else {
-                        sendToHost({ type: 'CLIENT_PLAY_CARD', seatIndex: mySeatIndex });
+                        sendToHost({ type: 'CLIENT_PLAY_CARD', seatIndex: mySeatIndexRef.current });
                     }
                 } else {
-                    executeCardPlay(turn);
+                    executeCardPlay(turnRef.current);
                 }
             };
 
@@ -1271,6 +1319,8 @@
                             setCenterPile(prev => [...prev, flippedCardRef.current]);
                             centerPileRef.current = [...centerPileRef.current, flippedCardRef.current];
                             setFlyingCard(null);
+                            setCurrentCall(null);
+                            isAnimatingRef.current = false;
                             setIsAnimating(false);
                         }
                         setGameState('slapping');
@@ -1348,6 +1398,8 @@
                             setCenterPile(activePile);
                             centerPileRef.current = activePile;
                             setFlyingCard(null);
+                            setCurrentCall(null);
+                            isAnimatingRef.current = false;
                             setIsAnimating(false);
                         }
 
@@ -1414,7 +1466,7 @@
                     timeoutRef.current = setTimeout(() => playTurn(false), delay);
                 }
                 return () => clearTimeout(timeoutRef.current);
-            }, [turn, gameState, isAnimating, punishingCard, isPenaltyCooling, aiLevel, isOnline]);
+            }, [turn, gameState, isAnimating, punishingCard, isPenaltyCooling, aiLevel, isOnline, players]);
 
             // 當前輪到的玩家若已無牌，自動跳至下一個有牌玩家
             useEffect(() => {
