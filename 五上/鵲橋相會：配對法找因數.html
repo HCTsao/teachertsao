@@ -882,6 +882,7 @@
         <div class="hud-panel timer-panel" style="display:none;" id="hud-timer-container">時間: <span id="hud-timer-txt">120s</span></div>
       </div>
       <div class="hud-right">
+        <button class="btn-icon" id="btn-hud-leaderboard" title="查看英雄榜" style="font-size: 0.95rem; width: auto; padding: 4px 12px; border-radius: 20px; font-weight: bold; background: rgba(245, 158, 11, 0.25); border: 1px solid #f59e0b; color: #ffd043; cursor: pointer; margin-right: 4px;">🏆 英雄榜</button>
         <div class="hud-panel score-panel" style="display:none;" id="hud-score-container">得分: <span id="hud-score-txt">0分</span></div>
         <div class="hud-panel progress-panel">題號: <span id="hud-progress-txt">1 / 5</span></div>
         <button class="btn-icon" id="btn-mute" title="開關聲音">🔊</button>
@@ -991,7 +992,7 @@
         
         <div class="level-grid" style="flex-wrap: nowrap; gap: 8px;">
           <button class="btn-level selected" data-mode="basic" style="min-width: 80px; padding: 15px 8px;">
-            <h3>基礎</h3>
+            <h3>簡單</h3>
           </button>
           <button class="btn-level" data-mode="advanced" style="min-width: 80px; padding: 15px 8px;">
             <h3>進階</h3>
@@ -1002,6 +1003,7 @@
         </div>
 
         <button class="btn-primary" id="btn-start-game">啟動鵲橋大冒險 🌠</button>
+        <button class="btn-primary" id="btn-open-leaderboard-menu" type="button" style="margin-top: 10px; background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4); border: none; cursor: pointer;">🏆 查看全班英雄榜 🏆</button>
         <div style="margin-top: 15px; text-align: center;">
           <a href="javascript:void(0)" id="btn-open-teacher-admin" style="color: #94a3b8; text-decoration: none; font-size: 0.9rem; font-weight: bold; opacity: 0.8; transition: opacity 0.2s; cursor: pointer;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">⚙️ 教師管理後台</a>
         </div>
@@ -1028,6 +1030,48 @@
         <div class="bubbles-pool" id="cf-bubbles-container" style="justify-content: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;"></div>
         <div style="display: flex; justify-content: center; gap: 15px; width: 100%;">
           <button class="btn-primary" id="btn-submit-cf-overlay" style="padding: 10px 30px; font-size: 1.1rem;">確認公因數 ➔</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🏆 全班英雄榜 (Leaderboard) 🏆 -->
+    <div class="overlay" id="leaderboard-overlay" style="z-index: 100;">
+      <div class="modal-card" style="max-width: 650px; width: 92%; max-height: 85vh; display: flex; flex-direction: column; padding: 25px 20px;">
+        <h2 style="color: #ffd043; font-size: 1.8rem; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+          <span>🏆</span> 鵲橋相會・全班積分英雄榜 <span>🏆</span>
+        </h2>
+        <p style="color: #cbd5e1; font-size: 0.95rem; margin-bottom: 15px;">全校神射手排行榜！誰能最快配對因數搭建鵲橋？</p>
+
+        <div style="display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 15px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label for="lb-filter-class" style="font-weight: bold; color: #94a3b8; font-size: 0.9rem;">🏫 班級：</label>
+            <select id="lb-filter-class" style="padding: 6px 12px; border-radius: 8px; background: #1e293b; color: #fff; border: 1px solid #475569; font-weight: bold; cursor: pointer;">
+              <option value="">全部班級</option>
+            </select>
+          </div>
+          <div style="font-size: 0.85rem; color: #94a3b8;" id="lb-update-time">即時連線中...</div>
+        </div>
+
+        <div style="flex: 1; overflow-y: auto; max-height: 48vh; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(15, 23, 42, 0.6);">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem; text-align: center;">
+            <thead style="position: sticky; top: 0; background: #1e293b; z-index: 2; color: #fbbf24;">
+              <tr>
+                <th style="padding: 10px 8px; width: 60px;">排名</th>
+                <th style="padding: 10px 8px;">班級</th>
+                <th style="padding: 10px 8px;">座號</th>
+                <th style="padding: 10px 8px;">姓名</th>
+                <th style="padding: 10px 8px;">總積分</th>
+                <th style="padding: 10px 8px;">時間</th>
+              </tr>
+            </thead>
+            <tbody id="lb-table-body">
+              <tr><td colspan="6" style="padding: 30px; color: #94a3b8;">載入中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="margin-top: 18px; display: flex; justify-content: center;">
+          <button class="btn-primary" id="btn-close-leaderboard" type="button" style="padding: 10px 36px; font-size: 1.05rem; background: #475569; border-color: #64748b; cursor: pointer;">關閉 ✖</button>
         </div>
       </div>
     </div>
@@ -2080,6 +2124,15 @@
           }, 600);
         } else {
           // 全對 → 正常召喚喜鵲
+          logRecordToFirebase({
+            type: gameMode === 'basic' ? "簡單" : (gameMode === 'advanced' ? "進階" : "困難"),
+            base: targetNum,
+            questionText: `找出 ${targetNum} 的所有因數`,
+            errorType: "完全正確",
+            expectedVal: sortedFactors.join('、'),
+            userInputVal: sortedFactors.join('、'),
+            isCorrect: true
+          });
           setGameTimeout(buildMagpieBridgeAnimation, 600);
         }
       }
@@ -2290,97 +2343,263 @@
       triggerFallingAnimation();
     }
 
-    function logMistakeToFirebase(type, base, errorType, expectedVal, userInputVal) {
+    function logRecordToFirebase(recordData) {
       try {
+        const payload = Object.assign({
+          timestamp: isFirebaseActive ? firebase.database.ServerValue.TIMESTAMP : Date.now(),
+          dateStr: new Date().toISOString().split('T')[0],
+          name: studentName || '訪客',
+          studentClass: studentClass || '-',
+          studentSeat: studentSeat || '-',
+          studentOnlyName: studentOnlyName || studentName || '訪客',
+          score: sessionTotalScore || 0
+        }, recordData);
+
         if (isFirebaseActive) {
-          database.ref('GCD/mistakes').push({
-            name: studentName,
-            studentClass: studentClass,
-            studentSeat: studentSeat,
-            studentOnlyName: studentOnlyName,
-            type: type,
-            base: base,
-            errorType: errorType,
-            expectedVal: expectedVal,
-            userInputVal: userInputVal,
-            timestamp: firebase.database.ServerValue.TIMESTAMP
-          });
+          // 記錄所有作答結果至 GCD/records
+          database.ref('GCD/records').push(payload).catch(e => console.error("Firebase record write error: ", e));
+          
+          // 若為錯題，同步至舊有 GCD/mistakes 以保持向下相容性
+          if (!payload.isCorrect) {
+            database.ref('GCD/mistakes').push({
+              name: payload.name,
+              studentClass: payload.studentClass,
+              studentSeat: payload.studentSeat,
+              studentOnlyName: payload.studentOnlyName,
+              type: payload.type,
+              base: payload.base,
+              errorType: payload.errorType,
+              expectedVal: payload.expectedVal,
+              userInputVal: payload.userInputVal,
+              timestamp: firebase.database.ServerValue.TIMESTAMP
+            }).catch(() => {});
+          }
         } else {
-          // Local storage fallback
-          let localMistakes = JSON.parse(localStorage.getItem('GCD_mistakes') || '[]');
-          localMistakes.push({
-            name: studentName,
-            studentClass: studentClass,
-            studentSeat: studentSeat,
-            studentOnlyName: studentOnlyName,
-            type: type,
-            base: base,
-            errorType: errorType,
-            expectedVal: expectedVal,
-            userInputVal: userInputVal,
-            timestamp: Date.now()
-          });
-          localStorage.setItem('GCD_mistakes', JSON.stringify(localMistakes));
+          // 離線 LocalStorage 備援
+          let localRecords = JSON.parse(localStorage.getItem('GCD_records') || '[]');
+          let item = Object.assign({}, payload, { timestamp: Date.now() });
+          localRecords.push(item);
+          localStorage.setItem('GCD_records', JSON.stringify(localRecords));
+
+          if (!payload.isCorrect) {
+            let localMistakes = JSON.parse(localStorage.getItem('GCD_mistakes') || '[]');
+            localMistakes.push({
+              name: item.name,
+              studentClass: item.studentClass,
+              studentSeat: item.studentSeat,
+              studentOnlyName: item.studentOnlyName,
+              type: item.type,
+              base: item.base,
+              errorType: item.errorType,
+              expectedVal: item.expectedVal,
+              userInputVal: item.userInputVal,
+              timestamp: item.timestamp
+            });
+            localStorage.setItem('GCD_mistakes', JSON.stringify(localMistakes));
+          }
         }
       } catch (e) {
-        console.error("Firebase mistake logging error: ", e);
+        console.error("Record logging error: ", e);
       }
+    }
+
+    function logMistakeToFirebase(type, base, errorType, expectedVal, userInputVal) {
+      logRecordToFirebase({
+        type: type,
+        base: base,
+        questionText: inCommonFactorPhase ? `${base} 的公因數與最大公因數` : `找出 ${base} 的所有因數`,
+        errorType: errorType,
+        expectedVal: expectedVal,
+        userInputVal: userInputVal,
+        isCorrect: false
+      });
     }
 
     function saveScoreToLeaderboard() {
       try {
+        const entry = {
+          name: studentName || '訪客',
+          studentClass: studentClass || '-',
+          studentSeat: studentSeat || '-',
+          studentOnlyName: studentOnlyName || studentName || '訪客',
+          score: sessionTotalScore,
+          timestamp: isFirebaseActive ? firebase.database.ServerValue.TIMESTAMP : Date.now()
+        };
+
         if (isFirebaseActive) {
-          database.ref('GCD/leaderboard').orderByChild('score').limitToLast(10).once('value', snapshot => {
-            let list = [];
-            snapshot.forEach(child => {
-              list.push(child.val().score);
-            });
-            // 若榜單不足10筆，或是目前分數高於或等於榜單中的最低分，則寫入 Firebase 榜單
-            let isTop10 = list.length < 10 || sessionTotalScore >= Math.min(...list);
-            if (isTop10) {
-              database.ref('GCD/leaderboard').push({
-                name: studentName,
-                studentClass: studentClass,
-                studentSeat: studentSeat,
-                studentOnlyName: studentOnlyName,
-                score: sessionTotalScore,
-                timestamp: firebase.database.ServerValue.TIMESTAMP
-              });
-            }
-          });
+          database.ref('GCD/leaderboard').push(entry).catch(e => console.error("Firebase leaderboard push error: ", e));
         } else {
           let localLeaderboard = JSON.parse(localStorage.getItem('GCD_leaderboard') || '[]');
-          let scores = localLeaderboard.map(item => item.score);
-          // 本機排行若不足10筆，或目前分數高於等於本機最低分
-          let isTop10 = scores.length < 10 || sessionTotalScore >= (scores.length > 0 ? Math.min(...scores) : 0);
-          if (isTop10) {
-            localLeaderboard.push({
-              name: studentName,
-              studentClass: studentClass,
-              studentSeat: studentSeat,
-              studentOnlyName: studentOnlyName,
-              score: sessionTotalScore,
-              timestamp: Date.now()
-            });
-            localLeaderboard.sort((a, b) => b.score - a.score);
-            localStorage.setItem('GCD_leaderboard', JSON.stringify(localLeaderboard.slice(0, 10)));
-          }
+          localLeaderboard.push(entry);
+          localLeaderboard.sort((a, b) => b.score - a.score);
+          localStorage.setItem('GCD_leaderboard', JSON.stringify(localLeaderboard.slice(0, 100)));
         }
       } catch (e) {
         console.error("Firebase leaderboard save error: ", e);
       }
     }
 
+    // ==========================================
+    // 前台英雄榜 (Leaderboard Modal) 邏輯
+    // ==========================================
+    let cachedLeaderboardList = [];
+
+    function openLeaderboardModal() {
+      const modal = document.getElementById('leaderboard-overlay');
+      if (modal) {
+        modal.classList.add('active');
+        loadAndRenderLeaderboard();
+      }
+    }
+
+    function closeLeaderboardModal() {
+      const modal = document.getElementById('leaderboard-overlay');
+      if (modal) modal.classList.remove('active');
+    }
+
+    function loadAndRenderLeaderboard() {
+      const tbody = document.getElementById('lb-table-body');
+      const timeEl = document.getElementById('lb-update-time');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="padding: 30px; color: #94a3b8;">載入排行資料中...</td></tr>';
+
+      if (isFirebaseActive) {
+        database.ref('GCD/leaderboard').orderByChild('score').limitToLast(100).once('value', snapshot => {
+          let list = [];
+          snapshot.forEach(child => {
+            let item = child.val() || {};
+            item.id = child.key;
+            list.push(item);
+          });
+          list.sort((a, b) => (b.score || 0) - (a.score || 0));
+          cachedLeaderboardList = list;
+          populateLeaderboardClassFilter(list);
+          renderLeaderboardTable(list);
+          if (timeEl) timeEl.innerText = '連線正常 · ' + new Date().toLocaleTimeString();
+        }).catch(err => {
+          console.warn("Leaderboard fetch error:", err);
+          loadLocalLeaderboardFallback();
+        });
+      } else {
+        loadLocalLeaderboardFallback();
+      }
+    }
+
+    function loadLocalLeaderboardFallback() {
+      const timeEl = document.getElementById('lb-update-time');
+      let localLeaderboard = JSON.parse(localStorage.getItem('GCD_leaderboard') || '[]');
+      localLeaderboard.sort((a, b) => (b.score || 0) - (a.score || 0));
+      cachedLeaderboardList = localLeaderboard;
+      populateLeaderboardClassFilter(localLeaderboard);
+      renderLeaderboardTable(localLeaderboard);
+      if (timeEl) timeEl.innerText = '本機離線資料 · ' + new Date().toLocaleTimeString();
+    }
+
+    function populateLeaderboardClassFilter(list) {
+      const select = document.getElementById('lb-filter-class');
+      if (!select) return;
+      const currentVal = select.value;
+      let classes = new Set();
+      list.forEach(item => {
+        let cls = item.studentClass || '';
+        if (!cls && item.name) {
+          let parts = item.name.trim().split(/\s+/);
+          if (parts.length >= 2 && /^\d+/.test(parts[0])) cls = parts[0];
+        }
+        if (cls && cls !== '-') classes.add(cls);
+      });
+
+      let sorted = Array.from(classes).sort();
+      select.innerHTML = '<option value="">全部班級</option>';
+      sorted.forEach(c => {
+        let opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c + ' 班';
+        if (c === currentVal) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+
+    function renderLeaderboardTable(list) {
+      const tbody = document.getElementById('lb-table-body');
+      if (!tbody) return;
+      const filterClass = document.getElementById('lb-filter-class')?.value || '';
+
+      let filtered = list;
+      if (filterClass) {
+        filtered = list.filter(item => {
+          let cls = item.studentClass || '';
+          if (!cls && item.name) {
+            let parts = item.name.trim().split(/\s+/);
+            if (parts.length >= 2 && /^\d+/.test(parts[0])) cls = parts[0];
+          }
+          return cls === filterClass;
+        });
+      }
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="padding: 30px; color: #94a3b8;">目前尚無任何積分紀錄。</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = '';
+      filtered.forEach((item, index) => {
+        let tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid rgba(255,255,255,0.06)';
+        tr.style.transition = 'background 0.2s';
+        tr.onmouseover = () => tr.style.background = 'rgba(255,255,255,0.05)';
+        tr.onmouseout = () => tr.style.background = 'transparent';
+
+        let rankBadge = `${index + 1}`;
+        if (index === 0) rankBadge = '🥇 1';
+        else if (index === 1) rankBadge = '🥈 2';
+        else if (index === 2) rankBadge = '🥉 3';
+
+        let cls = item.studentClass || '-';
+        let seat = item.studentSeat || '-';
+        let sName = item.studentOnlyName || item.name || '訪客';
+        if (cls === '-' && seat === '-' && item.name) {
+          let parts = item.name.trim().split(/\s+/);
+          if (parts.length >= 3) {
+            cls = parts[0];
+            seat = parts[1];
+            sName = parts.slice(2).join(' ');
+          } else if (parts.length === 2 && /^\d+/.test(parts[0])) {
+            cls = parts[0];
+            sName = parts[1];
+          }
+        }
+
+        let timeStr = item.timestamp ? new Date(item.timestamp).toLocaleDateString() : '-';
+
+        tr.innerHTML = `
+          <td style="padding: 10px 6px; font-weight: 800; color: ${index < 3 ? '#ffd043' : '#cbd5e1'}; font-size: 1rem;">${rankBadge}</td>
+          <td style="padding: 10px 6px; color: #93c5fd; font-weight: bold;">${cls}</td>
+          <td style="padding: 10px 6px; color: #e2e8f0;">${seat}</td>
+          <td style="padding: 10px 6px; font-weight: bold; color: #fff;">${sName}</td>
+          <td style="padding: 10px 6px; color: #ffd043; font-weight: 900; font-size: 1.1rem;">${item.score || 0}</td>
+          <td style="padding: 10px 6px; font-size: 0.8rem; color: #64748b;">${timeStr}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
     function showLeaderboardInClearScreen() {
-      let containerHtml = `<div style="margin-top: 15px; background: rgba(15, 23, 42, 0.4); border-radius: 12px; padding: 12px; max-height: 150px; overflow-y: auto; text-align: left;">
-        <h4 style="color: #ffd043; text-align: center; margin-bottom: 8px; font-weight: 800;">🏆 英雄榜 (Leaderboard) 🏆</h4>
+      let containerHtml = `<div style="margin-top: 15px; background: rgba(15, 23, 42, 0.4); border-radius: 12px; padding: 12px; max-height: 160px; overflow-y: auto; text-align: left;">
+        <h4 style="color: #ffd043; text-align: center; margin-bottom: 8px; font-weight: 800;">🏆 榮譽英雄榜 (Top 5) 🏆</h4>
         <ol id="clear-leaderboard-list" style="padding-left: 20px; font-size: 0.9rem; color: #fff;">
           <li>載入中...</li>
         </ol>
+        <div style="text-align: center; margin-top: 10px;">
+          <button type="button" id="btn-show-full-lb-clear" style="background: rgba(245, 158, 11, 0.25); border: 1px solid #f59e0b; color: #ffd043; padding: 6px 14px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 0.85rem;">🏆 查看完整全班英雄榜 ➔</button>
+        </div>
       </div>`;
       
       clearMsg.innerHTML += containerHtml;
       const listEl = document.getElementById('clear-leaderboard-list');
+      const btnFull = document.getElementById('btn-show-full-lb-clear');
+      if (btnFull) {
+        btnFull.addEventListener('click', openLeaderboardModal);
+      }
       
       if (isFirebaseActive) {
         database.ref('GCD/leaderboard').orderByChild('score').limitToLast(10).once('value', snapshot => {
@@ -2395,7 +2614,7 @@
             listEl.innerHTML = '<li>目前無排行紀錄。</li>';
             return;
           }
-          list.forEach((item, index) => {
+          list.slice(0, 5).forEach((item, index) => {
             let li = document.createElement('li');
             li.style.marginBottom = '4px';
             li.innerHTML = `<span style="font-weight:bold; color:#e2e8f0;">${index+1}. ${item.name}</span> - <span style="color:#ffd043; font-weight:900;">${item.score}分</span>`;
@@ -2410,7 +2629,7 @@
           listEl.innerHTML = '<li>目前無排行紀錄。</li>';
           return;
         }
-        localLeaderboard.slice(0, 10).forEach((item, index) => {
+        localLeaderboard.slice(0, 5).forEach((item, index) => {
           let li = document.createElement('li');
           li.style.marginBottom = '4px';
           li.innerHTML = `<span style="font-weight:bold; color:#e2e8f0;">${index+1}. ${item.name}</span> - <span style="color:#ffd043; font-weight:900;">${item.score}分</span>`;
@@ -2690,6 +2909,23 @@
       return goodGCFCount >= 3;
     }
 
+    // 前台英雄榜事件綁定
+    const btnOpenLbMenu = document.getElementById('btn-open-leaderboard-menu');
+    if (btnOpenLbMenu) btnOpenLbMenu.addEventListener('click', openLeaderboardModal);
+
+    const btnHudLb = document.getElementById('btn-hud-leaderboard');
+    if (btnHudLb) btnHudLb.addEventListener('click', openLeaderboardModal);
+
+    const btnCloseLb = document.getElementById('btn-close-leaderboard');
+    if (btnCloseLb) btnCloseLb.addEventListener('click', closeLeaderboardModal);
+
+    const lbFilterClass = document.getElementById('lb-filter-class');
+    if (lbFilterClass) {
+      lbFilterClass.addEventListener('change', () => {
+        renderLeaderboardTable(cachedLeaderboardList);
+      });
+    }
+
     const btnOpenTeacherAdmin = document.getElementById('btn-open-teacher-admin');
     if (btnOpenTeacherAdmin) {
       btnOpenTeacherAdmin.addEventListener('click', (e) => {
@@ -2742,11 +2978,11 @@
       while (attempts < 100) {
         let sq, pr, comp3;
         if (gameMode === 'basic') {
-          // Basic Mode: Targets up to 50
+          // 簡單版：目標數 50 以內，質數嚴格限制小於等於 20
           let squares = [9, 16, 25, 36, 49];
           sq = squares[Math.floor(Math.random() * squares.length)];
 
-          let primes = [7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47];
+          let primes = [3, 5, 7, 11, 13, 17, 19];
           pr = primes[Math.floor(Math.random() * primes.length)];
 
           let composites = [
@@ -2797,7 +3033,7 @@
       shuffle(sessionTargets);
       
       currentQuestionIndex = 0;
-      hudLevelTxt.innerText = gameMode === 'basic' ? "基礎" : (gameMode === 'advanced' ? "進階" : "困難");
+      hudLevelTxt.innerText = gameMode === 'basic' ? "簡單" : (gameMode === 'advanced' ? "進階" : "困難");
       
       startNewGame();
     });
@@ -3168,6 +3404,16 @@
         sessionTotalScore += qScore;
         hudScoreTxt.innerText = `${sessionTotalScore}分`;
 
+        logRecordToFirebase({
+          type: "困難",
+          base: targetNum,
+          questionText: `找出 ${targetNum} 的所有因數`,
+          errorType: "完全正確",
+          expectedVal: sortedFactors.join('、'),
+          userInputVal: sortedFactors.join('、'),
+          isCorrect: true
+        });
+
         gameState = 'building_bridge';
         updateBridgeSlots();
         buildMagpieBridgeAnimation();
@@ -3443,6 +3689,16 @@
             sessionTotalScore += qScore;
           }
           hudScoreTxt.innerText = `${sessionTotalScore}分`;
+
+          logRecordToFirebase({
+            type: "公因數挑戰",
+            base: `${commonFactorNumA}, ${commonFactorNumB}`,
+            questionText: `${commonFactorNumA} 與 ${commonFactorNumB} 的公因數與最大公因數`,
+            errorType: "完全正確",
+            expectedVal: `最大公因數: ${correctGCF} (公因數: ${correctCommonFactors.join('、')})`,
+            userInputVal: `最大公因數: ${selectedGCF} (選取: ${selectedCommonFactors.join('、')})`,
+            isCorrect: true
+          });
 
           gameState = 'building_bridge';
           document.getElementById('common-factor-overlay').classList.remove('active');

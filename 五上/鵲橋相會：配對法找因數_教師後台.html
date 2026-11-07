@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>鵲橋相會：配對法找因數 - 教師管理後台</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+  <!-- Firebase Compatibility SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  <!-- 純前端 Excel 匯出庫 -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --font-body: 'Noto Sans TC', sans-serif;
+      --color-primary: #0f172a;
+      --color-accent: #2563eb;
+      --color-success: #16a34a;
+      --color-danger: #dc2626;
+      --color-warning: #ea580c;
+      --color-bg: #f8fafc;
+      --color-card: #ffffff;
+      --color-border: #cbd5e1;
+      --color-text-main: #1e293b;
+      --color-text-muted: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* 放大4號字體：基準字級設定為 18px (原為 14px) */
+    body {
+      font-family: var(--font-body);
+      background-color: var(--color-bg);
+      color: var(--color-text-main);
+      padding: 30px;
+      font-size: 18px;
+      line-height: 1.6;
+    }
+
+    .dashboard-container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* --- Navigation header --- */
+    .top-left-nav {
+      margin-bottom: 25px;
+      display: flex;
+      gap: 12px;
+    }
+    .top-left-nav a {
+      background: #ffffff;
+      color: #1e293b;
+      border: 2px solid var(--color-border);
+      padding: 10px 22px;
+      border-radius: 30px;
+      font-size: 1.05rem;
+      font-weight: 800;
+      text-decoration: none;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .top-left-nav a:hover {
+      background: #f1f5f9;
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+      transform: translateY(-2px);
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      border-bottom: 3px solid var(--color-border);
+      padding-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      font-weight: 900;
+      color: var(--color-primary);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-weight: 800;
+      font-size: 1.05rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-danger {
+      background-color: var(--color-danger);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+    }
+
+    .btn-danger:hover {
+      background-color: #b91c1c;
+      transform: translateY(-2px);
+    }
+
+    .btn-success {
+      background-color: var(--color-success);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);
+    }
+
+    .btn-success:hover {
+      background-color: #15803d;
+      transform: translateY(-2px);
+    }
+
+    .btn-delete-row {
+      padding: 6px 14px;
+      font-size: 0.95rem;
+      font-weight: 800;
+      border: 1.5px solid #fecaca;
+      background-color: #fef2f2;
+      color: #dc2626;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    .btn-delete-row:hover {
+      background-color: #dc2626;
+      color: #ffffff;
+      border-color: #dc2626;
+      transform: translateY(-1px);
+      box-shadow: 0 3px 6px rgba(220, 38, 38, 0.25);
+    }
+
+    input[type="date"],
+    input[type="text"],
+    select {
+      font-size: 1.05rem;
+      font-family: inherit;
+      font-weight: bold;
+      color: var(--color-text-main);
+      padding: 9px 14px;
+      border-radius: 10px;
+      border: 2px solid var(--color-border);
+      background: #fff;
+      transition: all 0.2s;
+    }
+
+    input[type="date"]:focus,
+    input[type="text"]:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--color-accent) !important;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    /* --- Stats cards --- */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 18px;
+      margin-bottom: 30px;
+    }
+
+    .stats-card {
+      background: var(--color-card);
+      border: 2px solid var(--color-border);
+      border-radius: 16px;
+      padding: 22px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      text-align: center;
+    }
+
+    .stats-card h3 {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--color-text-muted);
+      letter-spacing: 0.5px;
+    }
+
+    .stats-card .value {
+      font-size: 2.6rem;
+      font-weight: 900;
+      color: var(--color-primary);
+      margin: 4px 0;
+    }
+
+    .stats-card .desc {
+      font-size: 0.95rem;
+      color: var(--color-text-muted);
+      font-weight: 600;
+    }
+
+    /* --- Table & Card Layout --- */
+    .card {
+      background: var(--color-card);
+      border: 2px solid var(--color-border);
+      border-radius: 16px;
+      box-shadow: 0 4px 8px -1px rgba(0, 0, 0, 0.06);
+      padding: 24px;
+      overflow: hidden;
+      margin-bottom: 30px;
+    }
+
+    .table-container {
+      overflow-x: auto;
+      margin-top: 15px;
+      border-radius: 12px;
+      border: 1px solid var(--color-border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 1.05rem;
+      text-align: left;
+      min-width: 1100px;
+    }
+
+    th, td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--color-border);
+      vertical-align: middle;
+    }
+
+    th {
+      background-color: #f1f5f9;
+      font-weight: 900;
+      color: var(--color-primary);
+      white-space: nowrap;
+      font-size: 1.05rem;
+    }
+
+    tr:hover {
+      background-color: #f8fafc;
+    }
+
+    tr.good td {
+      background-color: #f0fdf4 !important;
+    }
+
+    tr.wrong td {
+      background-color: #fef2f2 !important;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .badge-error {
+      background-color: #fee2e2;
+      color: var(--color-danger);
+      border: 1px solid #fca5a5;
+    }
+
+    .badge-success {
+      background-color: #dcfce7;
+      color: var(--color-success);
+      border: 1px solid #86efac;
+    }
+
+    /* --- Factor Pills & Highlights (圈出多填與漏填) --- */
+    .factor-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 34px;
+      height: 34px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-family: monospace;
+      font-weight: 900;
+      font-size: 1.1rem;
+      margin: 2px 3px;
+      vertical-align: middle;
+      transition: transform 0.15s;
+    }
+
+    /* 學生多填的因數：明顯紅圈圈出來 */
+    .factor-extra {
+      border: 3px solid #dc2626 !important;
+      background-color: #fee2e2 !important;
+      color: #991b1b !important;
+      box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.25);
+      animation: pulseExtra 1.8s infinite;
+    }
+
+    @keyframes pulseExtra {
+      0% { box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.4); }
+      50% { box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.15); }
+      100% { box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.4); }
+    }
+
+    /* 正確答案中，學生漏填的因數：明顯橘紅圈圈起來 */
+    .factor-missed {
+      border: 3px dashed #ea580c !important;
+      background-color: #ffedd5 !important;
+      color: #c2410c !important;
+      box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.25);
+    }
+
+    /* 正確比對到的因數 */
+    .factor-matched {
+      border: 1.5px solid #cbd5e1;
+      background-color: #ffffff;
+      color: #334155;
+    }
+
+    .good .factor-matched {
+      border-color: #86efac;
+      background-color: #f0fdf4;
+      color: #166534;
+    }
+
+    .legend-bar {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 12px;
+      padding: 10px 16px;
+      background: #f8fafc;
+      border-radius: 10px;
+      border: 1px dashed var(--color-border);
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    .status-banner {
+      background-color: #ffedd5;
+      border: 2px solid #fed7aa;
+      color: #9a3412;
+      padding: 14px 22px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      font-weight: bold;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-container">
+    <!-- Top Left Nav -->
+    <div class="top-left-nav">
+      <a href="鵲橋相會：配對法找因數.html">🎮 回到遊戲</a>
+    </div>
+
+    <!-- DB Offline Banner -->
+    <div class="status-banner" id="status-banner">
+      ⚠️ Firebase 資料庫連線失敗，目前顯示的是本機 LocalStorage 離線資料。
+    </div>
+
+    <header>
+      <h1>👨‍🏫 鵲橋相會：配對法找因數・教師管理後台</h1>
+      <div class="header-actions">
+        <button class="btn btn-success" id="btn-export-excel">📥 下載 Excel</button>
+        <button class="btn btn-danger" id="btn-clear-db">🧹 清除所有紀錄</button>
+      </div>
+    </header>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+      <div class="stats-card">
+        <h3>累計作答人數</h3>
+        <div class="value" id="stats-total-players">0</div>
+        <div class="desc">位學生已完成練習</div>
+      </div>
+      <div class="stats-card">
+        <h3>全班答對率</h3>
+        <div class="value" id="stats-avg-accuracy">0%</div>
+        <div class="desc">全體平均命中正確率</div>
+      </div>
+      <div class="stats-card">
+        <h3>總作答題數</h3>
+        <div class="value" id="stats-total-attempts">0</div>
+        <div class="desc">題 (含因數與公因數)</div>
+      </div>
+      <div class="stats-card">
+        <h3>錯題總次數</h3>
+        <div class="value" id="stats-total-wrong">0</div>
+        <div class="desc">次漏找、找錯或超時</div>
+      </div>
+      <div class="stats-card">
+        <h3>高頻出錯題目數字</h3>
+        <div class="value" id="stats-most-failed-base">-</div>
+        <div class="desc">學生失誤最多的目標數</div>
+      </div>
+    </div>
+
+    <!-- Filter Panel -->
+    <div class="card" style="margin-bottom: 25px; padding: 20px 24px;">
+      <div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label style="font-weight: 800; font-size: 1.05rem; color: var(--color-primary);">📅 日期區間：</label>
+          <input type="date" id="filter-date-start" title="起始日期">
+          <span style="font-weight: bold; color: var(--color-text-muted);">~</span>
+          <input type="date" id="filter-date-end" title="結束日期">
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label for="filter-class" style="font-weight: 800; font-size: 1.05rem; color: var(--color-primary);">🏫 班級：</label>
+          <select id="filter-class">
+            <option value="">全部班級</option>
+          </select>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 220px;">
+          <label for="filter-keyword" style="font-weight: 800; font-size: 1.05rem; color: var(--color-primary);">🔍 關鍵字：</label>
+          <input type="text" id="filter-keyword" placeholder="搜尋學生姓名、座號或題目..." style="width: 100%;">
+        </div>
+
+        <!-- 只看錯題 Checkbox -->
+        <div style="display: flex; align-items: center;">
+          <label style="font-weight: 900; font-size: 1.1rem; color: var(--color-danger); cursor: pointer; display: flex; align-items: center; gap: 8px; background: #fee2e2; padding: 8px 16px; border-radius: 10px; border: 1.5px solid #fca5a5;">
+            <input type="checkbox" id="filter-wrong-only" style="width: 22px; height: 22px; cursor: pointer;">
+            ❌ 只看錯題
+          </label>
+        </div>
+
+        <button class="btn" id="btn-reset-filter" style="background: #e2e8f0; color: #334155; padding: 9px 18px;">↺ 重置篩選</button>
+      </div>
+
+      <!-- 標記圖例 (Legend) -->
+      <div class="legend-bar">
+        <span>💡 因數標記圖例：</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px;">
+          <span class="factor-pill factor-extra" style="min-width: 28px; height: 28px; font-size: 0.95rem;">5</span>
+          <strong>紅實線圈：學生多填（非題目因數）</strong>
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 6px;">
+          <span class="factor-pill factor-missed" style="min-width: 28px; height: 28px; font-size: 0.95rem;">8</span>
+          <strong>橘虛線圈：學生漏填（正解中有但未找出）</strong>
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 6px;">
+          <span class="factor-pill factor-matched" style="min-width: 28px; height: 28px; font-size: 0.95rem;">1</span>
+          正確配對之因數
+        </span>
+      </div>
+    </div>
+
+    <!-- Student Records Table -->
+    <div class="card">
+      <h2 style="font-size: 1.5rem; font-weight: 900; color: var(--color-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+        <span>📋</span> 學生作答紀錄總表 (作答成果與錯題分析)
+      </h2>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 140px;">作答時間</th>
+              <th style="width: 80px;">班級</th>
+              <th style="width: 70px;">座號</th>
+              <th style="width: 100px;">學生姓名</th>
+              <th style="width: 100px;">關卡類型</th>
+              <th style="width: 100px;">目標數</th>
+              <th style="min-width: 200px;">學生選/填的因數</th>
+              <th style="min-width: 200px;">正確答案</th>
+              <th style="width: 130px;">結果</th>
+              <th style="text-align: center; width: 90px;">操作</th>
+            </tr>
+          </thead>
+          <tbody id="records-table-body">
+            <tr><td colspan="10" style="text-align: center; padding: 40px; color: var(--color-text-muted);">載入資料中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // 進入教師後台密碼驗證 (8888)
+    // ==========================================
+    function verifyTeacherAccess() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const isParamAuthed = urlParams.get('auth') === '8888';
+      let isSessionAuthed = false;
+      try {
+        isSessionAuthed = sessionStorage.getItem('gcd_teacher_authed') === 'true';
+      } catch (e) {}
+
+      if (isParamAuthed || isSessionAuthed) {
+        try {
+          sessionStorage.setItem('gcd_teacher_authed', 'true');
+        } catch (e) {}
+        if (isParamAuthed) {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        return true;
+      }
+
+      const inputPwd = prompt("🔒 請輸入教師後台密碼：");
+      if (inputPwd === "8888") {
+        try {
+          sessionStorage.setItem('gcd_teacher_authed', 'true');
+        } catch (e) {}
+        return true;
+      } else {
+        if (inputPwd !== null) {
+          alert("❌ 密碼錯誤，無法進入教師後台！");
+        }
+        window.location.href = "鵲橋相會：配對法找因數.html";
+        return false;
+      }
+    }
+
+    if (!verifyTeacherAccess()) {
+      throw new Error("Teacher authentication failed");
+    }
+
+    // ==========================================
+    // Firebase 連線設定 (與遊戲一致)
+    // ==========================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyCFNaVRETt062_As1hF7Mfyr22pKMG-lvk",
+      authDomain: "chickenrabbit-ea442.firebaseapp.com",
+      databaseURL: "https://chickenrabbit-ea442-default-rtdb.firebaseio.com",
+      projectId: "chickenrabbit-ea442",
+      storageBucket: "chickenrabbit-ea442.firebasestorage.app",
+      messagingSenderId: "65728951973",
+      appId: "1:65728951973:web:eb52738ca86ed7175abf4c"
+    };
+
+    let database = null;
+    let isFirebaseActive = false;
+
+    try {
+      if (typeof firebase !== 'undefined') {
+        firebase.initializeApp(firebaseConfig);
+        database = firebase.database();
+        isFirebaseActive = true;
+        console.log("Firebase Realtime Database 連線成功！");
+      }
+    } catch (e) {
+      console.warn("Firebase 載入失敗，切換為離線模式：", e);
+      document.getElementById('status-banner').style.display = 'block';
+    }
+
+    // --- 資料緩存 ---
+    let rawRecords = [];
+    let rawMistakes = [];
+    let combinedRecords = [];
+
+    // --- 載入資料庫 ---
+    function initDataLoad() {
+      if (isFirebaseActive) {
+        // 監聽完整作答紀錄 GCD/records
+        database.ref('GCD/records').on('value', snapshot => {
+          let list = [];
+          snapshot.forEach(child => {
+            let data = child.val() || {};
+            data.id = child.key;
+            data.sourceNode = 'records';
+            list.push(data);
+          });
+          rawRecords = list;
+          mergeAndRefreshData();
+        }, error => {
+          console.error("Firebase records error:", error);
+          document.getElementById('status-banner').style.display = 'block';
+        });
+
+        // 同步監聽 GCD/mistakes 以兼顧舊紀錄
+        database.ref('GCD/mistakes').on('value', snapshot => {
+          let list = [];
+          snapshot.forEach(child => {
+            let data = child.val() || {};
+            data.id = child.key;
+            data.sourceNode = 'mistakes';
+            data.isCorrect = false;
+            list.push(data);
+          });
+          rawMistakes = list;
+          mergeAndRefreshData();
+        });
+      } else {
+        loadLocalData();
+      }
+    }
+
+    function loadLocalData() {
+      let localRec = JSON.parse(localStorage.getItem('GCD_records') || '[]');
+      let localMis = JSON.parse(localStorage.getItem('GCD_mistakes') || '[]');
+
+      localRec.forEach((item, idx) => {
+        if (!item.id) item.id = 'loc_r_' + (item.timestamp || idx) + '_' + idx;
+        item.sourceNode = 'records';
+      });
+      localMis.forEach((item, idx) => {
+        if (!item.id) item.id = 'loc_m_' + (item.timestamp || idx) + '_' + idx;
+        item.sourceNode = 'mistakes';
+        item.isCorrect = false;
+      });
+
+      rawRecords = localRec;
+      rawMistakes = localMis;
+      mergeAndRefreshData();
+    }
+
+    // 合併 records 與 mistakes (去重，以 records 優先)
+    function mergeAndRefreshData() {
+      let map = new Map();
+      rawRecords.forEach(r => {
+        let key = r.id || (r.timestamp + '_' + (r.studentName || '') + '_' + (r.base || ''));
+        map.set(key, r);
+      });
+
+      // 若 mistakes 有早期獨立產生的紀錄，補入
+      rawMistakes.forEach(m => {
+        let key = m.id || (m.timestamp + '_' + (m.studentName || '') + '_' + (m.base || ''));
+        if (!map.has(key)) {
+          // 檢查是否有同 timestamp 的已存在
+          let exists = rawRecords.some(r => Math.abs((r.timestamp || 0) - (m.timestamp || 0)) < 1000 && r.studentName === m.studentName);
+          if (!exists) {
+            map.set(key, m);
+          }
+        }
+      });
+
+      combinedRecords = Array.from(map.values());
+      // 最新的排前面
+      combinedRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+      populateClassOptions();
+      applyFilters();
+    }
+
+    // 解析班級、座號、姓名
+    function getStudentInfo(item) {
+      let cls = item.studentClass || item.className || '';
+      let seat = item.studentSeat || item.seat || '';
+      let name = item.studentOnlyName || '';
+
+      if (!cls && !seat && item.name) {
+        let raw = item.name.trim();
+        let parts = raw.split(/\s+/);
+        if (parts.length >= 3) {
+          cls = parts[0];
+          seat = parts[1];
+          name = parts.slice(2).join(' ');
+        } else if (parts.length === 2) {
+          if (/^\d+/.test(parts[0])) {
+            cls = parts[0];
+            name = parts[1];
+          } else {
+            name = raw;
+          }
+        } else {
+          name = raw;
+        }
+      }
+
+      return {
+        classStr: cls || '-',
+        seatStr: seat || '-',
+        nameStr: name || item.studentName || item.name || '訪客'
+      };
+    }
+
+    function getLocalDateStr(ts) {
+      if (!ts) return '';
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return '';
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function populateClassOptions() {
+      const classSelect = document.getElementById('filter-class');
+      let currentVal = classSelect.value;
+      let classes = new Set();
+
+      combinedRecords.forEach(item => {
+        let info = getStudentInfo(item);
+        if (info.classStr && info.classStr !== '-') {
+          classes.add(info.classStr);
+        }
+      });
+
+      let sorted = Array.from(classes).sort();
+      classSelect.innerHTML = '<option value="">全部班級</option>';
+      sorted.forEach(cls => {
+        let opt = document.createElement('option');
+        opt.value = cls;
+        opt.innerText = cls + ' 班';
+        if (cls === currentVal) opt.selected = true;
+        classSelect.appendChild(opt);
+      });
+    }
+
+    // 提煉數字陣列
+    function extractNumbers(val) {
+      if (!val || val === '無' || val === '超時未完成' || val === '-') return [];
+      let str = String(val);
+      let matches = str.match(/\d+/g);
+      if (!matches) return [];
+      return Array.from(new Set(matches.map(m => parseInt(m, 10)))).sort((a, b) => a - b);
+    }
+
+    // 智慧比對：學生多填的圈紅圈，正解中漏填的圈橘紅虛線圈
+    function renderComparisonPills(userInputVal, expectedVal, isCorrect) {
+      let studentNums = extractNumbers(userInputVal);
+      let correctNums = extractNumbers(expectedVal);
+
+      // 若完全無數字輸入
+      if (studentNums.length === 0) {
+        let studentText = userInputVal ? String(userInputVal) : '未填 / 超時';
+        let studentHtml = `<span style="color: var(--color-danger); font-weight: bold;">${studentText}</span>`;
+        let correctHtml = correctNums.length > 0
+          ? correctNums.map(n => `<span class="factor-pill factor-missed" title="⭕ 漏填因數">${n}</span>`).join('')
+          : String(expectedVal || '-');
+        return { studentHtml, correctHtml };
+      }
+
+      // 若正解無法提取數字，退回純文字
+      if (correctNums.length === 0) {
+        return {
+          studentHtml: String(userInputVal || '-'),
+          correctHtml: String(expectedVal || '-')
+        };
+      }
+
+      // 1. 學生作答欄：比對學生數字，不是正解因數者 -> 圈出多填 (factor-extra)
+      let studentHtml = studentNums.map(num => {
+        if (!correctNums.includes(num)) {
+          return `<span class="factor-pill factor-extra" title="⚠️ 多填（非因數）">${num}</span>`;
+        } else {
+          return `<span class="factor-pill factor-matched">${num}</span>`;
+        }
+      }).join('');
+
+      // 2. 正確答案欄：比對正解因數，學生沒填到的 -> 圈出漏填 (factor-missed)
+      let correctHtml = correctNums.map(num => {
+        if (!studentNums.includes(num)) {
+          return `<span class="factor-pill factor-missed" title="⭕ 學生漏填">${num}</span>`;
+        } else {
+          return `<span class="factor-pill factor-matched">${num}</span>`;
+        }
+      }).join('');
+
+      return { studentHtml, correctHtml };
+    }
+
+    function applyFilters() {
+      const filterClass = document.getElementById('filter-class').value.trim().toLowerCase();
+      const filterDateStart = document.getElementById('filter-date-start').value;
+      const filterDateEnd = document.getElementById('filter-date-end').value;
+      const filterKeyword = document.getElementById('filter-keyword').value.trim().toLowerCase();
+      const filterWrongOnly = document.getElementById('filter-wrong-only').checked;
+
+      let filtered = combinedRecords.filter(item => {
+        let info = getStudentInfo(item);
+        let isItemCorrect = item.isCorrect === true || item.isCorrect === 'true';
+
+        // 只看錯題
+        if (filterWrongOnly && isItemCorrect) {
+          return false;
+        }
+
+        // 班級
+        if (filterClass && info.classStr.toLowerCase() !== filterClass) {
+          return false;
+        }
+
+        // 日期
+        if (filterDateStart || filterDateEnd) {
+          const itemDate = getLocalDateStr(item.timestamp);
+          if (filterDateStart && itemDate < filterDateStart) return false;
+          if (filterDateEnd && itemDate > filterDateEnd) return false;
+        }
+
+        // 關鍵字
+        if (filterKeyword) {
+          let fullSearch = `${info.classStr} ${info.seatStr} ${info.nameStr} ${item.name || ''} ${item.base || ''} ${item.type || ''} ${item.errorType || ''}`.toLowerCase();
+          if (!fullSearch.includes(filterKeyword)) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+
+      renderRecordsTable(filtered);
+      updateStatisticsDisplay(filtered);
+    }
+
+    function renderRecordsTable(list) {
+      const tbody = document.getElementById('records-table-body');
+      tbody.innerHTML = '';
+
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 40px; color: var(--color-text-muted); font-size: 1.1rem;">沒有符合條件的作答紀錄。</td></tr>';
+        return;
+      }
+
+      list.forEach(item => {
+        let info = getStudentInfo(item);
+        let tr = document.createElement('tr');
+        let isItemCorrect = item.isCorrect === true || item.isCorrect === 'true';
+
+        tr.className = isItemCorrect ? 'good' : 'wrong';
+
+        let dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString() : '-';
+        let levelType = item.type || (item.mode === 'basic' ? '簡單' : (item.mode === 'advanced' ? '進階' : '困難'));
+        let targetBase = item.base || '-';
+        let studentAnsRaw = item.studentAnswer || item.userInputVal || '無';
+        let correctAnsRaw = item.correctAnswer || item.expectedVal || '-';
+
+        let pills = renderComparisonPills(studentAnsRaw, correctAnsRaw, isItemCorrect);
+
+        let errorTypeStr = item.errorType || (isItemCorrect ? '完全正確' : '作答失誤');
+        if (errorTypeStr.includes('我找完了') || errorTypeStr.includes('因數配對有誤')) {
+          errorTypeStr = '漏找或找錯';
+        }
+
+        let resultBadge = isItemCorrect
+          ? '<span class="badge badge-success">✅ 答對</span>'
+          : `<span class="badge badge-error">❌ 答錯 (${errorTypeStr})</span>`;
+
+        tr.innerHTML = `
+          <td style="font-size: 0.95rem; color: var(--color-text-muted);">${dateStr}</td>
+          <td style="font-weight: 900; color: var(--color-accent);">${info.classStr}</td>
+          <td style="font-weight: 800;">${info.seatStr}</td>
+          <td style="font-weight: 900; color: var(--color-primary);">${info.nameStr}</td>
+          <td><span class="badge ${levelType === '公因數挑戰' ? 'badge-success' : 'badge-error'}" style="background:#e0e7ff; color:#3730a3; border-color:#c7d2fe;">${levelType}</span></td>
+          <td style="font-family: monospace; font-weight: 900; font-size: 1.2rem; color: var(--color-primary);">${targetBase}</td>
+          <td>${pills.studentHtml}</td>
+          <td>${pills.correctHtml}</td>
+          <td>${resultBadge}</td>
+          <td style="text-align: center;">
+            <button class="btn-delete-row" data-id="${item.id}" data-node="${item.sourceNode || 'records'}" title="刪除此筆紀錄">🗑️ 刪除</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateStatisticsDisplay(list) {
+      // 1. 累計人數 (以班級+座號/姓名去重)
+      let studentSet = new Set();
+      list.forEach(item => {
+        let info = getStudentInfo(item);
+        studentSet.add(`${info.classStr}_${info.seatStr}_${info.nameStr}`);
+      });
+      document.getElementById('stats-total-players').innerText = studentSet.size;
+
+      // 2. 總題數
+      document.getElementById('stats-total-attempts').innerText = list.length;
+
+      // 3. 錯題數與答對率
+      let correctCount = list.filter(item => item.isCorrect === true || item.isCorrect === 'true').length;
+      let wrongCount = list.length - correctCount;
+      document.getElementById('stats-total-wrong').innerText = wrongCount;
+
+      let acc = list.length > 0 ? Math.round((correctCount / list.length) * 100) : 0;
+      document.getElementById('stats-avg-accuracy').innerText = acc + '%';
+
+      // 4. 高頻出錯數字
+      let wrongList = list.filter(item => !(item.isCorrect === true || item.isCorrect === 'true'));
+      let freq = {};
+      wrongList.forEach(m => {
+        let b = m.base;
+        if (b) freq[b] = (freq[b] || 0) + 1;
+      });
+
+      let maxBase = '-';
+      let maxCount = 0;
+      for (let b in freq) {
+        if (freq[b] > maxCount) {
+          maxCount = freq[b];
+          maxBase = b;
+        }
+      }
+      document.getElementById('stats-most-failed-base').innerText = maxBase !== '-' ? `${maxBase} (${maxCount}次)` : '-';
+    }
+
+    // --- 單筆刪除 ---
+    function deleteSingleRecord(id, node) {
+      if (!id) return;
+      const target = combinedRecords.find(r => r.id === id);
+      const studentName = target ? (getStudentInfo(target).nameStr || '該學生') : '該學生';
+
+      const pwd = prompt(`⚠️ 準備刪除「${studentName}」的這筆作答紀錄。\n請輸入管理者密碼確認刪除：`);
+      if (pwd === null) return;
+      if (pwd !== "0987912307") {
+        alert("❌ 管理者密碼錯誤，無法刪除！");
+        return;
+      }
+
+      if (isFirebaseActive) {
+        let path = (node === 'mistakes') ? ('GCD/mistakes/' + id) : ('GCD/records/' + id);
+        database.ref(path).remove()
+          .then(() => {
+            // 同步清理另一個節點若有對應 id
+            if (node === 'records') {
+              database.ref('GCD/mistakes/' + id).remove().catch(() => {});
+            }
+          })
+          .catch(err => {
+            alert("❌ 刪除失敗：" + err.message);
+          });
+      } else {
+        let localRec = JSON.parse(localStorage.getItem('GCD_records') || '[]');
+        let localMis = JSON.parse(localStorage.getItem('GCD_mistakes') || '[]');
+
+        localRec = localRec.filter(r => r.id !== id);
+        localMis = localMis.filter(m => m.id !== id);
+
+        localStorage.setItem('GCD_records', JSON.stringify(localRec));
+        localStorage.setItem('GCD_mistakes', JSON.stringify(localMis));
+        loadLocalData();
+      }
+    }
+
+    // --- 清除全班紀錄 ---
+    document.getElementById('btn-clear-db').addEventListener('click', () => {
+      let pwd = prompt("🔒 請輸入管理者密碼以清除所有數據：");
+      if (pwd === null) return;
+      if (pwd !== "0987912307") {
+        alert("❌ 管理者密碼錯誤，拒絕清除數據！");
+        return;
+      }
+
+      let conf1 = confirm("⚠️ 警告：您即將清空所有的學生作答紀錄！此操作無法復原，是否繼續？");
+      if (conf1) {
+        let conf2 = confirm("🔒 請再次確認：是否確定清空 GCD 資料庫節點下的所有作答紀錄？");
+        if (conf2) {
+          if (isFirebaseActive) {
+            Promise.all([
+              database.ref('GCD/records').remove(),
+              database.ref('GCD/mistakes').remove()
+            ]).then(() => {
+              alert("✅ Firebase GCD 作答紀錄已成功清空！");
+            }).catch(err => {
+              alert("❌ 清除失敗：" + err.message);
+            });
+          } else {
+            localStorage.removeItem('GCD_records');
+            localStorage.removeItem('GCD_mistakes');
+            alert("✅ 本機離線紀錄已成功清空！");
+            loadLocalData();
+          }
+        }
+      }
+    });
+
+    // --- 匯出 Excel (SheetJS) ---
+    function exportToExcel() {
+      // 提取目前篩選後的資料
+      const tbody = document.getElementById('records-table-body');
+      const rows = tbody.querySelectorAll('tr');
+      if (rows.length === 0 || rows[0].querySelector('td[colspan]')) {
+        alert("目前沒有任何作答紀錄可供匯出！");
+        return;
+      }
+
+      let excelData = [];
+      const filterWrongOnly = document.getElementById('filter-wrong-only').checked;
+
+      combinedRecords.forEach(item => {
+        let isItemCorrect = item.isCorrect === true || item.isCorrect === 'true';
+        if (filterWrongOnly && isItemCorrect) return;
+
+        let info = getStudentInfo(item);
+        let dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString() : '-';
+        let levelType = item.type || (item.mode === 'basic' ? '簡單' : (item.mode === 'advanced' ? '進階' : '困難'));
+
+        excelData.push({
+          '作答時間': dateStr,
+          '班級': info.classStr,
+          '座號': info.seatStr,
+          '姓名': info.nameStr,
+          '關卡類型': levelType,
+          '目標數字': item.base || '-',
+          '學生作答': item.studentAnswer || item.userInputVal || '無',
+          '正確答案': item.correctAnswer || item.expectedVal || '-',
+          '結果': isItemCorrect ? '答對' : '答錯',
+          '錯誤分析': isItemCorrect ? '完全正確' : (item.errorType || '漏找或找錯')
+        });
+      });
+
+      if (excelData.length === 0) {
+        alert("篩選後無任何資料可匯出！");
+        return;
+      }
+
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "作答紀錄");
+
+      const dateTag = new Date().toISOString().split('T')[0];
+      const filename = `鵲橋相會配對法找因數_全班作答成果_${dateTag}.xlsx`;
+      XLSX.writeFile(wb, filename);
+    }
+
+    document.getElementById('btn-export-excel').addEventListener('click', exportToExcel);
+
+    // --- 篩選事件 ---
+    document.getElementById('filter-class').addEventListener('change', applyFilters);
+    document.getElementById('filter-date-start').addEventListener('change', applyFilters);
+    document.getElementById('filter-date-end').addEventListener('change', applyFilters);
+    document.getElementById('filter-keyword').addEventListener('input', applyFilters);
+    document.getElementById('filter-wrong-only').addEventListener('change', applyFilters);
+
+    document.getElementById('btn-reset-filter').addEventListener('click', () => {
+      document.getElementById('filter-date-start').value = '';
+      document.getElementById('filter-date-end').value = '';
+      document.getElementById('filter-class').value = '';
+      document.getElementById('filter-keyword').value = '';
+      document.getElementById('filter-wrong-only').checked = false;
+      applyFilters();
+    });
+
+    document.getElementById('records-table-body').addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-delete-row');
+      if (btn && btn.dataset.id) {
+        deleteSingleRecord(btn.dataset.id, btn.dataset.node);
+      }
+    });
+
+    initDataLoad();
+  </script>
+</body>
+</html>
