@@ -298,13 +298,71 @@ let advDragStart = null; // 拖曳連線起點 'x,y'
 let advHintPair = null;  // 提示點對高亮
 let advHintProj = null;  // 提示投影線
 
+function arePointsCollinear(p1, p2, p3) {
+  const [x1, y1] = typeof p1 === 'string' ? p1.split(',').map(Number) : p1;
+  const [x2, y2] = typeof p2 === 'string' ? p2.split(',').map(Number) : p2;
+  const [x3, y3] = typeof p3 === 'string' ? p3.split(',').map(Number) : p3;
+  return (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1) === 0;
+}
+
+// 三點共線自動去除中間點，保留起點和終點兩個點連成一條線
+function mergeCollinearSegments(segSet) {
+  let segs = [...segSet];
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    for (let i = 0; i < segs.length; i++) {
+      const [a1, a2] = segs[i].split('_');
+      for (let j = i + 1; j < segs.length; j++) {
+        const [b1, b2] = segs[j].split('_');
+
+        // 檢查 4 個端點是否都在同一直線上
+        if (!arePointsCollinear(a1, a2, b1) || !arePointsCollinear(a1, a2, b2)) {
+          continue;
+        }
+
+        const pts = [a1, a2, b1, b2].map(p => {
+          const [x, y] = p.split(',').map(Number);
+          return { key: p, x, y };
+        });
+
+        const isVert = (pts[0].x === pts[1].x);
+        const getCoord = p => isVert ? p.y : p.x;
+
+        const [minA, maxA] = [getCoord(pts[0]), getCoord(pts[1])].sort((a,b)=>a-b);
+        const [minB, maxB] = [getCoord(pts[2]), getCoord(pts[3])].sort((a,b)=>a-b);
+
+        // 檢查區間是否相連或重疊
+        if (Math.max(minA, minB) <= Math.min(maxA, maxB)) {
+          const allCoords = pts.map(p => ({ p: p.key, c: getCoord(p) }));
+          allCoords.sort((a,b) => a.c - b.c);
+          const startPt = allCoords[0].p;
+          const endPt = allCoords[allCoords.length - 1].p;
+
+          const merged = normSeg(startPt, endPt);
+          segs.splice(j, 1);
+          segs.splice(i, 1);
+          segs.push(merged);
+          changed = true;
+          break;
+        }
+      }
+      if (changed) break;
+    }
+  }
+
+  return new Set(segs);
+}
+
 function answerSimple() {
   return new Set(run.levels[run.index].given.map(k => mirror(k, run.levels[run.index].axis)));
 }
 
 function answerAdvanced() {
   const lv = run.levels[run.index];
-  return new Set(lv.given.map(seg => mirrorSegAdv(seg, lv.axis)));
+  const mirrored = lv.given.map(seg => mirrorSegAdv(seg, lv.axis));
+  return mergeCollinearSegments(new Set(mirrored));
 }
 
 function editableSimple(key) {
@@ -333,7 +391,7 @@ function record(kind, extra = {}) {
     at: new Date().toISOString(),
     kind,
     mode: isAdv ? 'advanced' : 'simple',
-    modeLabel: isAdv ? '進階模式(格點連線)' : '簡單模式(方格填色)',
+    modeLabel: isAdv ? '點線繪圖' : '方格填色',
     level: run.index + 1,
     shapeName: curLevel.name,
     axis: curLevel.axis,
@@ -859,15 +917,17 @@ function rememberAdvanced() {
   if (undo.length > 40) undo.shift();
 }
 
-// 新增一條線段 (線畫了就畫了，除非按上一步或用橡皮擦擦掉，不然不會消失)
+// 新增一條線段 (支援三點共線自動合併中繼點)
 function addAdvancedSegment(p1, p2) {
   if (p1 === p2 || run.passed) return;
   const seg = normSeg(p1, p2);
-  const currentSegs = new Set(run.segments || []);
+  let currentSegs = new Set(run.segments || []);
   if (currentSegs.has(seg)) return; // 已經連過則不重複連
 
   rememberAdvanced();
   currentSegs.add(seg);
+  // 三點共線自動去除中間點，保留起點和終點兩個點連成一條線
+  currentSegs = mergeCollinearSegments(currentSegs);
   run.segments = [...currentSegs];
   refreshAdvanced();
 }
@@ -890,7 +950,7 @@ function handleDotClick(dotKey) {
   if (run.passed) return;
 
   if (currentTool === 'eraser') {
-    message('🧹 橡皮擦模式中：請點選要擦除的線段，或切換回「🖌️ 畫筆」繼續連線。');
+    message('橡皮擦模式中：請點選要擦除的線段，或切換回「🖌️ 畫筆」繼續連線。');
     return;
   }
 
@@ -974,7 +1034,7 @@ function handleDotClick(dotKey) {
     const endDot = getHitDotFromEvent(e);
     if (endDot && endDot !== startDot) {
       if (currentTool === 'eraser') {
-        message('🧹 橡皮擦模式中：請點選要擦除的線段。');
+        message('橡皮擦模式中：請點選要擦除的線段。');
         return;
       }
       // 拖曳成功連線
@@ -1337,7 +1397,7 @@ function result() {
   $('endScreen').hidden = false;
   $('summary').replaceChildren();
   let completed = Object.entries(run.results);
-  const modeName = run.mode === 'advanced' ? '進階模式（點線繪圖）' : '簡單模式（方格填色）';
+  const modeName = run.mode === 'advanced' ? '點線繪圖' : '方格填色';
   $('finalScore').textContent = `【${modeName}】收集了全部 ${completed.length} 塊藏寶圖殘卷 · 共奪得 ${completed.reduce((n, [, r]) => n + r.gold, 0)} 枚金幣！`;
 
   for (const [i, r] of completed) {

@@ -174,11 +174,13 @@
       to { stroke: #f97316; stroke-width: 6; }
     }
 
-    /* 限制出題半邊的高亮指示底色 */
+    /* 限制出題半邊的高亮指示底色 (綠底提醒出題區域) */
     .allowed-half-rect {
-      fill: rgba(34, 197, 94, 0.08);
-      stroke: rgba(34, 197, 94, 0.35);
-      stroke-dasharray: 4 3;
+      fill: rgba(34, 197, 94, 0.22);
+      stroke: #16a34a;
+      stroke-width: 2;
+      stroke-dasharray: 6 4;
+      pointer-events: none;
     }
     .disabled-half-rect {
       fill: rgba(0, 0, 0, 0.04);
@@ -373,6 +375,18 @@
       cursor: pointer;
       transition: background 0.1s;
     }
+    .simple-cell.allowed {
+      background: #dcfce7 !important; /* 綠底提醒出題區域 */
+      border: 1px solid #86efac;
+    }
+    .simple-cell.allowed:hover {
+      background: #bbf7d0 !important;
+    }
+    .simple-cell.forbidden {
+      background: #e2d5bd !important;
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
     .simple-cell.given {
       background: #181512 !important;
     }
@@ -470,23 +484,19 @@
         </div>
       </div>
 
-      <!-- 對戰模式選擇 (簡單模式 / 進階模式) -->
+      <!-- 對戰模式選擇 (方格填色 / 點線繪圖) -->
       <div class="battle-mode-section" style="margin-bottom:14px;">
         <div style="font-size:0.95rem;font-weight:900;color:#5c2d12;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
-          <span>🎯</span> 對戰模式選擇：
+          <span>🎯</span> 對戰模式：
         </div>
         <div class="battle-mode-grid">
           <button type="button" class="battle-mode-card active" id="btnModeSimple" data-mode="simple">
             <div class="mode-icon">🟩</div>
-            <div class="mode-title">簡單模式</div>
-            <div class="mode-desc">12×10 方格填色</div>
-            <div class="mode-badge">入門推薦</div>
+            <div class="mode-title">方格填色</div>
           </button>
           <button type="button" class="battle-mode-card" id="btnModeAdvanced" data-mode="advanced">
             <div class="mode-icon">📐</div>
-            <div class="mode-title">進階模式</div>
-            <div class="mode-desc">7×7 格點點線繪圖</div>
-            <div class="mode-badge">幾何思維</div>
+            <div class="mode-title">點線繪圖</div>
           </button>
         </div>
       </div>
@@ -543,7 +553,7 @@
         <h2 class="antique-title">ROOM CREATED</h2>
         <div class="antique-subtitle">決鬥密室已開闢，等待水手登船...</div>
         <div class="room-code-display" id="waitRoomCode">----</div>
-        <div id="waitModeDisplay" style="font-size:1.05rem;font-weight:900;color:#78350f;margin:8px 0;">模式：簡單模式（12×10 方格填色）</div>
+        <div id="waitModeDisplay" style="font-size:1.05rem;font-weight:900;color:#78350f;margin:8px 0;">模式：方格填色</div>
         <p style="font-size:0.95rem;color:#573315;line-height:1.6;">
           請告訴對手輸入上方 <strong>4 位數字代碼</strong> 加入房間！<br>
           <span style="color:#b45309;font-weight:900;">⚡ 對手連線後將自動開局！</span>
@@ -612,22 +622,22 @@
           </p>
         </div>
 
-        <!-- 模式 1：簡單模式棋盤 (12x10 方格填色) -->
+        <!-- 模式 1：方格填色 (12x10) -->
         <div id="simpleBoardBox" hidden>
           <div id="simpleBoardArea">
             <div id="simpleAxisLine" class="v"></div>
             <div id="simpleGrid"></div>
           </div>
           <div class="dot-instructions" id="simpleInstructions">
-            💡 點選限定半邊方格即可填色；再點一下可清除；支援復原與全部清除。
+            💡 點選綠底方格填色，擦除請用橡皮擦。
           </div>
         </div>
 
-        <!-- 模式 2：進階模式格點 (7x7 格點連線) -->
+        <!-- 模式 2：點線繪圖 (7x7) -->
         <div id="dotGridBox">
           <svg id="battleSvg" viewBox="0 0 420 420" role="img" aria-label="連線對戰畫布"></svg>
           <div class="dot-instructions" id="battleInstructions">
-            💡 點選兩個格點連成一條線段；欲擦除請切換「🧹 橡皮擦」或點選「復原」。
+            💡 點選兩點連成線段，擦除請用橡皮擦。
           </div>
         </div>
       </div>
@@ -635,14 +645,14 @@
       <!-- 工具列 (畫筆、橡皮擦、復原、全部清除) -->
       <div class="tools tools-four" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 8px;">
         <button id="bDrawBtn" aria-pressed="true"><span class="tool-ic">🖌️</span> 畫筆</button>
-        <button id="bEraseBtn" aria-pressed="false"><span class="tool-ic">🧹</span> 橡皮擦</button>
+        <button id="bEraseBtn" aria-pressed="false"><svg class="tool-ic-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:2px;"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg> 橡皮擦</button>
         <button id="bUndoBtn"><span class="tool-ic">↶</span> 復原</button>
         <button id="bClearBtn"><span class="tool-ic">🗑️</span> 全部清除</button>
       </div>
 
-      <!-- 核心動作提交按鈕 -->
-      <div class="actions" style="margin-top:10px;">
-        <button class="primary wide btn-check antique-gold-btn" id="bSubmitBtn">
+      <!-- 核心動作提交按鈕 (置中對齊) -->
+      <div class="actions" style="margin-top:14px;display:flex;justify-content:center;align-items:center;">
+        <button class="primary btn-check antique-gold-btn" id="bSubmitBtn" style="min-width:280px;padding:12px 28px;margin:auto;">
           完成設計，送出題目 🚀
         </button>
       </div>
@@ -769,6 +779,64 @@
       return normSeg(mirrorDot(p1, axis), mirrorDot(p2, axis));
     };
 
+    // 判定三點共線演算法
+    function arePointsCollinear(p1, p2, p3) {
+      const [x1, y1] = typeof p1 === 'string' ? p1.split(',').map(Number) : p1;
+      const [x2, y2] = typeof p2 === 'string' ? p2.split(',').map(Number) : p2;
+      const [x3, y3] = typeof p3 === 'string' ? p3.split(',').map(Number) : p3;
+      return (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1) === 0;
+    }
+
+    // 三點共線自動去除中間點，保留起點和終點兩個點連成一條線
+    function mergeCollinearSegments(segSet) {
+      let segs = [...segSet];
+      let changed = true;
+
+      while (changed) {
+        changed = false;
+        for (let i = 0; i < segs.length; i++) {
+          const [a1, a2] = segs[i].split('_');
+          for (let j = i + 1; j < segs.length; j++) {
+            const [b1, b2] = segs[j].split('_');
+
+            // 檢查 4 個端點是否都在同一直線上
+            if (!arePointsCollinear(a1, a2, b1) || !arePointsCollinear(a1, a2, b2)) {
+              continue;
+            }
+
+            const pts = [a1, a2, b1, b2].map(p => {
+              const [x, y] = p.split(',').map(Number);
+              return { key: p, x, y };
+            });
+
+            const isVert = (pts[0].x === pts[1].x);
+            const getCoord = p => isVert ? p.y : p.x;
+
+            const [minA, maxA] = [getCoord(pts[0]), getCoord(pts[1])].sort((a,b)=>a-b);
+            const [minB, maxB] = [getCoord(pts[2]), getCoord(pts[3])].sort((a,b)=>a-b);
+
+            // 檢查區間是否相連或重疊
+            if (Math.max(minA, minB) <= Math.min(maxA, maxB)) {
+              const allCoords = pts.map(p => ({ p: p.key, c: getCoord(p) }));
+              allCoords.sort((a,b) => a.c - b.c);
+              const startPt = allCoords[0].p;
+              const endPt = allCoords[allCoords.length - 1].p;
+
+              const merged = normSeg(startPt, endPt);
+              segs.splice(j, 1);
+              segs.splice(i, 1);
+              segs.push(merged);
+              changed = true;
+              break;
+            }
+          }
+          if (changed) break;
+        }
+      }
+
+      return new Set(segs);
+    }
+
     // 檢查點是否落在合法出題半邊
     // side: 'left' (x<=3), 'right' (x>=3), 'top' (y<=3), 'bottom' (y>=3)
     function isDotInAllowedSide(x, y, axis, side) {
@@ -887,9 +955,9 @@
       gameState.activeDot = null;
       renderBattleActiveRing();
       if (gameState.roomData?.mode === 'simple') {
-        bMessage('🧹 橡皮擦已備妥：點選想擦除的方格即可清除。');
+        bMessage('橡皮擦已備妥：點選想擦除的方格即可清除。');
       } else {
-        bMessage('🧹 橡皮擦已備妥：點選想擦除的線段即可刪除。');
+        bMessage('橡皮擦已備妥：點選想擦除的線段即可刪除。');
       }
     };
 
@@ -1002,7 +1070,7 @@
         gameState.roomRef = ref;
 
         $('waitRoomCode').textContent = code;
-        const modeDesc = (selectedBattleMode === 'simple') ? '簡單模式（12×10 方格填色）' : '進階模式（7×7 格點點線繪圖）';
+        const modeDesc = (selectedBattleMode === 'simple') ? '方格填色' : '點線繪圖';
         $('waitModeDisplay').textContent = `模式：${modeDesc}`;
         $('lobbyScreen').hidden = true;
         $('waitScreen').hidden = false;
@@ -1184,11 +1252,11 @@
 
       if ($('bModePill')) {
         if (mode === 'simple') {
-          $('bModePill').textContent = '🟩 簡單模式 (12×10)';
+          $('bModePill').textContent = '🟩 方格填色';
           $('bModePill').style.background = '#064e3b';
           $('bModePill').style.borderColor = '#34d399';
         } else {
-          $('bModePill').textContent = '📐 進階模式 (7×7)';
+          $('bModePill').textContent = '📐 點線繪圖';
           $('bModePill').style.background = '#78350f';
           $('bModePill').style.borderColor = '#f59e0b';
         }
@@ -1254,31 +1322,24 @@
         gameState.localUndo = [];
         gameState.activeDot = null;
 
-        const sideNameMap = { left: '左半邊', right: '右半邊', top: '上半邊', bottom: '下半邊' };
-        const sideName = sideNameMap[room.side] || '';
-
         if (isDesigner) {
           $('lockOverlay').hidden = true;
-          $('phaseTitle').textContent = `🎨 輪到你出題！（限定 ${sideName}）`;
-          if (mode === 'simple') {
-            $('phaseDesc').textContent = `請在虛線的 ${sideName} 點選方格進行填色（至少塗 3 格），完成後送出。`;
-          } else {
-            $('phaseDesc').textContent = `請在虛線的 ${sideName} 自由點選兩點連線（至少連 2 條線段），完成後送出。`;
-          }
+          $('phaseTitle').textContent = `🎨 輪到你出題！`;
+          $('phaseDesc').textContent = `請在「綠底區域」出題，完成後送出。`;
           $('bSubmitBtn').textContent = '完成設計，送出題目 🚀';
           $('bSubmitBtn').disabled = false;
           $('bUndoBtn').disabled = false;
           $('bClearBtn').disabled = false;
-          bMessage(`你是指揮官！請在 ${sideName} 構思題目考倒對手。`);
+          bMessage('請在綠底區域出題。');
         } else {
           // 答題者此時看不到題目，顯示迷霧遮罩
           $('lockOverlay').hidden = false;
-          $('phaseTitle').textContent = `⏳ 對手正在設計秘圖中...`;
-          $('phaseDesc').textContent = `出題者擁有 90 秒時間，請耐心等候迷霧散開。`;
+          $('phaseTitle').textContent = `⏳ 對手出題中...`;
+          $('phaseDesc').textContent = `請耐心等候對手完成題目。`;
           $('bSubmitBtn').disabled = true;
           $('bUndoBtn').disabled = true;
           $('bClearBtn').disabled = true;
-          bMessage('海霧瀰漫中，對手正在密謀繪製線對稱殘卷...');
+          bMessage('對手出題中...');
         }
 
         if (mode === 'simple') {
@@ -1297,21 +1358,17 @@
         if (isSolver) {
           gameState.localUserSegs.clear();
           gameState.localUserCells.clear();
-          $('phaseTitle').textContent = `⚔️ 破解秘圖！完成對稱圖形！`;
-          if (mode === 'simple') {
-            $('phaseDesc').textContent = `觀察題目方格，在對稱側點選對稱方格完成圖形！越快完成分數越高！`;
-          } else {
-            $('phaseDesc').textContent = `觀察題目線段，在對稱側點選兩點連出對稱線段！越快完成分數越高！`;
-          }
+          $('phaseTitle').textContent = `⚔️ 輪到你破解！`;
+          $('phaseDesc').textContent = `請在對稱側完成圖形，越快完成分數越高！`;
           $('bSubmitBtn').textContent = '完成作答，送出檢查 🔍';
           $('bSubmitBtn').disabled = false;
           $('bUndoBtn').disabled = false;
           $('bClearBtn').disabled = false;
-          bMessage('計時開始！找出各對稱位置，越快送出分數越高！');
+          bMessage('計時開始！越快送出分數越高！');
         } else {
           // 出題者觀戰中 (即時同步答題者作答歷程)
-          $('phaseTitle').innerHTML = `👀 對手正在破解你的題目... <span class="live-pill">● LIVE 歷程同步</span>`;
-          $('phaseDesc').textContent = `即時轉播對手的作答筆跡！對手有 90 秒答題時間。`;
+          $('phaseTitle').innerHTML = `👀 對手破解中... <span class="live-pill">● LIVE 同步</span>`;
+          $('phaseDesc').textContent = `即時轉播對手作答歷程`;
           $('bSubmitBtn').textContent = '對手作答中... ⏳';
           $('bSubmitBtn').disabled = true;
           $('bUndoBtn').disabled = true;
@@ -1323,7 +1380,7 @@
             const liveSegs = room.liveSolverSegs || [];
             gameState.localUserSegs = new Set(liveSegs);
           }
-          bMessage('👀 即時觀戰啟動！對手正聚精會神作答，你可同步看見他的作答歷程！');
+          bMessage('👀 即時觀戰中：對手正在作答...');
         }
 
         if (mode === 'simple') {
@@ -1336,13 +1393,13 @@
       } else if (room.phase === 'roundResult') {
         clearInterval(gameState.timerInterval);
         $('lockOverlay').hidden = true;
-        $('phaseTitle').textContent = `🎉 破解完成！雙方請檢視完整線對稱圖形！`;
-        $('phaseDesc').textContent = `完整線對稱圖形已拼合完畢，出題者與答題者皆可共同欣賞！`;
+        $('phaseTitle').textContent = `🎉 本題結束！完整線對稱圖形`;
+        $('phaseDesc').textContent = `出題與破解圖形已拼合完成`;
         $('bSubmitBtn').textContent = '本題已結束 ✓';
         $('bSubmitBtn').disabled = true;
         $('bUndoBtn').disabled = true;
         $('bClearBtn').disabled = true;
-        bMessage('✨ 對手破解完成！完整線對稱圖形已呈現在棋盤上。');
+        bMessage('✨ 本題結束！完整線對稱圖形已呈現在棋盤上。');
 
         if (mode === 'simple') {
           buildSimpleBattleGrid(room, 'solve');
@@ -1767,12 +1824,14 @@
 
       const seg = normSeg(p1, p2);
       if (gameState.localUserSegs.has(seg)) {
-        bMessage('這條線段已經連過了喔！若欲擦除請切換至「🧹 橡皮擦」。');
+        bMessage('這條線段已經連過了喔！若欲擦除請切換至「橡皮擦」。');
         return;
       }
 
       gameState.localUndo.push(new Set(gameState.localUserSegs));
       gameState.localUserSegs.add(seg);
+      // 三點共線自動去除中間點，保留起點和終點兩個點連成一條線
+      gameState.localUserSegs = mergeCollinearSegments(gameState.localUserSegs);
       soundConnect();
       bMessage('已連成一條線段！請再選取兩個格點畫下一條線。');
 
@@ -1792,7 +1851,7 @@
       if (currentBattleTool === 'eraser') {
         deleteBattleSegment(seg);
       } else {
-        bMessage('線段已畫好！若欲擦除請切換至「🧹 橡皮擦」或點選「復原」。');
+        bMessage('線段已畫好！若欲擦除請切換至「橡皮擦」或點選「復原」。');
       }
     }
 
@@ -2036,14 +2095,17 @@
     // 出題者送出題目 (進階模式)
     async function submitDesign(designArr, targetArr) {
       const room = gameState.roomData;
+      const cleanDesign = [...mergeCollinearSegments(new Set(designArr))];
+      const cleanTarget = [...mergeCollinearSegments(new Set(targetArr))];
+
       gameState.localUserSegs.clear();
       gameState.localUndo = [];
       gameState.activeDot = null;
 
       if (gameState.isAi) {
         room.phase = 'solve';
-        room.designSegs = designArr;
-        room.targetSegs = targetArr;
+        room.designSegs = cleanDesign;
+        room.targetSegs = cleanTarget;
         room.liveSolverSegs = [];
         room.liveSolverDot = null;
         room.solverSegs = [];
@@ -2054,8 +2116,8 @@
         try {
           await gameState.roomRef.update({
             phase: 'solve',
-            designSegs: designArr,
-            targetSegs: targetArr,
+            designSegs: cleanDesign,
+            targetSegs: cleanTarget,
             liveSolverSegs: [],
             liveSolverDot: null,
             solverSegs: [],
@@ -2071,8 +2133,8 @@
     // 答題者送出檢查 (進階模式)
     async function submitSolveAttempt() {
       const room = gameState.roomData;
-      const targetSet = new Set(room.targetSegs || []);
-      const userSet = gameState.localUserSegs;
+      const targetSet = mergeCollinearSegments(new Set(room.targetSegs || []));
+      const userSet = mergeCollinearSegments(gameState.localUserSegs);
 
       const wrong = [...userSet].filter(s => !targetSet.has(s));
       const missing = [...targetSet].filter(s => !userSet.has(s));
