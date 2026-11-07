@@ -375,15 +375,8 @@
       cursor: pointer;
       transition: background 0.1s;
     }
-    .simple-cell.allowed {
-      background: #dcfce7 !important; /* 綠底提醒出題區域 */
-      border: 1px solid #86efac;
-    }
-    .simple-cell.allowed:hover {
-      background: #bbf7d0 !important;
-    }
     .simple-cell.forbidden {
-      background: #e2d5bd !important;
+      background: #cbbba4 !important;
       cursor: not-allowed;
       opacity: 0.55;
     }
@@ -444,8 +437,13 @@
           🚪 離開房間
         </button>
       </div>
-      <div class="mode-badge" style="background:#b45309;color:#fff;padding:6px 14px;border-radius:20px;font-weight:800;font-size:0.85rem;border:1px solid #fde047;">
-        ⚔️ 雙人連線對戰版
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button id="bgmToggleBtn" class="nav-btn" title="切換背景音樂" aria-label="切換背景音樂">
+          🎵 音樂
+        </button>
+        <div class="mode-badge" style="background:#b45309;color:#fff;padding:6px 14px;border-radius:20px;font-weight:800;font-size:0.85rem;border:1px solid #fde047;">
+          ⚔️ 雙人連線對戰版
+        </div>
       </div>
     </nav>
 
@@ -990,6 +988,60 @@
     function soundTick() { playBeep(880, 0.04, 'square', 0.08); }
 
     // =========================================================
+    // 🌟 背景音樂管理器 (La Recherche du Trésor) 🌟
+    // =========================================================
+    let bgmAudio = null;
+    let bgmManualMute = false;
+
+    function initBgm() {
+      if (bgmAudio) return bgmAudio;
+      bgmAudio = new Audio('La%20Recherche%20du%20Tr%C3%A9sor.mp3');
+      bgmAudio.loop = true;
+      bgmAudio.volume = 0.35;
+      return bgmAudio;
+    }
+
+    function playBgm() {
+      if (bgmManualMute) return;
+      const audio = initBgm();
+      audio.play().then(() => {
+        updateBgmBtn();
+      }).catch(() => {});
+    }
+
+    function toggleBgm() {
+      const audio = initBgm();
+      if (audio.paused) {
+        bgmManualMute = false;
+        audio.play().then(() => {
+          updateBgmBtn();
+        }).catch(e => console.log('BGM error:', e));
+      } else {
+        bgmManualMute = true;
+        audio.pause();
+        updateBgmBtn();
+      }
+    }
+
+    function updateBgmBtn() {
+      const btn = $('bgmToggleBtn');
+      if (!btn) return;
+      const isPlaying = bgmAudio && !bgmAudio.paused;
+      btn.innerHTML = isPlaying ? '🎵 音樂' : '🔇 靜音';
+      btn.style.opacity = isPlaying ? '1' : '0.65';
+    }
+
+    if ($('bgmToggleBtn')) {
+      $('bgmToggleBtn').onclick = toggleBgm;
+    }
+
+    document.addEventListener('pointerdown', () => {
+      if (!bgmManualMute && (!bgmAudio || bgmAudio.paused)) {
+        playBgm();
+      }
+    }, { once: true });
+
+    // =========================================================
     // 🌟 大廳 Tab 切換與開房 / 加房 🌟
     // =========================================================
     $('tabCreate').onclick = () => switchLobbyTab('create');
@@ -1028,6 +1080,7 @@
 
     // 建立房間 (P1)
     $('btnDoCreate').onclick = async () => {
+      playBgm();
       if (!rtdb) { alert('Firebase 資料庫未就緒，請檢查網路連線。'); return; }
       const myName = ($('userName').value || '').trim() || '水手一號';
       const code = gen4DigitCode();
@@ -1093,6 +1146,7 @@
 
     // 加入房間 (P2)
     $('btnDoJoin').onclick = async () => {
+      playBgm();
       if (!rtdb) { alert('Firebase 資料庫未就緒，請檢查網路連線。'); return; }
       const code = ($('inRoomCode').value || '').trim();
       if (!/^\d{4}$/.test(code)) {
@@ -1448,8 +1502,114 @@
     }
 
     // =========================================================
-    // 🌟 簡單模式 (12x10 方格) 網格構建與互動 🌟
+    // 🌟 方格填色 (12x10 方格) 網格構建與連續拖曳互動 🌟
     // =========================================================
+    let battleSimpleStroke = null;
+
+    function hitBattleSimple(e) {
+      return document.elementFromPoint(e.clientX, e.clientY)?.closest('.simple-cell[data-key]')?.dataset.key;
+    }
+
+    function paintBattleSimpleCell(key, value) {
+      if (value) {
+        if (!gameState.localUserCells.has(key)) {
+          gameState.localUserCells.add(key);
+          soundConnect();
+        }
+      } else {
+        if (gameState.localUserCells.has(key)) {
+          gameState.localUserCells.delete(key);
+        }
+      }
+      renderSimpleBattleGridUser();
+    }
+
+    function beginBattleSimple(e) {
+      const room = gameState.roomData;
+      if (!room || room.mode !== 'simple') return;
+
+      const isTurn = (room.phase === 'design' && gameState.myRole === room.designer) ||
+                     (room.phase === 'solve' && gameState.myRole === room.solver);
+      if (!isTurn || battleSimpleStroke || e.button > 0) return;
+
+      const k = hitBattleSimple(e);
+      if (!k) return;
+      const [r, c] = k.split(',').map(Number);
+      const oppSideMap = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' };
+      const activeSide = (room.phase === 'solve') ? (oppSideMap[room.side] || room.side) : room.side;
+      if (!isCellInAllowedSide(r, c, room.axis, activeSide)) {
+        bMessage('⚠️ 只能在指定的半邊作答喔！請勿越界。');
+        playBeep(200, 0.15, 'sawtooth', 0.2);
+        return;
+      }
+
+      e.preventDefault();
+      gameState.localUndo.push(new Set(gameState.localUserCells));
+
+      let paintValue = true;
+      if (currentBattleTool === 'eraser') {
+        paintValue = false;
+        bMessage('已擦除方格顏色。');
+      } else {
+        paintValue = true;
+        bMessage('已填上顏色！');
+      }
+
+      battleSimpleStroke = {
+        id: e.pointerId,
+        value: paintValue,
+        last: k,
+        seen: new Set([k])
+      };
+
+      $('simpleGrid').setPointerCapture(e.pointerId);
+      paintBattleSimpleCell(k, battleSimpleStroke.value);
+    }
+
+    function moveBattleSimple(e) {
+      if (!battleSimpleStroke || battleSimpleStroke.id !== e.pointerId) return;
+      e.preventDefault();
+      const k = hitBattleSimple(e);
+      if (!k) return;
+      const room = gameState.roomData;
+      if (!room) return;
+      const [r, c] = k.split(',').map(Number);
+      const oppSideMap = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' };
+      const activeSide = (room.phase === 'solve') ? (oppSideMap[room.side] || room.side) : room.side;
+      if (!isCellInAllowedSide(r, c, room.axis, activeSide)) return;
+
+      const [a, b] = battleSimpleStroke.last.split(',').map(Number);
+      const steps = Math.max(Math.abs(r - a), Math.abs(c - b));
+      for (let n = 1; n <= steps; n++) {
+        let cellKey = `${Math.round(a + (r - a) * n / steps)},${Math.round(b + (c - b) * n / steps)}`;
+        const [cr, cc] = cellKey.split(',').map(Number);
+        if (isCellInAllowedSide(cr, cc, room.axis, activeSide) && !battleSimpleStroke.seen.has(cellKey)) {
+          paintBattleSimpleCell(cellKey, battleSimpleStroke.value);
+          battleSimpleStroke.seen.add(cellKey);
+        }
+      }
+      battleSimpleStroke.last = k;
+    }
+
+    function finishBattleSimple(e) {
+      if (battleSimpleStroke && battleSimpleStroke.id === e.pointerId) {
+        battleSimpleStroke = null;
+        const room = gameState.roomData;
+        if (room && room.phase === 'solve' && gameState.myRole === room.solver) {
+          syncLiveSolverCells();
+        }
+      }
+    }
+
+    (function bindSimpleGrid() {
+      const grid = $('simpleGrid');
+      if (!grid) return;
+      grid.addEventListener('pointerdown', beginBattleSimple);
+      grid.addEventListener('pointermove', moveBattleSimple);
+      grid.addEventListener('pointerup', finishBattleSimple);
+      grid.addEventListener('pointercancel', finishBattleSimple);
+    })();
+
     function buildSimpleBattleGrid(room, stage) {
       const grid = $('simpleGrid');
       grid.replaceChildren();
@@ -1490,20 +1650,13 @@
           cell.dataset.key = key;
 
           const isAllowed = isCellInAllowedSide(r, c, axis, activeSide);
-          if (isAllowed) {
-            cell.classList.add('allowed');
-          } else {
+          if (!isAllowed) {
             cell.classList.add('forbidden');
           }
 
           if (givenSet.has(key)) {
             cell.classList.add('given');
           }
-
-          cell.addEventListener('click', e => {
-            e.stopPropagation();
-            onSimpleBattleCellClick(key, isAllowed);
-          });
 
           grid.appendChild(cell);
         }
@@ -1525,43 +1678,6 @@
           cell.classList.remove('mine');
         }
       });
-    }
-
-    function onSimpleBattleCellClick(key, isAllowed) {
-      const room = gameState.roomData;
-      if (!room || room.mode !== 'simple') return;
-
-      const isTurn = (room.phase === 'design' && gameState.myRole === room.designer) ||
-                     (room.phase === 'solve' && gameState.myRole === room.solver);
-      if (!isTurn) return;
-
-      if (!isAllowed) {
-        bMessage('⚠️ 只能在指定的半邊作答喔！請勿越界。');
-        playBeep(200, 0.15, 'sawtooth', 0.2);
-        return;
-      }
-
-      if (currentBattleTool === 'draw') {
-        if (gameState.localUserCells.has(key)) {
-          bMessage('方格已經填過色了喔！若欲擦除請切換「🧹 橡皮擦」。');
-          return;
-        }
-        gameState.localUndo.push(new Set(gameState.localUserCells));
-        gameState.localUserCells.add(key);
-        soundConnect();
-        bMessage('已填上顏色！');
-      } else if (currentBattleTool === 'eraser') {
-        if (!gameState.localUserCells.has(key)) return;
-        gameState.localUndo.push(new Set(gameState.localUserCells));
-        gameState.localUserCells.delete(key);
-        bMessage('已擦除方格顏色。');
-      }
-
-      renderSimpleBattleGridUser();
-
-      if (room.phase === 'solve' && gameState.myRole === room.solver) {
-        syncLiveSolverCells();
-      }
     }
 
     function syncLiveSolverCells() {

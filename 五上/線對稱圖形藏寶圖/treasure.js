@@ -443,6 +443,7 @@ function start() {
 
   $('startScreen').hidden = true;
   $('gameScreen').hidden = false;
+  playBgm();
   $('endScreen').hidden = true;
   $('menuBtn').hidden = false;
 
@@ -1525,3 +1526,60 @@ if ($('closePuzzleBtn')) {
     }
   };
 }
+
+// =========================================================
+// 🌟 背景音樂管理器 (La Recherche du Trésor) 🌟
+// =========================================================
+let bgmAudio = null;
+let bgmManualMute = false;
+
+function initBgm() {
+  if (bgmAudio) return bgmAudio;
+  bgmAudio = new Audio('La%20Recherche%20du%20Tr%C3%A9sor.mp3');
+  bgmAudio.loop = true;
+  bgmAudio.volume = 0.35;
+  return bgmAudio;
+}
+
+function playBgm() {
+  if (bgmManualMute) return;
+  const audio = initBgm();
+  audio.play().then(() => {
+    updateBgmBtn();
+  }).catch(() => {
+    // 瀏覽器自動播放限制，待使用者首次互動後播放
+  });
+}
+
+function toggleBgm() {
+  const audio = initBgm();
+  if (audio.paused) {
+    bgmManualMute = false;
+    audio.play().then(() => {
+      updateBgmBtn();
+    }).catch(e => console.log('BGM error:', e));
+  } else {
+    bgmManualMute = true;
+    audio.pause();
+    updateBgmBtn();
+  }
+}
+
+function updateBgmBtn() {
+  const btn = $('bgmToggleBtn');
+  if (!btn) return;
+  const isPlaying = bgmAudio && !bgmAudio.paused;
+  btn.innerHTML = isPlaying ? '🎵 音樂' : '🔇 靜音';
+  btn.style.opacity = isPlaying ? '1' : '0.65';
+}
+
+if ($('bgmToggleBtn')) {
+  $('bgmToggleBtn').onclick = toggleBgm;
+}
+
+// 使用者與頁面首次互動即自動啟動背景音樂
+document.addEventListener('pointerdown', () => {
+  if (!bgmManualMute && (!bgmAudio || bgmAudio.paused)) {
+    playBgm();
+  }
+}, { once: true });
