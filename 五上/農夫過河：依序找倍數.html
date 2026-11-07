@@ -6,165 +6,7 @@
   <title>找倍數過河拱橋戰</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
   <!-- Firebase Compatibility SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js">
-    // ==========================================
-    // 🏆 前台專屬英雄榜 (Leaderboard Modal) 邏輯 🏆
-    // ==========================================
-    let cachedLeaderboardList = [];
-
-    function openLeaderboardModal() {
-      const modal = document.getElementById('leaderboard-overlay');
-      if (modal) {
-        modal.classList.add('active');
-        fetchLeaderboardForModal();
-      }
-    }
-
-    function closeLeaderboardModal() {
-      const modal = document.getElementById('leaderboard-overlay');
-      if (modal) {
-        modal.classList.remove('active');
-      }
-    }
-
-    function fetchLeaderboardForModal() {
-      const tbody = document.getElementById('lb-modal-tbody');
-      if (tbody) tbody.innerHTML = '<tr><td colspan="4" style="padding: 24px; color: #94a3b8;">資料連線載入中...</td></tr>';
-
-      if (isFirebaseActive) {
-        database.ref('LCM/leaderboard').orderByChild('score').limitToLast(100).once('value', snapshot => {
-          let list = [];
-          snapshot.forEach(child => {
-            let val = child.val() || {};
-            val.id = child.key;
-            list.push(val);
-          });
-          list.sort((a, b) => (b.score || 0) - (a.score || 0));
-          cachedLeaderboardList = list;
-          updateLeaderboardClassFilter(list);
-          renderLeaderboardModalTable(list);
-        }).catch(err => {
-          console.warn("Firebase leaderboard load err:", err);
-          loadLocalLeaderboardForModal();
-        });
-      } else {
-        loadLocalLeaderboardForModal();
-      }
-    }
-
-    function loadLocalLeaderboardForModal() {
-      let localData = JSON.parse(localStorage.getItem('LCM_leaderboard') || '[]');
-      localData.sort((a, b) => (b.score || 0) - (a.score || 0));
-      cachedLeaderboardList = localData;
-      updateLeaderboardClassFilter(localData);
-      renderLeaderboardModalTable(localData);
-    }
-
-    function updateLeaderboardClassFilter(records) {
-      const select = document.getElementById('lb-filter-class');
-      if (!select) return;
-      const currentVal = select.value;
-      const classSet = new Set();
-      records.forEach(r => {
-        let c = (r.className || r.class || '').trim();
-        if (!c && r.name) {
-          let parts = r.name.trim().split(/\s+/);
-          if (parts.length >= 2 && /^\d+/.test(parts[0])) c = parts[0];
-        }
-        if (c && c !== '-') classSet.add(c);
-      });
-
-      let optionsHtml = '<option value="">全部班級</option>';
-      Array.from(classSet).sort().forEach(c => {
-        optionsHtml += `<option value="${c}">${c} 班</option>`;
-      });
-      select.innerHTML = optionsHtml;
-      if (Array.from(classSet).includes(currentVal)) {
-        select.value = currentVal;
-      }
-    }
-
-    function renderLeaderboardModalTable(records) {
-      const tbody = document.getElementById('lb-modal-tbody');
-      if (!tbody) return;
-      const select = document.getElementById('lb-filter-class');
-      const filterClass = select ? select.value.trim().toLowerCase() : '';
-
-      let list = records;
-      if (filterClass) {
-        list = list.filter(r => {
-          let c = (r.className || r.class || '').trim().toLowerCase();
-          if (!c && r.name) {
-            let parts = r.name.trim().split(/\s+/);
-            if (parts.length >= 2 && /^\d+/.test(parts[0])) c = parts[0].toLowerCase();
-          }
-          return c === filterClass;
-        });
-      }
-
-      tbody.innerHTML = '';
-      if (list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="padding: 24px; color: #94a3b8;">目前暫無排行紀錄，快來挑戰爭取榮譽吧！</td></tr>';
-        return;
-      }
-
-      list.slice(0, 10).forEach((rec, idx) => {
-        let tr = document.createElement('tr');
-        tr.style.borderBottom = '1px solid #f1f5f9';
-        if (idx === 0) tr.style.background = '#fefce8';
-        else if (idx === 1) tr.style.background = '#f8fafc';
-        else if (idx === 2) tr.style.background = '#fff7ed';
-
-        let rankBadge = '';
-        if (idx === 0) rankBadge = '<span style="font-size: 1.3rem;">🥇</span>';
-        else if (idx === 1) rankBadge = '<span style="font-size: 1.3rem;">🥈</span>';
-        else if (idx === 2) rankBadge = '<span style="font-size: 1.3rem;">🥉</span>';
-        else rankBadge = `<strong style="color: #64748b;">${idx + 1}</strong>`;
-
-        let classStr = (rec.className || rec.class) ? `${rec.className || rec.class}班 ` : '';
-        let seatStr = (rec.seatNumber || rec.seat) ? `${rec.seatNumber || rec.seat}號 ` : '';
-        let nameStr = rec.name || '訪客';
-        let dateStr = rec.timestamp ? new Date(rec.timestamp).toLocaleDateString() : '-';
-
-        tr.innerHTML = `
-          <td style="padding: 10px;">${rankBadge}</td>
-          <td style="padding: 10px; font-weight: 800; color: #334155; text-align: left;">
-            <span style="color: #d97706;">${classStr}</span>${seatStr}<span style="color: #0f172a;">${nameStr}</span>
-          </td>
-          <td style="padding: 10px; font-weight: 900; color: #b45309; font-size: 1.15rem;">${rec.score || 0}</td>
-          <td style="padding: 10px; font-size: 0.85rem; color: #94a3b8;">${dateStr}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    // 綁定所有英雄榜開關按鈕
-    function initLeaderboardEvents() {
-      const btnShowLb = document.getElementById('btn-show-leaderboard');
-      if (btnShowLb) btnShowLb.addEventListener('click', openLeaderboardModal);
-
-      const btnHudLb = document.getElementById('btn-hud-leaderboard');
-      if (btnHudLb) btnHudLb.addEventListener('click', openLeaderboardModal);
-
-      const btnVictoryLb = document.getElementById('btn-victory-leaderboard');
-      if (btnVictoryLb) btnVictoryLb.addEventListener('click', openLeaderboardModal);
-
-      const btnCloseLb = document.getElementById('btn-close-leaderboard');
-      if (btnCloseLb) btnCloseLb.addEventListener('click', closeLeaderboardModal);
-
-      const btnCloseLbBottom = document.getElementById('btn-close-lb-bottom');
-      if (btnCloseLbBottom) btnCloseLbBottom.addEventListener('click', closeLeaderboardModal);
-
-      const lbFilterClass = document.getElementById('lb-filter-class');
-      if (lbFilterClass) {
-        lbFilterClass.addEventListener('change', () => {
-          renderLeaderboardModalTable(cachedLeaderboardList);
-        });
-      }
-    }
-    initLeaderboardEvents();
-
-</script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
   <style>
     /* --- CSS Variables & Design Tokens --- */
@@ -899,7 +741,7 @@
         <div class="hud-panel score-panel">積分: <span id="hud-score-txt">0</span></div>
       </div>
       <div class="hud-right">
-        <button class="btn-hud" id="btn-hud-leaderboard" style="padding: 6px 14px; border-radius: 999px; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; font-weight: 800; border: none; cursor: pointer; box-shadow: 0 4px 10px rgba(217, 119, 6, 0.3); font-size: 0.9rem; transition: transform 0.15s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">🏆 英雄榜</button>
+        <button class="btn-hud" id="btn-hud-leaderboard" type="button" onclick="openLeaderboardModal()" style="padding: 6px 14px; border-radius: 999px; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; font-weight: 800; border: none; cursor: pointer; box-shadow: 0 4px 10px rgba(217, 119, 6, 0.3); font-size: 0.9rem; transition: transform 0.15s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">🏆 英雄榜</button>
         <div class="hud-panel timer-panel">計時: <span id="hud-timer-txt">120s</span></div>
         <div class="hud-panel progress-panel">關卡: <span id="hud-progress-txt">1 / 3</span></div>
 
@@ -998,7 +840,7 @@
         </div>
 
         <button class="btn-primary" id="btn-start-game" style="width: 100%;">啟動過河大冒險 🌠</button>
-        <button class="btn-primary" id="btn-show-leaderboard" style="width: 100%; margin-top: 10px; background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 4px 15px rgba(217, 119, 6, 0.3);">🏆 英雄榜</button>
+        <button class="btn-primary" id="btn-show-leaderboard" type="button" onclick="openLeaderboardModal()" style="width: 100%; margin-top: 10px; background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 4px 15px rgba(217, 119, 6, 0.3); border: none; cursor: pointer; font-size: 1.1rem; font-weight: 800; padding: 12px; border-radius: 12px; color: #fff;">🏆 英雄榜</button>
         <div style="margin-top: 15px; text-align: center;">
           <a href="javascript:void(0)" id="btn-open-teacher-admin" style="font-size: 0.9rem; color: #d97706; text-decoration: none; font-weight: bold; border-bottom: 2px dashed #d97706; transition: color 0.2s, border-color 0.2s; cursor: pointer;" onmouseover="this.style.color='#b45309'; this.style.borderColor='#b45309';" onmouseout="this.style.color='#d97706'; this.style.borderColor='#d97706';">👨‍🏫 進入教師管理後台</a>
         </div>
@@ -1101,7 +943,7 @@
           <h2 style="color: #b45309; font-size: 1.6rem; margin: 0; display: flex; align-items: center; gap: 8px;">
             <span>🏆</span> 農夫過河・倍數榮譽英雄榜
           </h2>
-          <button id="btn-close-leaderboard" type="button" style="background: none; border: none; font-size: 1.8rem; cursor: pointer; color: #94a3b8; line-height: 1; padding: 0 4px;" title="關閉">✖</button>
+          <button id="btn-close-leaderboard" type="button" onclick="closeLeaderboardModal()" style="background: none; border: none; font-size: 1.8rem; cursor: pointer; color: #94a3b8; line-height: 1; padding: 0 4px;" title="關閉">✖</button>
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 10px; flex-wrap: wrap;">
@@ -1133,7 +975,7 @@
         </div>
 
         <div style="margin-top: 16px; display: flex; justify-content: center; gap: 12px;">
-          <button class="btn-primary" id="btn-close-lb-bottom" type="button" style="padding: 10px 36px; font-size: 1rem; background: #64748b; box-shadow: none; cursor: pointer;">關閉 ✕</button>
+          <button class="btn-primary" id="btn-close-lb-bottom" type="button" onclick="closeLeaderboardModal()" style="padding: 10px 36px; font-size: 1rem; background: #64748b; box-shadow: none; cursor: pointer;">關閉 ✕</button>
         </div>
       </div>
     </div>
@@ -2837,6 +2679,149 @@
     
     window.addEventListener('resize', adjustScale);
     adjustScale();
+  
+    // ==========================================
+    // 🏆 前台專屬英雄榜 (Leaderboard Modal) 完整邏輯 🏆
+    // ==========================================
+    let cachedLeaderboardList = [];
+
+    window.openLeaderboardModal = function() {
+      console.log("Opening leaderboard modal...");
+      const modal = document.getElementById('leaderboard-overlay');
+      if (modal) {
+        modal.classList.add('active');
+        fetchLeaderboardForModal();
+      } else {
+        console.error("leaderboard-overlay not found in DOM");
+      }
+    };
+
+    window.closeLeaderboardModal = function() {
+      const modal = document.getElementById('leaderboard-overlay');
+      if (modal) {
+        modal.classList.remove('active');
+      }
+    };
+
+    function fetchLeaderboardForModal() {
+      const tbody = document.getElementById('lb-modal-tbody');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="4" style="padding: 24px; color: #94a3b8;">資料連線載入中...</td></tr>';
+
+      if (typeof database !== 'undefined' && isFirebaseActive) {
+        database.ref('LCM/leaderboard').orderByChild('score').limitToLast(100).once('value', snapshot => {
+          let list = [];
+          snapshot.forEach(child => {
+            let val = child.val() || {};
+            val.id = child.key;
+            list.push(val);
+          });
+          list.sort((a, b) => (b.score || 0) - (a.score || 0));
+          cachedLeaderboardList = list;
+          updateLeaderboardClassFilter(list);
+          renderLeaderboardModalTable(list);
+        }).catch(err => {
+          console.warn("Firebase leaderboard load err:", err);
+          loadLocalLeaderboardForModal();
+        });
+      } else {
+        loadLocalLeaderboardForModal();
+      }
+    }
+
+    function loadLocalLeaderboardForModal() {
+      let localData = JSON.parse(localStorage.getItem('LCM_leaderboard') || '[]');
+      localData.sort((a, b) => (b.score || 0) - (a.score || 0));
+      cachedLeaderboardList = localData;
+      updateLeaderboardClassFilter(localData);
+      renderLeaderboardModalTable(localData);
+    }
+
+    function updateLeaderboardClassFilter(records) {
+      const select = document.getElementById('lb-filter-class');
+      if (!select) return;
+      const currentVal = select.value;
+      const classSet = new Set();
+      records.forEach(r => {
+        let c = (r.className || r.class || '').trim();
+        if (!c && r.name) {
+          let parts = r.name.trim().split(/\s+/);
+          if (parts.length >= 2 && /^\d+/.test(parts[0])) c = parts[0];
+        }
+        if (c && c !== '-') classSet.add(c);
+      });
+
+      let optionsHtml = '<option value="">全部班級</option>';
+      Array.from(classSet).sort().forEach(c => {
+        optionsHtml += `<option value="${c}">${c} 班</option>`;
+      });
+      select.innerHTML = optionsHtml;
+      if (Array.from(classSet).includes(currentVal)) {
+        select.value = currentVal;
+      }
+    }
+
+    function renderLeaderboardModalTable(records) {
+      const tbody = document.getElementById('lb-modal-tbody');
+      if (!tbody) return;
+      const select = document.getElementById('lb-filter-class');
+      const filterClass = select ? select.value.trim().toLowerCase() : '';
+
+      let list = records;
+      if (filterClass) {
+        list = list.filter(r => {
+          let c = (r.className || r.class || '').trim().toLowerCase();
+          if (!c && r.name) {
+            let parts = r.name.trim().split(/\s+/);
+            if (parts.length >= 2 && /^\d+/.test(parts[0])) c = parts[0].toLowerCase();
+          }
+          return c === filterClass;
+        });
+      }
+
+      tbody.innerHTML = '';
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="padding: 24px; color: #94a3b8;">目前暫無排行紀錄，快來挑戰爭取榮譽吧！</td></tr>';
+        return;
+      }
+
+      list.slice(0, 10).forEach((rec, idx) => {
+        let tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid #f1f5f9';
+        if (idx === 0) tr.style.background = '#fefce8';
+        else if (idx === 1) tr.style.background = '#f8fafc';
+        else if (idx === 2) tr.style.background = '#fff7ed';
+
+        let rankBadge = '';
+        if (idx === 0) rankBadge = '<span style="font-size: 1.3rem;">🥇</span>';
+        else if (idx === 1) rankBadge = '<span style="font-size: 1.3rem;">🥈</span>';
+        else if (idx === 2) rankBadge = '<span style="font-size: 1.3rem;">🥉</span>';
+        else rankBadge = `<strong style="color: #64748b;">${idx + 1}</strong>`;
+
+        let classStr = (rec.className || rec.class) ? `${rec.className || rec.class}班 ` : '';
+        let seatStr = (rec.seatNumber || rec.seat) ? `${rec.seatNumber || rec.seat}號 ` : '';
+        let nameStr = rec.name || '訪客';
+        let dateStr = rec.timestamp ? new Date(rec.timestamp).toLocaleDateString() : '-';
+
+        tr.innerHTML = `
+          <td style="padding: 10px;">${rankBadge}</td>
+          <td style="padding: 10px; font-weight: 800; color: #334155; text-align: left;">
+            <span style="color: #d97706;">${classStr}</span>${seatStr}<span style="color: #0f172a;">${nameStr}</span>
+          </td>
+          <td style="padding: 10px; font-weight: 900; color: #b45309; font-size: 1.15rem;">${rec.score || 0}</td>
+          <td style="padding: 10px; font-size: 0.85rem; color: #94a3b8;">${dateStr}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // 監聽班級篩選下拉變更
+    const lbFilterClassEl = document.getElementById('lb-filter-class');
+    if (lbFilterClassEl) {
+      lbFilterClassEl.addEventListener('change', () => {
+        renderLeaderboardModalTable(cachedLeaderboardList);
+      });
+    }
+
   </script>
 
   
