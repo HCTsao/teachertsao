@@ -1476,8 +1476,8 @@ $('grid').addEventListener('pointermove', moveSimple);
 for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
   $('grid').addEventListener(type, finishSimple);
 }
-// 防止行動裝置作圖時觸發網頁上下滾動
-['grid', 'dotSvg'].forEach(id => {
+// 防止行動裝置作圖時觸發網頁上下滾動與畫面縮放
+['grid', 'dotSvg', 'boardWrap'].forEach(id => {
   const el = $(id);
   if (el) {
     el.addEventListener('touchmove', e => {
@@ -1485,6 +1485,14 @@ for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
     }, { passive: false });
   }
 });
+
+// 手機與平板固定螢幕比例：阻止雙指手勢縮放與雙擊縮放
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('gesturechange', e => e.preventDefault());
+document.addEventListener('gestureend', e => e.preventDefault());
+document.addEventListener('dblclick', e => {
+  if (e.cancelable) e.preventDefault();
+}, { passive: false });
 
 // 工具列按鈕
 $('drawBtn').onclick = () => {
