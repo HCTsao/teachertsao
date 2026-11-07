@@ -865,11 +865,33 @@ function renderAdvancedUserLines() {
   renderActiveDotRing();
 }
 
-// 渲染當前選取點的光環與提示線
+// 輕量音效合成 (選點/連線回饋)
+let dotAudioCtx = null;
+function playDotBeep(freq = 660, duration = 0.08) {
+  try {
+    dotAudioCtx = dotAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (dotAudioCtx.state === 'suspended') dotAudioCtx.resume();
+    const osc = dotAudioCtx.createOscillator();
+    const gain = dotAudioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, dotAudioCtx.currentTime);
+    gain.gain.setValueAtTime(0.12, dotAudioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, dotAudioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(dotAudioCtx.destination);
+    osc.start();
+    osc.stop(dotAudioCtx.currentTime + duration);
+  } catch (e) {}
+}
+
+// 渲染當前選取點的光環與提示線 (選取的點亮起來)
 function renderActiveDotRing() {
   const hintGroup = $('svgHintLayer');
   if (!hintGroup) return;
   hintGroup.replaceChildren();
+
+  // 清除所有格點的 selected 發光類別
+  document.querySelectorAll('#dotSvg .dot-point.selected').forEach(el => el.classList.remove('selected'));
 
   // 1. 若有分步提示的光環與投影輔助線
   if (advHintPair) {
@@ -897,14 +919,27 @@ function renderActiveDotRing() {
     });
   }
 
-  // 2. 若玩家有點選一個起點
+  // 2. 若玩家有點選一個起點：點亮該格點！
   if (advActiveDot) {
     const [ax, ay] = advActiveDot.split(',').map(Number);
+
+    // 同步讓底層 dotPoint 加上 selected 類別
+    const basePoint = $(`dotPoint_${ax}_${ay}`);
+    if (basePoint) basePoint.classList.add('selected');
+
+    // 外圈光環波紋
     const actRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     actRing.setAttribute('cx', toSvgX(ax));
     actRing.setAttribute('cy', toSvgY(ay));
     actRing.setAttribute('class', 'dot-active-ring');
     hintGroup.appendChild(actRing);
+
+    // 核心高亮發光球 (保證在最上層清晰可見、耀眼亮起)
+    const actCore = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    actCore.setAttribute('cx', toSvgX(ax));
+    actCore.setAttribute('cy', toSvgY(ay));
+    actCore.setAttribute('class', 'dot-active-core');
+    hintGroup.appendChild(actCore);
   }
 }
 
@@ -958,11 +993,13 @@ function handleDotClick(dotKey) {
   if (!advActiveDot) {
     advActiveDot = dotKey;
     renderActiveDotRing();
+    playDotBeep(660, 0.08); // 清脆高音：選取起點亮起
     message('已選取起點，請點選第 2 個格點完成連線。');
   } else if (advActiveDot === dotKey) {
     // 點擊同一點取消選取起點
     advActiveDot = null;
     renderActiveDotRing();
+    playDotBeep(440, 0.06); // 取消選取
     message('已取消選取起點。');
   } else {
     // 點選第二個點：連成一條線！
@@ -970,6 +1007,7 @@ function handleDotClick(dotKey) {
     // 連完後起點重設為空，必須再選兩個點才會畫出一條新線！
     advActiveDot = null;
     renderActiveDotRing();
+    playDotBeep(880, 0.12); // 連線完成清脆音
     message('已連成一條線段！請再選取兩個格點畫下一條線。');
   }
 }

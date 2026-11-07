@@ -1860,16 +1860,34 @@
     }
 
     function renderBattleActiveRing() {
-      const old = $('bActRing');
-      if (old) old.remove();
+      const oldRing = $('bActRing');
+      if (oldRing) oldRing.remove();
+      const oldCore = $('bActCore');
+      if (oldCore) oldCore.remove();
+
+      // 清除所有格點的 selected 類別
+      document.querySelectorAll('#battleSvg .dot-point.selected').forEach(el => el.classList.remove('selected'));
 
       if (gameState.activeDot) {
         const [x, y] = gameState.activeDot.split(',').map(Number);
+
+        // 底層格點加上 selected 高亮
+        const basePt = $(`bDot_${x}_${y}`);
+        if (basePt) basePt.classList.add('selected');
+
+        // 外圈光環波紋
         const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         ring.setAttribute('id', 'bActRing');
         ring.setAttribute('cx', toSvgX(x)); ring.setAttribute('cy', toSvgY(y));
         ring.setAttribute('class', 'dot-active-ring');
         $('battleSvg').appendChild(ring);
+
+        // 核心高亮發光球 (保證在最上層清晰可見、耀眼亮起)
+        const core = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        core.setAttribute('id', 'bActCore');
+        core.setAttribute('cx', toSvgX(x)); core.setAttribute('cy', toSvgY(y));
+        core.setAttribute('class', 'dot-active-core');
+        $('battleSvg').appendChild(core);
       }
     }
 
@@ -2045,20 +2063,24 @@
           addBattleSegment(startDot, endDot);
           gameState.activeDot = null;
           renderBattleActiveRing();
+          playBeep(880, 0.12, 'triangle', 0.18);
         } else {
           // 原地點擊
           if (!gameState.activeDot) {
             gameState.activeDot = startDot;
             renderBattleActiveRing();
+            playBeep(660, 0.08, 'sine', 0.15);
             bMessage('已選取第 1 個格點，請點選第 2 個格點連成線段。');
           } else if (gameState.activeDot === startDot) {
             gameState.activeDot = null;
             renderBattleActiveRing();
+            playBeep(440, 0.06, 'sine', 0.1);
             bMessage('已取消選取格點。');
           } else {
             addBattleSegment(gameState.activeDot, startDot);
             gameState.activeDot = null;
             renderBattleActiveRing();
+            playBeep(880, 0.12, 'triangle', 0.18);
           }
         }
 
