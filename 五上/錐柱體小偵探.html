@@ -23,7 +23,7 @@
 </style>
 </head>
 <body>
-<header><div class="brand">錐柱體小偵探</div><div class="header-actions"><button id="sound-button" class="sound-button" aria-label="關閉聲音" aria-pressed="true" title="關閉聲音">🔊</button><button class="menu-button" id="menu-button" hidden>← 主選單</button></div></header>
+<header><div class="brand">錐柱體小偵探</div><div class="header-actions"><button id="sound-button" class="sound-button" aria-label="關閉聲音" aria-pressed="true" title="關閉聲音">🔊</button><button class="menu-button" id="menu-button" hidden>← 主選單</button><a class="teacher-link" href="錐柱體小偵探-教師後台.html" target="_blank" rel="noopener">教師後台</a></div></header>
 <main id="app"></main>
 <aside id="connection-status" class="connection-notice" role="status" hidden></aside>
 <script id="engine">(() => {
@@ -304,7 +304,7 @@
   function createGeometryCloud({root,fetcher=globalThis.fetch,now=()=>Date.now(),randomId=()=>crypto.randomUUID().replaceAll('-','')}={}){
     let offset=0;
     const serverNow=()=>now()+offset,timestamp=()=>({'.sv':'timestamp'});
-    const codePath=code=>{if(!/^[A-Z2-9]{6}$/.test(code))throw Error('請輸入 6 碼房號');return `rooms/${code}`;};
+    const codePath=code=>{if(!/^[0-9]{4}$/.test(code))throw Error('請輸入 4 碼數字房號');return `rooms/${code}`;};
     async function request(path,{method='GET',body,headers={}}={}){
       const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
       try{
@@ -339,8 +339,8 @@
       request,transaction,serverNow,
       async syncClock(){const id=randomId(),begin=now(),reply=await request(`clock/${id}`,{method:'PUT',body:timestamp()});offset=reply.data-(begin+now())/2;request(`clock/${id}`,{method:'DELETE'}).catch(()=>{});return offset;},
       async createRoom(level,deck,id){
-        for(let tries=0;tries<8;tries++){
-          const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',bytes=new Uint8Array(6);crypto.getRandomValues(bytes);const code=Array.from(bytes,byte=>alphabet[byte%alphabet.length]).join('');
+        for(let tries=0;tries<32;tries++){
+          const bytes=new Uint8Array(4);crypto.getRandomValues(bytes);const code=Array.from(bytes,byte=>String(byte%10)).join('');
           let created=false;
           const room=await transaction(codePath(code),current=>{if(current)return;created=true;return{version:1,code,level,deck,players:{host:{id}},scores:{host:0,guest:0},phase:'lobby',round:0,createdAt:timestamp(),updatedAt:timestamp(),heartbeat:{host:serverNow()}};});
           if(created&&room.players?.host?.id===id)return room;
@@ -574,7 +574,7 @@
     if(previous)C.leave(previous.code,previous.role,previous.id).catch(()=>{});
   }
   function lobby(){
-    G.readProfile();leave();G.disconnect();G.showPanel(`<section class="online-lobby"><h1>雙人連線</h1>${G.profileFields()}<div class="lobby-columns"><section class="lobby-card"><h2>建立房間</h2><label>難度<select id="room-level"><option value="easy">簡單</option><option value="normal">普通</option><option value="hard">困難</option></select></label><button class="primary" data-create-room>建立房間</button></section><section class="lobby-card"><h2>加入房間</h2><label>房號<input id="room-code" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="6 碼房號"></label><button class="primary" data-join-room>加入房間</button></section></div><p class="helper" id="network-status" role="status"></p></section>`);
+    G.readProfile();leave();G.disconnect();G.showPanel(`<section class="online-lobby"><h1>雙人連線</h1>${G.profileFields()}<div class="lobby-columns"><section class="lobby-card"><h2>建立房間</h2><label>難度<select id="room-level"><option value="easy">簡單</option><option value="normal">普通</option><option value="hard">困難</option></select></label><button class="primary" data-create-room>建立房間</button></section><section class="lobby-card"><h2>加入房間</h2><label>房號<input id="room-code" maxlength="4" inputmode="numeric" pattern="[0-9]{4}" autocomplete="off" spellcheck="false" placeholder="4 碼數字房號"></label><button class="primary" data-join-room>加入房間</button></section></div><p class="helper" id="network-status" role="status"></p></section>`);
   }
   function makeDeck(level){const deck=[],recent=[];let bag=[];for(let index=0;index<5;index++){if(!bag.length)bag=E.shuffle(['named','base','reverse']);const form=bag.pop(),mystery=form==='reverse'?E.makeReverse(level,recent,Math.random,index):E.makeForward(level,recent,Math.random,index,form);recent.push(mystery.target.id);deck.push(mystery);}return JSON.parse(JSON.stringify(deck));}
   function callbacks(){return{leave,next:ready,timeout:settle,submit:async(id,elapsed)=>{const current=session,room=await C.answer(current.code,current.role,current.id,current.round,id,elapsed);if(session===current)accept(room);}};}
@@ -604,7 +604,7 @@
     const buttons=[...app.querySelectorAll('[data-create-room],[data-join-room]')];buttons.forEach(button=>button.disabled=true);
     try{
       const id=crypto.randomUUID().replaceAll('-','');await C.syncClock();
-      const room=joining?await C.joinRoom(document.getElementById('room-code').value.trim().toUpperCase(),id):await C.createRoom(document.getElementById('room-level').value,makeDeck(document.getElementById('room-level').value),id);
+      const room=joining?await C.joinRoom(document.getElementById('room-code').value.trim(),id):await C.createRoom(document.getElementById('room-level').value,makeDeck(document.getElementById('room-level').value),id);
       session={id,code:room.code,role:joining?'guest':'host',round:room.round};saveSession();lastView='';accept(room);watch();
     }catch(error){setStatus(error.message||'無法連線，請重試');}finally{busy=false;buttons.forEach(button=>button.disabled=false);}
   }
@@ -615,7 +615,7 @@
   }
   async function settle(){if(!session||settling)return;settling=true;try{accept(await C.settle(session.code));}catch{notice('連線中，請稍候…');}finally{setTimeout(()=>{settling=false;},1200);}}
   app.addEventListener('click',event=>{if(event.target.closest('[data-online]'))lobby();else if(event.target.closest('[data-create-room]'))connect(false);else if(event.target.closest('[data-join-room]'))connect(true);else if(event.target.closest('[data-start-room]'))start();else if(event.target.closest('[data-leave-room]')){leave();G.disconnect();G.menu();}else if(event.target.closest('[data-room-close]'))G.menu();});
-  app.addEventListener('input',event=>{if(event.target.id==='room-code')event.target.value=event.target.value.toUpperCase().replace(/[^A-Z2-9]/g,'');});
+  app.addEventListener('input',event=>{if(event.target.id==='room-code')event.target.value=event.target.value.replace(/[^0-9]/g,'').slice(0,4);});
   globalThis.GeometryOnline={leave};
   try{const saved=JSON.parse(sessionStorage.getItem(storageKey)||'null');if(saved?.code&&saved?.id&&['host','guest'].includes(saved.role)){session=saved;G.showPanel('<section class="network-message"><h2>重新連回房間…</h2></section>');C.syncClock().then(watch).catch(()=>{leave();G.menu();});}}catch{}
   window.addEventListener('pagehide',()=>{if(unwatch)unwatch();if(heartbeat!==null)clearInterval(heartbeat);});
