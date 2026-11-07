@@ -872,21 +872,59 @@ function generateQuestion(difficulty = 'normal', time) {
     const { h, m } = time;
     const format = (hour, minute) => hour + '時' + minute + '分';
     const correct = format(h, m);
+    const options = [correct];
+
+    // 誘答優先1：直接讀鐘面數字（例如 8點45分 分針指在9 -> 誤讀為 8點9分；3點30分 分針指在6 -> 誤讀為 3點6分）
+    if (m > 0 && m % 5 === 0) {
+        const directNumber = m / 5;
+        const directDistractor = format(h, directNumber);
+        if (directDistractor !== correct && !options.includes(directDistractor)) {
+            options.push(directDistractor);
+        }
+    }
+
+    // 誘答優先2：時針未到下個整點卻誤判下一點（例如 8:45 誤判為 9:45）或整點偏差
     const nextHour = h === 12 ? 1 : h + 1;
-    const wrongHour = m >= 30 ? nextHour : (h === 1 ? 12 : h - 1);
-    const options = [correct, format(wrongHour, m)];
-    // 誘答也遵守所選難度的分鐘單位，且不重複。
-    let wrongMinute = (m + step) % 60;
-    if (m % 5 === 0 && m <= 30) {
-        const reversedHour = m === 0 ? 12 : m / 5;
+    const prevHour = h === 1 ? 12 : h - 1;
+    const wrongHour = m >= 30 ? nextHour : prevHour;
+    const wrongHourDistractor = format(wrongHour, m);
+    if (!options.includes(wrongHourDistractor)) {
+        options.push(wrongHourDistractor);
+    }
+
+    // 誘答優先3：時針與分針看反（例如 2:20 分針在4 -> 4點10分）
+    if (options.length < 3 && m % 5 === 0 && m <= 30 && m > 0) {
+        const reversedHour = m / 5;
         const reversedMinute = (h * 5) % 60;
         const reversed = format(reversedHour, reversedMinute);
-        if (reversedMinute % step === 0 && !options.includes(reversed)) {
+        if (reversed !== correct && !options.includes(reversed)) {
             options.push(reversed);
         }
     }
-    if (options.length < 3) options.push(format(h, wrongMinute));
-    return { h, m, correct, options: shuffleQuestions(options) };
+
+    // 誘答備用4：鄰近分鐘偏差 (依所選難度 step)
+    const deltas = [step, -step, step * 2, -step * 2, 5, -5, 10, -10];
+    for (const d of deltas) {
+        if (options.length >= 3) break;
+        const wm = (m + d + 60) % 60;
+        const opt = format(h, wm);
+        if (!options.includes(opt)) {
+            options.push(opt);
+        }
+    }
+
+    // 誘答保底5：不同小時保底
+    let hOffset = 1;
+    while (options.length < 3) {
+        const altH = ((h - 1 + hOffset) % 12) + 1;
+        const opt = format(altH, m);
+        if (!options.includes(opt)) {
+            options.push(opt);
+        }
+        hOffset++;
+    }
+
+    return { h, m, correct, options: shuffleQuestions(options.slice(0, 3)) };
 }
 
 
@@ -1579,6 +1617,31 @@ showChoice(barrier) {
                     this.createParticles(this.playerX, this.canvas.height * 0.75, '#ffd166');
                     playSound('correct');
                     this.showCorrectFeedback();
+
+                    // 記錄答對題目到 Firebase 教師後台
+                    try {
+                        if (db) {
+                            const className = document.getElementById('student-class').value.trim() || '未填班級';
+                            const seat = document.getElementById('student-seat').value.trim() || '無';
+                            const name = document.getElementById('student-name').value.trim() || '訪客';
+                            const { h, m } = barrier.question;
+                            db.ref('time_race_errors').push({
+                                className: className,
+                                seat: seat,
+                                name: name,
+                                question: `${h}時${m}分`,
+                                correctAnswer: `${h}時${m}分`,
+                                isCorrect: true,
+                                difficulty: this.difficulty,
+                                wrongChoice: timeText,
+                                studentAnswer: timeText,
+                                timestamp: firebase.database.ServerValue.TIMESTAMP
+                            }).catch(err => console.error("上傳答對紀錄失敗：", err));
+                        }
+                    } catch (err) {
+                        console.error('上傳答對紀錄失敗：', err);
+                    }
+
                     // 答對：立即復跑
                     this.scheduleNextQuestion();
                     this.lastTime = performance.now();
@@ -1720,6 +1783,7 @@ showChoice(barrier) {
                 isCorrect: false,
                 difficulty: this.difficulty,
                 wrongChoice: wrongChoice || '未填',
+                studentAnswer: wrongChoice || '未填',
                 timestamp: firebase.database.ServerValue.TIMESTAMP
             }).catch(err => console.error("上傳錯誤紀錄失敗：", err));
           }
