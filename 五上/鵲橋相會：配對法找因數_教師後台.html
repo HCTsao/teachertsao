@@ -437,7 +437,7 @@
       <h1>👨‍🏫 鵲橋相會：配對法找因數・教師管理後台</h1>
       <div class="header-actions">
         <button class="btn btn-success" id="btn-export-excel">📥 下載 Excel</button>
-        <button class="btn btn-danger" id="btn-clear-db">🧹 清除所有紀錄</button>
+        <button class="btn btn-danger" id="btn-clear-db">🧹 清除篩選紀錄</button>
       </div>
     </header>
 
@@ -608,6 +608,7 @@
     let rawRecords = [];
     let rawMistakes = [];
     let combinedRecords = [];
+    let currentFilteredRecords = [];
 
     // --- 載入資料庫 ---
     function initDataLoad() {
@@ -839,6 +840,7 @@
         return true;
       });
 
+      currentFilteredRecords = filtered;
       renderRecordsTable(filtered);
       updateStatisticsDisplay(filtered);
     }
@@ -1006,48 +1008,68 @@
       });
     }
 
-    // --- 清空全班紀錄 (黑點屏蔽密碼彈窗) ---
+    // --- 清除已篩選紀錄 (黑點屏蔽密碼彈窗) ---
     document.getElementById('btn-clear-db').addEventListener('click', () => {
+      if (!currentFilteredRecords || currentFilteredRecords.length === 0) {
+        alert("目前篩選條件下沒有任何紀錄可供刪除！");
+        return;
+      }
+
+      const filterClass = document.getElementById('filter-class').value.trim();
+      const filterWrongOnly = document.getElementById('filter-wrong-only').checked;
+      let targetDesc = '';
+      if (filterClass) targetDesc += `「${filterClass} 班」`;
+      if (filterWrongOnly) targetDesc += '【只看錯題】';
+      if (!targetDesc) targetDesc = '「全部班級」';
+
+      const count = currentFilteredRecords.length;
+
       openAdminModal({
-        title: '🧹 清空所有紀錄確認',
-        desc: '⚠️ 警告：即將清空所有學生的作答成果！請輸入密碼以確認清空：',
-        btnText: '確定全部清空',
+        title: '🧹 清除篩選紀錄確認',
+        desc: `⚠️ 準備刪除目前已篩選的 ${targetDesc} 共 ${count} 筆作答紀錄。此操作無法復原，請輸入密碼以確認刪除：`,
+        btnText: `確定刪除 (${count} 筆)`,
         onConfirm: () => {
           if (isFirebaseActive) {
-            Promise.all([
-              database.ref('GCD/records').remove(),
-              database.ref('GCD/mistakes').remove()
-            ]).then(() => {
-              alert("✅ Firebase GCD 作答紀錄已成功清空！");
+            let deletePromises = [];
+            currentFilteredRecords.forEach(item => {
+              if (item.id) {
+                deletePromises.push(database.ref('GCD/records/' + item.id).remove());
+                deletePromises.push(database.ref('GCD/mistakes/' + item.id).remove());
+              }
+            });
+
+            Promise.all(deletePromises).then(() => {
+              alert(`✅ 已成功刪除 ${targetDesc} 的 ${count} 筆作答紀錄！`);
             }).catch(err => {
-              alert("❌ 清除失敗：" + err.message);
+              alert("❌ 刪除過程中發生錯誤：" + err.message);
             });
           } else {
-            localStorage.removeItem('GCD_records');
-            localStorage.removeItem('GCD_mistakes');
-            alert("✅ 本機離線紀錄已成功清空！");
+            let deleteIds = new Set(currentFilteredRecords.map(r => r.id));
+            let localRec = JSON.parse(localStorage.getItem('GCD_records') || '[]');
+            let localMis = JSON.parse(localStorage.getItem('GCD_mistakes') || '[]');
+
+            localRec = localRec.filter(r => !deleteIds.has(r.id));
+            localMis = localMis.filter(m => !deleteIds.has(m.id));
+
+            localStorage.setItem('GCD_records', JSON.stringify(localRec));
+            localStorage.setItem('GCD_mistakes', JSON.stringify(localMis));
+            alert(`✅ 已成功刪除本機 ${targetDesc} 的 ${count} 筆作答紀錄！`);
             loadLocalData();
           }
         }
       });
     });
 
-    // --- 匯出 Excel (SheetJS) ---
+    // --- 匯出已篩選資料至 Excel (SheetJS) 並以班級命名 ---
     function exportToExcel() {
-      const tbody = document.getElementById('records-table-body');
-      const rows = tbody.querySelectorAll('tr');
-      if (rows.length === 0 || rows[0].querySelector('td[colspan]')) {
-        alert("目前沒有任何作答紀錄可供匯出！");
+      if (!currentFilteredRecords || currentFilteredRecords.length === 0) {
+        alert("目前篩選條件下沒有任何作答紀錄可供匯出！");
         return;
       }
 
       let excelData = [];
-      const filterWrongOnly = document.getElementById('filter-wrong-only').checked;
-
-      combinedRecords.forEach(item => {
+      currentFilteredRecords.forEach(item => {
         let isItemCorrect = item.isCorrect === true || item.isCorrect === 'true';
-        if (filterWrongOnly && isItemCorrect) return;
-
         let info = getStudentInfo(item);
         let dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString() : '-';
         let levelType = item.type || (item.mode === 'basic' ? '簡單' : (item.mode === 'advanced' ? '進階' : '困難'));
@@ -1066,17 +1088,30 @@
         });
       });
 
-      if (excelData.length === 0) {
-        alert("篩選後無任何資料可匯出！");
-        return;
-      }
-
       const ws = XLSX.utils.json_to_sheet(excelData);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "作答紀錄");
 
+      // 提取班級名稱以作為檔案名稱
+      const filterClass = document.getElementById('filter-class').value.trim();
+      let classTag = '';
+      if (filterClass) {
+        classTag = `${filterClass}班`;
+      } else {
+        let distinctClasses = Array.from(new Set(currentFilteredRecords.map(r => getStudentInfo(r).classStr).filter(c => c && c !== '-')));
+        if (distinctClasses.length === 1) {
+          classTag = `${distinctClasses[0]}班`;
+        } else {
+          classTag = '全部班級';
+        }
+      }
+
+      const filterWrongOnly = document.getElementById('filter-wrong-only').checked;
+      const statusTag = filterWrongOnly ? '_錯題紀錄' : '';
       const dateTag = new Date().toISOString().split('T')[0];
-      const filename = `鵲橋相會配對法找因數_全班作答成果_${dateTag}.xlsx`;
+
+      // 檔案名稱格式：鵲橋相會配對法找因數_[班級]_[日期]_作答成果.xlsx
+      const filename = `鵲橋相會配對法找因數_${classTag}${statusTag}_${dateTag}_作答成果.xlsx`;
       XLSX.writeFile(wb, filename);
     }
 
