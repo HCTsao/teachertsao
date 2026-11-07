@@ -301,6 +301,8 @@
             const [rpsWinner, setRpsWinner] = useState(null); // winner seat index
             const [isRpsProcessing, setIsRpsProcessing] = useState(false);
             const rpsChoicesRef = useRef({});
+            const cachedVoiceRef = useRef(null);
+            const pendingClientPlayRef = useRef(null);
 
 
             const timeoutRef = useRef(null);
@@ -352,12 +354,12 @@
             useEffect(() => { isPenaltyCoolingRef.current = isPenaltyCooling; }, [isPenaltyCooling]);
             useEffect(() => { isAnimatingRef.current = isAnimating; }, [isAnimating]);
 
-            // 預載 Windows / Chrome 語音包，並在首次使用者互動時全面解鎖 AudioContext 與 SpeechSynthesis
+            // 預載語音包並鎖定自然台灣國語發音人，並在首次使用者互動時全面解鎖 AudioContext 與 SpeechSynthesis
             useEffect(() => {
                 if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-                    window.speechSynthesis.getVoices();
+                    findBestVoice();
                     window.speechSynthesis.onvoiceschanged = () => {
-                        window.speechSynthesis.getVoices();
+                        findBestVoice();
                     };
                 }
 
@@ -418,19 +420,39 @@
                 setTimeout(() => setSlapHands(prev => prev.filter(h => h.id !== id)), 750);
             };
 
-            // 預載 Google TTS 自然語音串流 (提早於瀏覽器快取，實現零延遲流暢朗讀)
+            // 尋找最佳自然台灣國語發音人 (iOS: Mei-Jia 美佳, Android: cmn-tw / zh-tw, Windows: Hanhan / Yating)
+            const findBestVoice = () => {
+                if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
+                const voices = window.speechSynthesis.getVoices() || [];
+                if (!voices || voices.length === 0) return null;
+
+                const twVoice = voices.find(v => {
+                    const l = (v.lang || '').toLowerCase().replace('_', '-');
+                    const n = (v.name || '').toLowerCase();
+                    return (l === 'zh-tw' || l === 'cmn-tw' || l === 'zh-hant-tw') && 
+                           (n.includes('mei-jia') || n.includes('meijia') || n.includes('hanhan') || n.includes('yating') || n.includes('taiwan') || n.includes('臺灣') || n.includes('台灣') || n.includes('國語'));
+                }) || voices.find(v => {
+                    const l = (v.lang || '').toLowerCase().replace('_', '-');
+                    return l === 'zh-tw' || l === 'cmn-tw' || l === 'zh-hant-tw';
+                }) || voices.find(v => {
+                    const n = (v.name || '').toLowerCase();
+                    return n.includes('taiwan') || n.includes('臺灣') || n.includes('台灣') || n.includes('mei-jia') || n.includes('meijia');
+                }) || voices.find(v => {
+                    const l = (v.lang || '').toLowerCase().replace('_', '-');
+                    return l.startsWith('zh') || l.startsWith('cmn');
+                });
+
+                if (twVoice) {
+                    cachedVoiceRef.current = twVoice;
+                }
+                return twVoice || null;
+            };
+
             const preloadChants = (m) => {
-                if (!m) return;
-                try {
-                    for (let s = 1; s <= 9; s++) {
-                        const t = getChantText(m, s, m * s);
-                        const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=zh-TW&client=tw-ob&q=${encodeURIComponent(t)}`;
-                        const a = new Audio();
-                        a.referrerPolicy = "no-referrer";
-                        a.preload = "auto";
-                        a.src = url;
-                    }
-                } catch(e) {}
+                // SpeechSynthesis 原生合成音，在使用者首次觸控時完成預熱
+                if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                    findBestVoice();
+                }
             };
 
             const initAudio = () => {
@@ -446,48 +468,49 @@
                         source.start(0);
                     }
 
-                    // 2. 解鎖並預熱專用 Audio 播放器 (iOS/iPadOS/Android/PC 全平臺統一使用 Google TTS 自然語音)
-                    if (chantAudioRef.current && !chantAudioRef.current.dataset.unlocked) {
-                        chantAudioRef.current.dataset.unlocked = "true";
-                        chantAudioRef.current.volume = 0.01;
-                        const p = chantAudioRef.current.play();
-                        if (p !== undefined) {
-                            p.then(() => {
-                                chantAudioRef.current.pause();
-                                chantAudioRef.current.currentTime = 0;
-                                chantAudioRef.current.volume = 1.0;
-                            }).catch(() => {});
-                        }
+                    // 2. 解鎖並預熱 SpeechSynthesis，確保在第一次翻牌前已載入並鎖定台灣國語 (Mei-Jia / cmn-tw)
+                    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                        window.speechSynthesis.resume();
+                        const voice = cachedVoiceRef.current || findBestVoice();
+                        // 播放極短無聲音節預熱語音引擎，徹底避免首次發音與後續發音不同人的問題
+                        const preheat = new SpeechSynthesisUtterance(' ');
+                        preheat.volume = 0;
+                        if (voice) preheat.voice = voice;
+                        window.speechSynthesis.speak(preheat);
                     }
                 } catch(e) {}
             };
 
-            // 全平台（電腦、手機、平板）統一使用高品質 Google TTS 自然國語串流 (不再使用生硬本機機械音)
+            // 全平台統一使用輕快高語速 (rate = 1.25) 自然台灣國語發音，杜絕首次播放不同人問題
             const playChantVoice = (text) => {
-                if (isMuted) return;
+                if (isMuted || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
 
-                if (chantAudioRef.current) {
-                    try {
-                        const audio = chantAudioRef.current;
-                        const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=zh-TW&client=tw-ob&q=${encodeURIComponent(text)}`;
-                        audio.pause();
-                        audio.src = url;
-                        audio.currentTime = 0;
-                        audio.load();
-                        const p = audio.play();
-                        if (p !== undefined) {
-                            p.catch((err) => {
-                                console.warn("Chant audio wait for canplay:", err);
-                                const onCanPlay = () => {
-                                    audio.removeEventListener('canplay', onCanPlay);
-                                    audio.play().catch(() => {});
-                                };
-                                audio.addEventListener('canplay', onCanPlay);
-                            });
-                        }
-                    } catch(e) {
-                        console.warn("Chant audio element exception:", e);
+                try {
+                    window.speechSynthesis.resume();
+
+                    const u = new SpeechSynthesisUtterance(text);
+                    u.lang = 'zh-TW';
+                    u.rate = 1.25; // 輕快高語速，乾脆俐落
+                    u.pitch = 1.05;
+
+                    const voice = cachedVoiceRef.current || findBestVoice();
+                    if (voice) {
+                        u.voice = voice;
                     }
+
+                    window._activeUtterance = u;
+                    u.onend = () => { window._activeUtterance = null; };
+                    u.onerror = (e) => {
+                        console.warn("SpeechSynthesis error:", e);
+                        window._activeUtterance = null;
+                    };
+
+                    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+                        window.speechSynthesis.cancel();
+                    }
+                    window.speechSynthesis.speak(u);
+                } catch(e) {
+                    console.error("SpeechSynthesis error:", e);
                 }
             };
 
@@ -670,8 +693,17 @@
 
                     broadcastToClients({ type: 'SYNC_LOBBY_PLAYERS', players: updated });
                 } else if (data.type === 'CLIENT_PLAY_CARD') {
-                    if (gameStateRef.current === 'playing' && turnRef.current === data.seatIndex && !isAnimatingRef.current && !punishingCardRef.current && !isPenaltyCoolingRef.current) {
-                        executeCardPlay(data.seatIndex);
+                    const clientSeat = (typeof data.seatIndex === 'number') ? data.seatIndex : seat;
+                    if (turnRef.current === clientSeat) {
+                        if (isAnimatingRef.current) {
+                            // 若 Host 正處於上一張牌的動畫收尾中 (650ms 內)，將出牌請求排入佇列，動畫結束後立即出牌！
+                            pendingClientPlayRef.current = clientSeat;
+                        } else if (gameStateRef.current === 'playing' && !punishingCardRef.current && !isPenaltyCoolingRef.current) {
+                            executeCardPlay(clientSeat);
+                        }
+                    } else if (isAnimatingRef.current) {
+                        // 若在回合切換過渡期收到客端出牌請求，先存入佇列備用
+                        pendingClientPlayRef.current = clientSeat;
                     }
                 } else if (data.type === 'CLIENT_SLAP') {
                     if (punishingCardRef.current || isPenaltyCoolingRef.current) return;
@@ -770,17 +802,27 @@
                     setIsRpsProcessing(false);
                 } else if (data.type === 'START_GAME_SYNC') {
                     setPlayers(data.players);
+                    playersRef.current = data.players;
                     setMainDeck(data.mainDeck);
                     setCenterPile([]);
+                    centerPileRef.current = [];
                     setCurrentStep(data.initialStep);
+                    currentStepRef.current = data.initialStep;
                     setCurrentCall(null);
                     setSlapResults([]);
                     setWinner(null);
                     setPunishingCard(null);
+                    punishingCardRef.current = null;
+                    setIsPenaltyCooling(false);
+                    isPenaltyCoolingRef.current = false;
+                    setIsAnimating(false);
+                    isAnimatingRef.current = false;
                     setErrorMsg('');
                     setShowIdleHint(false);
                     setTurn(data.startingTurn);
+                    turnRef.current = data.startingTurn;
                     setGameState('dealing');
+                    gameStateRef.current = 'dealing';
                     setDealingProgress(0);
                 } else if (data.type === 'SYNC_CARD_FLIPPED') {
                     applyCardFlipped(data);
@@ -1211,6 +1253,13 @@
 
             // 客端與本機共用出牌動畫與語音
             const applyCardFlipped = (data) => {
+                // 若客端因動畫時差尚未進入 playing，確保在收到翻牌事件時自動校正為 playing 狀態
+                if (gameStateRef.current === 'starting' || gameStateRef.current === 'dealing') {
+                    setGameState('playing');
+                    gameStateRef.current = 'playing';
+                    setStartPrompt("");
+                }
+
                 playSoundEffect('flip');
                 isAnimatingRef.current = true;
                 setIsAnimating(true);
@@ -1283,6 +1332,7 @@
 
                     if (data.isMatch) {
                         setGameState('slapping');
+                        gameStateRef.current = 'slapping';
                         isAnimatingRef.current = false;
                         setIsAnimating(false);
                     } else {
@@ -1292,6 +1342,19 @@
                         currentStepRef.current = data.nextStep;
                         isAnimatingRef.current = false;
                         setIsAnimating(false);
+
+                        // 若連線房主在動畫期間收到客端提前點擊的出牌請求，在回合切換完成後立即自動執行出牌！
+                        if (isOnlineRef.current && isHostRef.current && pendingClientPlayRef.current !== null) {
+                            const queuedSeat = pendingClientPlayRef.current;
+                            pendingClientPlayRef.current = null;
+                            if (queuedSeat === data.nextTurn) {
+                                setTimeout(() => {
+                                    if (gameStateRef.current === 'playing' && turnRef.current === queuedSeat && !isAnimatingRef.current) {
+                                        executeCardPlay(queuedSeat);
+                                    }
+                                }, 30);
+                            }
+                        }
                     }
                 };
 
@@ -1307,7 +1370,7 @@
                 if (isOnlineRef.current) {
                     if (isManual && turnRef.current !== mySeatIndexRef.current) return;
                     if (isHostRef.current) {
-                        executeCardPlay(0);
+                        executeCardPlay(mySeatIndexRef.current);
                     } else {
                         sendToHost({ type: 'CLIENT_PLAY_CARD', seatIndex: mySeatIndexRef.current });
                     }
