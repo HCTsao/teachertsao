@@ -240,21 +240,15 @@
             }
         };
 
-        // 全域引用，避免 Chromium 垃圾回收提早中止語音
-        let activeUtteranceRef = null;
-        // 徹底阻止行動裝置與平板在拍牌時觸發縮放或畫面位移
+        // 全域引用，避免 Chromium 與 Mobile Safari 垃圾回收提早中止語音
         if (typeof window !== 'undefined') {
+            window._activeUtterance = null;
+            // 阻止行動裝置與平板在拍牌時雙指誤觸縮放，但保留單指手勢以維持瀏覽器音訊啟動權限
             window.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
             window.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
             window.addEventListener('gestureend', (e) => e.preventDefault(), { passive: false });
             window.addEventListener('touchstart', (e) => {
                 if (e.touches && e.touches.length > 1) e.preventDefault();
-            }, { passive: false });
-            let lastTouchTime = 0;
-            document.addEventListener('touchend', (e) => {
-                const now = Date.now();
-                if (now - lastTouchTime <= 300) e.preventDefault();
-                lastTouchTime = now;
             }, { passive: false });
         }
 
@@ -367,9 +361,6 @@
 
                 const unlockHandler = () => {
                     initAudio();
-                    window.removeEventListener('pointerdown', unlockHandler);
-                    window.removeEventListener('click', unlockHandler);
-                    window.removeEventListener('touchstart', unlockHandler);
                 };
                 window.addEventListener('pointerdown', unlockHandler);
                 window.addEventListener('click', unlockHandler);
@@ -425,24 +416,54 @@
                 setTimeout(() => setSlapHands(prev => prev.filter(h => h.id !== id)), 750);
             };
 
+            // 跨平台（Windows / iOS / iPad / Android）高相容語音包智慧選取
+            const findBestVoice = () => {
+                if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
+                const voices = window.speechSynthesis.getVoices() || [];
+                if (!voices || voices.length === 0) return null;
+
+                // 1. 優先匹配臺灣國語（iOS: Mei-Jia, Windows: Hanhan/Yating, Android: cmn-tw / Taiwan）
+                const twVoice = voices.find(v => {
+                    const l = (v.lang || '').toLowerCase().replace('_', '-');
+                    const n = (v.name || '').toLowerCase();
+                    return (l === 'zh-tw' || l === 'cmn-tw' || l === 'zh-hant-tw') && 
+                           (n.includes('mei-jia') || n.includes('hanhan') || n.includes('yating') || n.includes('taiwan') || n.includes('國語') || n.includes('臺灣') || n.includes('台灣'));
+                }) || voices.find(v => {
+                    const l = (v.lang || '').toLowerCase().replace('_', '-');
+                    return l === 'zh-tw' || l === 'cmn-tw' || l === 'zh-hant-tw';
+                }) || voices.find(v => {
+                    const n = (v.name || '').toLowerCase();
+                    return n.includes('taiwan') || n.includes('台灣') || n.includes('臺灣') || n.includes('mei-jia');
+                }) || voices.find(v => {
+                    const l = (v.lang || '').toLowerCase().replace('_', '-');
+                    return l.startsWith('zh') || l.startsWith('cmn');
+                });
+
+                return twVoice || null;
+            };
+
             const initAudio = () => {
                 try {
                     if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
-                    if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
+                    if (audioCtxRef.current) {
+                        if (audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
+                        // iOS / iPadOS Web Audio 標準喚醒方式：播放極短無聲 buffer
+                        const buffer = audioCtxRef.current.createBuffer(1, 1, 22050);
+                        const source = audioCtxRef.current.createBufferSource();
+                        source.buffer = buffer;
+                        source.connect(audioCtxRef.current.destination);
+                        source.start(0);
+                    }
                     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
                         window.speechSynthesis.resume();
-                        // 關鍵：在使用者點擊手勢中同步觸發一次極短無聲語音，解鎖瀏覽器 Autoplay Policy，允許後續 AI 定時器出牌自動朗讀
-                        const dummy = new SpeechSynthesisUtterance(' ');
-                        dummy.volume = 0.01;
-                        dummy.rate = 10;
-                        window.speechSynthesis.speak(dummy);
+                        window.speechSynthesis.getVoices();
                     }
                 } catch(e) {}
             };
 
-            // 專屬 Windows 電腦的高相容語音報讀函式
+            // 全平台（電腦、手機、平板）高相容語音報讀函式
             const playChantVoice = (text) => {
-                if (isMuted || !('speechSynthesis' in window)) return;
+                if (isMuted || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
                 try {
                     window.speechSynthesis.resume();
 
@@ -451,32 +472,23 @@
                     u.rate = 1.0;
                     u.pitch = 1.0;
 
-                    const voices = window.speechSynthesis.getVoices();
-                    if (voices && voices.length > 0) {
-                        const twVoice = voices.find(v => (v.lang === 'zh-TW' || v.lang === 'zh_TW') && (v.name.includes('Hanhan') || v.name.includes('Taiwan') || v.name.includes('臺灣') || v.name.includes('國語') || v.name.includes('HsiaoChen') || v.name.includes('Yating')))
-                                     || voices.find(v => v.lang === 'zh-TW' || v.lang === 'zh_TW')
-                                     || voices.find(v => v.lang.toLowerCase().startsWith('zh'));
-                        if (twVoice) {
-                            u.voice = twVoice;
-                        }
+                    const voice = findBestVoice();
+                    if (voice) {
+                        u.voice = voice;
                     }
 
-                    activeUtteranceRef = u;
-                    u.onend = () => { activeUtteranceRef = null; };
+                    window._activeUtterance = u;
+                    u.onend = () => { window._activeUtterance = null; };
                     u.onerror = (e) => {
                         console.warn("SpeechSynthesis error:", e);
-                        activeUtteranceRef = null;
+                        window._activeUtterance = null;
                     };
 
+                    // 行動裝置與平板（iOS Safari / Android Chrome）切勿在 setTimeout 中呼叫 speak，否則手勢遺失導致完全無聲
                     if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
                         window.speechSynthesis.cancel();
-                        setTimeout(() => {
-                            window.speechSynthesis.resume();
-                            window.speechSynthesis.speak(u);
-                        }, 50);
-                    } else {
-                        window.speechSynthesis.speak(u);
                     }
+                    window.speechSynthesis.speak(u);
                 } catch(e) {
                     console.error("SpeechSynthesis error:", e);
                 }
@@ -851,7 +863,7 @@
                 setGameState('rps');
             };
 
-            // 連線模式：房主開始猜拳決定出牌順序
+            // 連線模式：房主開始遊戲（系統隨機決定出牌順序，不用猜拳）
             const startOnlineGame = () => {
                 if (!isHost) return;
                 initAudio();
@@ -881,19 +893,25 @@
                 aiSlapScheduledRef.current = false;
                 penaltyScheduledRef.current = false;
 
-                // 進入猜拳流程
-                setRpsChoices({});
-                rpsChoicesRef.current = {};
-                setRpsStatus('waiting');
-                setRpsWinner(null);
-                setIsRpsProcessing(false);
-                setGameState('rps');
+                // 系統隨機決定出牌順序 (0 ~ initialPlayers.length - 1)，跳過猜拳直接發牌
+                const startingTurnVal = Math.floor(Math.random() * initialPlayers.length);
+                const deck = createDeck(multiplierRef.current);
+                const initialStepVal = difficultyRef.current === 'easy' ? 1 : 9;
+
+                setMainDeck(deck);
+                setCurrentStep(initialStepVal);
+                currentStepRef.current = initialStepVal;
+                setTurn(startingTurnVal);
+                turnRef.current = startingTurnVal;
+                setGameState('dealing');
+                setDealingProgress(0);
 
                 broadcastToClients({
-                    type: 'START_RPS_SYNC',
+                    type: 'START_GAME_SYNC',
                     players: initialPlayers,
-                    multiplier: multiplierRef.current,
-                    difficulty: difficultyRef.current
+                    mainDeck: deck,
+                    initialStep: initialStepVal,
+                    startingTurn: startingTurnVal
                 });
             };
 
