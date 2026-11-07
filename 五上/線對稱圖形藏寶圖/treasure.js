@@ -285,6 +285,7 @@ function makeLevels(mode) {
 let run = null;
 let undo = [];
 let stroke = null; // 簡單模式拖曳畫筆
+let currentTool = 'draw'; // 'draw' (畫筆) 或 'eraser' (橡皮擦)
 let lastCheck = null;
 let hintTarget = null;
 
@@ -570,9 +571,20 @@ function beginSimple(e) {
   if (!k || !editableSimple(k)) return;
   e.preventDefault();
   rememberSimple();
+
+  const isMine = run.mine.includes(k);
+  let paintValue = true;
+  if (currentTool === 'eraser') {
+    paintValue = false;
+    if (isMine) message('已擦除該方格。');
+  } else {
+    paintValue = true;
+    if (!isMine) message('已填入對稱方格。');
+  }
+
   stroke = {
     id: e.pointerId,
-    value: !run.mine.includes(k),
+    value: paintValue,
     last: k,
     seen: new Set([k])
   };
@@ -766,11 +778,15 @@ function renderAdvancedUserLines() {
     l.setAttribute('y2', toSvgY(y2));
     l.setAttribute('class', 'user-line');
     l.dataset.seg = seg;
-    // 點擊已畫好的線段可直接刪除
+    // 點擊已畫好的線段：橡皮擦模式擦除；畫筆模式提示
     l.addEventListener('click', e => {
       e.stopPropagation();
       if (run.passed) return;
-      deleteAdvancedSegment(seg);
+      if (currentTool === 'eraser') {
+        deleteAdvancedSegment(seg);
+      } else {
+        message('💡 線段已固定。若想擦除，請切換至「🧹 橡皮擦」工具或點擊「復原」。');
+      }
     });
     userGroup.appendChild(l);
   });
@@ -843,55 +859,57 @@ function rememberAdvanced() {
   if (undo.length > 40) undo.shift();
 }
 
-// 切換或新增一條線段
-function toggleAdvancedSegment(p1, p2) {
+// 新增一條線段 (線畫了就畫了，除非按上一步或用橡皮擦擦掉，不然不會消失)
+function addAdvancedSegment(p1, p2) {
   if (p1 === p2 || run.passed) return;
   const seg = normSeg(p1, p2);
   const currentSegs = new Set(run.segments || []);
+  if (currentSegs.has(seg)) return; // 已經連過則不重複連
+
   rememberAdvanced();
-
-  if (currentSegs.has(seg)) {
-    currentSegs.delete(seg);
-    message(`已清除線段 (${p1}) 至 (${p2})。`);
-  } else {
-    currentSegs.add(seg);
-    message(`已連線 (${p1}) 至 (${p2})！可接續點選下一個點。`);
-  }
-
+  currentSegs.add(seg);
   run.segments = [...currentSegs];
   refreshAdvanced();
 }
 
-// 刪除指定線段
+// 刪除/擦除指定線段
 function deleteAdvancedSegment(seg) {
   if (run.passed) return;
   rememberAdvanced();
   const currentSegs = new Set(run.segments || []);
-  currentSegs.delete(seg);
-  run.segments = [...currentSegs];
-  refreshAdvanced();
-  message('已刪除該條線段。');
+  if (currentSegs.has(seg)) {
+    currentSegs.delete(seg);
+    run.segments = [...currentSegs];
+    refreshAdvanced();
+    message('已擦除該條線段。');
+  }
 }
 
-// 處理點選格點
+// 處理點選格點 (選兩點連成一條線，然後要再選兩點才會畫出一條新線)
 function handleDotClick(dotKey) {
   if (run.passed) return;
+
+  if (currentTool === 'eraser') {
+    message('🧹 橡皮擦模式中：請點選要擦除的線段，或切換回「🖌️ 畫筆」繼續連線。');
+    return;
+  }
 
   if (!advActiveDot) {
     advActiveDot = dotKey;
     renderActiveDotRing();
-    message(`已選取起點 (${dotKey})，請點選另一個格點進行連線。`);
+    message('已選取起點，請點選第 2 個格點完成連線。');
   } else if (advActiveDot === dotKey) {
-    // 點擊同一點取消選取
+    // 點擊同一點取消選取起點
     advActiveDot = null;
     renderActiveDotRing();
     message('已取消選取起點。');
   } else {
-    // 點選第二個點：連線！
-    toggleAdvancedSegment(advActiveDot, dotKey);
-    // 連線後，自動把當前點設為新的活動點，方便學童順暢接續連折線！
-    advActiveDot = dotKey;
+    // 點選第二個點：連成一條線！
+    addAdvancedSegment(advActiveDot, dotKey);
+    // 連完後起點重設為空，必須再選兩個點才會畫出一條新線！
+    advActiveDot = null;
     renderActiveDotRing();
+    message('已連成一條線段！請再選取兩個格點畫下一條線。');
   }
 }
 
@@ -955,10 +973,15 @@ function handleDotClick(dotKey) {
 
     const endDot = getHitDotFromEvent(e);
     if (endDot && endDot !== startDot) {
+      if (currentTool === 'eraser') {
+        message('🧹 橡皮擦模式中：請點選要擦除的線段。');
+        return;
+      }
       // 拖曳成功連線
-      toggleAdvancedSegment(startDot, endDot);
-      advActiveDot = endDot;
+      addAdvancedSegment(startDot, endDot);
+      advActiveDot = null;
       renderActiveDotRing();
+      message('已連成一條線段！請再選取兩個格點畫下一條線。');
     } else {
       // 若是原地放開，視為純點擊行為
       handleDotClick(startDot);
@@ -1354,14 +1377,40 @@ $('grid').addEventListener('pointermove', moveSimple);
 for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
   $('grid').addEventListener(type, finishSimple);
 }
+// 防止行動裝置作圖時觸發網頁上下滾動
+['grid', 'dotSvg'].forEach(id => {
+  const el = $(id);
+  if (el) {
+    el.addEventListener('touchmove', e => {
+      if (e.cancelable) e.preventDefault();
+    }, { passive: false });
+  }
+});
 
 // 工具列按鈕
 $('drawBtn').onclick = () => {
+  currentTool = 'draw';
   $('drawBtn').setAttribute('aria-pressed', 'true');
+  $('eraseBtn')?.setAttribute('aria-pressed', 'false');
+  advActiveDot = null;
+  renderActiveDotRing();
   if (run && run.mode === 'advanced') {
-    advActiveDot = null;
-    renderActiveDotRing();
-    message('連線筆已備妥：點選格點即可連線。');
+    message('🖌️ 畫筆已備妥：請點選兩個格點連成線段。');
+  } else {
+    message('🖌️ 畫筆已備妥：點選方格進行填色。');
+  }
+};
+
+$('eraseBtn').onclick = () => {
+  currentTool = 'eraser';
+  $('eraseBtn')?.setAttribute('aria-pressed', 'true');
+  $('drawBtn').setAttribute('aria-pressed', 'false');
+  advActiveDot = null;
+  renderActiveDotRing();
+  if (run && run.mode === 'advanced') {
+    message('🧹 橡皮擦已備妥：點選想刪除的線段即可擦除。');
+  } else {
+    message('🧹 橡皮擦已備妥：點選已填色的方格即可擦除。');
   }
 };
 

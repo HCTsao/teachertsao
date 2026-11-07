@@ -270,6 +270,149 @@
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.75; transform: scale(0.96); }
     }
+
+    /* 手機/平板作圖區防上下滾動固定 (Touch Lock) */
+    #battleSvg, #dotGridBox, #simpleBoardArea, #simpleGrid, .simple-cell, #gridWrap {
+      touch-action: none !important;
+      -webkit-touch-callout: none !important;
+      user-select: none !important;
+      -webkit-user-select: none !important;
+      overscroll-behavior: contain !important;
+    }
+
+    /* 對戰模式選擇卡片 */
+    .battle-mode-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .battle-mode-card {
+      background: #fdfaf2;
+      border: 2.5px solid #8c5d2e;
+      border-radius: 12px;
+      padding: 12px 8px;
+      text-align: center;
+      cursor: pointer;
+      font-family: inherit;
+      color: #451a03;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+      position: relative;
+    }
+    .battle-mode-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0,0,0,0.25);
+    }
+    .battle-mode-card.active {
+      background: linear-gradient(180deg, #fef9c3 0%, #fef08a 60%, #fde047 100%);
+      border-color: #b45309;
+      box-shadow: 0 0 0 2px #b45309, 0 6px 14px rgba(180, 83, 9, 0.35);
+      transform: scale(1.02);
+    }
+    .battle-mode-card .mode-icon {
+      font-size: 1.8rem;
+      margin-bottom: 4px;
+    }
+    .battle-mode-card .mode-title {
+      font-size: 1.05rem;
+      font-weight: 900;
+      color: #451a03;
+      margin-bottom: 2px;
+    }
+    .battle-mode-card .mode-desc {
+      font-size: 0.78rem;
+      color: #78350f;
+      font-weight: 700;
+    }
+    .battle-mode-card .mode-badge {
+      display: inline-block;
+      margin-top: 6px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: rgba(180, 83, 9, 0.12);
+      color: #78350f;
+      border: 1px solid rgba(180, 83, 9, 0.3);
+    }
+    .battle-mode-card.active .mode-badge {
+      background: #78350f;
+      color: #fef08a;
+      border-color: #451a03;
+    }
+
+    /* 簡單模式棋盤樣式 (12x10 方格) */
+    #simpleBoardArea {
+      position: relative;
+      width: min(100%, 460px);
+      margin: auto;
+      border-radius: 12px;
+      padding: 8px;
+      background: #452414;
+      border: 3px solid #28140a;
+      box-shadow: inset 0 3px 8px rgba(0,0,0,0.5), 0 4px 10px rgba(0,0,0,0.3);
+    }
+    #simpleGrid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 2px;
+      touch-action: none !important;
+      user-select: none !important;
+    }
+    .simple-cell {
+      aspect-ratio: 1;
+      border: 0;
+      border-radius: 2px;
+      padding: 0;
+      background: #fdfaf2;
+      font-size: clamp(8px, 2.5vw, 16px);
+      color: white;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .simple-cell.given {
+      background: #181512 !important;
+    }
+    .simple-cell.mine {
+      background: #065f46 !important;
+      box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.3);
+    }
+    .simple-cell.timeout-sol {
+      background: #eab308 !important;
+      animation: pulseCellSol 1s infinite alternate;
+    }
+    @keyframes pulseCellSol {
+      from { background: #eab308; }
+      to { background: #f97316; }
+    }
+    .simple-cell.disabled-cell {
+      background: #cbbba4 !important;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    #simpleAxisLine {
+      position: absolute;
+      pointer-events: none;
+      z-index: 5;
+    }
+    #simpleAxisLine.v {
+      top: 8px;
+      bottom: 8px;
+      left: 50%;
+      border-left: 3.5px dashed #b91c1c;
+      transform: translateX(-50%);
+    }
+    #simpleAxisLine.h {
+      left: 8px;
+      right: 8px;
+      top: 50%;
+      border-top: 3.5px dashed #b91c1c;
+      transform: translateY(-50%);
+    }
   </style>
 </head>
 <body>
@@ -327,6 +470,27 @@
         </div>
       </div>
 
+      <!-- 對戰模式選擇 (簡單模式 / 進階模式) -->
+      <div class="battle-mode-section" style="margin-bottom:14px;">
+        <div style="font-size:0.95rem;font-weight:900;color:#5c2d12;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+          <span>🎯</span> 對戰模式選擇：
+        </div>
+        <div class="battle-mode-grid">
+          <button type="button" class="battle-mode-card active" id="btnModeSimple" data-mode="simple">
+            <div class="mode-icon">🟩</div>
+            <div class="mode-title">簡單模式</div>
+            <div class="mode-desc">12×10 方格填色</div>
+            <div class="mode-badge">入門推薦</div>
+          </button>
+          <button type="button" class="battle-mode-card" id="btnModeAdvanced" data-mode="advanced">
+            <div class="mode-icon">📐</div>
+            <div class="mode-title">進階模式</div>
+            <div class="mode-desc">7×7 格點點線繪圖</div>
+            <div class="mode-badge">幾何思維</div>
+          </button>
+        </div>
+      </div>
+
       <!-- 開房 / 加房 / 電腦對戰 Tab -->
       <div class="lobby-tabs">
         <button type="button" class="lobby-tab-btn active" id="tabCreate">🆕 建立房間</button>
@@ -379,6 +543,7 @@
         <h2 class="antique-title">ROOM CREATED</h2>
         <div class="antique-subtitle">決鬥密室已開闢，等待水手登船...</div>
         <div class="room-code-display" id="waitRoomCode">----</div>
+        <div id="waitModeDisplay" style="font-size:1.05rem;font-weight:900;color:#78350f;margin:8px 0;">模式：簡單模式（12×10 方格填色）</div>
         <p style="font-size:0.95rem;color:#573315;line-height:1.6;">
           請告訴對手輸入上方 <strong>4 位數字代碼</strong> 加入房間！<br>
           <span style="color:#b45309;font-weight:900;">⚡ 對手連線後將自動開局！</span>
@@ -408,6 +573,7 @@
         <!-- 中央計時鐘與回合 -->
         <div class="match-center">
           <div class="round-pill" id="roundPill">ROUND 1 / 3</div>
+          <div class="round-pill" id="bModePill" style="background:#064e3b;border-color:#34d399;color:#ecfdf5;font-size:0.72rem;padding:2px 8px;margin-top:2px;">🟩 簡單模式</div>
           <div class="timer-ring-box" id="timerBox">
             <span class="timer-sec" id="timerSec">90</span>
           </div>
@@ -428,36 +594,49 @@
       </div>
 
       <!-- 圖例說明 -->
-      <div class="legend-bar">
-        <span class="lg-item"><span class="swatch swatch-given-line"></span> 黑色題目線</span>
-        <span class="lg-item"><span class="swatch swatch-mine-line"></span> 綠色你連的線</span>
+      <div class="legend-bar" id="bLegendBar">
+        <span class="lg-item" id="lgItemGiven"><span class="swatch swatch-given-line" id="lgSwatchGiven"></span> <span id="lgTextGiven">黑色題目線</span></span>
+        <span class="lg-item" id="lgItemMine"><span class="swatch swatch-mine-line" id="lgSwatchMine"></span> <span id="lgTextMine">綠色你連的線</span></span>
         <span class="lg-item red"><span class="swatch swatch-axis"></span> 紅色虛線對稱軸</span>
       </div>
 
       <!-- 作答棋盤容器 -->
-      <div id="gridWrap">
-        <div id="dotGridBox">
-          <!-- 答題者等待出題時的迷霧遮罩 -->
-          <div id="lockOverlay" class="canvas-lock-overlay" hidden>
-            <div class="lock-skull">⏳</div>
-            <h3 style="font-size:1.35rem;color:#fde047;">對手正在閉門設計秘圖中...</h3>
-            <p style="font-size:0.9rem;max-width:320px;line-height:1.5;">
-              出題者擁有 90 秒秘密設計時間。<br>
-              請耐心稍候，對手送出後將立即掀開神秘海圖供你破解！
-            </p>
-          </div>
+      <div id="gridWrap" style="position:relative;">
+        <!-- 答題者等待出題時的迷霧遮罩 (通用覆蓋) -->
+        <div id="lockOverlay" class="canvas-lock-overlay" hidden>
+          <div class="lock-skull">⏳</div>
+          <h3 style="font-size:1.35rem;color:#fde047;">對手正在閉門設計秘圖中...</h3>
+          <p style="font-size:0.9rem;max-width:320px;line-height:1.5;">
+            出題者擁有 90 秒秘密設計時間。<br>
+            請耐心稍候，對手送出後將立即掀開神秘海圖供你破解！
+          </p>
+        </div>
 
-          <!-- 7x7 互動 SVG -->
+        <!-- 模式 1：簡單模式棋盤 (12x10 方格填色) -->
+        <div id="simpleBoardBox" hidden>
+          <div id="simpleBoardArea">
+            <div id="simpleAxisLine" class="v"></div>
+            <div id="simpleGrid"></div>
+          </div>
+          <div class="dot-instructions" id="simpleInstructions">
+            💡 點選限定半邊方格即可填色；再點一下可清除；支援復原與全部清除。
+          </div>
+        </div>
+
+        <!-- 模式 2：進階模式格點 (7x7 格點連線) -->
+        <div id="dotGridBox">
           <svg id="battleSvg" viewBox="0 0 420 420" role="img" aria-label="連線對戰畫布"></svg>
           <div class="dot-instructions" id="battleInstructions">
-            💡 點選兩個格點即可連線；再點一下線段可刪除；亦可按住拖曳連線。
+            💡 點選兩個格點連成一條線段；欲擦除請切換「🧹 橡皮擦」或點選「復原」。
           </div>
         </div>
       </div>
 
-      <!-- 工具列 (復原、清除) -->
-      <div class="tools" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 8px;">
-        <button id="bUndoBtn"><span class="tool-ic">↶</span> 復原上一步</button>
+      <!-- 工具列 (畫筆、橡皮擦、復原、全部清除) -->
+      <div class="tools tools-four" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 8px;">
+        <button id="bDrawBtn" aria-pressed="true"><span class="tool-ic">🖌️</span> 畫筆</button>
+        <button id="bEraseBtn" aria-pressed="false"><span class="tool-ic">🧹</span> 橡皮擦</button>
+        <button id="bUndoBtn"><span class="tool-ic">↶</span> 復原</button>
         <button id="bClearBtn"><span class="tool-ic">🗑️</span> 全部清除</button>
       </div>
 
@@ -608,6 +787,61 @@
       return isDotInAllowedSide(x1, y1, axis, side) && isDotInAllowedSide(x2, y2, axis, side);
     }
 
+    // 簡單模式 12x10 方格常數與運算
+    const SIM_W = 12, SIM_H = 10;
+    const mirrorCell = (key, axis) => {
+      let [r, c] = key.split(',').map(Number);
+      return axis === 'V' ? `${r},${SIM_W - 1 - c}` : `${SIM_H - 1 - r},${c}`;
+    };
+
+    function isCellInAllowedSide(r, c, axis, side) {
+      if (axis === 'V') {
+        return side === 'left' ? c < 6 : c >= 6;
+      } else {
+        return side === 'top' ? r < 5 : r >= 5;
+      }
+    }
+
+    // 簡單模式備援與 AI 題庫
+    const SIMPLE_AI_V = [
+      ['3,4','4,3','5,3','6,4'],
+      ['3,5','4,4','4,5','5,3','5,4','5,5'],
+      ['2,5','3,4','4,3','5,4','6,5'],
+      ['2,3','2,4','3,2','3,5','4,3','4,5','5,2','6,3','6,4'],
+      ['2,5','3,4','3,5','4,2','4,3','4,4','4,5','5,4','5,5','6,5'],
+      ['2,4','2,5','3,3','3,5','4,3','4,5','5,4','5,5','6,3','6,5']
+    ];
+    const SIMPLE_AI_H = [
+      ['3,4','3,7','4,3','4,4','4,7','4,8'],
+      ['2,5','2,6','3,4','3,5','3,6','3,7','4,5','4,6'],
+      ['3,5','3,6','4,3','4,4','4,5','4,6','4,7','4,8'],
+      ['2,4','2,5','2,6','2,7','3,3','3,8','4,3','4,8'],
+      ['1,5','1,6','2,4','2,5','2,6','2,7','3,3','3,4','3,7','3,8']
+    ];
+
+    function genFallbackSimpleDesign(axis, side) {
+      const list = axis === 'V' ? SIMPLE_AI_V : SIMPLE_AI_H;
+      const base = list[Math.floor(Math.random() * list.length)];
+      if (axis === 'V') {
+        return side === 'left' ? base : base.map(k => mirrorCell(k, 'V'));
+      } else {
+        return side === 'top' ? base : base.map(k => mirrorCell(k, 'H'));
+      }
+    }
+
+    // 模式與工具狀態
+    let selectedBattleMode = 'simple'; // 預設簡單模式，亦可切換進階模式
+    let currentBattleTool = 'draw';    // 'draw' (畫筆) 或 'eraser' (橡皮擦)
+
+    $('btnModeSimple').onclick = () => setBattleMode('simple');
+    $('btnModeAdvanced').onclick = () => setBattleMode('advanced');
+
+    function setBattleMode(mode) {
+      selectedBattleMode = mode;
+      $('btnModeSimple').classList.toggle('active', mode === 'simple');
+      $('btnModeAdvanced').classList.toggle('active', mode === 'advanced');
+    }
+
     // 2. 對戰全域狀態
     let gameState = {
       isAi: false,
@@ -618,8 +852,10 @@
       roomData: null,
       currentPhase: null,
       currentRound: null,
-      // 本地作答線段
+      // 本地作答線段 (進階模式)
       localUserSegs: new Set(),
+      // 本地作答方格 (簡單模式)
+      localUserCells: new Set(),
       localUndo: [],
       activeDot: null,
       dragStart: null,
@@ -628,6 +864,33 @@
       timeLeft: 90,
       roundNextTimeout: null,
       showingTimeoutSol: false
+    };
+
+    // 工具切換按鈕
+    $('bDrawBtn').onclick = () => {
+      currentBattleTool = 'draw';
+      $('bDrawBtn').setAttribute('aria-pressed', 'true');
+      $('bEraseBtn').setAttribute('aria-pressed', 'false');
+      gameState.activeDot = null;
+      renderBattleActiveRing();
+      if (gameState.roomData?.mode === 'simple') {
+        bMessage('🖌️ 畫筆已備妥：點選方格進行填色。');
+      } else {
+        bMessage('🖌️ 畫筆已備妥：請點選兩個格點連成線段。');
+      }
+    };
+
+    $('bEraseBtn').onclick = () => {
+      currentBattleTool = 'eraser';
+      $('bEraseBtn').setAttribute('aria-pressed', 'true');
+      $('bDrawBtn').setAttribute('aria-pressed', 'false');
+      gameState.activeDot = null;
+      renderBattleActiveRing();
+      if (gameState.roomData?.mode === 'simple') {
+        bMessage('🧹 橡皮擦已備妥：點選想擦除的方格即可清除。');
+      } else {
+        bMessage('🧹 橡皮擦已備妥：點選想擦除的線段即可刪除。');
+      }
     };
 
     // 音效合成器 (Web Audio)
@@ -704,6 +967,7 @@
 
       const initialRoom = {
         code: code,
+        mode: selectedBattleMode,
         phase: 'lobby', // lobby, design, solve, roundResult, gameOver
         round: 1,
         maxRounds: 3,
@@ -715,6 +979,12 @@
         p2: null,
         designSegs: [],
         targetSegs: [],
+        designCells: [],
+        targetCells: [],
+        liveSolverSegs: [],
+        liveSolverCells: [],
+        solverSegs: [],
+        solverCells: [],
         designDone: false,
         solveDone: false,
         phaseStartTime: Date.now(),
@@ -732,6 +1002,8 @@
         gameState.roomRef = ref;
 
         $('waitRoomCode').textContent = code;
+        const modeDesc = (selectedBattleMode === 'simple') ? '簡單模式（12×10 方格填色）' : '進階模式（7×7 格點點線繪圖）';
+        $('waitModeDisplay').textContent = `模式：${modeDesc}`;
         $('lobbyScreen').hidden = true;
         $('waitScreen').hidden = false;
 
@@ -803,6 +1075,7 @@
 
       const aiRoom = {
         code: 'AI88',
+        mode: selectedBattleMode,
         phase: 'design',
         round: 1,
         maxRounds: 3,
@@ -814,6 +1087,12 @@
         p2: { name: '海盜島 AI 船長', score: 0 },
         designSegs: [],
         targetSegs: [],
+        designCells: [],
+        targetCells: [],
+        liveSolverSegs: [],
+        liveSolverCells: [],
+        solverSegs: [],
+        solverCells: [],
         designDone: false,
         solveDone: false,
         phaseStartTime: Date.now(),
@@ -894,12 +1173,43 @@
     // 🌟 對戰主舞台核心邏輯 🌟
     // =========================================================
     function renderBattleStage(room) {
-      // 1. 更新玩家 HUD
+      const mode = room.mode || 'simple';
+
+      // 1. 更新玩家 HUD 與模式標籤
       $('p1NameLabel').textContent = room.p1?.name || '水手 1';
       $('p1ScoreVal').textContent = room.p1?.score || 0;
       $('p2NameLabel').textContent = room.p2?.name || '水手 2';
       $('p2ScoreVal').textContent = room.p2?.score || 0;
       $('roundPill').textContent = `ROUND ${room.round} / ${room.maxRounds}`;
+
+      if ($('bModePill')) {
+        if (mode === 'simple') {
+          $('bModePill').textContent = '🟩 簡單模式 (12×10)';
+          $('bModePill').style.background = '#064e3b';
+          $('bModePill').style.borderColor = '#34d399';
+        } else {
+          $('bModePill').textContent = '📐 進階模式 (7×7)';
+          $('bModePill').style.background = '#78350f';
+          $('bModePill').style.borderColor = '#f59e0b';
+        }
+      }
+
+      // 切換圖例說明文字與圖示
+      if (mode === 'simple') {
+        $('lgSwatchGiven').className = 'swatch swatch-given-cell';
+        $('lgSwatchMine').className = 'swatch swatch-mine-cell';
+        $('lgTextGiven').textContent = '黑色題目方格';
+        $('lgTextMine').textContent = '綠色你填的方格';
+        $('simpleBoardBox').hidden = false;
+        $('dotGridBox').hidden = true;
+      } else {
+        $('lgSwatchGiven').className = 'swatch swatch-given-line';
+        $('lgSwatchMine').className = 'swatch swatch-mine-line';
+        $('lgTextGiven').textContent = '黑色題目線段';
+        $('lgTextMine').textContent = '綠色你連的線段';
+        $('simpleBoardBox').hidden = true;
+        $('dotGridBox').hidden = false;
+      }
 
       const isDesigner = (gameState.myRole === room.designer);
       const isSolver = (gameState.myRole === room.solver);
@@ -913,14 +1223,20 @@
 
       if (!isPhaseChange) {
         // 同一階段內的微更新：
-        // 若出題者在觀戰 solve 階段，同步呈現答題者的即時連線歷程
+        // 若出題者在觀戰 solve 階段，同步呈現答題者的即時歷程
         if (room.phase === 'solve' && isDesigner) {
-          const liveSegs = room.liveSolverSegs || [];
-          gameState.localUserSegs = new Set(liveSegs);
-          gameState.activeDot = room.liveSolverDot || null;
-          renderBattleUserLines();
-          const count = liveSegs.length;
-          bMessage(`👀 即時轉播中：對手正在連線作答（目前已連 ${count} 條線）...`);
+          if (mode === 'simple') {
+            const liveCells = room.liveSolverCells || [];
+            gameState.localUserCells = new Set(liveCells);
+            renderSimpleBattleGridUser();
+            bMessage(`👀 即時轉播中：對手正在填色作答（目前已塗 ${liveCells.length} 格）...`);
+          } else {
+            const liveSegs = room.liveSolverSegs || [];
+            gameState.localUserSegs = new Set(liveSegs);
+            gameState.activeDot = null;
+            renderBattleUserLines();
+            bMessage(`👀 即時轉播中：對手正在連線作答（目前已連 ${liveSegs.length} 條線）...`);
+          }
         }
         return;
       }
@@ -934,6 +1250,7 @@
         $('roundModal').hidden = true;
         gameState.showingTimeoutSol = false;
         gameState.localUserSegs.clear();
+        gameState.localUserCells.clear();
         gameState.localUndo = [];
         gameState.activeDot = null;
 
@@ -943,12 +1260,16 @@
         if (isDesigner) {
           $('lockOverlay').hidden = true;
           $('phaseTitle').textContent = `🎨 輪到你出題！（限定 ${sideName}）`;
-          $('phaseDesc').textContent = `請在虛線的 ${sideName} 自由連出幾何折線（至少 2 條線段），完成後送出。`;
+          if (mode === 'simple') {
+            $('phaseDesc').textContent = `請在虛線的 ${sideName} 點選方格進行填色（至少塗 3 格），完成後送出。`;
+          } else {
+            $('phaseDesc').textContent = `請在虛線的 ${sideName} 自由點選兩點連線（至少連 2 條線段），完成後送出。`;
+          }
           $('bSubmitBtn').textContent = '完成設計，送出題目 🚀';
           $('bSubmitBtn').disabled = false;
           $('bUndoBtn').disabled = false;
           $('bClearBtn').disabled = false;
-          bMessage(`你是指揮官！請在 ${sideName} 繪製折線考倒對手。`);
+          bMessage(`你是指揮官！請在 ${sideName} 構思題目考倒對手。`);
         } else {
           // 答題者此時看不到題目，顯示迷霧遮罩
           $('lockOverlay').hidden = false;
@@ -960,7 +1281,11 @@
           bMessage('海霧瀰漫中，對手正在密謀繪製線對稱殘卷...');
         }
 
-        buildBattleSvg(room, 'design');
+        if (mode === 'simple') {
+          buildSimpleBattleGrid(room, 'design');
+        } else {
+          buildBattleSvg(room, 'design');
+        }
         startStageTimer(room, 90, onDesignTimeout);
 
       } else if (room.phase === 'solve') {
@@ -971,13 +1296,18 @@
 
         if (isSolver) {
           gameState.localUserSegs.clear();
+          gameState.localUserCells.clear();
           $('phaseTitle').textContent = `⚔️ 破解秘圖！完成對稱圖形！`;
-          $('phaseDesc').textContent = `觀察題目線段，在對稱側依序連出對稱線段！花的時間越短分數越高！`;
+          if (mode === 'simple') {
+            $('phaseDesc').textContent = `觀察題目方格，在對稱側點選對稱方格完成圖形！越快完成分數越高！`;
+          } else {
+            $('phaseDesc').textContent = `觀察題目線段，在對稱側點選兩點連出對稱線段！越快完成分數越高！`;
+          }
           $('bSubmitBtn').textContent = '完成作答，送出檢查 🔍';
           $('bSubmitBtn').disabled = false;
           $('bUndoBtn').disabled = false;
           $('bClearBtn').disabled = false;
-          bMessage('計時開始！找出各頂點的對稱點並連線，越快送出分數越高！');
+          bMessage('計時開始！找出各對稱位置，越快送出分數越高！');
         } else {
           // 出題者觀戰中 (即時同步答題者作答歷程)
           $('phaseTitle').innerHTML = `👀 對手正在破解你的題目... <span class="live-pill">● LIVE 歷程同步</span>`;
@@ -986,13 +1316,21 @@
           $('bSubmitBtn').disabled = true;
           $('bUndoBtn').disabled = true;
           $('bClearBtn').disabled = true;
-          const liveSegs = room.liveSolverSegs || [];
-          gameState.localUserSegs = new Set(liveSegs);
-          gameState.activeDot = room.liveSolverDot || null;
-          bMessage('👀 即時觀戰啟動！對手正聚精會神作答，你可同步看見他的每一筆連線！');
+          if (mode === 'simple') {
+            const liveCells = room.liveSolverCells || [];
+            gameState.localUserCells = new Set(liveCells);
+          } else {
+            const liveSegs = room.liveSolverSegs || [];
+            gameState.localUserSegs = new Set(liveSegs);
+          }
+          bMessage('👀 即時觀戰啟動！對手正聚精會神作答，你可同步看見他的作答歷程！');
         }
 
-        buildBattleSvg(room, 'solve');
+        if (mode === 'simple') {
+          buildSimpleBattleGrid(room, 'solve');
+        } else {
+          buildBattleSvg(room, 'solve');
+        }
         startStageTimer(room, 90, onSolveTimeout);
 
       } else if (room.phase === 'roundResult') {
@@ -1004,14 +1342,20 @@
         $('bSubmitBtn').disabled = true;
         $('bUndoBtn').disabled = true;
         $('bClearBtn').disabled = true;
-        bMessage('✨ 對手破解完成！完整線對稱圖形已呈現在畫布上。');
+        bMessage('✨ 對手破解完成！完整線對稱圖形已呈現在棋盤上。');
 
-        // 在主畫布上同步繪製出題線段與答題完成線段
-        buildBattleSvg(room, 'solve');
-        const solverSegs = room.solverSegs || room.targetSegs || [];
-        gameState.localUserSegs = new Set(solverSegs);
-        gameState.activeDot = null;
-        renderBattleUserLines();
+        if (mode === 'simple') {
+          buildSimpleBattleGrid(room, 'solve');
+          const solverCells = room.solverCells || room.targetCells || [];
+          gameState.localUserCells = new Set(solverCells);
+          renderSimpleBattleGridUser();
+        } else {
+          buildBattleSvg(room, 'solve');
+          const solverSegs = room.solverSegs || room.targetSegs || [];
+          gameState.localUserSegs = new Set(solverSegs);
+          gameState.activeDot = null;
+          renderBattleUserLines();
+        }
 
         showRoundResultModal(room);
       }
@@ -1047,7 +1391,137 @@
     }
 
     // =========================================================
-    // 🌟 SVG 畫布渲染與半邊互動 🌟
+    // 🌟 簡單模式 (12x10 方格) 網格構建與互動 🌟
+    // =========================================================
+    function buildSimpleBattleGrid(room, stage) {
+      const grid = $('simpleGrid');
+      grid.replaceChildren();
+
+      const { axis, side } = room;
+      const oppSideMap = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' };
+      const activeSide = (stage === 'solve') ? (oppSideMap[side] || side) : side;
+
+      // 設置中軸線位置
+      const axisLine = $('simpleAxisLine');
+      if (axisLine) {
+        if (axis === 'V') {
+          axisLine.className = 'v';
+          axisLine.style.top = '0';
+          axisLine.style.bottom = '0';
+          axisLine.style.left = '50%';
+          axisLine.style.right = 'auto';
+          axisLine.style.width = '3px';
+          axisLine.style.height = '100%';
+        } else {
+          axisLine.className = 'h';
+          axisLine.style.top = '50%';
+          axisLine.style.bottom = 'auto';
+          axisLine.style.left = '0';
+          axisLine.style.right = '0';
+          axisLine.style.width = '100%';
+          axisLine.style.height = '3px';
+        }
+      }
+
+      const givenSet = new Set((stage === 'solve' || stage === 'roundResult') ? (room.designCells || []) : []);
+
+      for (let r = 0; r < SIM_H; r++) {
+        for (let c = 0; c < SIM_W; c++) {
+          const key = `${r},${c}`;
+          const cell = document.createElement('div');
+          cell.className = 'simple-cell';
+          cell.dataset.key = key;
+
+          const isAllowed = isCellInAllowedSide(r, c, axis, activeSide);
+          if (isAllowed) {
+            cell.classList.add('allowed');
+          } else {
+            cell.classList.add('forbidden');
+          }
+
+          if (givenSet.has(key)) {
+            cell.classList.add('given');
+          }
+
+          cell.addEventListener('click', e => {
+            e.stopPropagation();
+            onSimpleBattleCellClick(key, isAllowed);
+          });
+
+          grid.appendChild(cell);
+        }
+      }
+
+      renderSimpleBattleGridUser();
+    }
+
+    function renderSimpleBattleGridUser() {
+      const grid = $('simpleGrid');
+      if (!grid) return;
+      const userCells = gameState.localUserCells;
+
+      grid.querySelectorAll('.simple-cell').forEach(cell => {
+        const key = cell.dataset.key;
+        if (userCells.has(key)) {
+          cell.classList.add('mine');
+        } else {
+          cell.classList.remove('mine');
+        }
+      });
+    }
+
+    function onSimpleBattleCellClick(key, isAllowed) {
+      const room = gameState.roomData;
+      if (!room || room.mode !== 'simple') return;
+
+      const isTurn = (room.phase === 'design' && gameState.myRole === room.designer) ||
+                     (room.phase === 'solve' && gameState.myRole === room.solver);
+      if (!isTurn) return;
+
+      if (!isAllowed) {
+        bMessage('⚠️ 只能在指定的半邊作答喔！請勿越界。');
+        playBeep(200, 0.15, 'sawtooth', 0.2);
+        return;
+      }
+
+      if (currentBattleTool === 'draw') {
+        if (gameState.localUserCells.has(key)) {
+          bMessage('方格已經填過色了喔！若欲擦除請切換「🧹 橡皮擦」。');
+          return;
+        }
+        gameState.localUndo.push(new Set(gameState.localUserCells));
+        gameState.localUserCells.add(key);
+        soundConnect();
+        bMessage('已填上顏色！');
+      } else if (currentBattleTool === 'eraser') {
+        if (!gameState.localUserCells.has(key)) return;
+        gameState.localUndo.push(new Set(gameState.localUserCells));
+        gameState.localUserCells.delete(key);
+        bMessage('已擦除方格顏色。');
+      }
+
+      renderSimpleBattleGridUser();
+
+      if (room.phase === 'solve' && gameState.myRole === room.solver) {
+        syncLiveSolverCells();
+      }
+    }
+
+    function syncLiveSolverCells() {
+      const room = gameState.roomData;
+      if (!room || room.phase !== 'solve' || gameState.myRole !== room.solver) return;
+      const cells = [...gameState.localUserCells];
+      if (gameState.isAi) {
+        room.liveSolverCells = cells;
+      } else if (gameState.roomRef) {
+        gameState.roomRef.update({
+          liveSolverCells: cells
+        }).catch(() => {});
+      }
+    }
+
+    // =========================================================
+    // 🌟 SVG 畫布渲染與進階模式互動 (7x7 格點) 🌟
     // =========================================================
     function buildBattleSvg(room, mode) {
       const svg = $('battleSvg');
@@ -1196,7 +1670,7 @@
         l.dataset.seg = seg;
         l.addEventListener('click', e => {
           e.stopPropagation();
-          deleteBattleSegment(seg);
+          handleBattleSegmentClick(seg);
         });
         userG.appendChild(l);
       });
@@ -1226,7 +1700,7 @@
       }
     }
 
-    // 逾時顯示標準完成正解
+    // 逾時顯示標準完成正解 (進階模式線段)
     function renderTimeoutSolution(solSegs) {
       const solG = $('bSolLinesG');
       if (!solG) return;
@@ -1245,25 +1719,24 @@
       });
     }
 
-    // 即時同步答題者的連線歷程與選取起點至雲端，供出題者實時觀戰
+    // 即時同步答題者的連線歷程至雲端，供出題者實時觀戰
     function syncLiveSolverSegs() {
       const room = gameState.roomData;
       if (!room || room.phase !== 'solve' || gameState.myRole !== room.solver) return;
       const segs = [...gameState.localUserSegs];
-      const dot = gameState.activeDot || null;
       if (gameState.isAi) {
         room.liveSolverSegs = segs;
-        room.liveSolverDot = dot;
+        room.liveSolverDot = null;
       } else if (gameState.roomRef) {
         gameState.roomRef.update({
           liveSolverSegs: segs,
-          liveSolverDot: dot
+          liveSolverDot: null
         }).catch(() => {});
       }
     }
 
-    // 連線新增或刪除
-    function toggleBattleSegment(p1, p2) {
+    // 連線新增：兩點一線機制，線畫了就畫了
+    function addBattleSegment(p1, p2) {
       if (p1 === p2) return;
       const room = gameState.roomData;
       if (!room) return;
@@ -1271,9 +1744,7 @@
       const isDesigner = (gameState.myRole === room.designer);
       const isSolver = (gameState.myRole === room.solver);
 
-      // 檢查半邊限制：
-      // 出題者只能在 room.side 連線
-      // 答題者只能在相反半邊連線
+      // 檢查半邊限制
       if (room.phase === 'design' && isDesigner) {
         if (!isDotInAllowedSide(p1.split(',')[0], p1.split(',')[1], room.axis, room.side) ||
             !isDotInAllowedSide(p2.split(',')[0], p2.split(',')[1], room.axis, room.side)) {
@@ -1282,7 +1753,6 @@
           return;
         }
       } else if (room.phase === 'solve' && isSolver) {
-        // 答題者對稱半邊
         const oppSideMap = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' };
         const oppSide = oppSideMap[room.side];
         if (!isDotInAllowedSide(p1.split(',')[0], p1.split(',')[1], room.axis, oppSide) ||
@@ -1296,20 +1766,33 @@
       }
 
       const seg = normSeg(p1, p2);
-      gameState.localUndo.push(new Set(gameState.localUserSegs));
-
       if (gameState.localUserSegs.has(seg)) {
-        gameState.localUserSegs.delete(seg);
-        bMessage(`已清除線段 (${p1}) 至 (${p2})。`);
-      } else {
-        gameState.localUserSegs.add(seg);
-        soundConnect();
-        bMessage(`已連線 (${p1}) 至 (${p2})！可接續點選下一個點。`);
+        bMessage('這條線段已經連過了喔！若欲擦除請切換至「🧹 橡皮擦」。');
+        return;
       }
+
+      gameState.localUndo.push(new Set(gameState.localUserSegs));
+      gameState.localUserSegs.add(seg);
+      soundConnect();
+      bMessage('已連成一條線段！請再選取兩個格點畫下一條線。');
 
       renderBattleUserLines();
       if (room.phase === 'solve' && isSolver) {
         syncLiveSolverSegs();
+      }
+    }
+
+    function handleBattleSegmentClick(seg) {
+      const room = gameState.roomData;
+      if (!room) return;
+      const isTurn = (room.phase === 'design' && gameState.myRole === room.designer) ||
+                     (room.phase === 'solve' && gameState.myRole === room.solver);
+      if (!isTurn) return;
+
+      if (currentBattleTool === 'eraser') {
+        deleteBattleSegment(seg);
+      } else {
+        bMessage('線段已畫好！若欲擦除請切換至「🧹 橡皮擦」或點選「復原」。');
       }
     }
 
@@ -1323,7 +1806,7 @@
       gameState.localUndo.push(new Set(gameState.localUserSegs));
       gameState.localUserSegs.delete(seg);
       renderBattleUserLines();
-      bMessage('已刪除該條線段。');
+      bMessage('已擦除線段。');
       if (room.phase === 'solve' && gameState.myRole === room.solver) {
         syncLiveSolverSegs();
       }
@@ -1384,22 +1867,22 @@
 
         const endDot = getHitDot(e);
         if (endDot && endDot !== startDot) {
-          toggleBattleSegment(startDot, endDot);
-          gameState.activeDot = endDot;
+          addBattleSegment(startDot, endDot);
+          gameState.activeDot = null;
           renderBattleActiveRing();
         } else {
           // 原地點擊
           if (!gameState.activeDot) {
             gameState.activeDot = startDot;
             renderBattleActiveRing();
-            bMessage(`已選取起點 (${startDot})，請點選另一個點連線。`);
+            bMessage('已選取第 1 個格點，請點選第 2 個格點連成線段。');
           } else if (gameState.activeDot === startDot) {
             gameState.activeDot = null;
             renderBattleActiveRing();
-            bMessage('已取消起點。');
+            bMessage('已取消選取格點。');
           } else {
-            toggleBattleSegment(gameState.activeDot, startDot);
-            gameState.activeDot = startDot;
+            addBattleSegment(gameState.activeDot, startDot);
+            gameState.activeDot = null;
             renderBattleActiveRing();
           }
         }
@@ -1420,28 +1903,39 @@
       const isTurn = (room && ((room.phase === 'design' && gameState.myRole === room.designer) ||
                                (room.phase === 'solve' && gameState.myRole === room.solver)));
       if (!isTurn || !gameState.localUndo.length) return;
-      gameState.localUserSegs = gameState.localUndo.pop();
-      gameState.activeDot = null;
-      renderBattleUserLines();
-      bMessage('已復原上一步。');
-      if (room.phase === 'solve' && gameState.myRole === room.solver) {
-        syncLiveSolverSegs();
+      if (room.mode === 'simple') {
+        gameState.localUserCells = gameState.localUndo.pop();
+        renderSimpleBattleGridUser();
+        if (room.phase === 'solve' && gameState.myRole === room.solver) syncLiveSolverCells();
+      } else {
+        gameState.localUserSegs = gameState.localUndo.pop();
+        gameState.activeDot = null;
+        renderBattleUserLines();
+        if (room.phase === 'solve' && gameState.myRole === room.solver) syncLiveSolverSegs();
       }
+      bMessage('已復原上一步。');
     };
 
     $('bClearBtn').onclick = () => {
       const room = gameState.roomData;
       const isTurn = (room && ((room.phase === 'design' && gameState.myRole === room.designer) ||
                                (room.phase === 'solve' && gameState.myRole === room.solver)));
-      if (!isTurn || !gameState.localUserSegs.size) return;
-      gameState.localUndo.push(new Set(gameState.localUserSegs));
-      gameState.localUserSegs.clear();
-      gameState.activeDot = null;
-      renderBattleUserLines();
-      bMessage('已全部清除。');
-      if (room.phase === 'solve' && gameState.myRole === room.solver) {
-        syncLiveSolverSegs();
+      if (!isTurn) return;
+      if (room.mode === 'simple') {
+        if (!gameState.localUserCells.size) return;
+        gameState.localUndo.push(new Set(gameState.localUserCells));
+        gameState.localUserCells.clear();
+        renderSimpleBattleGridUser();
+        if (room.phase === 'solve' && gameState.myRole === room.solver) syncLiveSolverCells();
+      } else {
+        if (!gameState.localUserSegs.size) return;
+        gameState.localUndo.push(new Set(gameState.localUserSegs));
+        gameState.localUserSegs.clear();
+        gameState.activeDot = null;
+        renderBattleUserLines();
+        if (room.phase === 'solve' && gameState.myRole === room.solver) syncLiveSolverSegs();
       }
+      bMessage('已全部清除。');
     };
 
     function bMessage(txt) {
@@ -1456,26 +1950,90 @@
       const room = gameState.roomData;
       if (!room) return;
 
-      if (room.phase === 'design' && gameState.myRole === room.designer) {
-        // 出題者提交
-        if (gameState.localUserSegs.size < 2) {
-          alert('請至少連出 2 條線段再送出題目！');
-          return;
+      const isDesigner = (room.phase === 'design' && gameState.myRole === room.designer);
+      const isSolver = (room.phase === 'solve' && gameState.myRole === room.solver);
+
+      if (isDesigner) {
+        if (room.mode === 'simple') {
+          if (gameState.localUserCells.size < 3) {
+            alert('請至少填滿 3 個方格再送出題目！');
+            return;
+          }
+          const designCells = [...gameState.localUserCells];
+          const targetCells = designCells.map(c => mirrorCell(c, room.axis));
+          submitSimpleDesign(designCells, targetCells);
+        } else {
+          if (gameState.localUserSegs.size < 2) {
+            alert('請至少連出 2 條線段再送出題目！');
+            return;
+          }
+          const designArr = [...gameState.localUserSegs];
+          const targetArr = designArr.map(s => mirrorSeg(s, room.axis));
+          submitDesign(designArr, targetArr);
         }
-
-        const designArr = [...gameState.localUserSegs];
-        // 計算標準對稱目標線段
-        const targetArr = designArr.map(s => mirrorSeg(s, room.axis));
-
-        submitDesign(designArr, targetArr);
-
-      } else if (room.phase === 'solve' && gameState.myRole === room.solver) {
-        // 答題者提交檢查
-        submitSolveAttempt();
+      } else if (isSolver) {
+        if (room.mode === 'simple') {
+          submitSimpleSolveAttempt();
+        } else {
+          submitSolveAttempt();
+        }
       }
     };
 
-    // 出題者送出題目
+    // 出題者送出題目 (簡單模式)
+    async function submitSimpleDesign(designCells, targetCells) {
+      const room = gameState.roomData;
+      gameState.localUserCells.clear();
+      gameState.localUndo = [];
+
+      if (gameState.isAi) {
+        room.phase = 'solve';
+        room.designCells = designCells;
+        room.targetCells = targetCells;
+        room.liveSolverCells = [];
+        room.solverCells = [];
+        room.phaseStartTime = Date.now();
+        renderBattleStage(room);
+        simulateAiSolving(room);
+      } else {
+        try {
+          await gameState.roomRef.update({
+            phase: 'solve',
+            designCells: designCells,
+            targetCells: targetCells,
+            liveSolverCells: [],
+            solverCells: [],
+            phaseStartTime: Date.now(),
+            updatedAt: Date.now()
+          });
+        } catch(e) {
+          alert('送出失敗：' + e.message);
+        }
+      }
+    }
+
+    // 答題者送出檢查 (簡單模式)
+    async function submitSimpleSolveAttempt() {
+      const room = gameState.roomData;
+      const targetSet = new Set(room.targetCells || []);
+      const userSet = gameState.localUserCells;
+
+      const wrong = [...userSet].filter(c => !targetSet.has(c));
+      const missing = [...targetSet].filter(c => !userSet.has(c));
+
+      if (wrong.length === 0 && missing.length === 0) {
+        clearInterval(gameState.timerInterval);
+        soundCorrect();
+        const timeUsed = 90 - gameState.timeLeft;
+        const roundScore = Math.max(10, 10 + gameState.timeLeft);
+        finishRound(true, timeUsed, roundScore, [], [...userSet]);
+      } else {
+        soundWrong();
+        bMessage(`⚠️ 還差一點喔！多塗了 ${wrong.length} 格，少塗了 ${missing.length} 格。請繼續修正！`);
+      }
+    }
+
+    // 出題者送出題目 (進階模式)
     async function submitDesign(designArr, targetArr) {
       const room = gameState.roomData;
       gameState.localUserSegs.clear();
@@ -1483,7 +2041,6 @@
       gameState.activeDot = null;
 
       if (gameState.isAi) {
-        // 單機 AI 模式
         room.phase = 'solve';
         room.designSegs = designArr;
         room.targetSegs = targetArr;
@@ -1492,10 +2049,8 @@
         room.solverSegs = [];
         room.phaseStartTime = Date.now();
         renderBattleStage(room);
-        // AI 答題模擬 (若當前 solver 是 AI)
         simulateAiSolving(room);
       } else {
-        // Firebase 雙人連線更新
         try {
           await gameState.roomRef.update({
             phase: 'solve',
@@ -1513,7 +2068,7 @@
       }
     }
 
-    // 答題者送出檢查
+    // 答題者送出檢查 (進階模式)
     async function submitSolveAttempt() {
       const room = gameState.roomData;
       const targetSet = new Set(room.targetSegs || []);
@@ -1523,15 +2078,11 @@
       const missing = [...targetSet].filter(s => !userSet.has(s));
 
       if (wrong.length === 0 && missing.length === 0) {
-        // 恭喜完全正確！
         clearInterval(gameState.timerInterval);
         soundCorrect();
-
         const timeUsed = 90 - gameState.timeLeft;
-        // 分數公式：10 + 剩餘秒數 (最高 100 分，越快分數越高)
         const roundScore = Math.max(10, 10 + gameState.timeLeft);
-
-        finishRound(true, timeUsed, roundScore, [...userSet]);
+        finishRound(true, timeUsed, roundScore, [...userSet], []);
       } else {
         soundWrong();
         bMessage(`⚠️ 還差一點喔！多連了 ${wrong.length} 條線，漏連了 ${missing.length} 條線。請繼續修正！`);
@@ -1544,14 +2095,22 @@
       if (!room || room.phase !== 'design') return;
 
       if (gameState.myRole === room.designer) {
-        // 若完全沒畫，系統自動備援出一組題
-        let designArr = [...gameState.localUserSegs];
-        if (designArr.length < 2) {
-          designArr = genFallbackDesign(room.axis, room.side);
-        }
-        const targetArr = designArr.map(s => mirrorSeg(s, room.axis));
         alert('⏰ 出題 90 秒時間到！系統已為你送出題目。');
-        submitDesign(designArr, targetArr);
+        if (room.mode === 'simple') {
+          let designArr = [...gameState.localUserCells];
+          if (designArr.length < 3) {
+            designArr = genFallbackSimpleDesign(room.axis, room.side);
+          }
+          const targetArr = designArr.map(c => mirrorCell(c, room.axis));
+          submitSimpleDesign(designArr, targetArr);
+        } else {
+          let designArr = [...gameState.localUserSegs];
+          if (designArr.length < 2) {
+            designArr = genFallbackDesign(room.axis, room.side);
+          }
+          const targetArr = designArr.map(s => mirrorSeg(s, room.axis));
+          submitDesign(designArr, targetArr);
+        }
       }
     }
 
@@ -1560,16 +2119,35 @@
       const room = gameState.roomData;
       if (!room || room.phase !== 'solve') return;
 
-      // 逾時無法得分，系統自動跳出完成答案
-      renderTimeoutSolution(room.targetSegs || []);
       soundWrong();
-      bMessage('⏰ 90 秒時間到！未能完成對稱圖形，本題獲得 0 分。正解以金色虛線顯示。');
+      bMessage('⏰ 90 秒時間到！未能完成對稱圖形，本題獲得 0 分。正解以金色醒目標示。');
 
-      if (gameState.myRole === room.solver || gameState.isAi) {
-        setTimeout(() => {
-          finishRound(false, 90, 0, room.targetSegs || []);
-        }, 3500);
+      if (room.mode === 'simple') {
+        renderSimpleTimeoutSolution(room.targetCells || []);
+        if (gameState.myRole === room.solver || gameState.isAi) {
+          setTimeout(() => {
+            finishRound(false, 90, 0, [], room.targetCells || []);
+          }, 3500);
+        }
+      } else {
+        renderTimeoutSolution(room.targetSegs || []);
+        if (gameState.myRole === room.solver || gameState.isAi) {
+          setTimeout(() => {
+            finishRound(false, 90, 0, room.targetSegs || [], []);
+          }, 3500);
+        }
       }
+    }
+
+    function renderSimpleTimeoutSolution(solCells) {
+      const grid = $('simpleGrid');
+      if (!grid) return;
+      const solSet = new Set(solCells);
+      grid.querySelectorAll('.simple-cell').forEach(cell => {
+        if (solSet.has(cell.dataset.key)) {
+          cell.classList.add('timeout-sol');
+        }
+      });
     }
 
     // 自動備援題目生成 (避免出題者發呆)
@@ -1585,20 +2163,21 @@
       }
     }
 
-    // 完成本題結算 (包含儲存答題者完成的線段，供出題者與雙方檢視)
-    async function finishRound(success, timeUsed, earnedScore, solverSegs = []) {
+    // 完成本題結算
+    async function finishRound(success, timeUsed, earnedScore, solverSegs = [], solverCells = []) {
       const room = gameState.roomData;
       const solverRole = room.solver;
       const designerRole = room.designer;
 
-      // 更新得分
       const newP1Score = (room.p1?.score || 0) + (solverRole === 'p1' ? earnedScore : 0);
       const newP2Score = (room.p2?.score || 0) + (solverRole === 'p2' ? earnedScore : 0);
 
       const finalSolverSegs = solverSegs.length ? solverSegs : (room.targetSegs || []);
+      const finalSolverCells = solverCells.length ? solverCells : (room.targetCells || []);
 
       const roundStatItem = {
         round: room.round,
+        mode: room.mode || 'simple',
         designer: designerRole,
         solver: solverRole,
         solverName: room[solverRole]?.name || '',
@@ -1607,7 +2186,9 @@
         score: earnedScore,
         axis: room.axis,
         designSegs: room.designSegs || [],
-        solverSegs: finalSolverSegs
+        solverSegs: finalSolverSegs,
+        designCells: room.designCells || [],
+        solverCells: finalSolverCells
       };
 
       const updatedStats = [...(room.roundStats || []), roundStatItem];
@@ -1617,7 +2198,9 @@
         room.p2.score = newP2Score;
         room.roundStats = updatedStats;
         room.solverSegs = finalSolverSegs;
+        room.solverCells = finalSolverCells;
         room.liveSolverSegs = finalSolverSegs;
+        room.liveSolverCells = finalSolverCells;
         room.liveSolverDot = null;
         room.phase = 'roundResult';
         renderBattleStage(room);
@@ -1628,7 +2211,9 @@
             'p2/score': newP2Score,
             roundStats: updatedStats,
             solverSegs: finalSolverSegs,
+            solverCells: finalSolverCells,
             liveSolverSegs: finalSolverSegs,
+            liveSolverCells: finalSolverCells,
             liveSolverDot: null,
             phase: 'roundResult',
             updatedAt: Date.now()
@@ -1639,7 +2224,7 @@
       }
     }
 
-    // 繪製完成的線對稱圖形 (黑色題目線 + 綠色答題線 + 紅色對稱軸)
+    // 繪製完成的線對稱圖形 (進階模式：線段)
     function renderCompletedPreviewSvg(targetSvg, axis, designSegs, solverSegs) {
       targetSvg.replaceChildren();
 
@@ -1723,7 +2308,54 @@
       }
     }
 
-    // 單題結算彈窗展示 (出題者與答題者皆可共同檢視完成圖形)
+    // 繪製完成的線對稱圖形 (簡單模式：12x10 方格)
+    function renderCompletedSimplePreviewSvg(targetSvg, axis, designCells, solverCells) {
+      targetSvg.replaceChildren();
+      const cellW = 420 / SIM_W;
+      const cellH = 420 / SIM_H;
+
+      const dSet = new Set(designCells || []);
+      const sSet = new Set(solverCells || []);
+
+      // 1. 畫格子背景
+      for (let r = 0; r < SIM_H; r++) {
+        for (let c = 0; c < SIM_W; c++) {
+          const key = `${r},${c}`;
+          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.setAttribute('x', c * cellW);
+          rect.setAttribute('y', r * cellH);
+          rect.setAttribute('width', cellW);
+          rect.setAttribute('height', cellH);
+          rect.setAttribute('stroke', '#ede4d4');
+          rect.setAttribute('stroke-width', '1');
+
+          if (dSet.has(key)) {
+            rect.setAttribute('fill', '#1e293b');
+          } else if (sSet.has(key)) {
+            rect.setAttribute('fill', '#059669');
+          } else {
+            rect.setAttribute('fill', '#ffffff');
+          }
+          targetSvg.appendChild(rect);
+        }
+      }
+
+      // 2. 對稱軸紅虛線
+      const axisLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      axisLine.setAttribute('class', 'axis-svg-line');
+      if (axis === 'V') {
+        const midX = (SIM_W / 2) * cellW;
+        axisLine.setAttribute('x1', midX); axisLine.setAttribute('y1', 4);
+        axisLine.setAttribute('x2', midX); axisLine.setAttribute('y2', 416);
+      } else {
+        const midY = (SIM_H / 2) * cellH;
+        axisLine.setAttribute('x1', 4); axisLine.setAttribute('y1', midY);
+        axisLine.setAttribute('x2', 416); axisLine.setAttribute('y2', midY);
+      }
+      targetSvg.appendChild(axisLine);
+    }
+
+    // 單題結算彈窗展示
     function showRoundResultModal(room) {
       const modal = $('roundModal');
       const latestStat = room.roundStats?.[room.roundStats.length - 1];
@@ -1750,10 +2382,14 @@
         👑 ${room.p1?.name}：${room.p1?.score || 0} 分 ｜ ⚔️ ${room.p2?.name}：${room.p2?.score || 0} 分
       `;
 
-      // 渲染完成的線對稱圖形預覽 (題目半邊 + 答題完成半邊)
+      // 渲染完成的線對稱圖形預覽
       const previewSvg = $('roundPreviewSvg');
       if (previewSvg) {
-        renderCompletedPreviewSvg(previewSvg, room.axis, room.designSegs || [], room.solverSegs || room.targetSegs || []);
+        if (room.mode === 'simple') {
+          renderCompletedSimplePreviewSvg(previewSvg, room.axis, room.designCells || [], room.solverCells || room.targetCells || []);
+        } else {
+          renderCompletedPreviewSvg(previewSvg, room.axis, room.designSegs || [], room.solverSegs || room.targetSegs || []);
+        }
       }
 
       modal.hidden = false;
@@ -1786,11 +2422,9 @@
       const room = gameState.roomData;
       if (!room) return;
 
-      // 只有房主或單機由本地推進
       if (gameState.myRole !== 'p1' && !gameState.isAi) return;
 
       if (room.round >= 3) {
-        // 3 題全滿，結束！
         if (gameState.isAi) {
           room.phase = 'gameOver';
           renderGameOverScreen(room);
@@ -1798,14 +2432,13 @@
           await gameState.roomRef.update({ phase: 'gameOver', updatedAt: Date.now() });
         }
       } else {
-        // 進入下一題：輪流出題！
         const nextRound = room.round + 1;
-        // 輪替出題者與答題者
         const nextDesigner = (room.designer === 'p1') ? 'p2' : 'p1';
         const nextSolver = (nextDesigner === 'p1') ? 'p2' : 'p1';
         const setup = pickRandomRoundSetup();
 
         gameState.localUserSegs.clear();
+        gameState.localUserCells.clear();
         gameState.localUndo = [];
 
         if (gameState.isAi) {
@@ -1816,14 +2449,17 @@
           room.solver = nextSolver;
           room.designSegs = [];
           room.targetSegs = [];
+          room.designCells = [];
+          room.targetCells = [];
           room.liveSolverSegs = [];
+          room.liveSolverCells = [];
           room.liveSolverDot = null;
           room.solverSegs = [];
+          room.solverCells = [];
           room.phase = 'design';
           room.phaseStartTime = Date.now();
           renderBattleStage(room);
 
-          // 若輪到 AI 出題
           if (nextDesigner === 'p2') {
             simulateAiDesigning(room);
           }
@@ -1836,9 +2472,13 @@
             solver: nextSolver,
             designSegs: [],
             targetSegs: [],
+            designCells: [],
+            targetCells: [],
             liveSolverSegs: [],
+            liveSolverCells: [],
             liveSolverDot: null,
             solverSegs: [],
+            solverCells: [],
             phase: 'design',
             phaseStartTime: Date.now(),
             updatedAt: Date.now()
@@ -1853,49 +2493,89 @@
     function simulateAiDesigning(room) {
       setTimeout(() => {
         if (room.phase !== 'design') return;
-        const aiSegs = genFallbackDesign(room.axis, room.side);
-        const targetArr = aiSegs.map(s => mirrorSeg(s, room.axis));
-        submitDesign(aiSegs, targetArr);
-      }, 4000);
+        if (room.mode === 'simple') {
+          const aiCells = genFallbackSimpleDesign(room.axis, room.side);
+          const targetCells = aiCells.map(c => mirrorCell(c, room.axis));
+          submitSimpleDesign(aiCells, targetCells);
+        } else {
+          const aiSegs = genFallbackDesign(room.axis, room.side);
+          const targetArr = aiSegs.map(s => mirrorSeg(s, room.axis));
+          submitDesign(aiSegs, targetArr);
+        }
+      }, 3500);
     }
 
     function simulateAiSolving(room) {
       if (room.phase !== 'solve') return;
-      const targets = [...(room.targetSegs || [])];
-      if (targets.length === 0) return;
 
-      let step = 0;
-      room.liveSolverSegs = [];
-      room.liveSolverDot = null;
+      if (room.mode === 'simple') {
+        const targets = [...(room.targetCells || [])];
+        if (targets.length === 0) return;
+        let step = 0;
+        room.liveSolverCells = [];
 
-      // 模擬 AI 每 1.3 ~ 2 秒逐步連出一條線，出題者即時看到同步作答歷程
-      const interval = setInterval(() => {
-        if (room.phase !== 'solve') {
-          clearInterval(interval);
-          return;
-        }
-
-        if (step < targets.length) {
-          const seg = targets[step];
-          room.liveSolverSegs.push(seg);
-          step++;
-
-          if (gameState.myRole === room.designer) {
-            gameState.localUserSegs = new Set(room.liveSolverSegs);
-            renderBattleUserLines();
-            soundConnect();
-            bMessage(`👀 電腦水手連出了第 ${step} 條對稱線段...（共 ${targets.length} 條）`);
+        const interval = setInterval(() => {
+          if (room.phase !== 'solve') {
+            clearInterval(interval);
+            return;
           }
-        } else {
-          clearInterval(interval);
-          setTimeout(() => {
-            if (room.phase !== 'solve') return;
-            const solveSeconds = Math.max(5, 90 - gameState.timeLeft);
-            const score = Math.max(10, 10 + gameState.timeLeft);
-            finishRound(true, solveSeconds, score, targets);
-          }, 800);
-        }
-      }, 1300 + Math.random() * 700);
+          if (step < targets.length) {
+            const cell = targets[step];
+            room.liveSolverCells.push(cell);
+            step++;
+            if (gameState.myRole === room.designer) {
+              gameState.localUserCells = new Set(room.liveSolverCells);
+              renderSimpleBattleGridUser();
+              soundConnect();
+              bMessage(`👀 電腦水手填上了第 ${step} 個對稱方格...（共 ${targets.length} 格）`);
+            }
+          } else {
+            clearInterval(interval);
+            setTimeout(() => {
+              if (room.phase !== 'solve') return;
+              const solveSeconds = Math.max(5, 90 - gameState.timeLeft);
+              const score = Math.max(10, 10 + gameState.timeLeft);
+              finishRound(true, solveSeconds, score, [], targets);
+            }, 800);
+          }
+        }, 800 + Math.random() * 500);
+
+      } else {
+        const targets = [...(room.targetSegs || [])];
+        if (targets.length === 0) return;
+
+        let step = 0;
+        room.liveSolverSegs = [];
+        room.liveSolverDot = null;
+
+        const interval = setInterval(() => {
+          if (room.phase !== 'solve') {
+            clearInterval(interval);
+            return;
+          }
+
+          if (step < targets.length) {
+            const seg = targets[step];
+            room.liveSolverSegs.push(seg);
+            step++;
+
+            if (gameState.myRole === room.designer) {
+              gameState.localUserSegs = new Set(room.liveSolverSegs);
+              renderBattleUserLines();
+              soundConnect();
+              bMessage(`👀 電腦水手連出了第 ${step} 條對稱線段...（共 ${targets.length} 條）`);
+            }
+          } else {
+            clearInterval(interval);
+            setTimeout(() => {
+              if (room.phase !== 'solve') return;
+              const solveSeconds = Math.max(5, 90 - gameState.timeLeft);
+              const score = Math.max(10, 10 + gameState.timeLeft);
+              finishRound(true, solveSeconds, score, targets, []);
+            }, 800);
+          }
+        }, 1200 + Math.random() * 600);
+      }
     }
 
     // =========================================================
@@ -1952,6 +2632,16 @@
     $('playAgainBtn').onclick = () => {
       exitToLobby();
     };
+
+    // 手機與平板作圖區防上下滾動事件鎖定
+    ['battleSvg', 'simpleGrid', 'simpleBoardArea', 'simpleBoardBox', 'dotGridBox', 'gridWrap'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('touchmove', e => {
+          e.preventDefault();
+        }, { passive: false });
+      }
+    });
   </script>
 </body>
 </html>

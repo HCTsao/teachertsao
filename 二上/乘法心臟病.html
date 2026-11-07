@@ -627,11 +627,8 @@
                 setRoomCode('');
                 setRoomPlayers([]);
                 setConnStatus('');
-                setRpsChoices({});
-                setRpsStatus('waiting');
-                setRpsWinner(null);
-                setIsRpsProcessing(false);
-                rpsChoicesRef.current = {};
+                setMySeatIndex(0);
+                mySeatIndexRef.current = 0;
             };
 
             // 廣播給所有連線客戶端 (Host 專用)
@@ -865,13 +862,16 @@
                 }
             };
 
-            // 開始單機遊戲 (專為二年級學生設計，進入猜拳決定出牌順序)
+            // 開始單機遊戲 (由系統隨機決定先後攻順序，我方永遠固定在正下方 Slot 0)
             const startLocalGame = (num) => {
                 cleanupPeer();
                 initAudio();
 
                 setMultiplier(num);
                 multiplierRef.current = num;
+
+                setMySeatIndex(0);
+                mySeatIndexRef.current = 0;
 
                 // 2人模式：你 (🙋) vs 電腦 (🤖)
                 // 3人模式：你 (🙋) vs 電腦 1 (🤖) vs 電腦 2 (🐰)
@@ -906,19 +906,27 @@
                 aiSlapScheduledRef.current = false;
                 penaltyScheduledRef.current = false;
 
-                // 進入猜拳流程
-                setRpsChoices({});
-                rpsChoicesRef.current = {};
-                setRpsStatus('waiting');
-                setRpsWinner(null);
-                setIsRpsProcessing(false);
-                setGameState('rps');
+                // 由系統隨機決定先後攻順序 (0 到 playerCount - 1)
+                const startingTurnVal = Math.floor(Math.random() * playerCount);
+                const deck = createDeck(num);
+                const initialStepVal = difficultyRef.current === 'easy' ? 1 : 9;
+
+                setMainDeck(deck);
+                setCurrentStep(initialStepVal);
+                currentStepRef.current = initialStepVal;
+                setTurn(startingTurnVal);
+                turnRef.current = startingTurnVal;
+                setDealingProgress(0);
+                setGameState('dealing');
             };
 
             // 連線模式：房主開始遊戲（系統隨機決定出牌順序，不用猜拳）
             const startOnlineGame = () => {
                 if (!isHost) return;
                 initAudio();
+
+                setMySeatIndex(0);
+                mySeatIndexRef.current = 0;
 
                 const initialPlayers = roomPlayers.map((rp, idx) => ({
                     id: idx,
@@ -1130,16 +1138,19 @@
                         return () => clearTimeout(timer);
                     } else if (dealingProgress >= 54) {
                         setGameState('starting');
-                        setStartPrompt("3");
-                        setTimeout(() => setStartPrompt("2"), 700);
-                        setTimeout(() => setStartPrompt("1"), 1400);
+                        const firstPlayer = playersRef.current[turnRef.current];
+                        const firstName = firstPlayer?.name || "玩家";
+                        setStartPrompt(`由 ${firstName} 先出牌！`);
+                        setTimeout(() => setStartPrompt("3"), 800);
+                        setTimeout(() => setStartPrompt("2"), 1500);
+                        setTimeout(() => setStartPrompt("1"), 2200);
                         setTimeout(() => {
                             setStartPrompt("開始！");
                             setTimeout(() => {
                                 setGameState('playing');
                                 setStartPrompt("");
                             }, 500);
-                        }, 2100);
+                        }, 2900);
                     }
                 }
             }, [gameState, dealingProgress, mainDeck, players, playerCount]);
@@ -1260,7 +1271,7 @@
                 isFlipResolvedRef.current = false;
 
                 // 判斷是否為自己出牌 (單機模式下自己是 seat 0，連線模式下對應自己的座位 mySeatIndexRef.current)
-                const isMyCard = (data.fromSeat === mySeatIndexRef.current);
+                const isMyCard = isOnlineRef.current ? (data.fromSeat === mySeatIndexRef.current) : (data.fromSeat === 0);
 
                 // 教學邏輯：輪到自己出牌時不唸出聲音、不顯示乘法算式（訓練學生自行心算默唸）；
                 // 只有別人（電腦或對手）出牌時，才會出現語音朗讀與氣泡算式！
@@ -1344,15 +1355,17 @@
             const playTurn = (isManual = false) => {
                 initAudio();
                 if (gameStateRef.current !== 'playing' || isAnimatingRef.current || punishingCardRef.current || isPenaltyCoolingRef.current) return;
-                if (isManual && turnRef.current !== mySeatIndexRef.current) return;
 
                 if (isOnlineRef.current) {
+                    if (isManual && turnRef.current !== mySeatIndexRef.current) return;
                     if (isHostRef.current) {
                         executeCardPlay(0);
                     } else {
                         sendToHost({ type: 'CLIENT_PLAY_CARD', seatIndex: mySeatIndexRef.current });
                     }
                 } else {
+                    // 單機模式：我方固定是 seat 0！如果是手動點擊手牌出牌，必須輪到 seat 0 才出牌
+                    if (isManual && turnRef.current !== 0) return;
                     executeCardPlay(turnRef.current);
                 }
             };
@@ -1519,7 +1532,8 @@
 
             // 輪到玩家出牌時的閒置提示
             useEffect(() => {
-                if (gameState === 'playing' && turn === mySeatIndex && !isAnimating && !punishingCard && !isPenaltyCooling) {
+                const mySeat = isOnline ? mySeatIndex : 0;
+                if (gameState === 'playing' && turn === mySeat && !isAnimating && !punishingCard && !isPenaltyCooling) {
                     idleTimerRef.current = setTimeout(() => {
                         setShowIdleHint(true);
                     }, 5000);
@@ -1527,7 +1541,7 @@
                     setShowIdleHint(false);
                 }
                 return () => clearTimeout(idleTimerRef.current);
-            }, [turn, gameState, isAnimating, punishingCard, isPenaltyCooling, mySeatIndex]);
+            }, [turn, gameState, isAnimating, punishingCard, isPenaltyCooling, mySeatIndex, isOnline]);
 
             // 輪到 AI 出牌時的定時器
             useEffect(() => {
@@ -1548,14 +1562,15 @@
                 }
             }, [turn, gameState, players]);
 
-            // 座位畫面映射 (自己永遠在下方 Slot 0，3人時呈現 120度 Y型對稱分佈)
+            // 座位畫面映射 (我方永遠固定在正下方 Slot 0，3人時呈現 120度 Y型對稱分佈)
             const getRelativeSlot = (seatIdx) => {
                 const total = players.length || playerCount;
-                const rel = (seatIdx - mySeatIndex + total) % total;
+                const mySeat = isOnline ? mySeatIndex : 0;
+                const rel = (seatIdx - mySeat + total) % total;
                 if (total === 2) {
-                    return rel === 0 ? 0 : 2; // 0: 底部自己(6點鐘), 2: 正上方電腦(12點鐘)
+                    return rel === 0 ? 0 : 2; // 0: 底部我方(6點鐘), 2: 正上方對手(12點鐘)
                 } else {
-                    // 3人模式：0: 底部自己(6點鐘/90度), 1: 左上電腦1(10點鐘/210度, 距自己120度), 3: 右上電腦2(2點鐘/330度, 距自己120度)
+                    // 3人模式：0: 底部我方(6點鐘), 1: 左上對手1(10點鐘), 3: 右上對手2(2點鐘)
                     return rel === 0 ? 0 : (rel === 1 ? 1 : 3);
                 }
             };
@@ -1909,122 +1924,7 @@
                                         </button>
                                     </div>
                                 </div>
-                                {gameState === 'rps' ? (
-                                    <div className="relative w-full h-full flex flex-col items-center justify-between pt-16 pb-10 px-8 z-30 select-none">
-                                        {/* 標題與引導提示 */}
-                                        <div className="flex flex-col items-center text-center mt-2">
-                                            <div className="text-amber-300 text-3xl md:text-4xl font-black drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] tracking-wider mb-3 flex items-center gap-3">
-                                                <span className="animate-bounce">✊</span> 猜拳決定出牌順序 <span className="animate-bounce">🖐️</span>
-                                            </div>
-                                            
-                                            {/* 狀態橫幅 */}
-                                            {rpsStatus === 'waiting' && (
-                                                <div className="bg-emerald-950/80 text-white px-8 py-2.5 rounded-full text-xl md:text-2xl font-bold border-2 border-emerald-400/60 shadow-lg flex items-center gap-2">
-                                                    {rpsChoices[mySeatIndex] ? (
-                                                        <>
-                                                            <span className="text-amber-300 animate-spin">⏳</span>
-                                                            <span>等待其他玩家出拳...</span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <span className="animate-pulse">👉</span>
-                                                            <span>請點擊下方按鈕出拳！</span>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            )}
-                                            {rpsStatus === 'tie' && (
-                                                <div className="bg-amber-500 text-slate-900 px-8 py-3 rounded-full text-2xl md:text-3xl font-black border-4 border-white shadow-2xl animate-bounce flex items-center gap-2">
-                                                    <span>🤝</span> 平手！再來一次！
-                                                </div>
-                                            )}
-                                            {rpsStatus === 'winner' && (
-                                                <div className="bg-yellow-400 text-slate-900 px-8 py-3 rounded-full text-2xl md:text-3xl font-black border-4 border-white shadow-2xl animate-bounce flex items-center gap-2">
-                                                    <span>🎉</span> {players[rpsWinner]?.name || "獲勝者"} 獲勝！由 {players[rpsWinner]?.name || "獲勝者"} 先出牌！
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* 玩家出拳展示區 */}
-                                        <div className="flex items-center justify-center gap-8 md:gap-16 my-auto">
-                                            {players.map((p, idx) => {
-                                                const choice = rpsChoices[idx];
-                                                const isWinner = (rpsStatus === 'winner' && rpsWinner === idx);
-                                                const isMe = (idx === mySeatIndex);
-                                                const handEmoji = choice === 'scissors' ? '✌️' : (choice === 'rock' ? '✊' : (choice === 'paper' ? '🖐️' : null));
-                                                const handName = choice === 'scissors' ? '剪刀' : (choice === 'rock' ? '石頭' : (choice === 'paper' ? '布' : ''));
-
-                                                return (
-                                                    <div key={p.id || idx} className="flex flex-col items-center">
-                                                        {/* 玩家頭像與姓名標籤 */}
-                                                        <div className="flex items-center gap-2 mb-4 bg-slate-900/90 backdrop-blur px-5 py-2 rounded-full border-2 border-white/30 shadow-lg">
-                                                            <span className="text-3xl">{p.avatar}</span>
-                                                            <span className="text-white font-black text-xl">{p.name}{isMe ? " (你)" : ""}</span>
-                                                        </div>
-
-                                                        {/* 出拳圓形大徽章 */}
-                                                        <div className={`w-36 h-36 md:w-44 md:h-44 rounded-full border-4 flex flex-col items-center justify-center shadow-2xl transition-all duration-300 ${
-                                                            isWinner 
-                                                                ? 'bg-gradient-to-br from-yellow-300 to-amber-500 border-white ring-8 ring-yellow-400/80 scale-110 animate-bounce' 
-                                                                : (choice 
-                                                                    ? 'bg-slate-800/95 border-amber-400/80 ring-4 ring-white/20' 
-                                                                    : 'bg-slate-900/80 border-slate-600')
-                                                        }`}>
-                                                            {choice ? (
-                                                                <>
-                                                                    <span className="text-6xl md:text-7xl drop-shadow-md select-none">{handEmoji}</span>
-                                                                    <span className={`text-xl font-black mt-2 ${isWinner ? 'text-slate-950' : 'text-amber-300'}`}>
-                                                                        {handName}
-                                                                    </span>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <span className="text-5xl text-amber-300/80 animate-pulse select-none">❓</span>
-                                                                    <span className="text-sm text-slate-300 mt-2 font-bold">
-                                                                        {isMe ? "請選擇" : "思考中..."}
-                                                                    </span>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-
-                                        {/* 底部出拳按鈕區 (3顆超大按鈕，專為小朋友好點擊) */}
-                                        <div className="mb-2 flex flex-col items-center">
-                                            {rpsStatus === 'waiting' && !rpsChoices[mySeatIndex] && (
-                                                <div className="flex items-center gap-6">
-                                                    <button
-                                                        onClick={() => handleRpsChoice('scissors')}
-                                                        className="px-8 py-5 bg-gradient-to-b from-sky-400 to-blue-600 hover:from-sky-300 hover:to-blue-500 text-white font-black text-3xl rounded-3xl shadow-[0_8px_0_#1d4ed8] active:translate-y-2 active:shadow-none transition border-4 border-white flex items-center gap-3 cursor-pointer select-none"
-                                                    >
-                                                        <span className="text-4xl">✌️</span> 剪刀
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleRpsChoice('rock')}
-                                                        className="px-8 py-5 bg-gradient-to-b from-amber-400 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-white font-black text-3xl rounded-3xl shadow-[0_8px_0_#b45309] active:translate-y-2 active:shadow-none transition border-4 border-white flex items-center gap-3 cursor-pointer select-none"
-                                                    >
-                                                        <span className="text-4xl">✊</span> 石頭
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleRpsChoice('paper')}
-                                                        className="px-8 py-5 bg-gradient-to-b from-purple-400 to-indigo-600 hover:from-purple-300 hover:to-indigo-500 text-white font-black text-3xl rounded-3xl shadow-[0_8px_0_#4338ca] active:translate-y-2 active:shadow-none transition border-4 border-white flex items-center gap-3 cursor-pointer select-none"
-                                                    >
-                                                        <span className="text-4xl">🖐️</span> 布
-                                                    </button>
-                                                </div>
-                                            )}
-
-                                            {rpsStatus === 'waiting' && rpsChoices[mySeatIndex] && (
-                                                <div className="text-white text-xl font-bold bg-slate-950/70 px-8 py-4 rounded-full border-2 border-emerald-400/50 shadow-lg animate-pulse flex items-center gap-2">
-                                                    <span className="text-2xl">✅</span> 你已出拳，等待對手揭曉中...
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <Fragment>
+                                <Fragment>
 
 
                                 {/* 各玩家座位與卡牌 (120度 Y型對稱分佈，手牌與姓名方框徹底分離不重疊) */}
@@ -2032,7 +1932,7 @@
                                     const slot = getRelativeSlot(idx);
                                     const conf = SLOT_CONFIGS[slot];
                                     const isCurrentTurn = (turn === idx);
-                                    const isMe = (idx === mySeatIndex);
+                                    const isMe = isOnline ? (idx === mySeatIndex) : (idx === 0);
 
                                     return (
                                         <Fragment key={p.id || idx}>
@@ -2044,7 +1944,7 @@
                                                     </div>
 
                                                     {/* 出牌口訣氣泡 (僅在他人出牌時顯示，自己出牌不顯示算式) */}
-                                                    {currentCall && currentCall.playerIdx === idx && idx !== mySeatIndex && (
+                                                    {currentCall && currentCall.playerIdx === idx && !isMe && (
                                                         <div className={`absolute ${conf.call} z-50 pointer-events-none animate-bounce`}>
                                                             <div className="bg-yellow-400 text-slate-900 px-6 py-3 rounded-[32px] text-4xl font-black shadow-2xl border-4 border-white whitespace-nowrap">
                                                                 {currentCall.text}
@@ -2095,7 +1995,7 @@
                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-52 h-64">
                                     <div 
                                         className={`relative w-full h-full bg-emerald-800/40 rounded-[40px] border-4 border-dashed transition-all duration-300 flex items-center justify-center cursor-pointer select-none slap-area ${gameState === 'slapping' ? 'border-amber-400 bg-amber-500/30 shadow-[0_0_40px_rgba(251,191,36,0.8)] scale-105' : 'border-white/25 hover:border-white/50 hover:bg-emerald-800/60'}`}
-                                        onClick={() => handleSlap(mySeatIndex)}
+                                        onClick={() => handleSlap(isOnline ? mySeatIndex : 0)}
                                     >
                                         {/* 發牌動畫 */}
                                         {isDealing ? (
@@ -2164,7 +2064,6 @@
                                     </div>
                                 )}
                             </Fragment>
-                        )}
                     </div>
                 )}
 
