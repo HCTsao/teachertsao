@@ -983,11 +983,11 @@ function updateCommonHud() {
   if ($('fragmentCount')) $('fragmentCount').textContent = solvedCount;
 
   $('checkBtn').disabled = run.passed;
-  $('hintBtn').disabled = run.passed;
+  $('hintBtn').disabled = run.passed || run.failures < 2;
   $('undoBtn').disabled = run.passed || !undo.length;
   $('clearBtn').disabled = run.passed;
 
-  $('hintBtn').innerHTML = '<span class="parrot-ic">💡</span> 分步提示';
+  $('hintBtn').innerHTML = run.failures < 2 ? `<span class="parrot-ic">💡</span> 分步提示 (再試 ${2 - run.failures} 次)` : '<span class="parrot-ic">💡</span> 分步提示';
   $('nextBtn').hidden = !run.passed;
   $('nextBtn').innerHTML = run.index === 4 ? '前往秘寶島洞窟 👑 →' : '前往下一關 ⛵ →';
 
@@ -1108,7 +1108,7 @@ function onLevelPassed() {
 // 2. 第二次、第三次及之後按：將畫錯的清空（保留畫對的），再多給一步正確位置。
 // =========================================================
 function hint() {
-  if (run.passed) return;
+  if (run.passed || run.failures < 2) return;
   run.hints++;
 
   if (run.mode === 'advanced') {
