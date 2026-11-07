@@ -250,6 +250,26 @@
       background: #fffdf9;
       color: #3b1908;
     }
+
+    /* 即時觀戰同步標籤 */
+    .live-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.8rem;
+      font-weight: 800;
+      background: #dc2626;
+      color: #ffffff;
+      padding: 2px 9px;
+      border-radius: 12px;
+      vertical-align: middle;
+      box-shadow: 0 0 10px rgba(220, 38, 38, 0.7);
+      animation: livePulse 1.4s infinite ease-in-out;
+    }
+    @keyframes livePulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.75; transform: scale(0.96); }
+    }
   </style>
 </head>
 <body>
@@ -596,6 +616,8 @@
       roomRef: null,
       listener: null,
       roomData: null,
+      currentPhase: null,
+      currentRound: null,
       // 本地作答線段
       localUserSegs: new Set(),
       localUndo: [],
@@ -858,6 +880,8 @@
       }
       gameState.roomRef = null;
       gameState.roomData = null;
+      gameState.currentPhase = null;
+      gameState.currentRound = null;
       $('roundModal').hidden = true;
       $('battleScreen').hidden = true;
       $('waitScreen').hidden = true;
@@ -884,10 +908,34 @@
       $('p1Card').classList.toggle('active-turn', (room.phase === 'design' && room.designer === 'p1') || (room.phase === 'solve' && room.solver === 'p1'));
       $('p2Card').classList.toggle('active-turn', (room.phase === 'design' && room.designer === 'p2') || (room.phase === 'solve' && room.solver === 'p2'));
 
+      // 檢查是否為階段切換 (Phase Change 或 Round Change)
+      const isPhaseChange = (room.phase !== gameState.currentPhase || room.round !== gameState.currentRound);
+
+      if (!isPhaseChange) {
+        // 同一階段內的微更新：
+        // 若出題者在觀戰 solve 階段，同步呈現答題者的即時連線歷程
+        if (room.phase === 'solve' && isDesigner) {
+          const liveSegs = room.liveSolverSegs || [];
+          gameState.localUserSegs = new Set(liveSegs);
+          gameState.activeDot = room.liveSolverDot || null;
+          renderBattleUserLines();
+          const count = liveSegs.length;
+          bMessage(`👀 即時轉播中：對手正在連線作答（目前已連 ${count} 條線）...`);
+        }
+        return;
+      }
+
+      // 記錄新階段
+      gameState.currentPhase = room.phase;
+      gameState.currentRound = room.round;
+
       // 2. 依階段處理視圖
       if (room.phase === 'design') {
         $('roundModal').hidden = true;
         gameState.showingTimeoutSol = false;
+        gameState.localUserSegs.clear();
+        gameState.localUndo = [];
+        gameState.activeDot = null;
 
         const sideNameMap = { left: '左半邊', right: '右半邊', top: '上半邊', bottom: '下半邊' };
         const sideName = sideNameMap[room.side] || '';
@@ -918,8 +966,11 @@
       } else if (room.phase === 'solve') {
         $('roundModal').hidden = true;
         $('lockOverlay').hidden = true;
+        gameState.localUndo = [];
+        gameState.activeDot = null;
 
         if (isSolver) {
+          gameState.localUserSegs.clear();
           $('phaseTitle').textContent = `⚔️ 破解秘圖！完成對稱圖形！`;
           $('phaseDesc').textContent = `觀察題目線段，在對稱側依序連出對稱線段！花的時間越短分數越高！`;
           $('bSubmitBtn').textContent = '完成作答，送出檢查 🔍';
@@ -928,14 +979,17 @@
           $('bClearBtn').disabled = false;
           bMessage('計時開始！找出各頂點的對稱點並連線，越快送出分數越高！');
         } else {
-          // 出題者觀戰中
-          $('phaseTitle').textContent = `👀 對手正在破解你的題目...`;
-          $('phaseDesc').textContent = `對手有 90 秒答題時間，越慢答對你越有優勢！`;
+          // 出題者觀戰中 (即時同步答題者作答歷程)
+          $('phaseTitle').innerHTML = `👀 對手正在破解你的題目... <span class="live-pill">● LIVE 歷程同步</span>`;
+          $('phaseDesc').textContent = `即時轉播對手的作答筆跡！對手有 90 秒答題時間。`;
           $('bSubmitBtn').textContent = '對手作答中... ⏳';
           $('bSubmitBtn').disabled = true;
           $('bUndoBtn').disabled = true;
           $('bClearBtn').disabled = true;
-          bMessage('對手正聚精會神尋找對稱點，靜待勝負揭曉...');
+          const liveSegs = room.liveSolverSegs || [];
+          gameState.localUserSegs = new Set(liveSegs);
+          gameState.activeDot = room.liveSolverDot || null;
+          bMessage('👀 即時觀戰啟動！對手正聚精會神作答，你可同步看見他的每一筆連線！');
         }
 
         buildBattleSvg(room, 'solve');
@@ -956,6 +1010,7 @@
         buildBattleSvg(room, 'solve');
         const solverSegs = room.solverSegs || room.targetSegs || [];
         gameState.localUserSegs = new Set(solverSegs);
+        gameState.activeDot = null;
         renderBattleUserLines();
 
         showRoundResultModal(room);
@@ -999,12 +1054,14 @@
       svg.replaceChildren();
 
       const { axis, side } = room;
+      const oppSideMap = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' };
+      const activeSide = (mode === 'solve') ? (oppSideMap[side] || side) : side;
 
       // 1. 半邊高亮陰影 (標出允許出題或答題的半邊)
       const allowedRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       allowedRect.setAttribute('class', 'allowed-half-rect');
       if (axis === 'V') {
-        if (side === 'left') {
+        if (activeSide === 'left') {
           allowedRect.setAttribute('x', 14); allowedRect.setAttribute('y', 14);
           allowedRect.setAttribute('width', toSvgX(3) - 14); allowedRect.setAttribute('height', 392);
         } else {
@@ -1012,7 +1069,7 @@
           allowedRect.setAttribute('width', 392 - toSvgX(3) + 14); allowedRect.setAttribute('height', 392);
         }
       } else {
-        if (side === 'top') {
+        if (activeSide === 'top') {
           allowedRect.setAttribute('x', 14); allowedRect.setAttribute('y', 14);
           allowedRect.setAttribute('width', 392); allowedRect.setAttribute('height', toSvgY(3) - 14);
         } else {
@@ -1188,6 +1245,23 @@
       });
     }
 
+    // 即時同步答題者的連線歷程與選取起點至雲端，供出題者實時觀戰
+    function syncLiveSolverSegs() {
+      const room = gameState.roomData;
+      if (!room || room.phase !== 'solve' || gameState.myRole !== room.solver) return;
+      const segs = [...gameState.localUserSegs];
+      const dot = gameState.activeDot || null;
+      if (gameState.isAi) {
+        room.liveSolverSegs = segs;
+        room.liveSolverDot = dot;
+      } else if (gameState.roomRef) {
+        gameState.roomRef.update({
+          liveSolverSegs: segs,
+          liveSolverDot: dot
+        }).catch(() => {});
+      }
+    }
+
     // 連線新增或刪除
     function toggleBattleSegment(p1, p2) {
       if (p1 === p2) return;
@@ -1234,13 +1308,25 @@
       }
 
       renderBattleUserLines();
+      if (room.phase === 'solve' && isSolver) {
+        syncLiveSolverSegs();
+      }
     }
 
     function deleteBattleSegment(seg) {
+      const room = gameState.roomData;
+      if (!room) return;
+      const isTurn = (room.phase === 'design' && gameState.myRole === room.designer) ||
+                     (room.phase === 'solve' && gameState.myRole === room.solver);
+      if (!isTurn) return;
+
       gameState.localUndo.push(new Set(gameState.localUserSegs));
       gameState.localUserSegs.delete(seg);
       renderBattleUserLines();
       bMessage('已刪除該條線段。');
+      if (room.phase === 'solve' && gameState.myRole === room.solver) {
+        syncLiveSolverSegs();
+      }
     }
 
     // 綁定 SVG 互動
@@ -1317,6 +1403,11 @@
             renderBattleActiveRing();
           }
         }
+
+        const curRoom = gameState.roomData;
+        if (curRoom && curRoom.phase === 'solve' && gameState.myRole === curRoom.solver) {
+          syncLiveSolverSegs();
+        }
       }
 
       svg.addEventListener('pointerup', endDrag);
@@ -1325,20 +1416,32 @@
 
     // 復原與清除
     $('bUndoBtn').onclick = () => {
-      if (!gameState.localUndo.length) return;
+      const room = gameState.roomData;
+      const isTurn = (room && ((room.phase === 'design' && gameState.myRole === room.designer) ||
+                               (room.phase === 'solve' && gameState.myRole === room.solver)));
+      if (!isTurn || !gameState.localUndo.length) return;
       gameState.localUserSegs = gameState.localUndo.pop();
       gameState.activeDot = null;
       renderBattleUserLines();
       bMessage('已復原上一步。');
+      if (room.phase === 'solve' && gameState.myRole === room.solver) {
+        syncLiveSolverSegs();
+      }
     };
 
     $('bClearBtn').onclick = () => {
-      if (!gameState.localUserSegs.size) return;
+      const room = gameState.roomData;
+      const isTurn = (room && ((room.phase === 'design' && gameState.myRole === room.designer) ||
+                               (room.phase === 'solve' && gameState.myRole === room.solver)));
+      if (!isTurn || !gameState.localUserSegs.size) return;
       gameState.localUndo.push(new Set(gameState.localUserSegs));
       gameState.localUserSegs.clear();
       gameState.activeDot = null;
       renderBattleUserLines();
       bMessage('已全部清除。');
+      if (room.phase === 'solve' && gameState.myRole === room.solver) {
+        syncLiveSolverSegs();
+      }
     };
 
     function bMessage(txt) {
@@ -1384,6 +1487,9 @@
         room.phase = 'solve';
         room.designSegs = designArr;
         room.targetSegs = targetArr;
+        room.liveSolverSegs = [];
+        room.liveSolverDot = null;
+        room.solverSegs = [];
         room.phaseStartTime = Date.now();
         renderBattleStage(room);
         // AI 答題模擬 (若當前 solver 是 AI)
@@ -1395,6 +1501,9 @@
             phase: 'solve',
             designSegs: designArr,
             targetSegs: targetArr,
+            liveSolverSegs: [],
+            liveSolverDot: null,
+            solverSegs: [],
             phaseStartTime: Date.now(),
             updatedAt: Date.now()
           });
@@ -1508,6 +1617,8 @@
         room.p2.score = newP2Score;
         room.roundStats = updatedStats;
         room.solverSegs = finalSolverSegs;
+        room.liveSolverSegs = finalSolverSegs;
+        room.liveSolverDot = null;
         room.phase = 'roundResult';
         renderBattleStage(room);
       } else {
@@ -1517,6 +1628,8 @@
             'p2/score': newP2Score,
             roundStats: updatedStats,
             solverSegs: finalSolverSegs,
+            liveSolverSegs: finalSolverSegs,
+            liveSolverDot: null,
             phase: 'roundResult',
             updatedAt: Date.now()
           });
@@ -1703,6 +1816,9 @@
           room.solver = nextSolver;
           room.designSegs = [];
           room.targetSegs = [];
+          room.liveSolverSegs = [];
+          room.liveSolverDot = null;
+          room.solverSegs = [];
           room.phase = 'design';
           room.phaseStartTime = Date.now();
           renderBattleStage(room);
@@ -1720,6 +1836,9 @@
             solver: nextSolver,
             designSegs: [],
             targetSegs: [],
+            liveSolverSegs: [],
+            liveSolverDot: null,
+            solverSegs: [],
             phase: 'design',
             phaseStartTime: Date.now(),
             updatedAt: Date.now()
@@ -1741,13 +1860,42 @@
     }
 
     function simulateAiSolving(room) {
-      // 模擬 AI 在 8~18 秒內答對
-      const solveSeconds = Math.floor(8 + Math.random() * 10);
-      setTimeout(() => {
-        if (room.phase !== 'solve') return;
-        const score = 10 + (90 - solveSeconds);
-        finishRound(true, solveSeconds, score, room.targetSegs || []);
-      }, solveSeconds * 1000);
+      if (room.phase !== 'solve') return;
+      const targets = [...(room.targetSegs || [])];
+      if (targets.length === 0) return;
+
+      let step = 0;
+      room.liveSolverSegs = [];
+      room.liveSolverDot = null;
+
+      // 模擬 AI 每 1.3 ~ 2 秒逐步連出一條線，出題者即時看到同步作答歷程
+      const interval = setInterval(() => {
+        if (room.phase !== 'solve') {
+          clearInterval(interval);
+          return;
+        }
+
+        if (step < targets.length) {
+          const seg = targets[step];
+          room.liveSolverSegs.push(seg);
+          step++;
+
+          if (gameState.myRole === room.designer) {
+            gameState.localUserSegs = new Set(room.liveSolverSegs);
+            renderBattleUserLines();
+            soundConnect();
+            bMessage(`👀 電腦水手連出了第 ${step} 條對稱線段...（共 ${targets.length} 條）`);
+          }
+        } else {
+          clearInterval(interval);
+          setTimeout(() => {
+            if (room.phase !== 'solve') return;
+            const solveSeconds = Math.max(5, 90 - gameState.timeLeft);
+            const score = Math.max(10, 10 + gameState.timeLeft);
+            finishRound(true, solveSeconds, score, targets);
+          }, 800);
+        }
+      }, 1300 + Math.random() * 700);
     }
 
     // =========================================================
