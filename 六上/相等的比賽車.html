@@ -2634,71 +2634,107 @@
                 if (ai.bumpCooldown > 0) ai.bumpCooldown -= dt;
 
                 // 【對手主動尋找並走加速帶 (Boost Pad Seeking)】：
-                // 若前方 8m ~ 90m 內有賽道加速跳板，AI 賽車會主動切換車道走上去！
+                // 若前方 8m ~ 90m 內有賽道加速跳板，且該加速跳板不在玩家正前方，AI 賽車會主動切換車道走上去！
                 State.boostPads.forEach(pad => {
                     const padDiff = pad.distance - ai.distance;
                     if (padDiff > 8 && padDiff < 95) {
-                        ai.targetX = pad.x; // 主動切入加速帶車道！
+                        // 核心防護：若玩家正在前方 80m 內且位於該加速帶同一車道，AI 絕不搶走該車道以免追撞玩家！
+                        const padNearPlayer = (p.distance > ai.distance && p.distance < pad.distance + 25 && Math.abs(pad.x - p.x) < 0.45);
+                        if (!padNearPlayer) {
+                            ai.targetX = pad.x; // 主動切入加速帶車道！
+                        }
                     }
                 });
 
                 // 【對手走過加速帶檢測】：觸發 3 秒加速噴射！
                 State.boostPads.forEach(pad => {
                     if (Math.abs(pad.distance - ai.distance) < 5.5 && Math.abs(pad.x - ai.x) < 0.35) {
-                        ai.boostTimer = 3.0;
-                        ai.speed = Math.max(ai.speed, 520); // 瞬間飆升到最高 300 km/h
-                        // 產生對手排氣噴火粒子
-                        for (let k = 0; k < 6; k++) {
-                            addParticle(canvas.width * 0.5 + ai.x * 200, canvas.height * 0.7, 'flame');
+                        // 核心防護：若玩家在前方 40m 內且同車道，AI 就算踩到加速帶也不觸發極速狂飆
+                        const playerDirectlyAhead = (p.distance > ai.distance && (p.distance - ai.distance) < 40 && Math.abs(p.x - ai.x) < 0.45);
+                        if (!playerDirectlyAhead) {
+                            ai.boostTimer = 3.0;
+                            ai.speed = Math.max(ai.speed, 520); // 瞬間飆升到最高 300 km/h
+                            // 產生對手排氣噴火粒子
+                            for (let k = 0; k < 6; k++) {
+                                addParticle(canvas.width * 0.5 + ai.x * 200, canvas.height * 0.7, 'flame');
+                            }
                         }
                     }
                 });
 
-                // AI 車道選擇：平緩變道
+                // AI 車道選擇：平緩變道 (若在玩家身後，不隨機挑選靠近玩家的車道)
                 ai.laneTimer = (ai.laneTimer || 0) - dt;
                 if (ai.laneTimer <= 0) {
                     ai.laneTimer = Math.random() * 3.5 + 4.0;
                     const lanes = [-0.6, -0.3, 0.0, 0.3, 0.6];
-                    ai.targetX = lanes[Math.floor(Math.random() * lanes.length)];
+                    const distToPlayerAhead = p.distance - ai.distance;
+                    let safeLanes = lanes;
+                    if (distToPlayerAhead > 0 && distToPlayerAhead < 80) {
+                        // 排除靠近玩家的車道
+                        safeLanes = lanes.filter(lx => Math.abs(lx - p.x) >= 0.42);
+                        if (safeLanes.length === 0) safeLanes = lanes;
+                    }
+                    ai.targetX = safeLanes[Math.floor(Math.random() * safeLanes.length)];
                 }
 
-                // 【核心安全機制】：確保電腦操控的車絕對不會來撞玩家的車！
+                // 【核心安全機制：極致防追撞系統 — 盡量避免 AI 從後方追撞我車】
                 const distRelToPlayer = ai.distance - p.distance; // < 0 表示在玩家身後，> 0 表示在玩家前方
                 const absDistToPlayer = Math.abs(distRelToPlayer);
                 const xDiffToPlayer = Math.abs(ai.x - p.x);
 
-                // 1. 後方 AI 主動避讓與安全減速 (防追撞煞車)
-                if (distRelToPlayer < 0 && distRelToPlayer > -65) {
-                    if (xDiffToPlayer < 0.48) {
-                        // 提早變換至遠離玩家的安全車道
-                        if (p.x >= 0) {
-                            ai.targetX = Math.min(-0.35, p.x - 0.52);
-                        } else {
-                            ai.targetX = Math.max(0.35, p.x + 0.52);
-                        }
-                        ai.targetX = Math.max(-0.75, Math.min(0.75, ai.targetX));
+                if (distRelToPlayer < 0 && distRelToPlayer > -90) {
+                    const distBehind = -distRelToPlayer; // 距玩家後方 0 ~ 90 米
 
-                        // 若仍在同車道且逼近玩家，AI 主動自動煞車減速，時速安全限制在玩家之後，絕對不追撞！
-                        if (distRelToPlayer > -40) {
-                            const safeFollowSpeed = Math.max(30, p.speed - 20);
-                            ai.targetSpeed = Math.min(ai.targetSpeed, safeFollowSpeed);
-                            ai.speed = Math.min(ai.speed, safeFollowSpeed);
+                    // 1. 遠距離偵測 (85m 內)：提前變道超車，往空間較大一側完全避開玩家軌道
+                    if (xDiffToPlayer < 0.65) {
+                        let avoidX;
+                        if (p.x >= 0.12) {
+                            avoidX = Math.min(-0.35, p.x - 0.58);
+                        } else if (p.x <= -0.12) {
+                            avoidX = Math.max(0.35, p.x + 0.58);
+                        } else {
+                            avoidX = (ai.x <= p.x) ? -0.58 : 0.58;
+                        }
+                        ai.targetX = Math.max(-0.85, Math.min(0.85, avoidX));
+                    }
+
+                    // 2. 中距離主動防追撞煞車 (55m 內)：若橫向車距尚未完全拉開，強效主動煞車並解除衝刺
+                    if (distBehind < 55 && xDiffToPlayer < 0.50) {
+                        if (ai.boostTimer > 0) {
+                            ai.boostTimer = 0; // 解除加速帶衝刺，避免高速暴衝撞上玩家車尾
+                        }
+                        const safeSpeed = Math.max(20, p.speed - 15);
+                        ai.targetSpeed = Math.min(ai.targetSpeed, safeSpeed);
+                        if (ai.speed > safeSpeed) {
+                            ai.speed = Math.max(safeSpeed, ai.speed - dt * 320); // 主動煞車減速
                         }
                     }
-                } else if (distRelToPlayer >= 0 && distRelToPlayer < 30) {
-                    // 2. 前方 AI 側向禮讓：若橫向距離過近，AI 自動向外側避開
-                    if (xDiffToPlayer < 0.36) {
-                        const nudgeDir = (ai.x >= p.x) ? 0.36 : -0.36;
-                        ai.targetX = Math.max(-0.75, Math.min(0.75, ai.x + nudgeDir));
+
+                    // 3. 近距離緊急避險 (22m 內)：若仍同車道，強制橫向閃避 + 重踩煞車
+                    if (distBehind < 22 && xDiffToPlayer < 0.40) {
+                        const dodgeDir = (ai.x <= p.x) ? -1 : 1;
+                        ai.targetX = Math.max(-0.88, Math.min(0.88, p.x + dodgeDir * 0.68));
+                        ai.steerVel = dodgeDir * 3.5;
+                        ai.x += dodgeDir * dt * 2.2;
+                        ai.speed = Math.max(15, Math.min(ai.speed, p.speed - 30));
+                        ai.targetSpeed = Math.min(ai.targetSpeed, ai.speed);
+                    }
+                } else if (distRelToPlayer >= 0 && distRelToPlayer < 35) {
+                    // 前方 AI 側向禮讓：若橫向距離過近，AI 自動向外側避開
+                    if (xDiffToPlayer < 0.38) {
+                        const nudgeDir = (ai.x >= p.x) ? 0.38 : -0.38;
+                        ai.targetX = Math.max(-0.85, Math.min(0.85, ai.x + nudgeDir));
                     }
                 }
 
-                // 轉向物理 (遇玩家時提升反應速度)
+                // 轉向物理 (遇玩家時提升反應速度，後方避讓時反應極速)
                 ai.steerVel = ai.steerVel || 0;
                 ai.bumpVel = ai.bumpVel || 0;
                 const steerDiff = ai.targetX - ai.x;
-                const steerGain = (absDistToPlayer < 45 && xDiffToPlayer < 0.5) ? 14.0 : 8.5;
-                const desiredSteer = Math.max(-1.8, Math.min(1.8, steerDiff * 3.0));
+                const isNearBehindPlayer = (distRelToPlayer < 0 && distRelToPlayer > -70 && xDiffToPlayer < 0.60);
+                const steerGain = isNearBehindPlayer ? 22.0 : ((absDistToPlayer < 45 && xDiffToPlayer < 0.5) ? 14.0 : 8.5);
+                const maxSteer = isNearBehindPlayer ? 2.8 : 1.8;
+                const desiredSteer = Math.max(-maxSteer, Math.min(maxSteer, steerDiff * 3.5));
                 ai.steerVel += (desiredSteer - ai.steerVel) * dt * steerGain;
 
                 // 碰撞反彈力衰減
@@ -2873,48 +2909,49 @@
 
                 Sound.crash();
 
-                // 判斷碰撞型態：玩家是否從後面追撞前車 (玩家在後方且速度快)
-                const isPlayerRearEnding = (p.distance <= ai.distance && p.speed > ai.speed + 15);
+                // 判斷碰撞型態：從後面追撞別人是自己會翻掉！
+                const distDiff = p.distance - ai.distance; // > 0: 玩家在前方, AI在後方; < 0: AI在前方, 玩家在後方
 
-                if (isPlayerRearEnding) {
-                    // 玩家主動追撞前車：玩家自己打滑失控
-                    triggerScreenShake(0.38);
-                    p.spinTimer = 1.0;
+                if (distDiff < -0.25) {
+                    // 1. 玩家在後方追撞前車：玩家自己打滑失控翻車！前車不翻車
+                    triggerScreenShake(0.40);
+                    p.spinTimer = 1.3;
                     p.wobbleTimer = 0;
-                    p.speed = Math.max(25, p.speed * 0.4);
+                    p.speed = Math.max(15, p.speed * 0.35);
 
                     ai.spinTimer = 0;
-                    ai.wobbleTimer = 0.25;
-                    ai.speed = Math.min(220, ai.speed + 30);
+                    ai.wobbleTimer = 0.2;
+                    ai.speed = Math.min(320, ai.speed + 30); // 前方 AI 被推一下前進，不翻車
 
-                    const bumpForce = (p.x <= ai.x) ? -1.8 : 1.8;
+                    const bumpForce = (p.x <= ai.x) ? -2.2 : 2.2;
                     p.bumpVel = (p.bumpVel || 0) + bumpForce;
-                    ai.bumpVel = (ai.bumpVel || 0) - bumpForce * 0.5;
+                    ai.bumpVel = (ai.bumpVel || 0) - bumpForce * 0.3;
 
-                    triggerFloatingAlert('💥 追撞前車！自己失控翻車！');
-                } else if (ai.distance < p.distance) {
-                    // 電腦後車接近玩家：電腦車主動彈開讓位並減速，玩家絕不卡機、絕不翻車！
-                    triggerScreenShake(0.18);
-                    p.speed = Math.min(MAX_NORMAL_SPEED, p.speed + 10);
-                    p.wobbleTimer = 0.2;
-                    p.spinTimer = 0;
+                    triggerFloatingAlert('💥 從後方追撞前車！自己翻車打滑！');
+                } else if (distDiff > 0.25) {
+                    // 2. 後方 AI 追撞玩家：後車 (AI) 自己打滑失控翻車！玩家不翻車
+                    triggerScreenShake(0.12);
+                    p.speed = Math.min(MAX_NORMAL_SPEED, p.speed + 15); // 玩家在前被推了一把加速
+                    p.wobbleTimer = 0.15;
+                    p.spinTimer = 0; // 玩家絕對不翻車
 
-                    // AI 電腦車被彈開並減速
-                    ai.spinTimer = 0.4;
-                    ai.speed = Math.max(30, p.speed * 0.7);
+                    // 後方 AI 自己翻車失控彈向外側
+                    ai.spinTimer = 1.6;
+                    ai.speed = Math.max(15, ai.speed * 0.25);
+                    ai.boostTimer = 0;
 
-                    const bumpForce = (p.x <= ai.x) ? 1.5 : -1.5;
-                    p.bumpVel = (p.bumpVel || 0) + bumpForce * 0.3;
-                    ai.bumpVel = (ai.bumpVel || 0) - bumpForce * 1.5;
+                    const bumpForce = (p.x <= ai.x) ? 1.8 : -1.8;
+                    p.bumpVel = (p.bumpVel || 0) + bumpForce * 0.2;
+                    ai.bumpVel = (ai.bumpVel || 0) - bumpForce * 2.5;
 
-                    triggerFloatingAlert('🛡️ 後車彈開！保持領先！');
+                    triggerFloatingAlert('🛡️ 後方對手追撞你！對手自己翻車了！');
                 } else {
-                    // 車側擦撞：雙方平緩彈開
-                    triggerScreenShake(0.2);
+                    // 3. 車側並排擦撞 (前後差在 0.25m 以內)：雙方平緩彈開，皆不翻車
+                    triggerScreenShake(0.18);
                     p.speed = Math.max(40, p.speed * 0.9);
                     ai.speed = Math.max(40, ai.speed * 0.9);
 
-                    const bumpForce = (p.x <= ai.x) ? -1.4 : 1.4;
+                    const bumpForce = (p.x <= ai.x) ? -1.5 : 1.5;
                     p.bumpVel = (p.bumpVel || 0) + bumpForce;
                     ai.bumpVel = (ai.bumpVel || 0) - bumpForce;
 
@@ -3978,7 +4015,9 @@
             ctx.translate(proj.x, proj.y);
 
             if (ai.spinTimer > 0) {
-                ctx.rotate(timestampSec() * 20);
+                ctx.rotate(timestampSec() * 22);
+                const flipBounce = Math.abs(Math.sin(timestampSec() * 22)) * 14 * relativeScale;
+                ctx.translate(0, -flipBounce);
             } else {
                 ctx.rotate((ai.steerVel || 0) * 0.06);
             }
@@ -4060,9 +4099,11 @@
             ctx.save();
             ctx.translate(carX, carY);
 
-            // 車身轉向傾斜與打滑
+            // 車身轉向傾斜與翻車打滑
             if (p.spinTimer > 0) {
-                ctx.rotate(timestampSec() * 20);
+                ctx.rotate(timestampSec() * 22);
+                const flipBounce = Math.abs(Math.sin(timestampSec() * 22)) * 18;
+                ctx.translate(0, -flipBounce);
             } else if (p.wobbleTimer > 0) {
                 ctx.rotate(Math.sin(timestampSec() * 40) * 0.12);
             } else {
