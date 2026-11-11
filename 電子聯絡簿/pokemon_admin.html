@@ -620,7 +620,7 @@
         <button class="header-nav-btn" onclick="window.location.href='二年甲班電子聯絡簿.html'" style="background: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 100%); color: #0f172a; border: none;">
           <i class="fa-solid fa-book-open"></i> 回電子聯絡簿
         </button>
-        <span style="color: var(--text-muted); font-size: 0.96rem; font-weight: 700; white-space: nowrap;">後台系統 v6.4</span>
+        <span style="color: var(--text-muted); font-size: 0.96rem; font-weight: 700; white-space: nowrap;">後台系統 v6.5</span>
       </div>
     </header>
 
@@ -1905,6 +1905,8 @@
     };
 
     let database = null;
+    let firebaseHydrated = false;
+    let firebaseListenersAttached = false;
     try {
       if (typeof firebase !== 'undefined') {
         firebase.initializeApp(firebaseConfig);
@@ -1913,6 +1915,7 @@
     } catch (err) {
       console.warn("Firebase 載入失敗，切換為離線模式：", err);
     }
+    if (!database) firebaseHydrated = true;
 
     function loadData() {
       // 1. Load local cache first
@@ -1962,9 +1965,12 @@
 
       // 3. Connect live real-time Firebase listener on 'studentData' node
       if (database) {
+        if (!firebaseListenersAttached) {
+        firebaseListenersAttached = true;
         database.ref('studentData').on('value', (snapshot) => {
           const val = snapshot.val();
           if (val && typeof val === 'object' && val["1"]) {
+            firebaseHydrated = true;
             students = val;
             if (students['teacher'] && students['teacher'].pokemons) {
               const piplupPoke = students['teacher'].pokemons.find(p => p.family === 'piplup');
@@ -1991,7 +1997,11 @@
             }
             localStorage.setItem('pokemon_trainer_data', JSON.stringify(students));
             renderOverview();
+          } else if (!val) {
+            console.warn("Firebase studentData 尚無資料，等待雲端初始化");
           }
+        }, (err) => {
+          console.error("Firebase 讀取失敗：", err);
         });
 
         database.ref('showTeacherPage').on('value', (snapshot) => {
@@ -2002,6 +2012,7 @@
             updateTeacherToggleBtn();
           }
         });
+        }
       } else {
         updateTeacherToggleBtn();
         renderOverview();
@@ -2035,8 +2046,12 @@
     }
 
     function saveData() {
+      if (database && !firebaseHydrated) {
+        console.warn("Firebase 尚未完成首次同步，略過寫入以避免覆蓋最新資料");
+        return;
+      }
       localStorage.setItem('pokemon_trainer_data', JSON.stringify(students));
-      if (database) {
+      if (database && firebaseHydrated) {
         // Use Object.assign to ensure plain object (not array) is stored
         const payload = Object.assign({}, students);
         database.ref('studentData').set(payload).catch(err => {
