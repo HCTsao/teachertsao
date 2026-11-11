@@ -620,7 +620,7 @@
         <button class="header-nav-btn" onclick="window.location.href='二年甲班電子聯絡簿.html'" style="background: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 100%); color: #0f172a; border: none;">
           <i class="fa-solid fa-book-open"></i> 回電子聯絡簿
         </button>
-        <span style="color: var(--text-muted); font-size: 0.96rem; font-weight: 700; white-space: nowrap;">後台系統 v6.1</span>
+        <span style="color: var(--text-muted); font-size: 0.96rem; font-weight: 700; white-space: nowrap;">後台系統 v6.2</span>
       </div>
     </header>
 
@@ -665,16 +665,8 @@
 
           <div class="form-group" id="points-group">
             <label for="points-input">平時分數增減（影響帳面等級）</label>
-            <div class="quick-presets-bar">
-              <button type="button" class="btn-preset minus" onclick="quickModifySelected(-10)">-10</button>
-              <button type="button" class="btn-preset minus" onclick="quickModifySelected(-5)">-5</button>
-              <button type="button" class="btn-preset minus" onclick="quickModifySelected(-1)">-1</button>
-              <button type="button" class="btn-preset plus" onclick="quickModifySelected(1)">+1</button>
-              <button type="button" class="btn-preset plus" onclick="quickModifySelected(5)">+5</button>
-              <button type="button" class="btn-preset plus" onclick="quickModifySelected(10)">+10</button>
-            </div>
             <div style="display: flex; gap: 8px; align-items: stretch;">
-              <input type="number" id="points-input" value="1" min="-200" max="200" style="width: 110px; text-align: center; font-weight: 800; font-size: 1.15rem;">
+              <input type="number" id="points-input" value="1" min="-200" max="200" placeholder="輸入分數(正/負)" style="flex: 1; min-width: 90px; text-align: center; font-weight: 800; font-size: 1.15rem;">
               <button class="btn btn-primary" onclick="modifyPoints()"><i class="fa-solid fa-plus-minus"></i> 送出帳面增減分</button>
             </div>
           </div>
@@ -1825,12 +1817,6 @@
             family: "piplup",
             points: 0,
             moves: ["撞擊", "水槍"]
-          },
-          {
-            family: "pichu",
-            points: 101,
-            confirmedStage: 1,
-            moves: ["撞擊", "電擊", "電光一閃", "十萬伏特"]
           }
         ]
       }
@@ -1953,20 +1939,9 @@
           if (piplupPoke && piplupPoke.confirmedStage !== 0) {
             piplupPoke.confirmedStage = 0;
           }
-          let pichuPoke = students['teacher'].pokemons.find(p => p.family === 'pichu');
-          if (!pichuPoke) {
-            pichuPoke = {
-              family: "pichu",
-              points: 101,
-              confirmedStage: 1,
-              moves: ["撞擊", "電擊", "電光一閃", "十萬伏特"]
-            };
-            students['teacher'].pokemons.push(pichuPoke);
-          } else {
-            if (pichuPoke.confirmedStage !== 1 || (pichuPoke.points || 0) < 100) {
-              pichuPoke.confirmedStage = 1;
-              if ((pichuPoke.points || 0) < 100) pichuPoke.points = 101;
-            }
+          students['teacher'].pokemons = students['teacher'].pokemons.filter(p => !(p.family === 'pichu' && !p.wildCaught));
+          if ((students['teacher'].activePokemonIndex || 0) >= students['teacher'].pokemons.length) {
+            students['teacher'].activePokemonIndex = Math.max(0, students['teacher'].pokemons.length - 1);
           }
         }
       } catch (e) {
@@ -1996,18 +1971,13 @@
               if (piplupPoke && piplupPoke.confirmedStage !== 0) {
                 piplupPoke.confirmedStage = 0;
               }
-              let pichuPoke = students['teacher'].pokemons.find(p => p.family === 'pichu');
-              if (!pichuPoke) {
-                pichuPoke = {
-                  family: "pichu",
-                  points: 101,
-                  confirmedStage: 1,
-                  moves: ["撞擊", "電擊", "電光一閃", "十萬伏特"]
-                };
-                students['teacher'].pokemons.push(pichuPoke);
-              } else {
-                pichuPoke.confirmedStage = 1;
-                if ((pichuPoke.points || 0) < 100) pichuPoke.points = 101;
+              const tBefore = students['teacher'].pokemons.length;
+              students['teacher'].pokemons = students['teacher'].pokemons.filter(p => !(p.family === 'pichu' && !p.wildCaught));
+              if (students['teacher'].pokemons.length !== tBefore) {
+                if ((students['teacher'].activePokemonIndex || 0) >= students['teacher'].pokemons.length) {
+                  students['teacher'].activePokemonIndex = Math.max(0, students['teacher'].pokemons.length - 1);
+                }
+                if (typeof saveData === 'function') saveData();
               }
             }
             for (let sId in students) {
@@ -2277,11 +2247,6 @@
                   ${branchBadge}
                 </div>
                 <div class="poke-row-actions" onclick="event.stopPropagation()">
-                  <button type="button" class="btn-row-quick minus" title="扣 5 分" onclick="quickModifyPoints('${id}', ${idx}, -5)">-5</button>
-                  <button type="button" class="btn-row-quick minus" title="扣 1 分" onclick="quickModifyPoints('${id}', ${idx}, -1)">-1</button>
-                  <button type="button" class="btn-row-quick plus" title="加 1 分" onclick="quickModifyPoints('${id}', ${idx}, 1)">+1</button>
-                  <button type="button" class="btn-row-quick plus" title="加 5 分" onclick="quickModifyPoints('${id}', ${idx}, 5)">+5</button>
-                  <button type="button" class="btn-row-quick plus" title="加 10 分" onclick="quickModifyPoints('${id}', ${idx}, 10)">+10</button>
                   ${!isActive ? `<button type="button" class="btn-row-active" onclick="setStudentActivePokemon('${id}', ${idx})">出戰</button>` : ''}
                   <button type="button" class="btn-row-release" onclick="releasePokemon('${id}', ${idx})"><i class="fa-solid fa-leaf"></i> 放生</button>
                 </div>
