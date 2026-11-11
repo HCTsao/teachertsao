@@ -1464,7 +1464,7 @@
       const oldData = JSON.parse(JSON.stringify(students || {}));
       students = newData;
       
-      if (document.getElementById('battle-container').style.display === 'block') {
+      if (document.getElementById('battle-container').style.display === 'block' && document.getElementById('battle-lobby').style.display !== 'none') {
         updateLobbyDetails();
       }
 
@@ -2575,7 +2575,8 @@
       p2: { name: "", activePoke: null, hp: 100, maxHp: 100, level: 1, family: "water", atkMod: 1, defMod: 1, moves: [] },
       currentTurn: "p1",
       logQueue: [],
-      isNarrating: false
+      isNarrating: false,
+      sessionId: 0
     };
 
     function showPasswordModal(onSuccess, onCancel, titleText = "老師對戰授權") {
@@ -2719,24 +2720,58 @@
       if (btnGotoWild) btnGotoWild.style.display = inBattle ? 'none' : 'flex';
     }
 
+    function resetBattleArenaState() {
+      battleState.sessionId = (battleState.sessionId || 0) + 1;
+      battleState.active = false;
+      battleState.autoBattle = false;
+      battleState.isWild = false;
+      battleState.logQueue = [];
+      battleState.isNarrating = false;
+
+      if (typeof battleBGM !== 'undefined') { battleBGM.pause(); battleBGM.currentTime = 0; }
+      if (typeof wildBattleBGM !== 'undefined') { wildBattleBGM.pause(); wildBattleBGM.currentTime = 0; }
+      if (typeof winSound !== 'undefined') { winSound.pause(); winSound.currentTime = 0; }
+      if (typeof catchFanfareSound !== 'undefined') { catchFanfareSound.pause(); catchFanfareSound.currentTime = 0; }
+      if (typeof catchCelebrationBGM !== 'undefined') { catchCelebrationBGM.pause(); catchCelebrationBGM.currentTime = 0; }
+
+      updateTeacherAutoButton();
+
+      const movesGrid = document.getElementById('battle-moves-grid');
+      if (movesGrid) movesGrid.style.display = 'none';
+      const wildBar = document.getElementById('battle-wild-bar');
+      if (wildBar) wildBar.style.display = 'none';
+      const autoInd = document.getElementById('battle-auto-indicator');
+      if (autoInd) autoInd.style.display = 'none';
+      const ball = document.getElementById('battle-animated-pokeball');
+      if (ball) ball.style.display = 'none';
+
+      const arena = document.getElementById('battle-arena-card');
+      if (arena) {
+        arena.style.transform = '';
+        arena.querySelectorAll('.effect-particle, svg').forEach(el => el.remove());
+        arena.style.display = 'none';
+      }
+      const flashOverlay = document.getElementById('battle-flash-overlay');
+      if (flashOverlay) flashOverlay.style.opacity = '0';
+
+      const img1 = document.getElementById('battle-img-p1');
+      const img2 = document.getElementById('battle-img-p2');
+      if (img1) { img1.style.transition = ''; img1.style.transform = ''; img1.style.opacity = '1'; img1.style.filter = ''; }
+      if (img2) { img2.style.transition = ''; img2.style.transform = ''; img2.style.opacity = '1'; img2.style.filter = ''; }
+
+      const lobby = document.getElementById('battle-lobby');
+      if (lobby) lobby.style.display = 'block';
+    }
+
     function exitBattleToCardView() {
       if (battleState.active) {
         if (!confirm("確定要退出對戰返回集點卡嗎？")) return;
       }
-      battleBGM.pause();
-      battleBGM.currentTime = 0;
-      wildBattleBGM.pause();
-      wildBattleBGM.currentTime = 0;
-      winSound.pause();
-      winSound.currentTime = 0;
-      
-      battleState.active = false;
-      
+      resetBattleArenaState();
+
       document.getElementById('student-container').style.display = 'block';
       document.getElementById('battle-container').style.display = 'none';
-      document.getElementById('battle-arena-card').style.display = 'none';
-      document.getElementById('battle-lobby').style.display = 'block';
-      
+
       updateReturnButton(false);
       renderContent();
     }
@@ -2767,6 +2802,7 @@
         if (!confirm(confirmMsg)) return;
 
         showPasswordModal(() => {
+          resetBattleArenaState();
           studentContainer.style.display = 'none';
           battleContainer.style.display = 'block';
           updateReturnButton(true);
@@ -2775,10 +2811,7 @@
           // Cancelled
         });
       } else {
-        // Stop background music
-        battleBGM.pause();
-        battleBGM.currentTime = 0;
-
+        resetBattleArenaState();
         studentContainer.style.display = 'block';
         battleContainer.style.display = 'none';
         updateReturnButton(false);
@@ -2991,15 +3024,11 @@
         }
       });
 
+      resetBattleArenaState();
       battleState.active = true;
       battleState.autoBattle = false;
       battleState.isWild = false;
-      battleState.logQueue = [];
-      battleState.isNarrating = false;
       updateTeacherAutoButton();
-
-      const wildBar = document.getElementById('battle-wild-bar');
-      if (wildBar) wildBar.style.display = 'none';
       
       const p1Details = getCurrentPokemon(active1);
       const p2Details = getCurrentPokemon(active2);
@@ -3109,6 +3138,7 @@
     function processLogQueue() {
       if (battleState.isNarrating || battleState.logQueue.length === 0) return;
       battleState.isNarrating = true;
+      const mySession = battleState.sessionId;
       
       const logEl = document.getElementById('battle-log');
       const item = battleState.logQueue.shift();
@@ -3118,12 +3148,14 @@
       const text = item.text;
       
       function printChar() {
+        if (battleState.sessionId !== mySession) return;
         if (index < text.length) {
           logEl.textContent += text.charAt(index);
           index++;
           setTimeout(printChar, 35);
         } else {
           setTimeout(() => {
+            if (battleState.sessionId !== mySession) return;
             battleState.isNarrating = false;
             if (item.callback) item.callback();
             processLogQueue();
@@ -3193,8 +3225,9 @@
           const wildBar = document.getElementById('battle-wild-bar');
           if (wildBar) wildBar.style.display = 'none';
 
+          const mySessionAuto = battleState.sessionId;
           setTimeout(() => {
-            if (battleState.active && battleState.autoBattle && battleState.currentTurn === 'p1' && !battleState.isNarrating) {
+            if (battleState.sessionId === mySessionAuto && battleState.active && battleState.autoBattle && battleState.currentTurn === 'p1' && !battleState.isNarrating) {
               autoExecuteTeacherMove();
             }
           }, 600);
@@ -3227,7 +3260,7 @@
           const btn = document.getElementById(`move-btn-${i}`);
           const moveName = fighterMoves[i];
           if (moveName) {
-            const move = MOVES_DETAILS_MAP[moveName];
+            const move = MOVES_DETAILS_MAP[moveName] || MOVES_DETAILS_MAP['撞擊'];
             const maxPp = getMoveMaxPp(move);
             const currentPp = (battleState.p1.movePP && battleState.p1.movePP[moveName] !== undefined)
               ? battleState.p1.movePP[moveName]
@@ -3296,7 +3329,9 @@
           ? `<i class="fa-solid fa-tree"></i> 野生寶可夢行動中...`
           : `<i class="fa-solid fa-robot"></i> 對手 AI 思考中...`;
         
+        const mySessionAi = battleState.sessionId;
         setTimeout(() => {
+          if (battleState.sessionId !== mySessionAi || !battleState.active) return;
           const unlockedMoves = getUnlockedMoves(battleState.p2);
           const move = unlockedMoves[Math.floor(Math.random() * unlockedMoves.length)];
           executeMove(battleState.p2, move);
@@ -3305,7 +3340,8 @@
     }
 
     function getUnlockedMoves(fighter) {
-      return fighter.moves.map(name => MOVES_DETAILS_MAP[name]);
+      const list = (fighter && fighter.moves ? fighter.moves : []).map(name => MOVES_DETAILS_MAP[name]).filter(Boolean);
+      return list.length > 0 ? list : [MOVES_DETAILS_MAP['撞擊']];
     }
 
     function toggleTeacherAutoBattle() {
@@ -3317,8 +3353,11 @@
         document.getElementById('battle-moves-grid').style.display = 'none';
         const wildBar = document.getElementById('battle-wild-bar');
         if (wildBar) wildBar.style.display = 'none';
+        const mySessionToggle = battleState.sessionId;
         setTimeout(() => {
-          autoExecuteTeacherMove();
+          if (battleState.sessionId === mySessionToggle && battleState.active) {
+            autoExecuteTeacherMove();
+          }
         }, 400);
       } else if (!battleState.autoBattle && battleState.active && battleState.currentTurn === 'p1' && !battleState.isNarrating) {
         document.getElementById('battle-auto-indicator').style.display = 'none';
@@ -3442,6 +3481,8 @@
     }
 
     function executeMove(attacker, move) {
+      if (!battleState.active || !move) return;
+      const mySession = battleState.sessionId;
       document.getElementById('battle-moves-grid').style.display = 'none';
       const wildBar = document.getElementById('battle-wild-bar');
       if (wildBar) wildBar.style.display = 'none';
@@ -3450,8 +3491,11 @@
       const defenderSide = attackerSide === 'p1' ? 'p2' : 'p1';
 
       queueLog(`${attacker.name}的${attacker.pokeDetails.name} 使用了 ${move.name}！`, () => {
+        if (battleState.sessionId !== mySession || !battleState.active) return;
         animateAttack(attackerSide, defenderSide, () => {
+          if (battleState.sessionId !== mySession || !battleState.active) return;
           playMoveEffect(move, attackerSide, defenderSide, () => {
+            if (battleState.sessionId !== mySession || !battleState.active) return;
             
             if (move.type === 'status') {
               if (move.status === 'sleep') {
@@ -7129,6 +7173,7 @@
     }
 
     function endBattle(winnerName) {
+      const mySession = battleState.sessionId;
       battleState.active = false;
       battleState.autoBattle = false;
       updateTeacherAutoButton();
@@ -7142,10 +7187,10 @@
       // Play victory sound
       winSound.pause();
       winSound.currentTime = 0;
-      winSound.play();
+      winSound.play().catch(() => {});
 
-      const student = students[currentStudentId];
-      const pokes = student.pokemons;
+      const student = students[currentStudentId] || {};
+      const pokes = student.pokemons || [];
       const activeIndex = (student.activePokemonIndex !== undefined && student.activePokemonIndex >= 0 && student.activePokemonIndex < pokes.length) ? student.activePokemonIndex : (pokes.length - 1);
       const activePoke = pokes.length > 0 ? pokes[activeIndex] : null;
 
@@ -7179,15 +7224,8 @@
       }
       
       queueLog(`對戰結束！恭喜 ${winnerName} 獲得了勝利！${deductionMsg}`, () => {
-        document.getElementById('battle-img-p1').style.transition = '';
-        document.getElementById('battle-img-p2').style.transition = '';
-        document.getElementById('battle-img-p1').style.transform = '';
-        document.getElementById('battle-img-p2').style.transform = '';
-        document.getElementById('battle-img-p1').style.opacity = '1';
-        document.getElementById('battle-img-p2').style.opacity = '1';
-        
-        document.getElementById('battle-lobby').style.display = 'block';
-        document.getElementById('battle-arena-card').style.display = 'none';
+        if (battleState.sessionId !== mySession) return;
+        resetBattleArenaState();
         initBattleLobby();
       });
     }
@@ -7367,14 +7405,13 @@
         if (mObj) p1MovePP[mName] = getMoveMaxPp(mObj);
       });
 
+      resetBattleArenaState();
       battleState.active = true;
       battleState.autoBattle = false;
       battleState.isWild = true;
       battleState.wildCaught = false;
       battleState.wildBallsLeft = (pokes.length >= 6) ? 0 : 5;
       battleState.wildPokeData = wildPoke;
-      battleState.logQueue = [];
-      battleState.isNarrating = false;
       updateTeacherAutoButton();
 
       const scale1 = 1 + (lv1 / 30);
@@ -7522,6 +7559,7 @@
     }
 
     function animateThrowPokeball(catchRate) {
+      const mySession = battleState.sessionId;
       battleState.isNarrating = true;
       const ball = document.getElementById('battle-animated-pokeball');
       const wildImg = document.getElementById('battle-img-p2');
@@ -7552,6 +7590,7 @@
       let startTime = null;
 
       function animFlight(timestamp) {
+        if (battleState.sessionId !== mySession) return;
         if (!startTime) startTime = timestamp;
         const elapsed = timestamp - startTime;
         const t = Math.min(1, elapsed / duration);
@@ -7575,8 +7614,10 @@
 
           // Step 4: Ball rests inside green circle & wiggles back and forth
           setTimeout(() => {
+            if (battleState.sessionId !== mySession) return;
             let shakeCount = 0;
             const shakeInterval = setInterval(() => {
+              if (battleState.sessionId !== mySession) { clearInterval(shakeInterval); return; }
               shakeCount++;
               ball.style.transition = 'transform 0.18s ease-in-out';
               if (shakeCount === 1) {
@@ -7591,6 +7632,7 @@
 
                 // Step 5: Determine Catch outcome
                 setTimeout(() => {
+                  if (battleState.sessionId !== mySession) return;
                   const isCaught = Math.random() < catchRate;
 
                   if (isCaught) {
@@ -7633,7 +7675,7 @@
 
                     let celebrationTriggered = false;
                     const openCelebration = () => {
-                      if (celebrationTriggered) return;
+                      if (celebrationTriggered || battleState.sessionId !== mySession) return;
                       celebrationTriggered = true;
                       catchFanfareSound.removeEventListener('ended', openCelebration);
                       triggerCatchCelebration(student.name, wildPokeData, () => {
@@ -7661,6 +7703,7 @@
                     wildImg.style.opacity = '1';
 
                     setTimeout(() => {
+                      if (battleState.sessionId !== mySession) return;
                       ball.style.display = 'none';
                       const ballsMsg = battleState.wildBallsLeft > 0
                         ? `還剩 ${battleState.wildBallsLeft} 顆精靈球！`
@@ -7698,6 +7741,7 @@
     }
 
     function endWildBattle(isCaught, isEscape = false) {
+      const mySession = battleState.sessionId;
       battleState.active = false;
       battleState.autoBattle = false;
       updateTeacherAutoButton();
@@ -7724,11 +7768,8 @@
       }
 
       const finishReturn = () => {
-        document.getElementById('battle-img-p1').style.transform = '';
-        document.getElementById('battle-img-p2').style.transform = '';
-        document.getElementById('battle-img-p1').style.opacity = '1';
-        document.getElementById('battle-img-p2').style.opacity = '1';
-        document.getElementById('battle-img-p2').style.filter = '';
+        if (!isCaught && !isEscape && battleState.sessionId !== mySession) return;
+        resetBattleArenaState();
 
         document.getElementById('student-container').style.display = 'block';
         document.getElementById('battle-container').style.display = 'none';
