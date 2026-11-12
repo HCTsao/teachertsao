@@ -620,7 +620,7 @@
         <button class="header-nav-btn" onclick="window.location.href='二年甲班電子聯絡簿.html'" style="background: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 100%); color: #0f172a; border: none;">
           <i class="fa-solid fa-book-open"></i> 回電子聯絡簿
         </button>
-        <span style="color: var(--text-muted); font-size: 0.96rem; font-weight: 700; white-space: nowrap;">後台系統 v7.3</span>
+        <span style="color: var(--text-muted); font-size: 0.96rem; font-weight: 700; white-space: nowrap;">後台系統 v7.4</span>
       </div>
     </header>
 
@@ -664,25 +664,25 @@
           </div>
 
           <div class="form-group" id="points-group">
-            <label for="points-input">平時分數增減（影響帳面等級）</label>
+            <label for="points-input">平時分數增減（影響實際分數）</label>
             <div style="display: flex; gap: 8px; align-items: stretch;">
               <input type="number" id="points-input" value="1" min="-200" max="200" placeholder="輸入分數(正/負)" style="flex: 1; min-width: 90px; text-align: center; font-weight: 800; font-size: 1.15rem;">
-              <button class="btn btn-primary" onclick="modifyPoints()"><i class="fa-solid fa-plus-minus"></i> 送出帳面增減分</button>
+              <button class="btn btn-primary" onclick="modifyPoints()"><i class="fa-solid fa-plus-minus"></i> 送出分數增減</button>
             </div>
           </div>
 
-          <!-- 修正實際等級/點數 -->
+          <!-- 修正帳面分數/升級門檻 -->
           <div style="margin-top: 16px; margin-bottom: 16px; background: rgba(167, 139, 250, 0.12); border: 1.5px solid rgba(167, 139, 250, 0.35); border-radius: 12px; padding: 14px;">
             <div style="font-weight: 800; font-size: 1.05rem; color: #ddd6fe; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
-              <i class="fa-solid fa-shield-halved"></i> 修正實際點數（戰鬥實力，0~300分）
+              <i class="fa-solid fa-shield-halved"></i> 修正帳面分數（等級紀錄上限，0~300分）
             </div>
             <p style="font-size: 0.94rem; color: #cbd5e1; margin-bottom: 10px; line-height: 1.45;">
-              不改變學生端看到的帳面分數，只直接校正背後戰鬥能力點數。
+              寶可夢等級依帳面分數顯示；若實際分數低於帳面分數，需等實際分數超過帳面分數才會繼續升級。
             </p>
             <div style="display: flex; gap: 8px;">
-              <input type="number" id="actual-points-input" placeholder="實際點數 (0~300)" min="0" max="300" style="flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.22); background: rgba(0,0,0,0.35); color: white; font-size: 1.08rem; font-weight: 700;">
+              <input type="number" id="actual-points-input" placeholder="帳面分數 (0~300)" min="0" max="300" style="flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.22); background: rgba(0,0,0,0.35); color: white; font-size: 1.08rem; font-weight: 700;">
               <button class="btn" onclick="modifyActualPoints()" style="flex: 0 0 auto; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; padding: 10px 16px; border-radius: 8px; font-size: 1rem;">
-                套用實際點數
+                套用帳面分數
               </button>
             </div>
           </div>
@@ -2186,13 +2186,7 @@
       }
     }
 
-    // Helper to get nominal level (帳面等級)
-    function getNominalLevel(poke) {
-      if (!poke) return 0;
-      return Math.floor((poke.points || 0) / 10);
-    }
-
-    // Helper to get actual points (實際點數，累計實力，不受扣分影響)
+    // Helper to get book points (帳面分數：曾達到的最高紀錄點數，不受扣分影響；stored actualPoints)
     function getActualPoints(poke) {
       if (!poke) return 0;
       let act = (poke.actualPoints !== undefined && poke.actualPoints !== null) ? Number(poke.actualPoints) : undefined;
@@ -2204,7 +2198,7 @@
       return Math.max(act, pts, stageFloor);
     }
 
-    // Helper to get actual level (實際等級)
+    // Helper to get Pokemon level (等級一律依實際等級計算，不降級)
     function getActualLevel(poke) {
       return Math.floor(getActualPoints(poke) / 10);
     }
@@ -2329,13 +2323,13 @@
 
       const poke = student.pokemons[pIdx];
       const d = getCurrentPokemon(poke);
-      const nomLv = getNominalLevel(poke);
       const actLv = getActualLevel(poke);
-      const actPts = getActualPoints(poke);
-      const diff = actPts - (poke.points || 0);
+      const bookPts = getActualPoints(poke);
+      const realPts = poke.points || 0;
+      const diff = bookPts - realPts;
       img.src = d ? d.url : 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png';
       title.textContent = `${student.name} 的 ${d ? d.name : '寶可夢'}`;
-      sub.textContent = `帳 Lv.${nomLv}(${poke.points || 0}) │ 實 Lv.${actLv}(${actPts})${diff > 0 ? ` · 扣${diff}` : ''}`;
+      sub.textContent = `Lv.${actLv} · 帳面 ${bookPts}分 │ 實際 ${realPts}分${diff > 0 ? ` · 扣${diff}` : ''}`;
     }
 
     function renderOverview() {
@@ -2351,19 +2345,17 @@
 
         let pName = "尚未選擇";
         let pLv = 0;
-        let pPoints = 0;
-        let pActualLv = 0;
-        let pActualPoints = 0;
+        let pBookPoints = 0;
+        let pRealPoints = 0;
         let imgUrl = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png";
 
         if (activePoke) {
           const currentPoke = getCurrentPokemon(activePoke);
           if (currentPoke) {
             pName = currentPoke.name;
-            pLv = getNominalLevel(activePoke);
-            pPoints = activePoke.points || 0;
-            pActualPoints = getActualPoints(activePoke);
-            pActualLv = getActualLevel(activePoke);
+            pLv = getActualLevel(activePoke);
+            pBookPoints = getActualPoints(activePoke);
+            pRealPoints = activePoke.points || 0;
             imgUrl = currentPoke.url;
           }
         }
@@ -2376,10 +2368,10 @@
         if (pokes.length > 0) {
           pokes.forEach((p, idx) => {
             const pDetails = getCurrentPokemon(p);
-            const nomLvl = getNominalLevel(p);
-            const actPts = getActualPoints(p);
             const actLvl = getActualLevel(p);
-            const diff = actPts - (p.points || 0);
+            const bookPts = getActualPoints(p);
+            const realPts = p.points || 0;
+            const diff = bookPts - realPts;
             const isActive = idx === activeIndex;
             const branchBadge = (p.evoBranch === 0 || p.evoBranch === 1) && (POKEMON_DATA[p.family] || []).some(Array.isArray)
               ? `<span class="tag-pill" style="background: rgba(168, 85, 247, 0.22); color: #e9d5ff; border: 1px solid rgba(192, 132, 252, 0.45);">分支${p.evoBranch === 0 ? 'A' : 'B'}</span>`
@@ -2391,9 +2383,9 @@
                   <img src="${pDetails ? pDetails.url : imgUrl}" style="width: 44px; height: 44px; object-fit: contain; flex-shrink: 0;">
                   <span class="poke-row-name">${pDetails ? pDetails.name : '寶可夢'}</span>
                   <div class="poke-row-stats">
-                    <span style="color: #38bdf8;">帳面 Lv.${nomLvl} (${p.points || 0})</span>
+                    <span style="color: #38bdf8;">Lv.${actLvl} · 帳面 ${bookPts}分</span>
                     <span style="color: #64748b;">│</span>
-                    <span style="color: #ddd6fe;">實際 Lv.${actLvl} (${actPts})</span>
+                    <span style="color: #ddd6fe;">實際 ${realPts}分</span>
                   </div>
                   ${diff > 0 ? `<span class="tag-pill" style="background: rgba(245, 158, 11, 0.22); color: #fde047; border: 1px solid rgba(251, 191, 36, 0.45);">扣${diff}</span>` : ''}
                   ${isActive ? '<span class="tag-pill" style="background: #16a34a; color: white;">★出戰</span>' : ''}
@@ -2425,7 +2417,7 @@
                 <div class="student-pokemon-desc">出戰夥伴：${pName} · 共 ${pokes.length} 隻</div>
               </div>
             </div>
-            <span class="student-badge" style="${badgeBg}">帳面 Lv.${pLv} (${pPoints}分) │ 實際 Lv.${pActualLv} (${pActualPoints}分)</span>
+            <span class="student-badge" style="${badgeBg}">Lv.${pLv} · 帳面 ${pBookPoints}分 │ 實際 ${pRealPoints}分</span>
           </div>
           <div style="border-top: 1px dashed rgba(255,255,255,0.12); padding-top: 8px;">
             ${pokeListHTML}
@@ -2471,7 +2463,7 @@
       selectStudentAndPokemon(studentId, targetIndex);
       renderOverview();
       const sign = pointsToAdd > 0 ? `+${pointsToAdd}` : `${pointsToAdd}`;
-      showAdminToast(`${student.name} 的「${targetPokeName}」${sign} 分！（帳面：${targetPoke.points}分 / 實際：${getActualPoints(targetPoke)}分）`, pointsToAdd >= 0 ? "success" : "warn");
+      showAdminToast(`${student.name} 的「${targetPokeName}」${sign} 分！（帳面：${getActualPoints(targetPoke)}分 / 實際：${targetPoke.points}分 · Lv.${getActualLevel(targetPoke)}）`, pointsToAdd >= 0 ? "success" : "warn");
     }
 
     function quickModifyPoints(studentId, pokeIdx, delta) {
@@ -2503,7 +2495,7 @@
       const poke = student.pokemons[pokeIndex];
       const pokeData = getCurrentPokemon(poke);
       const pokeName = pokeData ? pokeData.name : "寶可夢";
-      const level = Math.floor(poke.points / 10);
+      const level = getActualLevel(poke);
 
       const confirmRelease = confirm(`⚠️ 【放生確認】\n\n您確定要幫「${student.name}」放生「${pokeName} (Lv.${level})」嗎？\n\n放生後該寶可夢將回歸大自然，無法復原！`);
       if (!confirmRelease) return;
@@ -2537,12 +2529,12 @@
       const student = students[selectedId];
 
       if (!student || !student.pokemons || student.pokemons.length === 0) {
-        showAdminToast("這位學生還沒有寶可夢夥伴喔！無法設定實際點數。", "warn");
+        showAdminToast("這位學生還沒有寶可夢夥伴喔！無法設定帳面分數。", "warn");
         return;
       }
 
       if (isNaN(actVal) || actVal < 0 || actVal > 300) {
-        showAdminToast("請輸入有效的實際點數 (0 ~ 300)！", "error");
+        showAdminToast("請輸入有效的帳面分數 (0 ~ 300)！", "error");
         return;
       }
 
@@ -2586,7 +2578,7 @@
       saveData();
       renderOverview();
       updateSelectedInfo(targetIndex);
-      showAdminToast(`${student.name} 的「${targetPokeName}」實際點數已設為 ${targetPoke.actualPoints} 分 (Lv.${Math.floor(targetPoke.actualPoints / 10)})`, "success");
+      showAdminToast(`${student.name} 的「${targetPokeName}」帳面分數已設為 ${targetPoke.actualPoints} 分 (Lv.${Math.floor(targetPoke.actualPoints / 10)})`, "success");
     }
 
     function resetStudent() {
@@ -2681,16 +2673,16 @@
       student.pokemons.forEach((poke, idx) => {
         const pokeData = getCurrentPokemon(poke);
         const name = pokeData ? pokeData.name : '寶可夢';
-        const nomLevel = getNominalLevel(poke);
         const actLevel = getActualLevel(poke);
-        const actPoints = getActualPoints(poke);
-        const diff = actPoints - (poke.points || 0);
+        const bookPoints = getActualPoints(poke);
+        const realPoints = poke.points || 0;
+        const diff = bookPoints - realPoints;
         const isActive = (idx === activeIndex);
 
         const opt = document.createElement('option');
         opt.value = idx;
         const diffText = diff > 0 ? ` [-${diff}]` : '';
-        opt.textContent = `${idx + 1}. ${name} · 帳Lv.${nomLevel} / 實Lv.${actLevel}${diffText}${isActive ? ' ★' : ''}`;
+        opt.textContent = `${idx + 1}. ${name} · Lv.${actLevel} (帳面${bookPoints}/實際${realPoints})${diffText}${isActive ? ' ★' : ''}`;
         pokeSelect.appendChild(opt);
       });
 

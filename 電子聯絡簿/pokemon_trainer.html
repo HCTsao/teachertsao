@@ -1227,7 +1227,7 @@
     </button>
   </div>
 
-  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v7.3</span></h1>
+  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v7.4</span></h1>
 
   <!-- Student Card Container -->
   <div class="main-container" id="student-container">
@@ -4450,7 +4450,7 @@
         { name: "撞擊", level: 0, power: 10, type: "normal", status: "none" },
         { name: "叫聲", level: 0, power: 0, type: "status", status: "atk-down" },
         { name: "藤鞭", level: 3, power: 16, type: "grass", status: "none" },
-        { name: "寄生種子", level: 5, power: 0, type: "status", status: "heal", maxPp: 7 },
+        { name: "寄生種子", level: 5, power: 0, type: "status", status: "leech-seed", maxPp: 7 },
         { name: "毒粉", level: 8, power: 22, type: "poison", status: "none" },
         { name: "飛葉快刀", level: 10, power: 26, type: "grass", status: "none" },
         { name: "污泥炸彈", level: 12, power: 30, type: "poison", status: "none" },
@@ -4589,10 +4589,10 @@
       "turtwig": [
         { name: "撞擊", level: 0, power: 10, type: "normal", status: "none" },
         { name: "縮入殼中", level: 0, power: 0, type: "status", status: "def-up" },
-        { name: "樹汁吸收", level: 3, power: 16, type: "grass", status: "none" },
+        { name: "吸取", level: 3, power: 16, type: "grass", status: "none" },
         { name: "飛葉快刀", level: 5, power: 18, type: "grass", status: "none" },
         { name: "青草滑梯", level: 8, power: 22, type: "grass", status: "none" },
-        { name: "寄生種子", level: 10, power: 0, type: "status", status: "heal", maxPp: 7 },
+        { name: "寄生種子", level: 10, power: 0, type: "status", status: "leech-seed", maxPp: 7 },
         { name: "咬住", level: 12, power: 30, type: "dark", status: "none", legacy: true },
         { name: "種子炸彈", level: 16, power: 34, type: "grass", status: "none" },
         { name: "地震", level: 20, power: 38, type: "ground", status: "none" },
@@ -4920,7 +4920,7 @@
         { name: "撞擊", level: 0, power: 10, type: "normal", status: "none" },
         { name: "搖尾巴", level: 0, power: 0, type: "status", status: "atk-down" },
         { name: "吸取", level: 3, power: 16, type: "grass", status: "none" },
-        { name: "寄生種子", level: 5, power: 0, type: "status", status: "heal", maxPp: 7 },
+        { name: "寄生種子", level: 5, power: 0, type: "status", status: "leech-seed", maxPp: 7 },
         { name: "超級吸取", level: 8, power: 22, type: "grass", status: "none" },
         { name: "種子炸彈", level: 10, power: 26, type: "grass", status: "none" },
         { name: "終極吸取", level: 12, power: 30, type: "grass", status: "none" },
@@ -5419,7 +5419,7 @@
         { name: "生長", level: 0, power: 0, type: "status", status: "def-up" },
         { name: "吸取", level: 3, power: 16, type: "grass", status: "none" },
         { name: "電光一閃", level: 5, power: 18, type: "normal", status: "none" },
-        { name: "樹汁吸收", level: 8, power: 22, type: "grass", status: "none" },
+        { name: "超級吸取", level: 8, power: 22, type: "grass", status: "none" },
         { name: "魔法葉", level: 10, power: 26, type: "grass", status: "none" },
         { name: "光合作用", level: 12, power: 0, type: "status", status: "heal", maxPp: 6 },
         { name: "葉刃", level: 16, power: 34, type: "grass", status: "none" },
@@ -5526,6 +5526,10 @@
     function isMoveEligibleForPoke(move, poke, level, student) {
       if (!move || !poke) return false;
       const actualLv = (level !== undefined) ? level : getActualLevel(poke);
+      // Lv.0~9 凱西（Abra）僅會使用「瞬間移動」
+      if (poke.family === 'abra' && actualLv < 10) {
+        return move.name === '瞬間移動';
+      }
       const confirmed = (isTeacherPiplup(poke, student) || isSingleStageFamily(poke.family))
         ? (actualLv < 10 ? 0 : (actualLv < 20 ? 1 : 2))
         : (poke.confirmedStage || 0);
@@ -5561,7 +5565,28 @@
         poke.moves = migratePeck(poke.moves);
         poke.moveLibrary = migratePeck(poke.moveLibrary);
       }
+      const migrateSap = (arr) => {
+        if (!Array.isArray(arr) || !arr.includes('樹汁吸收')) return arr;
+        changed = true;
+        const replacement = poke.family === 'shaymin' ? '超級吸取' : '吸取';
+        const next = [];
+        arr.forEach(n => {
+          const mapped = n === '樹汁吸收' ? replacement : n;
+          if (!next.includes(mapped)) next.push(mapped);
+        });
+        return next;
+      };
+      poke.moves = migrateSap(poke.moves);
+      poke.moveLibrary = migrateSap(poke.moveLibrary);
       const level = getActualLevel(poke);
+      if (poke.family === 'abra' && level < 10) {
+        const beforeM = JSON.stringify(poke.moves || []);
+        const beforeL = JSON.stringify(poke.moveLibrary || []);
+        poke.moves = ['瞬間移動'];
+        poke.moveLibrary = ['瞬間移動'];
+        if (beforeM !== JSON.stringify(poke.moves) || beforeL !== JSON.stringify(poke.moveLibrary)) changed = true;
+        return changed;
+      }
       const confirmed = (isTeacherPiplup(poke, student) || isSingleStageFamily(poke.family))
         ? (level < 10 ? 0 : (level < 20 ? 1 : 2))
         : (poke.confirmedStage || 0);
@@ -5738,9 +5763,9 @@
         const newActive = newStudent.pokemons[newActiveIdx];
         
         if (oldActive.family === newActive.family) {
-          const oldLevel = Math.floor(oldActive.points / 10);
+          const oldLevel = getActualLevel(oldActive);
           const oldStage = getStage(oldLevel);
-          const newLevel = Math.floor(newActive.points / 10);
+          const newLevel = getActualLevel(newActive);
           const newStage = getStage(newLevel);
           
           if (newLevel > oldLevel) {
@@ -5854,13 +5879,7 @@
       ]
     };
 
-    // Helper to get nominal level (帳面等級：隨平時點數增減)
-    function getNominalLevel(poke) {
-      if (!poke) return 0;
-      return Math.floor((poke.points || 0) / 10);
-    }
-
-    // Helper to get actual points (實際點數：累計最高實力，不受扣分影響)
+    // Helper to get book points (帳面分數：曾經達到的最高紀錄，不受扣分影響；stored actualPoints)
     function getActualPoints(poke) {
       if (!poke) return 0;
       let act = (poke.actualPoints !== undefined && poke.actualPoints !== null) ? Number(poke.actualPoints) : undefined;
@@ -5872,12 +5891,12 @@
       return Math.max(act, pts, stageFloor);
     }
 
-    // Helper to get actual level (實際等級：戰鬥能力與招式解鎖之核心依據)
+    // Helper to get Pokemon level (等級統一依實際等級計算，不降級)
     function getActualLevel(poke) {
       return Math.floor(getActualPoints(poke) / 10);
     }
 
-    // Helper to add points to a pokemon (加分時若超越實際點數則同步成長，扣分時只扣帳面)
+    // Helper to add points to a pokemon (加扣實際分數；實際分數超過帳面分數時同步提高帳面分數並繼續升級)
     function addPokemonPoints(poke, delta) {
       if (!poke) return;
       poke.points = (poke.points || 0) + delta;
@@ -5953,12 +5972,13 @@
       if (move.status === 'paralyze') return "使對手麻痺（25% 無法行動 & 速度減半）";
       if (move.status === 'atk-down') return "降低對手攻擊力 15%";
       if (move.status === 'def-up') return "強化自身防禦力 +30%";
-      if (move.name === '瞬間移動') return "強制替換另一隻寶可夢出戰（野生凱西有 50% 機率使用並脫離戰鬥）";
+      if (move.name === '瞬間移動') return "";
       if (move.status === 'eva-up') return "提升自身閃避率 +35%";
+      if (move.status === 'leech-seed' || move.name === '寄生種子') return "持續吸血：每回合結束時，陷入寄生種子狀態的對手會損失最大 HP 的 1/8 並回復自身";
       if (move.status === 'heal') return "立即恢復自身 45% 最大 HP";
       if (move.name === '潛水') return "第 1 回合潛入水中閃避攻擊，第 2 回合現身造成高傷害";
-      if (['吸取', '超級吸取', '終極吸取', '吸血', '吸取之吻', '樹汁吸收'].includes(move.name)) {
-        return "造成傷害並吸取 50% 傷害回復自身 HP";
+      if (['吸取', '超級吸取', '終極吸取', '吸血', '吸取之吻'].includes(move.name)) {
+        return "攻擊命中後，使用者會回復相當於給予對手傷害 50% 的 HP";
       }
       if (move.name === '蹭蹭臉頰') return "造成傷害並 100% 使對手麻痺";
       if (move.type === 'electric' || move.name === '泰山壓頂' || move.name === '龍息' || move.name === '龍之氣息') {
@@ -6169,7 +6189,7 @@
       let canEvolve = false;
       let targetStageName = '';
       if (activePoke && !teacherEternalPiplup) {
-        const level = getNominalLevel(activePoke); // 進化跟著帳面等級走，進化後由 confirmedStage 鎖定不退化
+        const level = getActualLevel(activePoke); // 進化依實際等級判斷，進化後由 confirmedStage 鎖定不退化
         const confirmedStage = activePoke.confirmedStage || 0;
         const targetStage = confirmedStage + 1;
         const familyArr = POKEMON_DATA[activePoke.family];
@@ -6224,9 +6244,14 @@
       } else {
         // Show Pokemon View
         const pokemon = getCurrentPokemon(activePoke, student);
-        const level = Math.floor(activePoke.points / 10);
-        const currentStagePoints = activePoke.points % 10;
-        const progressPercent = (currentStagePoints / 10) * 100;
+        const level = getActualLevel(activePoke);
+        const bookPoints = getActualPoints(activePoke);
+        const realPoints = activePoke.points || 0;
+        const isBehindBook = realPoints < bookPoints;
+        const currentStagePoints = isBehindBook ? 0 : (realPoints % 10);
+        const progressPercent = isBehindBook
+          ? Math.max(0, Math.min(100, (realPoints / Math.max(1, bookPoints)) * 100))
+          : (currentStagePoints / 10) * 100;
         const scaledStats = getPokemonScaledStats(activePoke, student);
         
         const famArr = POKEMON_DATA[activePoke.family];
@@ -6238,15 +6263,15 @@
         } else if (famArr && famArr.length === 1) {
           const rarityLabel = LEGENDARY_FAMILIES.has(activePoke.family) ? '傳說／幻之寶可夢（無進化階段）' : '無進化階段';
           nextEvolutionText = level < 30
-            ? `${rarityLabel} · 距離滿級 (30等) 還有 ${300 - activePoke.points} 分`
+            ? `${rarityLabel} · 距離滿級 (30等) 還有 ${Math.max(0, 300 - realPoints)} 分`
             : `${rarityLabel} · 已達滿級 (30等)`;
         } else if (level < 10) {
-          nextEvolutionText = `距離進化成 ${getStageDisplayName(famArr, 1, activePoke)} 還有 ${100 - activePoke.points} 分`;
+          nextEvolutionText = `距離進化成 ${getStageDisplayName(famArr, 1, activePoke)} 還有 ${Math.max(0, 100 - realPoints)} 分`;
         } else if (level < 20) {
-          nextEvolutionText = `距離進化成 ${getStageDisplayName(famArr, 2, activePoke)} 還有 ${200 - activePoke.points} 分`;
+          nextEvolutionText = `距離進化成 ${getStageDisplayName(famArr, 2, activePoke)} 還有 ${Math.max(0, 200 - realPoints)} 分`;
         } else {
           if (level < 30) {
-            nextEvolutionText = `已經達到最終進化階段！距離滿級 (30等) 還有 ${300 - activePoke.points} 分`;
+            nextEvolutionText = `已經達到最終進化階段！距離滿級 (30等) 還有 ${Math.max(0, 300 - realPoints)} 分`;
           } else {
             nextEvolutionText = '已經達到最終進化階段！已達滿級 (30等)';
           }
@@ -6272,7 +6297,7 @@
           <div class="stamp-card-section" style="margin-bottom: 25px;">
             <div class="stamp-card-title">
               <i class="fa-solid fa-circle-check" style="color: #ef4444;"></i> 
-              升級集點卡 (目前進度: ${currentStagePoints} / 10)
+              ${isBehindBook ? `升級集點卡 (實際分數 ${realPoints} / 帳面 ${bookPoints} · 超過後繼續升級)` : `升級集點卡 (目前進度: ${currentStagePoints} / 10)`}
             </div>
             <div class="stamp-grid">
               ${stampGridHTML}
@@ -6307,7 +6332,9 @@
             <div class="pokemon-types-row" style="display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 6px 0 8px 0;">
               ${getPokemonTypeBadges(pokemon.types, 'md')}
             </div>
-            <div class="points-info">目前分數：${activePoke.points} / 300 分 (Lv. ${level})</div>
+            ${isBehindBook
+              ? `<div class="points-info">帳面分數：${bookPoints} / 300 分 (Lv. ${level}) ｜ 實際分數：${realPoints} 分<div style="font-size: 0.78rem; color: #b45309; font-weight: 700; margin-top: 3px;">實際分數超過 ${bookPoints} 分時，才會繼續升級！</div></div>`
+              : `<div class="points-info">目前分數：${realPoints} / 300 分 (Lv. ${level})</div>`}
             ${(student.masterBalls || 0) > 0 ? `
               <div class="master-ball-bag-badge" style="margin-top: 8px; display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, rgba(147, 51, 234, 0.16) 0%, rgba(107, 33, 168, 0.22) 100%); border: 1.5px solid rgba(168, 85, 247, 0.55); color: #6b21a8; padding: 4px 12px; border-radius: 999px; font-size: 0.82rem; font-weight: 800; box-shadow: 0 2px 6px rgba(147,51,234,0.18);">
                 <img src="${MASTER_BALL_IMG}" alt="大師球" style="width: 20px; height: 20px; object-fit: contain; image-rendering: pixelated;">
@@ -6333,7 +6360,7 @@
             
             <div class="progress-container">
               <div class="progress-bar" style="width: ${progressPercent}%;"></div>
-              <div class="progress-text">${currentStagePoints} / 10 (下個等級)</div>
+              <div class="progress-text">${isBehindBook ? `實際 ${realPoints} / 帳面 ${bookPoints}（超過後升級）` : `${currentStagePoints} / 10 (下個等級)`}</div>
             </div>
             
             <div style="font-size: 0.9rem; color: #94a3b8; font-weight: 600; margin-top: 5px; margin-bottom: 15px;">
@@ -6397,7 +6424,7 @@
       let gridItems = '';
       pokes.forEach((p, index) => {
         const currentPoke = getCurrentPokemon(p);
-        const level = Math.floor(p.points / 10);
+        const level = getActualLevel(p);
         const isActive = index === activeIndex;
         
         const activeBadge = isActive 
@@ -7149,7 +7176,7 @@
       const arena = document.getElementById('battle-arena-card');
       if (arena) {
         arena.style.transform = '';
-        arena.querySelectorAll('.effect-particle, .confusion-ducks-orbit, .switch-vfx-layer, .switch-backdrop-dim, .switch-speed-rays, svg').forEach(el => el.remove());
+        arena.querySelectorAll('.effect-particle, .confusion-ducks-orbit, .switch-vfx-layer, .switch-backdrop-dim, .switch-speed-rays, .leer-eyes-vfx, svg').forEach(el => el.remove());
         arena.style.display = 'none';
       }
       const flashOverlay = document.getElementById('battle-flash-overlay');
@@ -7275,7 +7302,7 @@
 
       if (active1) {
         const pokeData = getCurrentPokemon(active1);
-        const level = Math.floor(active1.points / 10);
+        const level = getActualLevel(active1);
         lobbyPokeP1.innerHTML = `
           <img src="${pokeData.url}" style="width: 70px; height: 70px; object-fit: contain;">
           <div>${pokeData.name} (Lv.${level})</div>
@@ -7287,7 +7314,7 @@
 
       if (active2) {
         const pokeData = getCurrentPokemon(active2);
-        const level = Math.floor(active2.points / 10);
+        const level = getActualLevel(active2);
         lobbyPokeP2.innerHTML = `
           <img src="${pokeData.url}" style="width: 70px; height: 70px; object-fit: contain;">
           <div>${pokeData.name} (Lv.${level})</div>
@@ -7520,10 +7547,10 @@
       const idx2 = (s2.activePokemonIndex !== undefined && s2.activePokemonIndex >= 0 && s2.activePokemonIndex < s2.pokemons.length) ? s2.activePokemonIndex : (s2.pokemons.length - 1);
       const active1 = s1.pokemons[idx1];
       const active2 = s2.pokemons[idx2];
-      const displayLv1 = getNominalLevel(active1);
-      const displayLv2 = getNominalLevel(active2);
       const lv1 = getActualLevel(active1);
       const lv2 = getActualLevel(active2);
+      const displayLv1 = lv1;
+      const displayLv2 = lv2;
 
       // Fetch movesets from active pokemons or load defaults
       const p1Moves = active1.moves || initializeDefaultMoves(active1);
@@ -7578,6 +7605,7 @@
         diving: false,
         divingMove: null,
         poisoned: false,
+        leechSeeded: false,
         paralyzed: false,
         moves: p1Moves,
         movePP: p1MovePP
@@ -7609,6 +7637,7 @@
         diving: false,
         divingMove: null,
         poisoned: false,
+        leechSeeded: false,
         paralyzed: false,
         moves: p2Moves
       };
@@ -7646,6 +7675,14 @@
         battleState.currentTurn = speed1 >= speed2 ? 'p1' : 'p2';
         startTurn();
       });
+    }
+
+    // 瞬間移動成功率：依對手速度降低發動成功率（對手速度越快越容易阻止瞬間移動）
+    function getTeleportSuccessRate(userFighter, foeFighter) {
+      const userSpd = Math.max(1, getFighterSpeed(userFighter) || 50);
+      const foeSpd = Math.max(1, getFighterSpeed(foeFighter) || 50);
+      const rate = 0.85 - (foeSpd / (userSpd + foeSpd)) * 0.70;
+      return Math.max(0.15, Math.min(0.90, rate));
     }
 
     function getFighterSpeed(fighter) {
@@ -7744,8 +7781,8 @@
       if (!poke) return null;
       const saved = battleState.partyState && battleState.partyState[side] ? battleState.partyState[side][idx] : null;
       const details = getCurrentPokemon(poke, studentObj);
-      const displayLv = getNominalLevel(poke);
       const actualLv = getActualLevel(poke);
+      const displayLv = actualLv;
       const scale = 1 + (actualLv / 30);
       const hpScale = 1 + (actualLv / 30) * 1.3;
       const maxHp = saved ? saved.maxHp : Math.floor(details.hp * hpScale);
@@ -7859,6 +7896,7 @@
         diving: false,
         divingMove: null,
         poisoned: false,
+        leechSeeded: false,
         paralyzed: false,
         moves,
         movePP
@@ -8455,12 +8493,40 @@
               } else if (resolvedMove.status === 'def-up') {
                 attacker.defMod *= 1.3;
                 queueLog(`${attacker.name}的${attacker.pokeDetails.name} 防禦力提升了！`, () => endTurn());
+              } else if (resolvedMove.status === 'leech-seed' || resolvedMove.name === '寄生種子') {
+                if (defender.leechSeeded) {
+                  queueLog(`🌱 ${defender.name}的${defender.pokeDetails.name} 已經陷入寄生種子狀態了！`, () => endTurn());
+                } else {
+                  defender.leechSeeded = true;
+                  updateBattleUI();
+                  queueLog(`🌱 ${defender.name}的${defender.pokeDetails.name} 被種下了寄生種子！（每回合損失最大 HP 的 1/8）`, () => endTurn());
+                }
               } else if (resolvedMove.name === '瞬間移動' && battleState.isWild && attackerSide === 'p2' && attacker.family === 'abra') {
-                queueLog(`🌀 野生的${attacker.pokeDetails.name} 透過瞬間移動從戰場上消失，離開了戰鬥！`, () => {
-                  if (battleState.sessionId !== mySession || !battleState.active) return;
-                  endWildBattle(false, true);
-                });
+                const escapeRate = getTeleportSuccessRate(attacker, defender);
+                const pct = Math.round(escapeRate * 100);
+                if (Math.random() < escapeRate) {
+                  const p2Img = document.getElementById('battle-img-p2');
+                  if (p2Img) {
+                    p2Img.style.transition = 'transform 0.25s, opacity 0.25s';
+                    p2Img.style.transform = 'scale(0) rotate(180deg)';
+                    p2Img.style.opacity = '0';
+                  }
+                  queueLog(`🌀 野生的${attacker.pokeDetails.name} 透過瞬間移動從戰場上消失，離開了戰鬥！（成功率 ${pct}%）`, () => {
+                    if (battleState.sessionId !== mySession || !battleState.active) return;
+                    endWildBattle(false, true);
+                  });
+                } else {
+                  queueLog(`⚡ 受 ${defender.name}的${defender.pokeDetails.name} 高速度壓制，野生的${attacker.pokeDetails.name} 瞬間移動失敗了！（成功率 ${pct}%）`, () => endTurn());
+                }
               } else if (resolvedMove.name === '瞬間移動') {
+                if (battleState.isWild) {
+                  const switchRate = getTeleportSuccessRate(attacker, defender);
+                  const pct = Math.round(switchRate * 100);
+                  if (Math.random() >= switchRate) {
+                    queueLog(`⚡ 受野生${defender.pokeDetails.name}高速度壓制，${attacker.pokeDetails.name} 瞬間移動發動失敗！（成功率 ${pct}%）`, () => endTurn());
+                    return;
+                  }
+                }
                 const switchCands = getAvailableSwitchCandidates(attackerSide);
                 if (switchCands.length > 0) {
                   promptForcedSwitch(attackerSide, (chosenIdx) => {
@@ -8476,8 +8542,7 @@
                     });
                   });
                 } else {
-                  attacker.evaMod = (attacker.evaMod || 1.0) * 1.35;
-                  queueLog(`✨ ${attacker.name}的${attacker.pokeDetails.name} 使用${resolvedMove.name}（隊伍中無其他可替換寶可夢，閃避率提升了！）`, () => endTurn());
+                  queueLog(`✨ ${attacker.name}的${attacker.pokeDetails.name} 使用了 瞬間移動，但隊伍中沒有其他可替換的寶可夢！`, () => endTurn());
                 }
               } else if (resolvedMove.status === 'eva-up') {
                 attacker.evaMod = (attacker.evaMod || 1.0) * 1.35;
@@ -8542,6 +8607,7 @@
           const perHitPower = totalHits > 1 ? Math.max(8, Math.ceil((resolvedMove.power || 20) / totalHits)) : (resolvedMove.power || 10);
           const animMove = Object.assign({}, resolvedMove, { _hitNum: hitIndex + 1, _totalHits: totalHits });
 
+          battleState._activeMoveName = resolvedMove.name;
           battleState._activeVfxTheme = SWITCH_TYPE_THEME[resolvedMove.type] || SWITCH_TYPE_THEME.normal;
           animateAttack(attackerSide, defenderSide, () => {
             if (battleState.sessionId !== mySession || !battleState.active) return;
@@ -8565,7 +8631,7 @@
               defender.hp = Math.max(0, defender.hp - damage);
               hitDamages.push(damage);
 
-              const isDrainMove = ['吸取', '超級吸取', '終極吸取', '吸血', '吸取之吻', '樹汁吸收', '寄生種子'].includes(resolvedMove.name);
+              const isDrainMove = ['吸取', '超級吸取', '終極吸取', '吸血', '吸取之吻'].includes(resolvedMove.name);
               if (isDrainMove) {
                 const drain = Math.max(1, Math.floor(damage * 0.5));
                 totalDrainAmt += drain;
@@ -8698,7 +8764,7 @@
       const dirX = attackerSide === 'p1' ? 32 : -32;
       const dirY = attackerSide === 'p1' ? -18 : 18;
 
-      if (arena && attackerImg && attackerImg.src) {
+      if (arena && attackerImg && attackerImg.src && !(battleState && battleState._activeMoveName === '地震')) {
         const aRect = arena.getBoundingClientRect();
         const iRect = attackerImg.getBoundingClientRect();
         if (aRect.width > 0 && iRect.width > 0) {
@@ -9222,10 +9288,10 @@
       normal:   { core: '#ffffff', mid: '#fde047', dark: '#94a3b8', dimBg: 'radial-gradient(ellipse at 52% 45%, rgba(15,23,42,0.08) 15%, rgba(30,41,59,0.42) 68%, rgba(2,6,23,0.62) 100%)' }
     };
 
-    const SWITCH_LEGENDARY_SET = new Set(['時光咆哮','亞空裂斬','暗影潛襲','暗黑洞','新月舞','熔岩風暴','捏碎','種子閃光','制裁光礫','精神突進','破壞光線','終極衝擊','爆炸烈焰','加農水砲','瘋狂植物','流星群','閃焰衝鋒','打雷','大字爆炎','暴風雪','水炮','地震','逆鱗','日光束','近身戰']);
+    const SWITCH_LEGENDARY_SET = new Set(['時光咆哮','亞空裂斬','暗影潛襲','暗黑洞','新月舞','熔岩風暴','捏碎','種子閃光','制裁光礫','精神突進','破壞光線','終極衝擊','爆炸烈焰','加農水砲','瘋狂植物','流星群','閃焰衝鋒','打雷','大字爆炎','暴風雪','水炮','逆鱗','日光束','近身戰']);
     const SWITCH_BITE_SET = new Set(['咬住','咬碎','火焰牙','雷電牙','冰凍牙','吸取牙','劇毒牙']);
     const SWITCH_SLASH_SET = new Set(['抓','亂抓','劈開','居合斬','金屬爪','暗影爪','影子偷襲','龍爪','葉刃','飛葉快刀','燕返','空氣斬','鋼翼','啄','尖嘴鑽','烈暴風','亞空裂斬','電光一閃','神速','試刀','交叉毒刃','毒針','雙針','十字剪','修長之角']);
-    const SWITCH_PILLAR_SET = new Set(['潛水','攀瀑','地震','大地之力','噴煙','熔岩風暴','打草結','暴風','龍捲風','起風','衝浪','濁流','潮旋','暴風雪','十萬伏特','打雷','落石','岩崩','尖石攻擊']);
+    const SWITCH_PILLAR_SET = new Set(['潛水','攀瀑','大地之力','噴煙','熔岩風暴','打草結','暴風','龍捲風','起風','衝浪','濁流','潮旋','暴風雪','十萬伏特','打雷','落石','岩崩','尖石攻擊']);
     const SWITCH_BEAM_SET = new Set(['火花','噴射火焰','大字爆炎','過熱','熱風','水槍','水炮','泡沫光線','水之波動','加農水砲','急凍光線','冰凍光束','冰凍之風','高速星星','破壞光線','日光束','能源球','種子炸彈','暗影球','波導彈','加農光炮','精神強念','幻象光線','惡之波動','龍之波動','龍之怒','時光咆哮','魔法閃耀','月亮之力','吸取之吻','放電','電擊','電磁炮','淤泥波','污泥炸彈','泥巴射擊','瘋狂植物','爆炸烈焰','真氣彈','精神噪音','制裁光礫']);
 
     function createSwitchSvgEl(tag, attrs = {}) {
@@ -9381,6 +9447,7 @@
       const arena = document.getElementById('battle-arena-card');
       if (!arena || !arenaRect || arenaRect.width <= 0) return;
       const name = move.name || '';
+      if (name === '地震') return;
       const mType = move.type === 'status' ? 'psychic' : (move.type || 'normal');
       const theme = SWITCH_TYPE_THEME[mType] || SWITCH_TYPE_THEME.normal;
       battleState._activeVfxTheme = theme;
@@ -9764,11 +9831,8 @@
           });
         }
         setTimeout(() => {
-          const stayVanished = battleState.isWild && attackerSide === 'p2' && battleState.p2 && battleState.p2.family === 'abra';
-          if (!stayVanished) {
-            attackerImg.style.transform = 'scale(1) rotate(0deg)';
-            attackerImg.style.opacity = '1';
-          }
+          attackerImg.style.transform = 'scale(1) rotate(0deg)';
+          attackerImg.style.opacity = '1';
           callback();
         }, 550);
       }
@@ -9796,37 +9860,122 @@
         setTimeout(callback, delay + 450);
       }
       else if (name === '瞪眼' || name === '黑色目光' || name === '鬼面') {
-        // Intimidating glowing eyes in the dark with glare rays
-        const eyeL = document.createElement('div');
-        const eyeR = document.createElement('div');
-        const eyeColor = name === '黑色目光' ? '#a855f7' : (name === '鬼面' ? '#ef4444' : '#eab308');
-        [eyeL, eyeR].forEach((eye, idx) => {
-          eye.style.position = 'absolute';
-          eye.style.left = `${endX + (idx === 0 ? -25 : 25)}px`;
-          eye.style.top = `${endY - 20}px`;
-          eye.style.width = '18px';
-          eye.style.height = '10px';
-          eye.style.background = eyeColor;
-          eye.style.boxShadow = `0 0 15px ${eyeColor}, 0 0 25px white`;
-          eye.style.borderRadius = '50%';
-          eye.style.transform = `translate(-50%, -50%) rotate(${idx === 0 ? -15 : 15}deg) scale(0)`;
-          eye.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-          eye.style.zIndex = '46';
-          arena.appendChild(eye);
+        // Glaring anime pair of eyes locking onto the opponent
+        const irisMain = name === '黑色目光' ? '#a855f7' : (name === '鬼面' ? '#ef4444' : '#facc15');
+        const irisGlow = name === '黑色目光' ? '#d8b4fe' : (name === '鬼面' ? '#fca5a5' : '#ef4444');
+        const eyesX = startX * 0.42 + endX * 0.58;
+        const eyesY = Math.max(44, startY * 0.42 + endY * 0.58 - 22);
+        const dx = endX - eyesX;
+        const dy = endY - eyesY;
+        const dist = Math.hypot(dx, dy) || 1;
+        const lookX = (dx / dist) * 4.5;
+        const lookY = (dy / dist) * 2.5;
+
+        const wrap = document.createElement('div');
+        wrap.className = 'leer-eyes-vfx';
+        wrap.style.position = 'absolute';
+        wrap.style.left = `${eyesX}px`;
+        wrap.style.top = `${eyesY}px`;
+        wrap.style.width = '148px';
+        wrap.style.height = '66px';
+        wrap.style.pointerEvents = 'none';
+        wrap.style.zIndex = '48';
+        wrap.style.display = 'flex';
+        wrap.style.alignItems = 'center';
+        wrap.style.justifyContent = 'center';
+        wrap.style.background = 'radial-gradient(ellipse at center, rgba(15, 23, 42, 0.84) 0%, rgba(15, 23, 42, 0.45) 55%, rgba(15, 23, 42, 0) 76%)';
+        wrap.style.borderRadius = '50%';
+        wrap.style.transform = 'translate(-50%, -50%) scale(0.75) scaleY(0.15)';
+        wrap.style.opacity = '0';
+        wrap.style.transition = 'transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.14s ease-out';
+
+        wrap.innerHTML = `<svg viewBox="0 0 148 66" width="148" height="66" xmlns="http://www.w3.org/2000/svg" style="overflow:visible;filter:drop-shadow(0 0 10px ${irisGlow});">
+          <defs>
+            <clipPath id="leer-eye-l"><path d="M12,24 Q38,20 64,34 Q42,50 16,40 Z"/></clipPath>
+            <clipPath id="leer-eye-r"><path d="M136,24 Q110,20 84,34 Q106,50 132,40 Z"/></clipPath>
+          </defs>
+          <!-- Left glaring eye -->
+          <path d="M12,24 Q38,20 64,34 Q42,50 16,40 Z" fill="#ffffff" stroke="#0f172a" stroke-width="2.6" stroke-linejoin="round"/>
+          <g clip-path="url(#leer-eye-l)">
+            <circle cx="${39 + lookX}" cy="${33 + lookY}" r="11" fill="${irisMain}" stroke="${irisGlow}" stroke-width="2"/>
+            <ellipse class="leer-eye-pupil" cx="${39 + lookX * 1.15}" cy="${33 + lookY * 1.15}" rx="3.4" ry="8.5" fill="#0f172a"/>
+            <circle cx="${35 + lookX}" cy="${29 + lookY}" r="2.6" fill="#ffffff"/>
+          </g>
+          <path d="M8,19 Q38,16 67,31" fill="none" stroke="#0f172a" stroke-width="4.5" stroke-linecap="round"/>
+          <path d="M10,21 Q38,18 65,32" fill="none" stroke="${irisMain}" stroke-width="1.6" stroke-linecap="round" opacity="0.85"/>
+          <!-- Right glaring eye -->
+          <path d="M136,24 Q110,20 84,34 Q106,50 132,40 Z" fill="#ffffff" stroke="#0f172a" stroke-width="2.6" stroke-linejoin="round"/>
+          <g clip-path="url(#leer-eye-r)">
+            <circle cx="${109 + lookX}" cy="${33 + lookY}" r="11" fill="${irisMain}" stroke="${irisGlow}" stroke-width="2"/>
+            <ellipse class="leer-eye-pupil" cx="${109 + lookX * 1.15}" cy="${33 + lookY * 1.15}" rx="3.4" ry="8.5" fill="#0f172a"/>
+            <circle cx="${105 + lookX}" cy="${29 + lookY}" r="2.6" fill="#ffffff"/>
+          </g>
+          <path d="M140,19 Q110,16 81,31" fill="none" stroke="#0f172a" stroke-width="4.5" stroke-linecap="round"/>
+          <path d="M138,21 Q110,18 83,32" fill="none" stroke="${irisMain}" stroke-width="1.6" stroke-linecap="round" opacity="0.85"/>
+        </svg>`;
+        arena.appendChild(wrap);
+
+        // Twin glare gaze streaks toward defender (solid luminous beam, no dashed line)
+        const beamCoords = [
+          { sx: eyesX - 28, sy: eyesY + 2 },
+          { sx: eyesX + 28, sy: eyesY + 2 }
+        ];
+        const beams = beamCoords.map(bc => {
+          const bLen = Math.hypot(endX - bc.sx, endY - bc.sy);
+          const bAng = Math.atan2(endY - bc.sy, endX - bc.sx) * (180 / Math.PI);
+          const beam = document.createElement('div');
+          beam.className = 'leer-eyes-vfx leer-gaze-beam';
+          beam.style.position = 'absolute';
+          beam.style.left = `${bc.sx}px`;
+          beam.style.top = `${bc.sy}px`;
+          beam.style.width = `${bLen}px`;
+          beam.style.height = '8px';
+          beam.style.transformOrigin = '0 50%';
+          beam.style.transform = `translateY(-50%) rotate(${bAng}deg) scaleX(0)`;
+          beam.style.background = `linear-gradient(90deg, ${irisMain} 0%, ${irisGlow} 55%, rgba(255,255,255,0.92) 100%)`;
+          beam.style.boxShadow = `0 0 12px ${irisGlow}`;
+          beam.style.borderRadius = '999px';
+          beam.style.opacity = '0';
+          beam.style.pointerEvents = 'none';
+          beam.style.zIndex = '47';
+          beam.style.transition = 'transform 0.2s ease-out, opacity 0.16s ease-out';
+          arena.appendChild(beam);
+          return beam;
         });
 
         requestAnimationFrame(() => {
-          eyeL.style.transform = 'translate(-50%, -50%) rotate(-15deg) scale(1.4)';
-          eyeR.style.transform = 'translate(-50%, -50%) rotate(15deg) scale(1.4)';
+          wrap.style.opacity = '1';
+          wrap.style.transform = 'translate(-50%, -50%) scale(1.08) scaleY(1.04)';
         });
 
         setTimeout(() => {
+          wrap.style.transform = 'translate(-50%, -50%) scale(1.14) scaleY(0.84)';
+          beams.forEach(b => {
+            b.style.opacity = '0.88';
+            b.style.transform = b.style.transform.replace('scaleX(0)', 'scaleX(1)');
+          });
+        }, 160);
+
+        setTimeout(() => {
           flashDefender(defenderSide);
-          eyeL.style.opacity = '0';
-          eyeR.style.opacity = '0';
-          setTimeout(() => { eyeL.remove(); eyeR.remove(); }, 200);
-          callback();
-        }, 550);
+          if (defenderImg) {
+            defenderImg.style.transition = 'transform 0.08s ease-in-out';
+            defenderImg.style.transform = 'translateX(6px)';
+            setTimeout(() => { defenderImg.style.transform = 'translateX(-6px)'; }, 80);
+            setTimeout(() => { defenderImg.style.transform = ''; }, 160);
+          }
+          beams.forEach(b => { b.style.opacity = '0'; });
+        }, 360);
+
+        setTimeout(() => {
+          wrap.style.opacity = '0';
+          wrap.style.transform = 'translate(-50%, -50%) scale(0.95) scaleY(0.2)';
+          setTimeout(() => {
+            wrap.remove();
+            beams.forEach(b => b.remove());
+            callback();
+          }, 180);
+        }, 560);
       }
       else if (name === '折彎湯匙') {
         // Bending spoon psychic distortion wave
@@ -10788,7 +10937,7 @@
         setTimeout(() => flashDefender(defenderSide), 450);
         setTimeout(callback, 800);
       }
-      else if (name === '吸取' || name === '超級吸取' || name === '樹汁吸收' || name === '寄生種子') {
+      else if (name === '吸取' || name === '超級吸取' || name === '寄生種子') {
         let delay = 0;
         for (let i = 0; i < 16; i++) {
           setTimeout(() => {
@@ -11607,17 +11756,29 @@
       // 10. GROUND MOVES
       // ----------------------------------------------------
       else if (name === '地震' || name === '震級') {
-        arena.style.transition = 'transform 0.05s';
+        // Screen shake ONLY (no particles, pillars, or rings popping out)
+        arena.style.transition = 'transform 0.04s';
         let shakeCount = 0;
         const shakeInterval = setInterval(() => {
-          const offsetX = (Math.random() * 18 - 9);
-          const offsetY = (Math.random() * 18 - 9);
+          const offsetX = (Math.random() * 24 - 12);
+          const offsetY = (Math.random() * 20 - 10);
           arena.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
           shakeCount++;
-          if (shakeCount >= 10) {
+          if (shakeCount >= 12) {
             clearInterval(shakeInterval);
-            arena.style.transform = 'translate(0, 0)';
-            flashDefender(defenderSide);
+            arena.style.transform = '';
+            if (name === '地震') {
+              if (defenderImg) {
+                let fc = 0;
+                const fi = setInterval(() => {
+                  defenderImg.style.opacity = fc % 2 === 0 ? '0.3' : '1';
+                  fc++;
+                  if (fc >= 6) { clearInterval(fi); defenderImg.style.opacity = '1'; }
+                }, 45);
+              }
+            } else {
+              flashDefender(defenderSide);
+            }
             callback();
           }
         }, 45);
@@ -13258,7 +13419,7 @@
         }, 150);
       }
       else if (!move._fallbackTried && status && status !== 'none') {
-        const statusMap = { sleep: '催眠術', heal: '光合作用', 'eva-up': '瞬間移動', 'atk-down': '叫聲', 'def-up': '縮入殼中', confuse: '奇異光線' };
+        const statusMap = { sleep: '催眠術', heal: '光合作用', 'leech-seed': '寄生種子', 'eva-up': '瞬間移動', 'atk-down': '叫聲', 'def-up': '縮入殼中', confuse: '奇異光線' };
         const targetName = statusMap[status];
         if (targetName) return playMoveEffect(Object.assign({}, move, { name: targetName, _fallbackTried: true }), attackerSide, defenderSide, callback);
         flashDefender(defenderSide);
@@ -13381,25 +13542,83 @@
     }
 
     function endTurn() {
-      // Check if current active pokemon is poisoned at the end of their turn
-      const activeFighter = battleState[battleState.currentTurn];
-      if (activeFighter.poisoned && activeFighter.hp > 0) {
+      const mySession = battleState.sessionId;
+      const activeSide = battleState.currentTurn;
+      const otherSide = activeSide === 'p1' ? 'p2' : 'p1';
+      const activeFighter = battleState[activeSide];
+      const otherFighter = battleState[otherSide];
+
+      const runLeechSeedStep = () => {
+        if (battleState.sessionId !== mySession || !battleState.active) return;
+        if (activeFighter && activeFighter.leechSeeded && activeFighter.hp > 0) {
+          const drainAmt = Math.min(activeFighter.hp, Math.max(1, Math.floor(activeFighter.maxHp / 8)));
+          activeFighter.hp = Math.max(0, activeFighter.hp - drainAmt);
+          if (otherFighter && otherFighter.hp > 0) {
+            otherFighter.hp = Math.min(otherFighter.maxHp, otherFighter.hp + drainAmt);
+          }
+          const arena = document.getElementById('battle-arena-card');
+          const imgA = document.getElementById(activeSide === 'p1' ? 'battle-img-p1' : 'battle-img-p2');
+          const imgB = document.getElementById(otherSide === 'p1' ? 'battle-img-p1' : 'battle-img-p2');
+          if (arena && imgA && imgB) {
+            const aRect = arena.getBoundingClientRect();
+            if (aRect.width > 0) {
+              const ptA = getSpriteVisualCenter(imgA, activeSide === 'p1', activeFighter.pokeDetails?.id, aRect);
+              const ptB = getSpriteVisualCenter(imgB, otherSide === 'p1', otherFighter?.pokeDetails?.id, aRect);
+              for (let k = 0; k < 10; k++) {
+                setTimeout(() => {
+                  if (battleState.sessionId !== mySession || !battleState.active) return;
+                  createParticle({
+                    x: ptA.x + (Math.random() * 20 - 10),
+                    y: ptA.y + (Math.random() * 20 - 10),
+                    vx: (ptB.x - ptA.x) / 16,
+                    vy: (ptB.y - ptA.y) / 16,
+                    color: '#4ade80',
+                    size: 10,
+                    duration: 380,
+                    glow: true,
+                    fade: true
+                  });
+                }, k * 25);
+              }
+            }
+          }
+          updateBattleUI();
+          const healNote = (otherFighter && otherFighter.hp > 0) ? `，並為 ${otherFighter.name}的${otherFighter.pokeDetails.name} 回復 HP` : '';
+          queueLog(`🌱 寄生種子吸取了 ${activeFighter.name}的${activeFighter.pokeDetails.name} ${drainAmt} 點體力${healNote}！`, () => {
+            if (battleState.sessionId !== mySession || !battleState.active) return;
+            if (activeFighter.hp <= 0) {
+              animateFaint(activeSide, () => {
+                if (battleState.sessionId !== mySession) return;
+                const winner = activeSide === 'p1' ? battleState.p2.name : battleState.p1.name;
+                handleBattleFainted(activeSide, winner);
+              });
+            } else {
+              proceedTurnTransition();
+            }
+          });
+        } else {
+          proceedTurnTransition();
+        }
+      };
+
+      if (activeFighter && activeFighter.poisoned && activeFighter.hp > 0) {
         const poisonDmg = Math.max(4, Math.floor(activeFighter.maxHp * 0.08));
         activeFighter.hp = Math.max(0, activeFighter.hp - poisonDmg);
         updateBattleUI();
-        
         queueLog(`☠️ ${activeFighter.name}的${activeFighter.pokeDetails.name} 受到 ${poisonDmg} 點中毒傷害！`, () => {
+          if (battleState.sessionId !== mySession || !battleState.active) return;
           if (activeFighter.hp <= 0) {
-            animateFaint(battleState.currentTurn, () => {
-              const winner = battleState.currentTurn === 'p1' ? battleState.p2.name : battleState.p1.name;
-              handleBattleFainted(battleState.currentTurn, winner);
+            animateFaint(activeSide, () => {
+              if (battleState.sessionId !== mySession) return;
+              const winner = activeSide === 'p1' ? battleState.p2.name : battleState.p1.name;
+              handleBattleFainted(activeSide, winner);
             });
           } else {
-            proceedTurnTransition();
+            runLeechSeedStep();
           }
         });
       } else {
-        proceedTurnTransition();
+        runLeechSeedStep();
       }
     }
 
@@ -13446,6 +13665,7 @@
         if (fighter.confused) html += ' <span style="background: #ec4899; color: white; font-size: 0.75rem; padding: 1px 5px; border-radius: 3px; font-weight: bold; margin-left: 4px;">亂</span>';
         if (fighter.diving) html += ' <span style="background: #0284c7; color: white; font-size: 0.75rem; padding: 1px 5px; border-radius: 3px; font-weight: bold; margin-left: 4px;">潛</span>';
         if (fighter.poisoned) html += ' <span style="background: #a855f7; color: white; font-size: 0.75rem; padding: 1px 5px; border-radius: 3px; font-weight: bold; margin-left: 4px;">毒</span>';
+        if (fighter.leechSeeded) html += ' <span style="background: #16a34a; color: white; font-size: 0.75rem; padding: 1px 5px; border-radius: 3px; font-weight: bold; margin-left: 4px;">種</span>';
         if (fighter.burned) html += ' <span style="background: #ef4444; color: white; font-size: 0.75rem; padding: 1px 5px; border-radius: 3px; font-weight: bold; margin-left: 4px;">燒</span>';
         if (fighter.frozen) html += ' <span style="background: #06b6d4; color: white; font-size: 0.75rem; padding: 1px 5px; border-radius: 3px; font-weight: bold; margin-left: 4px;">冰</span>';
         if (fighter.paralyzed) html += ' <span style="background: #eab308; color: #1e293b; font-size: 0.75rem; padding: 1px 5px; border-radius: 3px; font-weight: bold; margin-left: 4px;">麻</span>';
@@ -13490,9 +13710,8 @@
         }
       } else {
         if (student && student.isTeacher && activePoke) {
-          const p1Level = Math.floor((activePoke.points || 0) / 10);
-          const p2Points = (battleState.p2 && battleState.p2.activePoke) ? (battleState.p2.activePoke.points || 0) : 0;
-          const p2Level = Math.floor(p2Points / 10);
+          const p1Level = getActualLevel(activePoke);
+          const p2Level = (battleState.p2 && battleState.p2.activePoke) ? getActualLevel(battleState.p2.activePoke) : (battleState.p2 ? battleState.p2.level : 0);
 
           let addPts = 0;
           if (p2Level > p1Level) {
@@ -13756,8 +13975,8 @@
       if (!activePoke) return;
 
       const p1Details = getCurrentPokemon(activePoke, student);
-      const displayLv1 = getNominalLevel(activePoke);
       const lv1 = getActualLevel(activePoke);
+      const displayLv1 = lv1;
 
       const wildPoke = pickRandomWildPokemon(lv1);
       const isWildLegendary = !!(wildPoke && (wildPoke.isLegendary || LEGENDARY_FAMILIES.has(wildPoke.family)));
@@ -13811,6 +14030,7 @@
         diving: false,
         divingMove: null,
         poisoned: false,
+        leechSeeded: false,
         paralyzed: false,
         moves: p1Moves,
         movePP: p1MovePP
@@ -13837,9 +14057,13 @@
       const wildPokeStub = { family: wildPoke.family, points: wildLevel * 10, confirmedStage: 0 };
       const wildUnlocked = wildPool.filter(m => m.level <= wildLevel && isMoveEligibleForPoke(m, wildPokeStub, wildLevel));
       const wildMoves = wildUnlocked.length > 0 ? wildUnlocked.slice(-4).map(m => m.name) : [(wildPool[0] ? wildPool[0].name : "撞擊")];
-      if (wildPoke.family === 'abra' && !wildMoves.includes('瞬間移動')) {
-        if (wildMoves.length >= 4) wildMoves[0] = '瞬間移動';
-        else wildMoves.push('瞬間移動');
+      if (wildPoke.family === 'abra') {
+        if (wildLevel < 10) {
+          wildMoves.splice(0, wildMoves.length, '瞬間移動');
+        } else if (!wildMoves.includes('瞬間移動')) {
+          if (wildMoves.length >= 4) wildMoves[0] = '瞬間移動';
+          else wildMoves.push('瞬間移動');
+        }
       }
       battleState.p2 = {
         id: 'wild',
@@ -13877,6 +14101,7 @@
         diving: false,
         divingMove: null,
         poisoned: false,
+        leechSeeded: false,
         paralyzed: false,
         moves: wildMoves
       };
