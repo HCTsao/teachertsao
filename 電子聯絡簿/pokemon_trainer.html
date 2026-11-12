@@ -793,6 +793,53 @@
       0% { transform: scale(1); box-shadow: 0 4px 15px rgba(245, 158, 11, 0.45); }
       100% { transform: scale(1.05); box-shadow: 0 6px 25px rgba(239, 68, 68, 0.75); }
     }
+    /* Confusion Ducklings Circling Above Head */
+    .confusion-ducks-orbit {
+      position: absolute;
+      width: 82px;
+      height: 30px;
+      pointer-events: none;
+      z-index: 46;
+      transform: translate(-50%, -50%);
+    }
+    .confusion-ducks-ring {
+      position: absolute;
+      inset: 5px 6px;
+      border-radius: 50%;
+      border: 1.5px dashed rgba(250, 204, 21, 0.78);
+      box-shadow: 0 0 8px rgba(250, 204, 21, 0.4);
+    }
+    .confusion-duck-item {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 24px;
+      height: 24px;
+      margin: -12px 0 0 -12px;
+      animation: duckOrbit 2.2s linear infinite;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.48));
+    }
+    .confusion-duck-item svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      animation: duckFace 2.2s steps(1, end) infinite;
+    }
+    .confusion-duck-item.duck-2,
+    .confusion-duck-item.duck-2 svg { animation-delay: -0.733s; }
+    .confusion-duck-item.duck-3,
+    .confusion-duck-item.duck-3 svg { animation-delay: -1.466s; }
+    @keyframes duckOrbit {
+      0%   { transform: translate(31px, 0px) scale(0.95); z-index: 3; }
+      25%  { transform: translate(0px, 10px) scale(1.12); z-index: 5; }
+      50%  { transform: translate(-31px, 0px) scale(0.95); z-index: 3; }
+      75%  { transform: translate(0px, -10px) scale(0.80); z-index: 1; }
+      100% { transform: translate(31px, 0px) scale(0.95); z-index: 3; }
+    }
+    @keyframes duckFace {
+      0%, 49.9% { transform: scaleX(-1); }
+      50%, 100% { transform: scaleX(1); }
+    }
 
     /* Mobile Responsive Optimizations */
     @media (max-width: 768px) {
@@ -1084,7 +1131,7 @@
     </button>
   </div>
 
-  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v7.1</span></h1>
+  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v7.2</span></h1>
 
   <!-- Student Card Container -->
   <div class="main-container" id="student-container">
@@ -5805,8 +5852,8 @@
       if (move.hits === 2) {
         return move.name === '雙針' ? "連續攻擊 2 次，20% 機率使對手中毒" : "連續攻擊 2 次，快速造成兩段傷害";
       }
-      if (move.status === 'confuse') return "使對手陷入混亂，機率攻擊自己";
-      if (move.status === 'sleep') return "60% 機率使對手沉睡 3 回合無法行動";
+      if (move.status === 'confuse') return "使對手陷入混亂 1～4 回合（1/3 機率攻擊自己）";
+      if (move.status === 'sleep') return "60% 機率使對手沉睡 1～3 回合無法行動";
       if (move.status === 'paralyze') return "使對手麻痺（25% 無法行動 & 速度減半）";
       if (move.status === 'atk-down') return "降低對手攻擊力 15%";
       if (move.status === 'def-up') return "強化自身防禦力 +30%";
@@ -6975,10 +7022,12 @@
         btnBallReset.style.border = '1.5px solid #fca5a5';
       }
 
+      clearConfusionDucksSide('p1');
+      clearConfusionDucksSide('p2');
       const arena = document.getElementById('battle-arena-card');
       if (arena) {
         arena.style.transform = '';
-        arena.querySelectorAll('.effect-particle, svg').forEach(el => el.remove());
+        arena.querySelectorAll('.effect-particle, .confusion-ducks-orbit, svg').forEach(el => el.remove());
         arena.style.display = 'none';
       }
       const flashOverlay = document.getElementById('battle-flash-overlay');
@@ -7262,6 +7311,65 @@
       };
     }
 
+    const CONFUSION_DUCK_SVG = `<svg viewBox="0 0 32 32" width="24" height="24" xmlns="http://www.w3.org/2000/svg"><path d="M9 17c-2.5 0-4 1.8-3.8 4.4C5.4 24.4 8.5 26 14.5 26c5.5 0 8.5-2.2 8.8-5.4.2-2.1-.9-3.6-2.5-4.1.6-.9.8-2.2.4-3.4-.6-2-2.6-3.4-4.9-3.4-2.5 0-4.4 1.6-4.7 4-.4 1.8.2 3.1.9 3.6-1.1-.2-2.3-.3-3.5-.3z" fill="#fde047" stroke="#ca8a04" stroke-width="1.6" stroke-linejoin="round"/><path d="M5.5 20.5c-.9-.9-1.7-2-.8-2.9.8-.8 2.1.1 2.9 1.1" fill="#facc15" stroke="#ca8a04" stroke-width="1.4" stroke-linecap="round"/><path d="M21 12.2l5 1.1c.7.2.7 1.3 0 1.6l-4.6 1.2z" fill="#f97316" stroke="#c2410c" stroke-width="1.2" stroke-linejoin="round"/><circle cx="18.6" cy="12.2" r="1.4" fill="#0f172a"/><circle cx="19.1" cy="11.7" r="0.45" fill="#ffffff"/><path d="M12.2 19.5c2.2-.8 4.6-.3 5.7 1.1.9 1.2-.2 2.9-2.2 3.1-1.9.2-3.7-.7-4.1-2.1-.2-.8.1-1.7.6-2.1z" fill="#fef08a" stroke="#ca8a04" stroke-width="1.1"/></svg>`;
+
+    function clearConfusionDucksSide(side) {
+      const el = document.getElementById('battle-confusion-ducks-' + side);
+      if (el) el.remove();
+    }
+
+    function syncConfusionDucksSide(side) {
+      const arena = document.getElementById('battle-arena-card');
+      const fighter = battleState ? battleState[side] : null;
+      const img = document.getElementById(side === 'p1' ? 'battle-img-p1' : 'battle-img-p2');
+      if (!arena || !battleState.active || !fighter || !fighter.confused || fighter.hp <= 0 || fighter.diving || !img) {
+        clearConfusionDucksSide(side);
+        return;
+      }
+      const elId = 'battle-confusion-ducks-' + side;
+      let duckWrap = document.getElementById(elId);
+      if (!duckWrap) {
+        duckWrap = document.createElement('div');
+        duckWrap.id = elId;
+        duckWrap.className = 'confusion-ducks-orbit';
+        duckWrap.innerHTML =
+          '<div class="confusion-ducks-ring"></div>' +
+          '<div class="confusion-duck-item duck-1">' + CONFUSION_DUCK_SVG + '</div>' +
+          '<div class="confusion-duck-item duck-2">' + CONFUSION_DUCK_SVG + '</div>' +
+          '<div class="confusion-duck-item duck-3">' + CONFUSION_DUCK_SVG + '</div>';
+        arena.appendChild(duckWrap);
+      }
+      const arenaRect = arena.getBoundingClientRect();
+      const imgRect = img.getBoundingClientRect();
+      if (arenaRect.width <= 0 || imgRect.width <= 0) return;
+
+      const pokeId = fighter.pokeDetails ? fighter.pokeDetails.id : null;
+      const isBack = side === 'p1';
+      const usePng = img.dataset.spriteMode === 'png';
+      const m = usePng
+        ? (pokeId && SPRITE_METRICS[isBack ? 'back' : 'front'] ? SPRITE_METRICS[isBack ? 'back' : 'front'][pokeId] : null)
+        : (pokeId && BW_SPRITE_METRICS[isBack ? 'back' : 'front'] ? BW_SPRITE_METRICS[isBack ? 'back' : 'front'][pokeId] : null);
+      let cxRatio = 0.5, headTopRatio = 0.14;
+      if (m && m.length === 6) {
+        const [w, h, cx, bm, visH] = m;
+        cxRatio = (cx + 0.5) / w;
+        headTopRatio = Math.max(0, h - bm - visH) / h;
+      } else if (m && m.length === 4) {
+        const [cx, bm, visH] = m;
+        cxRatio = (cx + 0.5) / 96;
+        headTopRatio = Math.max(0, 96 - bm - visH) / 96;
+      }
+      const headX = (imgRect.left + imgRect.width * cxRatio) - arenaRect.left;
+      const headTopY = (imgRect.top + imgRect.height * headTopRatio) - arenaRect.top;
+      duckWrap.style.left = `${headX}px`;
+      duckWrap.style.top = `${Math.max(18, headTopY - 10)}px`;
+    }
+
+    function syncConfusionDucksUI() {
+      syncConfusionDucksSide('p1');
+      syncConfusionDucksSide('p2');
+    }
+
     function adjustP1SpritePosition() {
       if (battleState.p1 && battleState.p1.pokeDetails) {
         centerBattleSprite('p1', battleState.p1.pokeDetails.id, null, document.getElementById('battle-img-p1'));
@@ -7269,6 +7377,7 @@
       if (battleState.p2 && battleState.p2.pokeDetails) {
         centerBattleSprite('p2', battleState.p2.pokeDetails.id, null, document.getElementById('battle-img-p2'));
       }
+      syncConfusionDucksUI();
     }
 
     function startBattle() {
@@ -7962,7 +8071,7 @@
 
     // Official Pokémon Gen VI+ Damage Formula calibrated to uniform move base powers & Lv.0..30 stats:
     // Damage = floor( (floor((floor(2 * EffLv / 5) + 2) * EffPower * (A / D) / 50) + 2) * STAB * Type * Crit * Random )
-    function computePokemonDamage({ attacker, defender, level, power, moveType, isSpecial, effMultiplier = 1.0, isCrit = false, applyStab = true, useRandom = true }) {
+    function computePokemonDamage({ attacker, defender, level, power, moveType, isSpecial, effMultiplier = 1.0, isCrit = false, applyStab = true, useRandom = true, rawPower = false }) {
       const atkMod = isCrit ? Math.max(1, attacker.atkMod || 1) : (attacker.atkMod || 1);
       const defMod = isCrit ? Math.min(1, defender.defMod || 1) : (defender.defMod || 1);
       const rawA = isSpecial ? attacker.spatk : attacker.atk;
@@ -7971,7 +8080,7 @@
       const D = Math.max(1, rawD * defMod);
 
       const effLv = Math.max(1, 10 + Math.round(((level || 0) / 30) * 65));
-      const effPwr = Math.max(1, (power || 10) * 1.55);
+      const effPwr = rawPower ? Math.max(1, power || 40) : Math.max(1, (power || 10) * 1.55);
       const lvFactor = Math.floor((2 * effLv) / 5) + 2;
       const baseDamage = Math.floor(Math.floor(lvFactor * effPwr * (A / D)) / 50) + 2;
 
@@ -8035,16 +8144,16 @@
                     queueLog(`💨 ${defender.name}的${defender.pokeDetails.name} 敏捷地閃開了，${resolvedMove.name} 沒有命中！`, () => endTurn());
                   } else {
                     defender.asleep = true;
-                    defender.sleepTurns = 3;
+                    defender.sleepTurns = Math.floor(Math.random() * 3) + 1;
                     updateBattleUI();
-                    queueLog(`🌀 ${defender.name}的${defender.pokeDetails.name} 中了${resolvedMove.name}，陷入了沉睡狀態！（3 回合無法行動）`, () => endTurn());
+                    queueLog(`🌀 ${defender.name}的${defender.pokeDetails.name} 中了${resolvedMove.name}，陷入了沉睡狀態！`, () => endTurn());
                   }
                 } else if (resolvedMove.status === 'confuse') {
                   if (defender.confused) {
                     queueLog(`${defender.name}的${defender.pokeDetails.name} 已經陷入混亂狀態了！`, () => endTurn());
                   } else {
                     defender.confused = true;
-                    defender.confusionTurns = Math.floor(Math.random() * 3) + 2;
+                    defender.confusionTurns = Math.floor(Math.random() * 4) + 1;
                     updateBattleUI();
                     queueLog(`💫 ${defender.name}的${defender.pokeDetails.name} 中了${resolvedMove.name}，陷入了混亂狀態！`, () => endTurn());
                   }
@@ -8201,22 +8310,24 @@
       if (attacker.confused) {
         if ((attacker.confusionTurns || 0) <= 0) {
           attacker.confused = false;
+          attacker.confusionTurns = 0;
           updateBattleUI();
           queueLog(`✨ ${attacker.name}的${attacker.pokeDetails.name} 從混亂中清醒了！`, () => {
             performResolvedAction();
           });
           return;
         }
-        attacker.confusionTurns--;
         queueLog(`💫 ${attacker.name}的${attacker.pokeDetails.name} 正處於混亂之中...`, () => {
           if (battleState.sessionId !== mySession || !battleState.active) return;
-          if (Math.random() < 0.5) {
+          attacker.confusionTurns = Math.max(0, (attacker.confusionTurns || 1) - 1);
+          if (Math.random() < (1 / 3)) {
             const selfLv = attacker.actualLevel !== undefined ? attacker.actualLevel : attacker.level;
             const selfDmg = computePokemonDamage({
               attacker,
               defender: attacker,
               level: selfLv,
-              power: 16,
+              power: 40,
+              rawPower: true,
               moveType: null,
               isSpecial: false,
               effMultiplier: 1.0,
@@ -8249,6 +8360,7 @@
     }
 
     function animateFaint(side, callback) {
+      clearConfusionDucksSide(side);
       const img = document.getElementById(side === 'p1' ? 'battle-img-p1' : 'battle-img-p2');
       img.style.transition = 'transform 0.6s ease-in, opacity 0.6s';
       img.style.transform = 'translateY(120px)';
@@ -12631,6 +12743,7 @@
 
       document.getElementById('battle-name-p1').innerHTML = `${battleState.p1.name}的${battleState.p1.pokeDetails.name}${getStatusBadgeHtml(battleState.p1)}`;
       document.getElementById('battle-name-p2').innerHTML = `${battleState.p2.name}的${battleState.p2.pokeDetails.name}${getStatusBadgeHtml(battleState.p2)}`;
+      syncConfusionDucksUI();
     }
 
     function endBattle(winnerName) {
