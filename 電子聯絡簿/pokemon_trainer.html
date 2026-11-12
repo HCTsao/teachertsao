@@ -1084,7 +1084,7 @@
     </button>
   </div>
 
-  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v7.0</span></h1>
+  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v7.1</span></h1>
 
   <!-- Student Card Container -->
   <div class="main-container" id="student-container">
@@ -12781,11 +12781,17 @@
       {"id":493,"family":"arceus","name":"阿爾宙斯","type":"normal","isLegendary":true,"url":"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/493.png"}
     ];
 
-    function pickRandomWildPokemon() {
+    function getLegendaryEncounterRate(level = 0) {
+      const lv = Math.max(0, Number(level) || 0);
+      // 基礎遇到神獸機率 1% + 使用寶可夢等級每 1 等提升 0.2%
+      return Math.min(1, 0.01 + lv * 0.002);
+    }
+
+    function pickRandomWildPokemon(level = 0) {
       const legendPool = WILD_POKEMON_POOL.filter(p => p && (p.isLegendary || LEGENDARY_FAMILIES.has(p.family)));
       const normalPool = WILD_POKEMON_POOL.filter(p => p && !p.isLegendary && !LEGENDARY_FAMILIES.has(p.family));
-      // 神獸野生遇見機率固定為 1%
-      if (legendPool.length > 0 && Math.random() < 0.01) {
+      const legendRate = getLegendaryEncounterRate(level);
+      if (legendPool.length > 0 && Math.random() < legendRate) {
         return legendPool[Math.floor(Math.random() * legendPool.length)];
       }
       return normalPool[Math.floor(Math.random() * normalPool.length)];
@@ -12896,9 +12902,11 @@
         return;
       }
 
+      const activeLv = getActualLevel(activePoke);
+      const legendPctStr = (getLegendaryEncounterRate(activeLv) * 100).toFixed(1);
       const confirmMsg = (currentStudentId === 'teacher' || student.isTeacher)
-        ? `🌲 確定要進入野外寶可夢冒險嗎？`
-        : `🌲 確定要進入野外寶可夢冒險嗎？\n\n進入冒險將扣除 10 點經驗值/點數（目前經驗值：${activePoke.points} 點，打倒野生的寶可夢將會把 10 點加回來）。`;
+        ? `🌲 確定要進入野外寶可夢冒險嗎？（目前出戰 Lv.${activeLv} 神獸遭遇率：${legendPctStr}%）`
+        : `🌲 確定要進入野外寶可夢冒險嗎？（目前出戰 Lv.${activeLv} 神獸遭遇率：${legendPctStr}%）\n\n進入冒險將扣除 10 點經驗值/點數（目前經驗值：${activePoke.points} 點，打倒野生的寶可夢將會把 10 點加回來）。`;
       if (!confirm(confirmMsg)) return;
 
       showPasswordModal(() => {
@@ -12923,12 +12931,12 @@
       const activePoke = pokes.length > 0 ? pokes[activeIdx] : null;
       if (!activePoke) return;
 
-      const wildPoke = pickRandomWildPokemon();
-      const isWildLegendary = !!(wildPoke && (wildPoke.isLegendary || LEGENDARY_FAMILIES.has(wildPoke.family)));
-
       const p1Details = getCurrentPokemon(activePoke, student);
       const displayLv1 = getNominalLevel(activePoke);
       const lv1 = getActualLevel(activePoke);
+
+      const wildPoke = pickRandomWildPokemon(lv1);
+      const isWildLegendary = !!(wildPoke && (wildPoke.isLegendary || LEGENDARY_FAMILIES.has(wildPoke.family)));
 
       const p1Moves = activePoke.moves || initializeDefaultMoves(activePoke);
       const p1MovePP = {};
