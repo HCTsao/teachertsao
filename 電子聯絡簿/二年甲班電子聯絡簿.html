@@ -540,7 +540,7 @@
       <h3 style="font-size: 1.3rem; color: #1e293b; margin-bottom: 6px;">教師後台安全驗證</h3>
       <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 16px;">請輸入管理員密碼進入維護後台</p>
       
-      <input type="password" id="adminPasswordInput" placeholder="請輸入後台密碼" style="width: 100%; padding: 10px 14px; border-radius: 12px; border: 1px solid #cbd5e1; font-size: 1rem; margin-bottom: 16px; text-align: center; font-family: inherit; outline: none;">
+      <input type="text" id="adminPasswordInput" name="teacher_pin_nomem" inputmode="numeric" maxlength="8" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')" onpointerdown="this.removeAttribute('readonly')" placeholder="" style="width: 100%; padding: 10px 14px; border-radius: 12px; border: 1px solid #cbd5e1; font-size: 1.2rem; letter-spacing: 5px; margin-bottom: 16px; text-align: center; font-family: inherit; outline: none; font-weight: 700; -webkit-text-security: disc; text-security: disc;">
       
       <div style="display: flex; gap: 10px; justify-content: center;">
         <button onclick="closeAdminPasswordModal()" style="flex: 1; padding: 8px 16px; border-radius: 10px; border: 1px solid #cbd5e1; background: white; color: #64748b; font-weight: 700; cursor: pointer; font-family: inherit;">取消</button>
@@ -633,28 +633,46 @@
       document.body.style.overflow = 'auto';
     }
 
-    // 教師後台密碼彈窗機制
+    // 教師後台密碼彈窗機制（統一 4007，禁止瀏覽器與快取自動記憶）
     function showAdminPasswordModal() {
       const modal = document.getElementById('adminPasswordModal');
       const input = document.getElementById('adminPasswordInput');
+      input.setAttribute('readonly', 'readonly');
       input.value = '';
       modal.classList.add('show');
-      setTimeout(() => input.focus(), 100);
+      setTimeout(() => {
+        input.removeAttribute('readonly');
+        input.value = '';
+        input.focus();
+      }, 100);
     }
 
     function closeAdminPasswordModal() {
       const modal = document.getElementById('adminPasswordModal');
+      const input = document.getElementById('adminPasswordInput');
+      if (input) {
+        input.value = '';
+        input.setAttribute('readonly', 'readonly');
+      }
       modal.classList.remove('show');
     }
 
     function verifyAdminPassword() {
-      const pwd = document.getElementById('adminPasswordInput').value;
-      if (pwd === '964007') {
+      const input = document.getElementById('adminPasswordInput');
+      const pwd = input ? input.value : '';
+      if (pwd === '4007') {
+        closeAdminPasswordModal();
         window.location.href = 'pokemon_admin.html?tab=homework';
       } else {
         alert('密碼錯誤！請輸入正確的後台管理員密碼。');
+        if (input) {
+          input.value = '';
+          input.focus();
+        }
       }
     }
+
+    window.addEventListener('pageshow', closeAdminPasswordModal);
 
     document.getElementById('adminPasswordInput').addEventListener('keyup', function(e) {
       if (e.key === 'Enter') {
