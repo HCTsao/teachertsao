@@ -1140,7 +1140,7 @@
 
       <!-- Status badges -->
       <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
-        <span style="background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; color: #34d399; padding: 6px 14px; border-radius: 20px; font-weight: 800; font-size: 0.9rem;">
+        <span id="catch-badge-level" style="background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; color: #34d399; padding: 6px 14px; border-radius: 20px; font-weight: 800; font-size: 0.9rem;">
           🌟 等級：Lv.0
         </span>
         <span style="background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b; color: #fbbf24; padding: 6px 14px; border-radius: 20px; font-weight: 800; font-size: 0.9rem;">
@@ -6686,7 +6686,13 @@
 
       const isWildLegendary = !!(wildPokeData && (wildPokeData.isLegendary || LEGENDARY_FAMILIES.has(wildPokeData.family)));
       const caughtPoints = isWildLegendary ? 300 : 0;
+      const caughtLv = isWildLegendary ? 30 : 0;
       const defaultMoves = initializeDefaultMoves({ family: wildPokeData.family, points: caughtPoints, actualPoints: caughtPoints, confirmedStage: 0 });
+
+      const badgeLvEl = document.getElementById('catch-badge-level');
+      if (badgeLvEl) badgeLvEl.textContent = `🌟 等級：Lv.${caughtLv}`;
+      const catchBallEl = document.getElementById('catch-img-ball');
+      if (catchBallEl) catchBallEl.src = (battleState && battleState.wildUsingMasterBall) ? MASTER_BALL_IMG : POKE_BALL_IMG;
 
       imgPoke.src = pokeUrl;
       imgPoke.style.transform = 'scale(0.2)';
@@ -8503,7 +8509,6 @@
                 }
               } else if (resolvedMove.name === '瞬間移動' && battleState.isWild && attackerSide === 'p2' && attacker.family === 'abra') {
                 const escapeRate = getTeleportSuccessRate(attacker, defender);
-                const pct = Math.round(escapeRate * 100);
                 if (Math.random() < escapeRate) {
                   const p2Img = document.getElementById('battle-img-p2');
                   if (p2Img) {
@@ -8511,19 +8516,18 @@
                     p2Img.style.transform = 'scale(0) rotate(180deg)';
                     p2Img.style.opacity = '0';
                   }
-                  queueLog(`🌀 野生的${attacker.pokeDetails.name} 透過瞬間移動從戰場上消失，離開了戰鬥！（成功率 ${pct}%）`, () => {
+                  queueLog(`🌀 野生的${attacker.pokeDetails.name} 透過瞬間移動從戰場上消失，離開了戰鬥！`, () => {
                     if (battleState.sessionId !== mySession || !battleState.active) return;
                     endWildBattle(false, true);
                   });
                 } else {
-                  queueLog(`⚡ 受 ${defender.name}的${defender.pokeDetails.name} 高速度壓制，野生的${attacker.pokeDetails.name} 瞬間移動失敗了！（成功率 ${pct}%）`, () => endTurn());
+                  queueLog(`⚡ 受 ${defender.name}的${defender.pokeDetails.name} 高速度壓制，野生的${attacker.pokeDetails.name} 瞬間移動失敗了！`, () => endTurn());
                 }
               } else if (resolvedMove.name === '瞬間移動') {
                 if (battleState.isWild) {
                   const switchRate = getTeleportSuccessRate(attacker, defender);
-                  const pct = Math.round(switchRate * 100);
                   if (Math.random() >= switchRate) {
-                    queueLog(`⚡ 受野生${defender.pokeDetails.name}高速度壓制，${attacker.pokeDetails.name} 瞬間移動發動失敗！（成功率 ${pct}%）`, () => endTurn());
+                    queueLog(`⚡ 受野生${defender.pokeDetails.name}高速度壓制，${attacker.pokeDetails.name} 瞬間移動發動失敗！`, () => endTurn());
                     return;
                   }
                 }
@@ -13674,6 +13678,10 @@
 
       document.getElementById('battle-name-p1').innerHTML = `${battleState.p1.name}的${battleState.p1.pokeDetails.name}${getStatusBadgeHtml(battleState.p1)}`;
       document.getElementById('battle-name-p2').innerHTML = `${battleState.p2.name}的${battleState.p2.pokeDetails.name}${getStatusBadgeHtml(battleState.p2)}`;
+      const lvEl1 = document.getElementById('battle-lv-p1');
+      const lvEl2 = document.getElementById('battle-lv-p2');
+      if (lvEl1 && battleState.p1) lvEl1.textContent = `Lv.${battleState.p1.level}`;
+      if (lvEl2 && battleState.p2) lvEl2.textContent = `Lv.${battleState.p2.level}`;
       syncConfusionDucksUI();
     }
 
