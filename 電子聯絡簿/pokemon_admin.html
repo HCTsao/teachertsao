@@ -620,7 +620,7 @@
         <button class="header-nav-btn" onclick="window.location.href='二年甲班電子聯絡簿.html'" style="background: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 100%); color: #0f172a; border: none;">
           <i class="fa-solid fa-book-open"></i> 回電子聯絡簿
         </button>
-        <span style="color: var(--text-muted); font-size: 0.96rem; font-weight: 700; white-space: nowrap;">後台系統 v6.6</span>
+        <span style="color: var(--text-muted); font-size: 0.96rem; font-weight: 700; white-space: nowrap;">後台系統 v6.7</span>
       </div>
     </header>
 
@@ -2114,11 +2114,22 @@
       adminToastTimer = setTimeout(() => { el.style.display = 'none'; }, 2800);
     }
 
+    function isTeacherPiplup(poke) {
+      if (!poke || poke.family !== 'piplup' || poke.wildCaught) return false;
+      const t = (typeof students !== 'undefined' && students) ? students['teacher'] : null;
+      return !!(t && Array.isArray(t.pokemons) && t.pokemons.includes(poke));
+    }
+
     function getStage(pokeOrLevel) {
       if (typeof pokeOrLevel === 'object' && pokeOrLevel !== null) {
         const poke = pokeOrLevel;
         const level = getActualLevel(poke);
         if (poke.stage !== undefined) return poke.stage;
+        if (isTeacherPiplup(poke)) {
+          if (level < 10) return 0;
+          if (level < 20) return 1;
+          return 2;
+        }
         const confirmed = (poke.confirmedStage !== undefined) ? poke.confirmedStage : 0;
         if (level < 10) return 0;
         if (level < 20) return Math.min(1, confirmed);
@@ -2132,6 +2143,7 @@
 
     function getDisplayStage(poke) {
       if (!poke) return 0;
+      if (isTeacherPiplup(poke)) return 0;
       if (poke.stage !== undefined) return poke.stage;
       return poke.confirmedStage || 0;
     }
@@ -2425,10 +2437,12 @@
       }
 
       const actLv = Math.floor(targetPoke.actualPoints / 10);
-      if (actLv >= 20 && (targetPoke.confirmedStage === undefined || targetPoke.confirmedStage < 2)) {
-        targetPoke.confirmedStage = 2;
-      } else if (actLv >= 10 && (targetPoke.confirmedStage === undefined || targetPoke.confirmedStage < 1)) {
-        targetPoke.confirmedStage = 1;
+      if (!isTeacherPiplup(targetPoke)) {
+        if (actLv >= 20 && (targetPoke.confirmedStage === undefined || targetPoke.confirmedStage < 2)) {
+          targetPoke.confirmedStage = 2;
+        } else if (actLv >= 10 && (targetPoke.confirmedStage === undefined || targetPoke.confirmedStage < 1)) {
+          targetPoke.confirmedStage = 1;
+        }
       }
 
       if (familyArr && (targetPoke.evoBranch === undefined || targetPoke.evoBranch === null)) {
