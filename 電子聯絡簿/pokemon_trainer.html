@@ -1084,7 +1084,7 @@
     </button>
   </div>
 
-  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v6.7</span></h1>
+  <h1 class="header-title"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" alt="Pokeball" width="40" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))"> 寶可夢訓練師 <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: auto;">v6.8</span></h1>
 
   <!-- Student Card Container -->
   <div class="main-container" id="student-container">
@@ -6883,6 +6883,7 @@
         maxHp: Math.floor(p1Details.hp * hpScale1),
         hp: Math.floor(p1Details.hp * hpScale1),
         level: displayLv1,
+        actualLevel: lv1,
         family: active1.family,
         atk: Math.floor(p1Details.atk * scale1),
         def: Math.floor(p1Details.def * scale1),
@@ -6911,6 +6912,7 @@
         maxHp: Math.floor(p2Details.hp * hpScale2),
         hp: Math.floor(p2Details.hp * hpScale2),
         level: displayLv2,
+        actualLevel: lv2,
         family: active2.family,
         atk: Math.floor(p2Details.atk * scale2),
         def: Math.floor(p2Details.def * scale2),
@@ -7039,7 +7041,11 @@
           img.style.transform = 'translateY(38px) scale(0.75)';
           img.style.opacity = '0';
         } else {
-          img.style.transition = 'transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease-out';
+          img.style.transition = 'none';
+          img.style.transform = 'translateY(46px) scale(0.8)';
+          img.style.opacity = '0';
+          void img.offsetWidth;
+          img.style.transition = 'transform 0.34s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease-out';
           img.style.transform = 'scale(1)';
           img.style.opacity = '1';
         }
@@ -7254,7 +7260,7 @@
         
         const mySessionAi = battleState.sessionId;
         setTimeout(() => {
-          if (battleState.sessionId !== mySessionAi || !battleState.active) return;
+          if (battleState.sessionId !== mySessionAi || !battleState.active || battleState.currentTurn !== 'p2' || battleState.isNarrating) return;
           const unlockedMoves = getUnlockedMoves(battleState.p2);
           const move = unlockedMoves[Math.floor(Math.random() * unlockedMoves.length)];
           executeMove(battleState.p2, move);
@@ -7484,6 +7490,54 @@
       }
     }
 
+    // Gen IV+ Physical vs Special split across all moves; status moves handled separately
+    const SPECIAL_MOVES_SET = new Set([
+      '火花', '噴射火焰', '熱風', '大字爆炎', '噴火', '噴煙', '過熱',
+      '泡沫', '水槍', '水炮', '水之波動', '濁流', '加農水砲', '加農水炮', '泡沫光線', '鹽水', '潮旋', '衝浪', '熱水',
+      '吸取', '超級吸取', '終極吸取', '陽光烈焰', '能量球', '瘋狂植物', '花瓣舞', '魔法葉', '綠葉風暴', '飛葉風暴', '日光束', '落英繽紛',
+      '電擊', '十萬伏特', '放電', '打雷', '電磁炮', '伏特替換', '充電光束',
+      '冰凍光束', '細雪', '冰凍之風', '暴風雪', '極光束',
+      '毒粉', '污泥炸彈', '濁霧', '污泥波', '溶解液', '毒液衝擊',
+      '大地之力', '泥巴射擊',
+      '起風', '空氣斬', '暴風', '空氣利刃',
+      '念力', '精神波', '幻象光線', '預知未來', '精神強念', '精神擊破', '食夢', '精神衝擊', '精神噪音',
+      '蟲鳴', '花粉團', '銀色旋風', '信號光束',
+      '禍不單行', '黑夜魔影', '暗影球', '陰影球', '影子球', '奇異之風',
+      '龍之怒', '龍之波動', '龍息', '龍之氣息', '龍捲風', '流星群',
+      '惡波動',
+      '加農光炮',
+      '吸取之吻', '魔法閃耀', '魅誘之聲', '薄霧炸裂', '月亮之力',
+      '旋風刀', '音爆', '破壞光線', '巨聲', '三重攻擊', '打鼾', '高速星星'
+    ]);
+
+    function getMoveCategory(move) {
+      if (!move || move.type === 'status') return 'status';
+      return SPECIAL_MOVES_SET.has(move.name) ? 'special' : 'physical';
+    }
+
+    // Official Pokémon Gen VI+ Damage Formula calibrated to uniform move base powers & Lv.0..30 stats:
+    // Damage = floor( (floor((floor(2 * EffLv / 5) + 2) * EffPower * (A / D) / 50) + 2) * STAB * Type * Crit * Random )
+    function computePokemonDamage({ attacker, defender, level, power, moveType, isSpecial, effMultiplier = 1.0, isCrit = false, applyStab = true, useRandom = true }) {
+      const atkMod = isCrit ? Math.max(1, attacker.atkMod || 1) : (attacker.atkMod || 1);
+      const defMod = isCrit ? Math.min(1, defender.defMod || 1) : (defender.defMod || 1);
+      const rawA = isSpecial ? attacker.spatk : attacker.atk;
+      const rawD = isSpecial ? defender.spdef : defender.def;
+      const A = Math.max(1, rawA * atkMod);
+      const D = Math.max(1, rawD * defMod);
+
+      const effLv = Math.max(1, 10 + Math.round(((level || 0) / 30) * 65));
+      const effPwr = Math.max(1, (power || 10) * 1.55);
+      const lvFactor = Math.floor((2 * effLv) / 5) + 2;
+      const baseDamage = Math.floor(Math.floor(lvFactor * effPwr * (A / D)) / 50) + 2;
+
+      const attackerTypes = (attacker.pokeDetails && Array.isArray(attacker.pokeDetails.types)) ? attacker.pokeDetails.types : [];
+      const stab = (applyStab && moveType && attackerTypes.includes(moveType)) ? 1.5 : 1.0;
+      const critMult = isCrit ? 1.5 : 1.0;
+      const randomFactor = useRandom ? ((Math.floor(Math.random() * 16) + 85) / 100) : 1.0;
+
+      return Math.max(1, Math.floor(baseDamage * stab * effMultiplier * critMult * randomFactor));
+    }
+
     function executeMove(attacker, move) {
       if (!battleState.active || !move) return;
       const resolvedMove = getMoveDetails(attacker.family, move.name, attacker.activePoke) || move;
@@ -7590,9 +7644,8 @@
         }
 
         const totalHits = resolvedMove.hits || 1;
-        const isNormal = resolvedMove.type === 'normal';
-        const activeAtk = isNormal ? attacker.atk : attacker.spatk;
-        const activeDef = isNormal ? defender.def : defender.spdef;
+        const isSpecialMove = getMoveCategory(resolvedMove) === 'special';
+        const attackerActualLv = attacker.actualLevel !== undefined ? attacker.actualLevel : attacker.level;
         const defTypes = (defender.pokeDetails && defender.pokeDetails.types) ? defender.pokeDetails.types : null;
         const eff = getTypeEffectiveness(resolvedMove.type, defender.family, defTypes);
 
@@ -7624,16 +7677,18 @@
             playMoveEffect(animMove, attackerSide, defenderSide, () => {
               if (battleState.sessionId !== mySession || !battleState.active) return;
 
-              let damage = Math.floor((perHitPower * activeAtk / activeDef) * 0.45) + Math.random() * 5 + (totalHits > 1 ? 2 : 4);
-              damage = Math.floor(damage * attacker.atkMod);
-              damage = Math.max(totalHits > 1 ? 3 : 4, Math.floor(damage / defender.defMod));
-              damage = Math.floor(damage * eff.multiplier);
-
-              const isCrit = Math.random() < 0.12;
-              if (isCrit) {
-                damage = Math.floor(damage * 1.5);
-                critCount++;
-              }
+              const isCrit = Math.random() < 0.0625;
+              if (isCrit) critCount++;
+              const damage = computePokemonDamage({
+                attacker,
+                defender,
+                level: attackerActualLv,
+                power: perHitPower,
+                moveType: resolvedMove.type,
+                isSpecial: isSpecialMove,
+                effMultiplier: eff.multiplier,
+                isCrit
+              });
               triggerArenaImpactShake(isCrit || eff.multiplier >= 2);
 
               defender.hp = Math.max(0, defender.hp - damage);
@@ -7711,8 +7766,18 @@
         queueLog(`💫 ${attacker.name}的${attacker.pokeDetails.name} 正處於混亂之中...`, () => {
           if (battleState.sessionId !== mySession || !battleState.active) return;
           if (Math.random() < 0.5) {
-            const rawSelf = Math.floor((36 * attacker.atk / Math.max(1, attacker.def)) * 0.25) + 4;
-            const selfDmg = Math.max(5, Math.floor(rawSelf * (attacker.atkMod || 1)));
+            const selfLv = attacker.actualLevel !== undefined ? attacker.actualLevel : attacker.level;
+            const selfDmg = computePokemonDamage({
+              attacker,
+              defender: attacker,
+              level: selfLv,
+              power: 16,
+              moveType: null,
+              isSpecial: false,
+              effMultiplier: 1.0,
+              isCrit: false,
+              applyStab: false
+            });
             flashDefender(attackerSide);
             triggerArenaImpactShake(false);
             attacker.hp = Math.max(0, attacker.hp - selfDmg);
@@ -8217,7 +8282,7 @@
 
     // Spawn custom visual effects based on move with individual elemental animations
     function playMoveEffect(move, attackerSide, defenderSide, callback) {
-      playSynthSound(move);
+      if (!move._fallbackTried) playSynthSound(move);
       const arena = document.getElementById('battle-arena-card');
       const arenaRect = arena.getBoundingClientRect();
       const img1 = document.getElementById('battle-img-p1');
@@ -8273,7 +8338,7 @@
         setTimeout(() => flashDefender(defenderSide), 100);
         setTimeout(callback, delay + 750);
       }
-      else if (name === '催眠術' || status === 'sleep') {
+      else if (name === '催眠術') {
         // Hypnotic concentric dream spirals
         for (let i = 0; i < 5; i++) {
           setTimeout(() => {
@@ -8356,7 +8421,7 @@
         }
         setTimeout(callback, 800);
       }
-      else if (name === '光合作用' || status === 'heal') {
+      else if (name === '光合作用') {
         // Warm golden sunlight beam shining down with green sparkles
         const sunbeam = document.createElement('div');
         sunbeam.style.position = 'absolute';
@@ -8436,7 +8501,7 @@
         }
         setTimeout(callback, 500);
       }
-      else if (name === '瞬間移動' || status === 'eva-up') {
+      else if (name === '瞬間移動') {
         // Cosmic purple dimensional fold warp
         attackerImg.style.transition = 'transform 0.25s, opacity 0.25s';
         attackerImg.style.transform = 'scale(0) rotate(180deg)';
@@ -8543,7 +8608,7 @@
         setTimeout(() => flashDefender(defenderSide), 300);
         setTimeout(callback, 600);
       }
-      else if (name === '叫聲' || name === '搖尾巴' || name === '挑釁' || status === 'atk-down' || status === 'def-up') {
+      else if (name === '叫聲' || name === '搖尾巴' || name === '挑釁') {
         // Status rings
         const color = status === 'atk-down' || name === '叫聲' || name === '搖尾巴' ? '#eab308' : '#3b82f6';
         const ringTargetX = (status === 'atk-down' || name === '叫聲' || name === '搖尾巴' || name === '挑釁') ? endX : startX;
@@ -8883,7 +8948,7 @@
           callback();
         }, delay + 200);
       }
-      else if (name === '火花' || type === 'fire') {
+      else if (name === '火花') {
         const count = 12;
         let delay = 0;
         for (let i = 0; i < count; i++) {
@@ -9160,7 +9225,7 @@
         setTimeout(() => flashDefender(defenderSide), delay + 150);
         setTimeout(callback, delay + 450);
       }
-      else if (name === '水槍' || type === 'water') {
+      else if (name === '水槍') {
         const count = 15;
         let delay = 0;
         for (let i = 0; i < count; i++) {
@@ -9495,7 +9560,7 @@
         setTimeout(() => flashDefender(defenderSide), delay + 120);
         setTimeout(callback, delay + 400);
       }
-      else if (type === 'grass') {
+      else if (name === '__GRASS_FALLBACK__') {
         const count = 12;
         let delay = 0;
         for (let i = 0; i < count; i++) {
@@ -9650,7 +9715,7 @@
           callback();
         }, 450);
       }
-      else if (name === '電擊' || type === 'electric') {
+      else if (name === '電擊') {
         for (let b = 0; b < 3; b++) {
           setTimeout(() => {
             drawLightningSVG(endX + (Math.random() * 30 - 15), 10, endX, endY, {
@@ -9773,7 +9838,7 @@
           }, 160);
         }, 120);
       }
-      else if (type === 'ice') {
+      else if (name === '__ICE_FALLBACK__') {
         for (let i = 0; i < 15; i++) {
           createParticle({
             x: endX + (Math.random() * 50 - 25),
@@ -9965,7 +10030,7 @@
         setTimeout(() => flashDefender(defenderSide), 150);
         setTimeout(callback, 380);
       }
-      else if (name === '起風' || type === 'flying') {
+      else if (name === '起風') {
         for (let i = 0; i < 12; i++) {
           createParticle({
             x: startX,
@@ -10143,7 +10208,7 @@
           callback();
         }, 210);
       }
-      else if (name === '音速拳' || name === '馬赫撲擊' || type === 'fighting') {
+      else if (name === '音速拳' || name === '馬赫撲擊') {
         const ring = document.createElement('div');
         ring.style.position = 'absolute';
         ring.style.left = `${endX}px`;
@@ -10273,7 +10338,7 @@
         setTimeout(() => flashDefender(defenderSide), 180);
         setTimeout(callback, delay + 650);
       }
-      else if (name === '毒粉' || type === 'poison') {
+      else if (name === '毒粉') {
         for (let i = 0; i < 20; i++) {
           createParticle({
             x: endX + (Math.random() * 50 - 25),
@@ -10336,7 +10401,7 @@
         setTimeout(() => flashDefender(defenderSide), 250);
         setTimeout(callback, 550);
       }
-      else if (name === '泥巴射擊' || type === 'ground') {
+      else if (name === '泥巴射擊') {
         const count = 10;
         let delay = 0;
         for (let i = 0; i < count; i++) {
@@ -10386,7 +10451,7 @@
           callback();
         }, 250);
       }
-      else if (name === '落石' || name === '岩石封鎖' || name === '岩崩' || type === 'rock') {
+      else if (name === '落石' || name === '岩石封鎖' || name === '岩崩') {
         const count = name === '岩崩' ? 6 : 4;
         for (let r = 0; r < count; r++) {
           setTimeout(() => {
@@ -10515,7 +10580,7 @@
         setTimeout(() => flashDefender(defenderSide), 350);
         setTimeout(callback, 700);
       }
-      else if (name === '舔' || type === 'ghost') {
+      else if (name === '舔') {
         const tongue = document.createElement('div');
         tongue.style.position = 'absolute';
         tongue.style.left = `${endX}px`;
@@ -10613,7 +10678,7 @@
           }, 150);
         }, 120);
       }
-      else if (name === '追打' || name === '咬住' || type === 'dark') {
+      else if (name === '追打' || name === '咬住') {
         const topChomp = document.createElement('div');
         const botChomp = document.createElement('div');
         [topChomp, botChomp].forEach((el, idx) => {
@@ -10725,7 +10790,7 @@
         setTimeout(() => flashDefender(defenderSide), 380);
         setTimeout(callback, 650);
       }
-      else if (name === '念力' || name === '精神波' || type === 'psychic') {
+      else if (name === '念力' || name === '精神波') {
         for (let i = 0; i < 3; i++) {
           setTimeout(() => {
             const wave = document.createElement('div');
@@ -10862,7 +10927,7 @@
           callback();
         }, 320);
       }
-      else if (name === '龍之怒' || type === 'dragon') {
+      else if (name === '龍之怒') {
         const count = 18;
         let delay = 0;
         for (let i = 0; i < count; i++) {
@@ -10887,7 +10952,7 @@
       // ----------------------------------------------------
       // 16. STEEL MOVES
       // ----------------------------------------------------
-      else if (name === '鋼翼' || name === '鐵尾' || type === 'steel') {
+      else if (name === '鋼翼' || name === '鐵尾') {
         const blade = document.createElement('div');
         blade.style.position = 'absolute';
         blade.style.left = `${endX}px`;
@@ -11152,7 +11217,72 @@
         setTimeout(() => flashDefender(defenderSide), 180);
         setTimeout(callback, count * 18 + 320);
       }
-      else if (['水流噴射', '鹽水', '水流尾', '衝浪', '水之誓約', '泡沫', '水流裂破', '潛水', '潮旋'].includes(name)) {
+      else if (name === '潛水') {
+        // Dedicated Dive Turn-2 visual: bursts up from under the ground onto the opponent's turf with wide splashing water sprays
+        const defOval = document.getElementById(defenderSide === 'p1' ? 'battle-oval-p1' : 'battle-oval-p2');
+        const ovalRect = defOval ? defOval.getBoundingClientRect() : null;
+        const gX = ovalRect ? ((ovalRect.left + ovalRect.width / 2) - arenaRect.left) : endX;
+        const gY = ovalRect ? ((ovalRect.top + ovalRect.height * 0.55) - arenaRect.top) : (endY + 20);
+
+        // Expanding underground water surge rings + foaming puddle at opponent's turf (rAF-driven for crisp frame accuracy)
+        for (let rIdx = 0; rIdx < 3; rIdx++) {
+          setTimeout(() => {
+            const ring = document.createElement('div');
+            ring.style.position = 'absolute';
+            ring.style.left = `${gX}px`;
+            ring.style.top = `${gY}px`;
+            ring.style.width = '28px';
+            ring.style.height = '12px';
+            ring.style.border = '4px solid #7dd3fc';
+            ring.style.background = 'radial-gradient(ellipse, rgba(56,189,248,0.42) 0%, rgba(14,165,233,0.12) 70%, transparent 100%)';
+            ring.style.boxShadow = '0 0 14px rgba(56, 189, 248, 0.85)';
+            ring.style.borderRadius = '50%';
+            ring.style.transform = 'translate(-50%, -50%)';
+            ring.style.pointerEvents = 'none';
+            ring.style.zIndex = '44';
+            arena.appendChild(ring);
+            const dur = 480;
+            const maxW = 148 + rIdx * 34;
+            const maxH = 54 + rIdx * 14;
+            let rStart = null;
+            function stepRing(ts) {
+              if (!rStart) rStart = ts;
+              const t = Math.min(1, (ts - rStart) / dur);
+              const ease = 1 - Math.pow(1 - t, 2);
+              ring.style.width = `${28 + (maxW - 28) * ease}px`;
+              ring.style.height = `${12 + (maxH - 12) * ease}px`;
+              ring.style.opacity = t < 0.45 ? '0.95' : `${Math.max(0, 1 - (t - 0.45) / 0.55)}`;
+              if (t < 1) requestAnimationFrame(stepRing);
+              else ring.remove();
+            }
+            requestAnimationFrame(stepRing);
+          }, rIdx * 70);
+        }
+
+        // Vertical water column + wide splashing water droplets erupting upward & outward across opponent's turf
+        for (let i = 0; i < 28; i++) {
+          setTimeout(() => {
+            const isCenterJet = i < 10;
+            createParticle({
+              x: gX + (isCenterJet ? (Math.random() * 28 - 14) : (Math.random() * 72 - 36)),
+              y: gY + 4,
+              vx: isCenterJet ? (Math.random() * 1.8 - 0.9) : ((Math.random() < 0.5 ? -1 : 1) * (Math.random() * 4.2 + 1.4)),
+              vy: isCenterJet ? -(Math.random() * 4.2 + 7.5) : -(Math.random() * 3.8 + 5.2),
+              gravity: 0.36,
+              color: i % 3 === 0 ? '#f0f9ff' : (i % 2 === 0 ? '#38bdf8' : '#0284c7'),
+              size: isCenterJet ? (Math.random() * 6 + 13) : (Math.random() * 7 + 9),
+              duration: 580,
+              glow: true,
+              fade: true,
+              isBubble: i % 2 === 1,
+              zIndex: '45'
+            });
+          }, i * 14);
+        }
+        setTimeout(() => flashDefender(defenderSide), 170);
+        setTimeout(callback, 680);
+      }
+      else if (['水流噴射', '鹽水', '水流尾', '衝浪', '水之誓約', '泡沫', '水流裂破', '潮旋'].includes(name)) {
         const count = name === '衝浪' || name === '水之誓約' ? 22 : 15;
         for (let i = 0; i < count; i++) {
           setTimeout(() => {
@@ -11542,16 +11672,58 @@
         if (!isSelf) setTimeout(() => flashDefender(defenderSide), 180);
         setTimeout(callback, 500);
       }
-      else if (['高速星星', '破壞光線', '音爆', '打鼾', '角撞', '出奇一擊'].includes(name)) {
+      else if (name === '高速星星') {
+        // Shooting golden 5-pointed star stream + star-burst on impact
+        for (let i = 0; i < 12; i++) {
+          setTimeout(() => {
+            const arcY = (i - 5.5) * 3.5;
+            createParticle({
+              x: startX + (Math.random() * 14 - 7),
+              y: startY + arcY * 0.4,
+              vx: (endX - startX) / 14,
+              vy: (endY - startY) / 14 + Math.sin(i * 0.8) * 1.1,
+              color: i % 3 === 0 ? '#fef08a' : '#facc15',
+              size: 26,
+              duration: 380,
+              glow: true,
+              fade: true,
+              isStar: true,
+              rotate: true,
+              rotSpeed: 0.7
+            });
+          }, i * 24);
+        }
+        setTimeout(() => {
+          flashDefender(defenderSide);
+          for (let j = 0; j < 10; j++) {
+            const ang = (Math.PI * 2 * j) / 10;
+            createParticle({
+              x: endX, y: endY,
+              vx: Math.cos(ang) * 4.2,
+              vy: Math.sin(ang) * 4.2,
+              color: j % 2 === 0 ? '#fde047' : '#ffffff',
+              size: 22,
+              duration: 320,
+              glow: true,
+              fade: true,
+              isStar: true,
+              rotate: true,
+              rotSpeed: 0.9
+            });
+          }
+        }, 230);
+        setTimeout(callback, 560);
+      }
+      else if (['破壞光線', '音爆', '打鼾', '角撞', '出奇一擊'].includes(name)) {
         for (let i = 0; i < 16; i++) {
           setTimeout(() => {
             const t = i / 15;
             createParticle({
-              x: name === '破壞光線' || name === '高速星星' ? startX + (endX - startX) * t : endX,
-              y: name === '破壞光線' || name === '高速星星' ? startY + (endY - startY) * t : endY,
-              vx: name === '破壞光線' || name === '高速星星' ? (Math.random() - 0.5) * 2 : Math.cos((Math.PI * 2 * i) / 16) * 4.5,
-              vy: name === '破壞光線' || name === '高速星星' ? (Math.random() - 0.5) * 2 : Math.sin((Math.PI * 2 * i) / 16) * 4.5,
-              color: name === '破壞光線' ? '#fb923c' : (name === '高速星星' ? '#fde047' : (name === '出奇一擊' ? '#a855f7' : '#f8fafc')),
+              x: name === '破壞光線' ? startX + (endX - startX) * t : endX,
+              y: name === '破壞光線' ? startY + (endY - startY) * t : endY,
+              vx: name === '破壞光線' ? (Math.random() - 0.5) * 2 : Math.cos((Math.PI * 2 * i) / 16) * 4.5,
+              vy: name === '破壞光線' ? (Math.random() - 0.5) * 2 : Math.sin((Math.PI * 2 * i) / 16) * 4.5,
+              color: name === '破壞光線' ? '#fb923c' : (name === '出奇一擊' ? '#a855f7' : '#f8fafc'),
               size: name === '破壞光線' ? 16 : 11, glow: true, fade: true, duration: 350
             });
           }, i * 22);
@@ -11692,6 +11864,20 @@
           }, 200);
         }, 150);
       }
+      else if (!move._fallbackTried && status && status !== 'none') {
+        const statusMap = { sleep: '催眠術', heal: '光合作用', 'eva-up': '瞬間移動', 'atk-down': '叫聲', 'def-up': '縮入殼中', confuse: '奇異光線' };
+        const targetName = statusMap[status];
+        if (targetName) return playMoveEffect(Object.assign({}, move, { name: targetName, _fallbackTried: true }), attackerSide, defenderSide, callback);
+        flashDefender(defenderSide);
+        setTimeout(callback, 280);
+      }
+      else if (!move._fallbackTried && type && type !== 'normal' && type !== 'status') {
+        const typeMap = { fire: '火花', water: '水槍', grass: '__GRASS_FALLBACK__', electric: '電擊', ice: '__ICE_FALLBACK__', flying: '起風', fighting: '音速拳', poison: '毒粉', ground: '泥巴射擊', rock: '落石', ghost: '舔', dark: '咬住', psychic: '念力', dragon: '龍之怒', steel: '鋼翼', bug: '蟲咬', fairy: '魔法閃耀' };
+        const targetName = typeMap[type];
+        if (targetName) return playMoveEffect(Object.assign({}, move, { name: targetName, _fallbackTried: true }), attackerSide, defenderSide, callback);
+        flashDefender(defenderSide);
+        setTimeout(callback, 280);
+      }
       else {
         flashDefender(defenderSide);
         setTimeout(callback, 280);
@@ -11727,6 +11913,9 @@
         el.style.borderRadius = '0 80% 0 80%';
         el.style.width = `${config.size * 1.4}px`;
         el.style.height = `${config.size * 0.6}px`;
+      } else if (config.isStar || config.shape === 'star') {
+        el.dataset.shape = 'star';
+        el.style.clipPath = 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)';
       } else {
         el.style.borderRadius = '50%';
       }
@@ -11734,7 +11923,11 @@
       el.style.transform = 'translate(-50%, -50%)';
 
       if (config.glow) {
-        el.style.boxShadow = `0 0 10px ${config.color}, 0 0 20px ${config.color}`;
+        if (config.isStar || config.shape === 'star') {
+          el.style.filter = `drop-shadow(0 0 8px ${config.color})`;
+        } else {
+          el.style.boxShadow = `0 0 10px ${config.color}, 0 0 20px ${config.color}`;
+        }
       }
       arena.appendChild(el);
 
@@ -12147,6 +12340,7 @@
         maxHp: Math.floor(p1Details.hp * hpScale1),
         hp: Math.floor(p1Details.hp * hpScale1),
         level: displayLv1,
+        actualLevel: lv1,
         family: activePoke.family,
         atk: Math.floor(p1Details.atk * scale1),
         def: Math.floor(p1Details.def * scale1),
@@ -12203,6 +12397,7 @@
         maxHp: wildHp,
         hp: wildHp,
         level: wildLevel,
+        actualLevel: wildLevel,
         family: wildPoke.family,
         atk: Math.floor(basePoke.atk * scale2),
         def: Math.floor(basePoke.def * scale2),
