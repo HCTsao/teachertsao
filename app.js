@@ -35,13 +35,6 @@ const toolsData = [
         type: "遊戲"
     },
     {
-        name: "乘法三面鏡：表徵轉換與AI說數學",
-        category: "二上",
-        path: "二上/乘法三面鏡：表徵轉換與AI說數學.html",
-        desc: "專為國小二年級初學乘法打造！靈活轉換「符號表徵 × 圖像表徵 × 文字表徵」，具備四階遊戲闖關熟練，並能透過麥克風錄音，由 AI 即時智慧檢核口語概念！",
-        type: "教學"
-    },
-    {
         name: "九九乘法心臟病",
         category: "二上",
         path: "二上/乘法心臟病.html",
@@ -431,6 +424,7 @@ function init() {
 // 動態獲取教具圖示
 function getToolIcon(name, type) {
     // 遊戲類與具體主題（高優先級）
+    if (name.includes("乘法冒險島") || name.includes("冒險島")) return "fa-solid fa-compass";
     if (name.includes("蛇")) return "fa-solid fa-worm";
     if (name.includes("地鼠")) return "fa-solid fa-hammer";
     if (name.includes("心臟病")) return "fa-solid fa-heart-pulse";
