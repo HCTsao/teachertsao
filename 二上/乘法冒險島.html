@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>乘法冒險島</title>
   <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -21,7 +21,20 @@
       overflow-wrap: normal;
       line-break: strict;
     }
-      font-family: 'BpmfZihiKai', 'DFKai-SB', 'BiauKai', '標楷體', cursive, sans-serif !important;
+      
+    html, body {
+      touch-action: manipulation;
+      -webkit-text-size-adjust: 100%;
+      overscroll-behavior: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    button, .slot-blank, .key-btn, .btn-cute, #global-keypad {
+      touch-action: manipulation;
+      -webkit-user-select: none;
+      user-select: none;
     }
 
     .math-font {
@@ -119,24 +132,7 @@
       100% { transform: translateX(0); }
     }
 
-    /* 觸控虛擬方向盤 */
-    .d-pad-btn {
-      background: rgba(255, 255, 255, 0.88);
-      backdrop-filter: blur(4px);
-      border: 2px solid #cbd5e1;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      border-radius: 1rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      touch-action: manipulation;
-      user-select: none;
-      transition: all 0.1s;
-    }
-    .d-pad-btn:active {
-      background: #e2e8f0;
-      transform: scale(0.92);
-    }
+    
 
     /* 3D 渲染容器 */
     #canvas-container {
@@ -172,6 +168,9 @@
         <button onclick="teleportToIsland(2)" class="btn-cute px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-xl text-xs sm:text-sm flex items-center space-x-1 shadow">
           <span>🏰 第二座島嶼</span>
         </button>
+        <button onclick="teleportToIsland(3)" class="btn-cute px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-black rounded-xl text-xs sm:text-sm flex items-center space-x-1 shadow">
+          <span>⚡ 第三島</span>
+        </button>
 
         <div class="bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 text-amber-800 font-black text-sm flex items-center space-x-1">
           <span>⭐</span>
@@ -186,32 +185,6 @@
     <!-- Three.js 3D 渲染畫布容器 -->
     <div id="canvas-container">
       <canvas id="three-canvas"></canvas>
-    </div>
-
-    <!-- 左下角虛擬方向鍵控制盤 (高 z-index 確保不被擋住，僅方向鍵) -->
-    <div id="virtual-dpad" class="fixed bottom-6 left-6 z-60 flex flex-col items-center space-y-1.5 sm:scale-110">
-      <button onmousedown="handleDpad('up', true)" onmouseup="handleDpad('up', false)"
-              ontouchstart="handleDpad('up', true)" ontouchend="handleDpad('up', false)"
-              class="d-pad-btn w-12 h-12 text-2xl text-slate-700">▲</button>
-      <div class="flex space-x-1.5">
-        <button onmousedown="handleDpad('left', true)" onmouseup="handleDpad('left', false)"
-                ontouchstart="handleDpad('left', true)" ontouchend="handleDpad('left', false)"
-                class="d-pad-btn w-12 h-12 text-2xl text-slate-700">◀</button>
-        <div class="w-12 h-12 flex items-center justify-center text-sky-400 font-black text-xs">🎮</div>
-        <button onmousedown="handleDpad('right', true)" onmouseup="handleDpad('right', false)"
-                ontouchstart="handleDpad('right', true)" ontouchend="handleDpad('right', false)"
-                class="d-pad-btn w-12 h-12 text-2xl text-slate-700">▶</button>
-      </div>
-      <button onmousedown="handleDpad('down', true)" onmouseup="handleDpad('down', false)"
-              ontouchstart="handleDpad('down', true)" ontouchend="handleDpad('down', false)"
-              class="d-pad-btn w-12 h-12 text-2xl text-slate-700">▼</button>
-    </div>
-
-    <!-- 右下角視角重設按鈕 -->
-    <div class="fixed bottom-6 right-6 z-40">
-      <button onclick="resetCameraView()" class="btn-cute px-4 py-2.5 bg-white/90 backdrop-blur-md text-sky-800 font-black rounded-xl border border-sky-300 text-sm shadow-lg flex items-center space-x-1">
-        <span>🔄 重設視角</span>
-      </button>
     </div>
   </div>
 
@@ -353,6 +326,66 @@
     </div>
   </div>
 
+  <!-- ==================== 第三島關卡選擇選單 (乘法大會考) ==================== -->
+  <div id="modal-island3-menu" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+    <div class="card-candy max-w-2xl w-full p-6 text-center border-4 border-purple-400 bg-white/95 shadow-2xl max-h-[90vh] overflow-y-auto pointer-events-auto transition-all">
+      <div class="flex items-center justify-between border-b pb-3 mb-4 border-purple-100">
+        <div class="text-left">
+          <span class="inline-block px-3 py-1 bg-purple-600 text-white font-black text-xs rounded-full uppercase tracking-wider mb-1">ISLAND 3</span>
+          <h2 class="bpmf-font text-xl sm:text-2xl md:text-3xl font-black text-purple-800 whitespace-nowrap">乘法大會考（抽背挑戰）</h2>
+        </div>
+        <button onclick="closeModals()" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold flex items-center justify-center">✕</button>
+      </div>
+      <p class="text-sm font-bold text-slate-600 mb-4">
+        ⚡ 考考你的乘法抽背速度！每題限時 5 秒，共 5 題。<br>
+        🌟 答對 3 題得 1 星、4 題得 2 星、5 題全對得 3 星！<br>
+        🌸 獲得 3 顆星時，將在第三座島嶼種下一棵專屬魔法星光樹！
+      </p>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        <button onclick="selectStageFromMenu(3, 2)" class="btn-cute p-3 rounded-2xl border-2 border-purple-200 bg-purple-50/60 hover:bg-purple-100/80 flex flex-col items-center">
+          <span class="text-2xl mb-1">⚡</span>
+          <span class="bpmf-font font-black text-base text-purple-800">二的乘法</span>
+          <span id="stars-i3-2" class="text-xs text-slate-300 font-bold">☆☆☆</span>
+        </button>
+        <button onclick="selectStageFromMenu(3, 3)" class="btn-cute p-3 rounded-2xl border-2 border-purple-200 bg-purple-50/60 hover:bg-purple-100/80 flex flex-col items-center">
+          <span class="text-2xl mb-1">⚡</span>
+          <span class="bpmf-font font-black text-base text-purple-800">三的乘法</span>
+          <span id="stars-i3-3" class="text-xs text-slate-300 font-bold">☆☆☆</span>
+        </button>
+        <button onclick="selectStageFromMenu(3, 4)" class="btn-cute p-3 rounded-2xl border-2 border-purple-200 bg-purple-50/60 hover:bg-purple-100/80 flex flex-col items-center">
+          <span class="text-2xl mb-1">⚡</span>
+          <span class="bpmf-font font-black text-base text-purple-800">四的乘法</span>
+          <span id="stars-i3-4" class="text-xs text-slate-300 font-bold">☆☆☆</span>
+        </button>
+        <button onclick="selectStageFromMenu(3, 5)" class="btn-cute p-3 rounded-2xl border-2 border-purple-200 bg-purple-50/60 hover:bg-purple-100/80 flex flex-col items-center">
+          <span class="text-2xl mb-1">⚡</span>
+          <span class="bpmf-font font-black text-base text-purple-800">五的乘法</span>
+          <span id="stars-i3-5" class="text-xs text-slate-300 font-bold">☆☆☆</span>
+        </button>
+        <button onclick="selectStageFromMenu(3, 6)" class="btn-cute p-3 rounded-2xl border-2 border-purple-200 bg-purple-50/60 hover:bg-purple-100/80 flex flex-col items-center">
+          <span class="text-2xl mb-1">⚡</span>
+          <span class="bpmf-font font-black text-base text-purple-800">六的乘法</span>
+          <span id="stars-i3-6" class="text-xs text-slate-300 font-bold">☆☆☆</span>
+        </button>
+        <button onclick="selectStageFromMenu(3, 7)" class="btn-cute p-3 rounded-2xl border-2 border-purple-200 bg-purple-50/60 hover:bg-purple-100/80 flex flex-col items-center">
+          <span class="text-2xl mb-1">⚡</span>
+          <span class="bpmf-font font-black text-base text-purple-800">七的乘法</span>
+          <span id="stars-i3-7" class="text-xs text-slate-300 font-bold">☆☆☆</span>
+        </button>
+        <button onclick="selectStageFromMenu(3, 8)" class="btn-cute p-3 rounded-2xl border-2 border-purple-200 bg-purple-50/60 hover:bg-purple-100/80 flex flex-col items-center">
+          <span class="text-2xl mb-1">⚡</span>
+          <span class="bpmf-font font-black text-base text-purple-800">八的乘法</span>
+          <span id="stars-i3-8" class="text-xs text-slate-300 font-bold">☆☆☆</span>
+        </button>
+        <button onclick="selectStageFromMenu(3, 9)" class="btn-cute p-3 rounded-2xl border-2 border-purple-200 bg-purple-50/60 hover:bg-purple-100/80 flex flex-col items-center">
+          <span class="text-2xl mb-1">⚡</span>
+          <span class="bpmf-font font-black text-base text-purple-800">九的乘法</span>
+          <span id="stars-i3-9" class="text-xs text-slate-300 font-bold">☆☆☆</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
 
   <!-- ==================== 視圖 2：第一座島嶼 關卡挑戰 ==================== -->
   <div id="screen-island1" class="hidden min-h-screen pt-20 pb-28 px-4 max-w-4xl mx-auto">
@@ -416,7 +449,7 @@
       </section>
 
       <!-- 步驟 3：算式的意思 (嚴格對齊兩行排版，個󠇡標注輕聲) -->
-      <section id="step-4-container" class="card-candy p-5 opacity-40 pointer-events-none transition-all">
+      <section id="step-4-container" class="card-candy p-5 hidden opacity-40 pointer-events-none transition-all">
         <div class="flex items-center justify-between mb-3 border-b pb-2 border-pink-100">
           <h3 class="bpmf-font text-xl md:text-2xl font-black text-pink-600 flex items-center whitespace-nowrap">
             <span>步驟 3：算式的意思</span>
@@ -531,6 +564,44 @@
       <div class="space-y-3" id="table-rows-container">
         <!-- 10 列算式 (4倍起隨機挖包含積的2格，9~10倍可隨機3格挖空) -->
       </div>
+    </div>
+  </div>
+
+  <!-- ==================== 畫面 3：第三島 乘法大會考 ==================== -->
+  <div id="screen-island3" class="hidden min-h-screen pt-20 pb-36 px-4 max-w-3xl mx-auto flex flex-col justify-start">
+    <div class="flex items-center justify-between mb-4">
+      <button onclick="returnTo3DWorld()" class="btn-cute px-4 py-2 bg-white/90 text-slate-700 font-black rounded-xl text-sm shadow flex items-center space-x-1">
+        <span>🏝️ 返回島嶼</span>
+      </button>
+      <h2 id="island3-stage-title" class="bpmf-font text-2xl sm:text-3xl font-black text-purple-700 text-center">
+        乘法大會考
+      </h2>
+      <div id="island3-question-progress" class="bg-purple-600 text-white font-black px-3.5 py-1.5 rounded-full text-xs shadow-md">
+        第 1 / 5 題
+      </div>
+    </div>
+
+    <!-- 計時器區域 -->
+    <div class="card-candy p-4 mb-4 bg-white/95 shadow-md">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-black text-slate-500 uppercase tracking-wider">限時抽背（5 秒）</span>
+        <span id="island3-timer-label" class="text-sm font-black text-purple-700">⏳ 剩餘 5.0 秒</span>
+      </div>
+      <div class="w-full bg-slate-100 rounded-full h-3.5 overflow-hidden border border-slate-200">
+        <div id="island3-timer-bar" class="h-full bg-emerald-500 rounded-full transition-all duration-75" style="width: 100%;"></div>
+      </div>
+    </div>
+
+    <!-- 題目主卡片 -->
+    <div class="card-candy p-8 mb-4 text-center bg-white/95 border-4 border-purple-300 shadow-xl">
+      <div class="inline-flex items-center justify-center space-x-3 text-4xl sm:text-5xl md:text-6xl font-black py-6">
+        <span id="i3-q-base" class="math-font text-purple-700">7</span>
+        <span class="math-font text-purple-500">×</span>
+        <span id="i3-q-k" class="math-font text-purple-700">8</span>
+        <span class="math-font text-purple-500">=</span>
+        <span id="slot-i3-answer" onclick="focusSlot('slot-i3-answer')" class="slot-blank math-font" style="min-width: 4.5rem; min-height: 4rem; line-height: 4rem; font-size: 2.75rem;"></span>
+      </div>
+      <div id="island3-feedback" class="hidden text-center text-lg font-black mt-2"></div>
     </div>
   </div>
 
@@ -685,13 +756,22 @@
     };
 
     let gameState = {
-      currentView: '3d-world', // '3d-world', 'island1', 'island2'
+      currentView: '3d-world', // '3d-world', 'island1', 'island2', 'island3'
       selectedIsland: 1,
       selectedBase: 2,
       totalStars: 0,
       island1Progress: { '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 },
-      island2Progress: { '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 }
+      island2Progress: { '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 },
+      island3Progress: { '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 }
     };
+
+    // 第三座島狀態 (乘法大會考)
+    let island3Questions = [];
+    let island3QIndex = 0;
+    let island3CorrectCount = 0;
+    let island3TimerInterval = null;
+    let island3TimeRemaining = 5.0;
+    let island3CanAnswer = false;
 
     // 第一座島嶼關卡狀態
     let island1CurrentQuestion = null;
@@ -768,16 +848,15 @@
     // ==================== 3D 場景系統 (Three.js) ====================
     let scene, camera, renderer;
     let charGroup, charLegL, charLegR, charBody;
-    let waypointBeacon1, waypointBeacon2;
+    let waypointBeacon1, waypointBeacon2, waypointBeacon3;
     let keys = {};
-    let dpadState = { up: false, down: false, left: false, right: false };
     let currentNearWaypoint = 0; // 0: none, 1: island1, 2: island2
     let isMenuManuallyClosed = false;
     let walkTime = 0;
     const clock = new THREE.Clock();
     let targetMarkerMesh = null;
     let targetWaypoints = [];
-    const WALK_SPEED = 9.0; // 每秒 9.0 單位，流暢自然且在 60Hz/120Hz 設備速度完全一致
+    const WALK_SPEED = 13.5; // 每秒 9.0 單位，流暢自然且在 60Hz/120Hz 設備速度完全一致
 
     function init3DWorld() {
       const container = document.getElementById('canvas-container');
@@ -835,6 +914,7 @@
       // 建構浮島群
       createIsland1();
       createIsland2();
+      createIsland3();
       createBridge();
 
       // 建構主角角色 (站在第一座島嶼白點稍前方，往前走幾步即可踏上白點)
@@ -963,6 +1043,52 @@
       scene.add(island);
     }
 
+    function createIsland3() {
+      const island = new THREE.Group();
+      island.position.set(0, 0, -36);
+
+      // 頂部草地/魔法島面 (紫色調)
+      const topGeo = new THREE.CylinderGeometry(19, 14, 6, 6);
+      const topMat = new THREE.MeshStandardMaterial({ color: 0x8b5cf6, roughness: 0.7 });
+      const topMesh = new THREE.Mesh(topGeo, topMat);
+      topMesh.receiveShadow = true;
+      island.add(topMesh);
+
+      // 底部懸崖
+      const botGeo = new THREE.ConeGeometry(13.5, 9, 6);
+      const botMat = new THREE.MeshStandardMaterial({ color: 0x4c1d95, roughness: 0.9 });
+      const botMesh = new THREE.Mesh(botGeo, botMat);
+      botMesh.rotation.x = Math.PI;
+      botMesh.position.y = -6;
+      island.add(botMesh);
+
+      // 種植第三座島專屬樹 (魔法星光樹)
+      buildIsland3Trees(island);
+
+      // 白色傳送點
+      const whiteSpotGeo = new THREE.CylinderGeometry(3.0, 3.0, 0.18, 32);
+      const whiteSpotMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const whiteSpot = new THREE.Mesh(whiteSpotGeo, whiteSpotMat);
+      whiteSpot.position.set(0, 3.14, 0);
+      island.add(whiteSpot);
+
+      // 旋轉光環
+      const ringGeo = new THREE.TorusGeometry(3.8, 0.28, 16, 32);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0xc084fc });
+      waypointBeacon3 = new THREE.Mesh(ringGeo, ringMat);
+      waypointBeacon3.rotation.x = Math.PI / 2;
+      waypointBeacon3.position.set(0, 3.2, 0);
+      island.add(waypointBeacon3);
+
+      const altar = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.6, 0.7, 8),
+        new THREE.MeshStandardMaterial({ color: 0xddd6fe, roughness: 0.5 }));
+      altar.position.set(0, 3.05, 0);
+      altar.receiveShadow = true;
+      island.add(altar);
+
+      scene.add(island);
+    }
+
     function createBridge() {
       const bridge = new THREE.Group();
       bridge.position.set(0, 2.9, 0);
@@ -970,27 +1096,61 @@
       const plankMat = new THREE.MeshStandardMaterial({ color: 0xa16207, roughness: 0.9 });
       const railMat = new THREE.MeshStandardMaterial({ color: 0x78350f });
 
-      // 東西向木橋 (連結島嶼 1 與島嶼 2)
+      // 主橋面 (東西向 1 號島到 2 號島)
       const plankGeoEW = new THREE.BoxGeometry(24, 0.6, 4.2);
       const plankMeshEW = new THREE.Mesh(plankGeoEW, plankMat);
       plankMeshEW.receiveShadow = true;
       bridge.add(plankMeshEW);
 
+      // 北向橋面 (通往第 3 號島)
+      const plankGeoNS = new THREE.BoxGeometry(4.2, 0.6, 20);
+      const plankMeshNS = new THREE.Mesh(plankGeoNS, plankMat);
+      plankMeshNS.position.set(0, 0, -10);
+      plankMeshNS.receiveShadow = true;
+      bridge.add(plankMeshNS);
+
+      // 中央路口圓形基座
+      const hubGeo = new THREE.CylinderGeometry(3.2, 3.2, 0.65, 16);
+      const hubMesh = new THREE.Mesh(hubGeo, plankMat);
+      hubMesh.position.set(0, 0.02, 0);
+      bridge.add(hubMesh);
+
+      // 東西橋墩
       for (let x = -8; x <= 8; x += 8) {
         const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 5.5, 8), plankMat);
         pillar.position.set(x, -2.5, 0);
         bridge.add(pillar);
       }
+      // 北向橋墩
+      for (let z = -6; z >= -18; z -= 6) {
+        const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 5.5, 8), plankMat);
+        pillar.position.set(0, -2.5, z);
+        bridge.add(pillar);
+      }
 
-      // 南側欄杆
+      // 南護欄 (持續)
       const railSouth = new THREE.Mesh(new THREE.BoxGeometry(24, 0.25, 0.25), railMat);
       railSouth.position.set(0, 0.9, 1.9);
       bridge.add(railSouth);
 
-      // 北側欄杆
-      const railNorth = new THREE.Mesh(new THREE.BoxGeometry(24, 0.25, 0.25), railMat);
-      railNorth.position.set(0, 0.9, -1.9);
-      bridge.add(railNorth);
+      // 北護欄 (留出往北路口)
+      const railNorthW = new THREE.Mesh(new THREE.BoxGeometry(9.8, 0.25, 0.25), railMat);
+      railNorthW.position.set(-7.1, 0.9, -1.9);
+      bridge.add(railNorthW);
+
+      const railNorthE = new THREE.Mesh(new THREE.BoxGeometry(9.8, 0.25, 0.25), railMat);
+      railNorthE.position.set(7.1, 0.9, -1.9);
+      bridge.add(railNorthE);
+
+      // 北向西護欄
+      const railNW = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 18), railMat);
+      railNW.position.set(-1.9, 0.9, -11);
+      bridge.add(railNW);
+
+      // 北向東護欄
+      const railNE = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 18), railMat);
+      railNE.position.set(1.9, 0.9, -11);
+      bridge.add(railNE);
 
       scene.add(bridge);
     }
@@ -1044,6 +1204,90 @@
     // ==================== 動態樹木系統 (十關三星種滿十棵樹) ====================
     let island1Trees = [];
     let island2Trees = [];
+    let island3Trees = [];
+
+    // 第三座島專屬樹木：魔法星光樹
+    function createIsland3Tree(x, y, z) {
+      const tree = new THREE.Group();
+      tree.position.set(x, y, z);
+
+      // 樹幹 (紫檀色)
+      const trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.35, 0.55, 2.2, 8),
+        new THREE.MeshStandardMaterial({ color: 0x581c87, roughness: 0.85 })
+      );
+      trunk.position.y = 1.1;
+      trunk.castShadow = true;
+      tree.add(trunk);
+
+      // 主樹冠 (粉櫻魔法雲)
+      const leafMat = new THREE.MeshStandardMaterial({
+        color: 0xec4899,
+        roughness: 0.5,
+        emissive: 0x831843,
+        emissiveIntensity: 0.25
+      });
+      const foliageMain = new THREE.Mesh(new THREE.DodecahedronGeometry(1.65, 1), leafMat);
+      foliageMain.position.y = 2.9;
+      foliageMain.castShadow = true;
+      tree.add(foliageMain);
+
+      // 頂部樹冠 (淡紫粉色)
+      const leafMatTop = new THREE.MeshStandardMaterial({
+        color: 0xf472b6,
+        roughness: 0.5,
+        emissive: 0xbe185d,
+        emissiveIntensity: 0.2
+      });
+      const foliageTop = new THREE.Mesh(new THREE.DodecahedronGeometry(1.15, 1), leafMatTop);
+      foliageTop.position.set(0, 3.8, 0);
+      foliageTop.castShadow = true;
+      tree.add(foliageTop);
+
+      // 閃耀魔法星光果實 (金黃閃耀八面體)
+      const starMat = new THREE.MeshStandardMaterial({
+        color: 0xfef08a,
+        emissive: 0xf59e0b,
+        emissiveIntensity: 0.6,
+        roughness: 0.2
+      });
+      for (let i = 0; i < 5; i++) {
+        const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.28), starMat);
+        const ang = (i / 5) * Math.PI * 2;
+        star.position.set(Math.cos(ang) * 1.35, 2.7 + (i % 2) * 0.45, Math.sin(ang) * 1.35);
+        tree.add(star);
+      }
+
+      // 樹頂浮動大星石
+      const topGem = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.42),
+        new THREE.MeshStandardMaterial({
+          color: 0x38bdf8,
+          emissive: 0x0284c7,
+          emissiveIntensity: 0.5,
+          roughness: 0.1
+        })
+      );
+      topGem.position.y = 4.8;
+      tree.add(topGem);
+
+      tree.visible = false;
+      return tree;
+    }
+
+    function buildIsland3Trees(islandGroup) {
+      island3Trees = [];
+      const angles = [45, 80, 115, 150, 210, 245, 280, 315];
+      const R = 12.0;
+      angles.forEach(deg => {
+        const rad = (deg * Math.PI) / 180;
+        const x = R * Math.cos(rad);
+        const z = R * Math.sin(rad);
+        const t = createIsland3Tree(x, 3.0, z);
+        islandGroup.add(t);
+        island3Trees.push(t);
+      });
+    }
 
     // 第一座島嶼樹木品種 A：青翠層疊圓形果樹 (帶可愛紅果實)
     function createIsland1Tree(x, y, z) {
@@ -1173,6 +1417,7 @@
     function updateIslandTrees() {
       const i1ThreeStars = Object.values(gameState.island1Progress).filter(s => s === 3).length;
       const i2ThreeStars = Object.values(gameState.island2Progress).filter(s => s === 3).length;
+      const i3ThreeStars = Object.values(gameState.island3Progress).filter(s => s === 3).length;
 
       island1Trees.forEach((tree, idx) => {
         tree.visible = (idx < i1ThreeStars);
@@ -1180,6 +1425,10 @@
 
       island2Trees.forEach((tree, idx) => {
         tree.visible = (idx < i2ThreeStars);
+      });
+
+      island3Trees.forEach((tree, idx) => {
+        tree.visible = (idx < i3ThreeStars);
       });
     }
 
@@ -1297,9 +1546,7 @@
     });
 
     // 觸控虛擬方向鍵
-    function handleDpad(dir, isPressed) {
-      dpadState[dir] = isPressed;
-    }
+    
 
     // ==================== 平板與手機點擊移動 (Tap-to-Move) 系統 ====================
     let pointerStartX = 0;
@@ -1309,7 +1556,7 @@
     function handlePointerDown(e) {
       if (gameState.currentView !== '3d-world') return;
       if (e.target && typeof e.target.closest === 'function') {
-        if (e.target.closest('button, nav, #virtual-dpad, .card-candy, [role="dialog"]')) return;
+        if (e.target.closest('button, nav, .card-candy, [role="dialog"]')) return;
       }
       pointerStartX = e.clientX;
       pointerStartY = e.clientY;
@@ -1319,7 +1566,7 @@
     function handlePointerUp(e) {
       if (gameState.currentView !== '3d-world') return;
       if (e.target && typeof e.target.closest === 'function') {
-        if (e.target.closest('button, nav, #virtual-dpad, .card-candy, [role="dialog"]')) return;
+        if (e.target.closest('button, nav, .card-candy, [role="dialog"]')) return;
       }
 
       const dist = Math.hypot(e.clientX - pointerStartX, e.clientY - pointerStartY);
@@ -1355,8 +1602,15 @@
       if (distToIs1 <= 17.5) return true;
       const distToIs2 = Math.hypot(x - 28, z);
       if (distToIs2 <= 17.5) return true;
-      // 東西向木橋 (連結島嶼 1 與 2，半寬約 2.1)
+      const distToIs3 = Math.hypot(x, z - (-36));
+      if (distToIs3 <= 17.5) return true;
+
+      // 主橋面 (東西向)
       if (x >= -14 && x <= 14 && Math.abs(z) <= 2.2) return true;
+      // 北向橋面 (通往第三島)
+      if (Math.abs(x) <= 2.2 && z >= -22 && z <= 0) return true;
+      // 中央路口
+      if (Math.abs(x) <= 3.0 && Math.abs(z) <= 3.0) return true;
       return false;
     }
 
@@ -1366,64 +1620,99 @@
 
       const dist1 = Math.hypot(finalX - (-28), finalZ);
       const dist2 = Math.hypot(finalX - 28, finalZ);
-      const onBridgeArea = (finalX >= -13.5 && finalX <= 13.5 && Math.abs(finalZ) <= 3.2);
+      const dist3 = Math.hypot(finalX, finalZ - (-36));
+      const onBridgeAreaEW = (finalX >= -13.5 && finalX <= 13.5 && Math.abs(finalZ) <= 3.2);
+      const onBridgeAreaNS = (Math.abs(finalX) <= 3.2 && finalZ >= -22 && finalZ <= 2);
 
-      // 邊界修正：吸附至最靠近的合法陸地範圍
       if (dist1 <= 17.2) {
-        // 在島嶼 1 範圍內
+        // 第一島範圍內
       } else if (dist2 <= 17.2) {
-        // 在島嶼 2 範圍內
-      } else if (onBridgeArea) {
+        // 第二島範圍內
+      } else if (dist3 <= 17.2) {
+        // 第三島範圍內
+      } else if (onBridgeAreaEW) {
         finalZ = Math.max(-1.8, Math.min(1.8, finalZ));
-      } else if (dist1 < 25.0) {
-        const ang = Math.atan2(finalZ, finalX - (-28));
-        finalX = -28 + 16.5 * Math.cos(ang);
-        finalZ = 16.5 * Math.sin(ang);
-      } else if (dist2 < 25.0) {
-        const ang = Math.atan2(finalZ, finalX - 28);
-        finalX = 28 + 16.5 * Math.cos(ang);
-        finalZ = 16.5 * Math.sin(ang);
+      } else if (onBridgeAreaNS) {
+        finalX = Math.max(-1.8, Math.min(1.8, finalX));
+        finalZ = Math.max(-20, Math.min(0, finalZ));
       } else {
-        if (dist1 <= dist2) {
+        // 拉回最近島嶼邊緣
+        if (dist1 <= dist2 && dist1 <= dist3) {
           const ang = Math.atan2(finalZ, finalX - (-28));
           finalX = -28 + 16.0 * Math.cos(ang);
           finalZ = 16.0 * Math.sin(ang);
-        } else {
+        } else if (dist2 <= dist1 && dist2 <= dist3) {
           const ang = Math.atan2(finalZ, finalX - 28);
           finalX = 28 + 16.0 * Math.cos(ang);
           finalZ = 16.0 * Math.sin(ang);
+        } else {
+          const ang = Math.atan2(finalZ - (-36), finalX);
+          finalX = 16.0 * Math.cos(ang);
+          finalZ = -36 + 16.0 * Math.sin(ang);
         }
       }
 
       const currX = charGroup.position.x;
-      const currOnIsland1 = currX < -11.5;
-      const currOnIsland2 = currX > 11.5;
-      const currOnBridge = !currOnIsland1 && !currOnIsland2;
+      const currZ = charGroup.position.z;
+      const currOnIsland1 = currX < -11.5 && currZ > -15;
+      const currOnIsland2 = currX > 11.5 && currZ > -15;
+      const currOnIsland3 = currZ < -16;
+      const currOnBridge = !currOnIsland1 && !currOnIsland2 && !currOnIsland3;
 
-      const targetOnIsland1 = finalX < -11.5;
-      const targetOnIsland2 = finalX > 11.5;
-      const targetOnBridge = !targetOnIsland1 && !targetOnIsland2;
+      const targetOnIsland1 = finalX < -11.5 && finalZ > -15;
+      const targetOnIsland2 = finalX > 11.5 && finalZ > -15;
+      const targetOnIsland3 = finalZ < -16;
 
       const waypoints = [];
-      // 跨島導航：自動規劃經由木橋出入口，防止抄近路跳水或卡在懸崖
-      if (currOnIsland1 && targetOnIsland2) {
-        waypoints.push({ x: -11.5, z: 0 });
-        waypoints.push({ x: 11.5, z: 0 });
-      } else if (currOnIsland2 && targetOnIsland1) {
-        waypoints.push({ x: 11.5, z: 0 });
-        waypoints.push({ x: -11.5, z: 0 });
-      } else if (currOnIsland1 && targetOnBridge) {
-        waypoints.push({ x: -11.5, z: 0 });
-      } else if (currOnIsland2 && targetOnBridge) {
-        waypoints.push({ x: 11.5, z: 0 });
-      } else if (currOnBridge && targetOnIsland1) {
-        waypoints.push({ x: -11.5, z: 0 });
-      } else if (currOnBridge && targetOnIsland2) {
-        waypoints.push({ x: 11.5, z: 0 });
+      // 跨島尋路
+      if (currOnIsland1) {
+        if (targetOnIsland2) {
+          waypoints.push({ x: -11.5, z: 0 });
+          waypoints.push({ x: 11.5, z: 0 });
+        } else if (targetOnIsland3) {
+          waypoints.push({ x: -11.5, z: 0 });
+          waypoints.push({ x: 0, z: 0 });
+          waypoints.push({ x: 0, z: -18 });
+        } else if (!targetOnIsland1) {
+          waypoints.push({ x: -11.5, z: 0 });
+        }
+      } else if (currOnIsland2) {
+        if (targetOnIsland1) {
+          waypoints.push({ x: 11.5, z: 0 });
+          waypoints.push({ x: -11.5, z: 0 });
+        } else if (targetOnIsland3) {
+          waypoints.push({ x: 11.5, z: 0 });
+          waypoints.push({ x: 0, z: 0 });
+          waypoints.push({ x: 0, z: -18 });
+        } else if (!targetOnIsland2) {
+          waypoints.push({ x: 11.5, z: 0 });
+        }
+      } else if (currOnIsland3) {
+        if (targetOnIsland1) {
+          waypoints.push({ x: 0, z: -18 });
+          waypoints.push({ x: 0, z: 0 });
+          waypoints.push({ x: -11.5, z: 0 });
+        } else if (targetOnIsland2) {
+          waypoints.push({ x: 0, z: -18 });
+          waypoints.push({ x: 0, z: 0 });
+          waypoints.push({ x: 11.5, z: 0 });
+        } else if (!targetOnIsland3) {
+          waypoints.push({ x: 0, z: -18 });
+        }
+      } else if (currOnBridge) {
+        if (targetOnIsland1) {
+          waypoints.push({ x: -11.5, z: 0 });
+        } else if (targetOnIsland2) {
+          waypoints.push({ x: 11.5, z: 0 });
+        } else if (targetOnIsland3) {
+          waypoints.push({ x: 0, z: 0 });
+          waypoints.push({ x: 0, z: -18 });
+        }
       }
       waypoints.push({ x: finalX, z: finalZ });
 
       targetWaypoints = waypoints;
+      currentWaypointIdx = 0;
 
       if (targetMarkerMesh) {
         targetMarkerMesh.position.set(finalX, 3.06, finalZ);
@@ -1450,10 +1739,10 @@
       let dirX = 0;
       let dirZ = 0;
 
-      if (keys['ArrowUp'] || dpadState.up) dirZ -= 1;
-      if (keys['ArrowDown'] || dpadState.down) dirZ += 1;
-      if (keys['ArrowLeft'] || dpadState.left) dirX -= 1;
-      if (keys['ArrowRight'] || dpadState.right) dirX += 1;
+      if (keys['ArrowUp']) dirZ -= 1;
+      if (keys['ArrowDown']) dirZ += 1;
+      if (keys['ArrowLeft']) dirX -= 1;
+      if (keys['ArrowRight']) dirX += 1;
 
       // 1. 若玩家使用鍵盤或虛擬 D-pad，手動操控優先，中斷點擊導航路徑
       if (dirX !== 0 || dirZ !== 0) {
@@ -1506,7 +1795,7 @@
       }
 
       if (isMoving) {
-        walkTime += dt * 10;
+        walkTime += dt * 14;
         charLegL.rotation.x = Math.sin(walkTime) * 0.65;
         charLegR.rotation.x = -Math.sin(walkTime) * 0.65;
         charBody.position.y = 1.8 + Math.abs(Math.sin(walkTime * 2)) * 0.15;
@@ -1521,13 +1810,14 @@
       }
 
       // 視角平滑跟隨 (獨立於畫面更新率)
-      const camLerp = 1.0 - Math.exp(-3.5 * dt);
+      const camLerp = 1.0 - Math.exp(-4.5 * dt);
       camera.position.x += (charGroup.position.x - camera.position.x) * camLerp;
       camera.position.z += (charGroup.position.z + 32 - camera.position.z) * camLerp;
       camera.lookAt(charGroup.position.x, charGroup.position.y + 1.5, charGroup.position.z);
 
       if (waypointBeacon1) waypointBeacon1.rotation.z += 0.02;
       if (waypointBeacon2) waypointBeacon2.rotation.z += 0.02;
+      if (waypointBeacon3) waypointBeacon3.rotation.z += 0.02;
 
       checkWaypointProximity();
 
@@ -1538,6 +1828,7 @@
       if (gameState.currentView !== '3d-world') return;
       const dist1 = Math.hypot(charGroup.position.x - (-28), charGroup.position.z - 0);
       const dist2 = Math.hypot(charGroup.position.x - 28, charGroup.position.z - 0);
+      const dist3 = Math.hypot(charGroup.position.x, charGroup.position.z - (-36));
 
       const WHITE_POINT_RADIUS = 3.8;
 
@@ -1546,17 +1837,27 @@
         if (!isMenuManuallyClosed) {
           document.getElementById('modal-island1-menu').classList.remove('hidden');
           document.getElementById('modal-island2-menu').classList.add('hidden');
+          document.getElementById('modal-island3-menu').classList.add('hidden');
         }
       } else if (dist2 <= WHITE_POINT_RADIUS) {
         currentNearWaypoint = 2;
         if (!isMenuManuallyClosed) {
           document.getElementById('modal-island2-menu').classList.remove('hidden');
           document.getElementById('modal-island1-menu').classList.add('hidden');
+          document.getElementById('modal-island3-menu').classList.add('hidden');
+        }
+      } else if (dist3 <= WHITE_POINT_RADIUS) {
+        currentNearWaypoint = 3;
+        if (!isMenuManuallyClosed) {
+          document.getElementById('modal-island3-menu').classList.remove('hidden');
+          document.getElementById('modal-island1-menu').classList.add('hidden');
+          document.getElementById('modal-island2-menu').classList.add('hidden');
         }
       } else {
         currentNearWaypoint = 0;
         document.getElementById('modal-island1-menu').classList.add('hidden');
         document.getElementById('modal-island2-menu').classList.add('hidden');
+        document.getElementById('modal-island3-menu').classList.add('hidden');
         isMenuManuallyClosed = false;
       }
     }
@@ -1564,6 +1865,7 @@
     function closeModals() {
       document.getElementById('modal-island1-menu').classList.add('hidden');
       document.getElementById('modal-island2-menu').classList.add('hidden');
+      document.getElementById('modal-island3-menu').classList.add('hidden');
       document.getElementById('modal-island3-animation').classList.add('hidden');
       document.getElementById('modal-celebrate').classList.add('hidden');
       isMenuManuallyClosed = true;
@@ -1573,13 +1875,16 @@
       playSound('tap');
       targetWaypoints = [];
       if (targetMarkerMesh) targetMarkerMesh.visible = false;
-      manuallyClosedWaypoint = 0;
+      isMenuManuallyClosed = false;
       if (islandNum === 1) {
         charGroup.position.set(-28, 3.1, 0);
-        camera.position.set(-28, 28, 38);
+        camera.position.set(-28, 28, 32);
       } else if (islandNum === 2) {
         charGroup.position.set(28, 3.1, 0);
-        camera.position.set(28, 28, 38);
+        camera.position.set(28, 28, 32);
+      } else if (islandNum === 3) {
+        charGroup.position.set(0, 3.1, -36);
+        camera.position.set(0, 28, -4);
       }
     }
 
@@ -1589,10 +1894,15 @@
     }
 
     function returnTo3DWorld() {
+      if (island3TimerInterval) {
+        clearInterval(island3TimerInterval);
+        island3TimerInterval = null;
+      }
       document.getElementById('modal-celebrate').classList.add('hidden');
       document.getElementById('modal-island3-animation').classList.add('hidden');
       document.getElementById('screen-island1').classList.add('hidden');
       document.getElementById('screen-island2').classList.add('hidden');
+      document.getElementById('screen-island3').classList.add('hidden');
       document.getElementById('global-keypad').classList.add('hidden');
       document.getElementById('screen-3d-world').classList.remove('hidden');
       gameState.currentView = '3d-world';
@@ -1607,10 +1917,12 @@
         charGroup.position.set(-28, 3.1, 0);
       } else if (gameState.selectedIsland === 2) {
         charGroup.position.set(28, 3.1, 0);
+      } else if (gameState.selectedIsland === 3) {
+        charGroup.position.set(0, 3.1, -36);
       }
 
       updateStarsDisplay();
-      checkWaypointProximity(); // Show menu immediately because player is on white spot!
+      checkWaypointProximity();
       window.scrollTo(0, 0);
     }
 
@@ -1619,8 +1931,10 @@
       gameState.selectedIsland = islandNum;
       if (islandNum === 1) {
         startIsland1Stage(base);
-      } else {
+      } else if (islandNum === 2) {
         startIsland2Stage(base);
+      } else if (islandNum === 3) {
+        startIsland3Stage(base);
       }
     }
 
@@ -1643,7 +1957,11 @@
         const el = document.getElementById(`stars-i2-${k}`);
         if (el) el.innerHTML = renderStars(gameState.island2Progress[k]);
       }
-
+      for (const k in gameState.island3Progress) {
+        total += gameState.island3Progress[k];
+        const el = document.getElementById(`stars-i3-${k}`);
+        if (el) el.innerHTML = renderStars(gameState.island3Progress[k]);
+      }
 
       gameState.totalStars = total;
       const navStars = document.getElementById('nav-stars-count');
@@ -1675,12 +1993,34 @@
     function generateIsland1Questions(base) {
       island1QuestionsPool = [];
 
-      // 1. 三題乘數為三個連續數字 startK, startK+1, startK+2 (乘數介於 2 ~ 9，因此 startK 介於 2 ~ 7)
-      const possibleStarts = [2, 3, 4, 5, 6, 7];
-      const startK = possibleStarts[Math.floor(Math.random() * possibleStarts.length)];
-      const counts = [startK, startK + 1, startK + 2];
+      // 篩選符合條件的乘數候選：
+      // 1. 乘數不是 1 (c >= 2)
+      // 2. 被乘數與乘數不相同 (c !== base)
+      // 3. 積在 45 以內 (base * c <= 45)
+      const validCounts = [];
+      for (let c = 2; c <= 9; c++) {
+        if (c !== base && (base * c) <= 45) {
+          validCounts.push(c);
+        }
+      }
 
-      // 前三題：倍數依序為三個連續數字
+      // 找出連續 3 個遞增乘數 [k, k+1, k+2]
+      const consecutiveTriplets = [];
+      for (let i = 0; i < validCounts.length - 2; i++) {
+        if (validCounts[i + 1] === validCounts[i] + 1 && validCounts[i + 2] === validCounts[i] + 2) {
+          consecutiveTriplets.push([validCounts[i], validCounts[i + 1], validCounts[i + 2]]);
+        }
+      }
+
+      let counts;
+      if (consecutiveTriplets.length > 0) {
+        counts = consecutiveTriplets[Math.floor(Math.random() * consecutiveTriplets.length)];
+      } else {
+        const shuffled = [...validCounts].sort(() => Math.random() - 0.5).slice(0, 3).sort((a, b) => a - b);
+        counts = shuffled;
+      }
+
+      // 前三題：標準連加轉乘法題目
       for (let i = 0; i < 3; i++) {
         island1QuestionsPool.push({
           base: base,
@@ -1691,10 +2031,7 @@
         });
       }
 
-      // 第四題：由前三題已出過的乘數 (counts) 來出
-      // 規則：
-      // 其中 2, 5, 4, 8 的第四題只會出現多幾個幾的題型 (m1 > m2)
-      // 3, 6, 7, 9 的第四題會出現少幾個幾的題型，也會出現多幾個幾的題型 (隨機 50/50)
+      // 第四題：想一想（比一比）
       const isBaseMoreOnly = [2, 4, 5, 8].includes(base);
       const compType = isBaseMoreOnly ? 'more' : (Math.random() < 0.5 ? 'more' : 'less');
 
@@ -1851,7 +2188,11 @@
       f2.classList.add('hidden');
       f2.innerHTML = '';
 
+      // 步驟1與步驟2顯示，步驟3算式的意思隱藏
+      document.getElementById('step-2-container').classList.remove('hidden');
+
       const step3 = document.getElementById('step-3-container');
+      step3.classList.remove('hidden');
       step3.classList.add('opacity-40', 'pointer-events-none');
       document.getElementById('slot-mult-base').innerText = '';
       document.getElementById('slot-mult-base').className = 'slot-blank math-font';
@@ -1864,7 +2205,7 @@
       f3.innerHTML = '';
 
       const step4 = document.getElementById('step-4-container');
-      step4.classList.add('opacity-40', 'pointer-events-none');
+      step4.classList.add('hidden', 'opacity-40', 'pointer-events-none');
       document.getElementById('verbal-equation-lead').innerText =
         `${island1CurrentQuestion.base} × ${island1CurrentQuestion.count} ＝ ${island1CurrentQuestion.total}`;
       const vt2 = document.getElementById('verbal-total-2');
@@ -2011,11 +2352,20 @@
     }
 
     function unlockIsland1Step3() {
-      currentStepI1 = 3; // 步驟 3：算式的意思
+      currentStepI1 = 3; // 進入 3:算式的意思
+      const step2 = document.getElementById('step-2-container');
+      const step3 = document.getElementById('step-3-container');
       const step4 = document.getElementById('step-4-container');
-      step4.classList.remove('opacity-40', 'pointer-events-none');
+
+      // 清空畫面：隱藏步驟1與步驟2，單獨顯示步驟3
+      step2.classList.add('hidden');
+      step3.classList.add('hidden');
+      step4.classList.remove('hidden', 'opacity-40', 'pointer-events-none');
+
       document.getElementById('verbal-equation-lead').innerText =
-        `${island1CurrentQuestion.base} × ${island1CurrentQuestion.count} ＝ ${island1CurrentQuestion.total}`;
+        `${island1CurrentQuestion.base} × ${island1CurrentQuestion.count} = ${island1CurrentQuestion.total}`;
+      const vt2 = document.getElementById('verbal-total-2');
+      if (vt2) vt2.innerText = island1CurrentQuestion.total;
       focusSlot('slot-verbal-base1');
     }
 
@@ -2033,6 +2383,7 @@
 
       const totalDigits = String(total).length;
 
+      // 自動跳轉焦點
       if (activeSlotId === 'slot-verbal-base1' && slotBase1.innerText.trim() !== '') {
         focusSlot('slot-verbal-count1');
       } else if (activeSlotId === 'slot-verbal-count1' && slotCount1.innerText.trim() !== '') {
@@ -2045,45 +2396,54 @@
         focusSlot('slot-verbal-total2');
       }
 
-      if (slotBase1.innerText.trim() !== '' && slotCount1.innerText.trim() !== '' &&
-          slotTotal1.innerText.trim() !== '' &&
-          slotBase2.innerText.trim() !== '' && slotCount2.innerText.trim() !== '' &&
-          slotTotal2 && slotTotal2.innerText.trim() !== '') {
-        const inBase1 = parseInt(slotBase1.innerText, 10);
-        const inCount1 = parseInt(slotCount1.innerText, 10);
-        const inTotal1 = parseInt(slotTotal1.innerText, 10);
-        const inBase2 = parseInt(slotBase2.innerText, 10);
-        const inCount2 = parseInt(slotCount2.innerText, 10);
-        const inTotal2 = parseInt(slotTotal2.innerText, 10);
+      // 等待所有空格完整輸入（積如果是二位數，等兩個數字都輸入完再判定！）
+      if (!slotBase1 || slotBase1.innerText.trim() === '') return;
+      if (!slotCount1 || slotCount1.innerText.trim() === '') return;
+      if (!slotTotal1 || slotTotal1.innerText.trim().length < totalDigits) {
+        if (slotTotal1) slotTotal1.classList.remove('wrong');
+        return;
+      }
+      if (!slotBase2 || slotBase2.innerText.trim() === '') return;
+      if (!slotCount2 || slotCount2.innerText.trim() === '') return;
+      if (!slotTotal2 || slotTotal2.innerText.trim().length < totalDigits) {
+        if (slotTotal2) slotTotal2.classList.remove('wrong');
+        return;
+      }
 
-        const feedback = document.getElementById('step-4-feedback');
-        feedback.classList.remove('hidden');
+      const inBase1 = parseInt(slotBase1.innerText, 10);
+      const inCount1 = parseInt(slotCount1.innerText, 10);
+      const inTotal1 = parseInt(slotTotal1.innerText, 10);
+      const inBase2 = parseInt(slotBase2.innerText, 10);
+      const inCount2 = parseInt(slotCount2.innerText, 10);
+      const inTotal2 = parseInt(slotTotal2.innerText, 10);
 
-        if (inBase1 === base && inCount1 === count && inTotal1 === total &&
-            inBase2 === base && inCount2 === count && inTotal2 === total) {
-          playSound('correct');
-          slotBase1.className = 'slot-blank filled math-font';
-          slotCount1.className = 'slot-blank filled math-font';
-          slotTotal1.className = 'slot-blank filled math-font';
-          slotBase2.className = 'slot-blank filled math-font';
-          slotCount2.className = 'slot-blank filled math-font';
-          slotTotal2.className = 'slot-blank filled math-font';
+      const feedback = document.getElementById('step-4-feedback');
+      feedback.classList.remove('hidden');
 
-          feedback.className = 'text-center text-lg font-black mt-2 text-emerald-600';
-          feedback.innerHTML = '<span class="bpmf-font">正確</span>';
-          handleIsland1QuestionCompletion();
-        } else {
-          island1CurrentQuestionHadError = true;
-          playSound('wrong');
-          if (inBase1 !== base) slotBase1.classList.add('wrong');
-          if (inCount1 !== count) slotCount1.classList.add('wrong');
-          if (inTotal1 !== total) slotTotal1.classList.add('wrong');
-          if (inBase2 !== base) slotBase2.classList.add('wrong');
-          if (inCount2 !== count) slotCount2.classList.add('wrong');
-          if (inTotal2 !== total) slotTotal2.classList.add('wrong');
-          feedback.className = 'text-center text-lg font-black mt-2 text-rose-600 animate-pulse';
-          feedback.innerHTML = '<span class="bpmf-font text-xl">再想想看～</span>';
-        }
+      if (inBase1 === base && inCount1 === count && inTotal1 === total &&
+          inBase2 === base && inCount2 === count && inTotal2 === total) {
+        playSound('correct');
+        slotBase1.className = 'slot-blank filled math-font';
+        slotCount1.className = 'slot-blank filled math-font';
+        slotTotal1.className = 'slot-blank filled math-font';
+        slotBase2.className = 'slot-blank filled math-font';
+        slotCount2.className = 'slot-blank filled math-font';
+        slotTotal2.className = 'slot-blank filled math-font';
+
+        feedback.className = 'text-center text-lg font-black mt-2 text-emerald-600';
+        feedback.innerHTML = '<span class="bpmf-font">太棒了！答對了！</span>';
+        handleIsland1QuestionCompletion();
+      } else {
+        island1CurrentQuestionHadError = true;
+        playSound('wrong');
+        if (inBase1 !== base) slotBase1.classList.add('wrong');
+        if (inCount1 !== count) slotCount1.classList.add('wrong');
+        if (inTotal1 !== total) slotTotal1.classList.add('wrong');
+        if (inBase2 !== base) slotBase2.classList.add('wrong');
+        if (inCount2 !== count) slotCount2.classList.add('wrong');
+        if (inTotal2 !== total) slotTotal2.classList.add('wrong');
+        feedback.className = 'text-center text-lg font-black mt-2 text-rose-600 animate-pulse';
+        feedback.innerHTML = '<span class="bpmf-font text-xl">再檢查一下喔！</span>';
       }
     }
 
@@ -2146,15 +2506,33 @@
 
       const chName = CH_NUM_MAP[island1CurrentQuestion.base];
       if (island1QuestionIndex + 1 >= TOTAL_QUESTIONS_I1) {
-        const stars = island1CorrectQuestions >= 4 ? 3 : (island1CorrectQuestions >= 3 ? 3 : (island1CorrectQuestions >= 2 ? 2 : 1));
+        let stars = 0;
+        if (island1CorrectQuestions === 4) {
+          stars = 3;
+        } else if (island1CorrectQuestions === 3) {
+          stars = 2;
+        } else if (island1CorrectQuestions >= 1) {
+          stars = 1;
+        } else {
+          stars = 0;
+        }
+
         setTimeout(() => {
-          playSound('fanfare');
+          if (stars > 0) {
+            playSound('fanfare');
+            document.getElementById('modal-title').innerText = `恭喜通過【${chName}的乘法】！`;
+            document.getElementById('modal-message').innerHTML =
+              `<span class="inline-block whitespace-nowrap">太棒了！答對 ${island1CorrectQuestions} 題，獲得 ${stars} 顆星！</span> <span class="inline-block whitespace-nowrap">點擊返回繼續探索！</span>`;
+          } else {
+            playSound('wrong');
+            document.getElementById('modal-title').innerText = `完成【${chName}的乘法】挑戰！`;
+            document.getElementById('modal-message').innerHTML =
+              `<span class="inline-block whitespace-nowrap">答對 ${island1CorrectQuestions} 題，獲得 0 顆星。</span> <span class="inline-block whitespace-nowrap">再練習一次一定會更厲害！</span>`;
+          }
+
           gameState.island1Progress[String(island1CurrentQuestion.base)] = Math.max(gameState.island1Progress[String(island1CurrentQuestion.base)] || 0, stars);
           updateStarsDisplay();
-          document.getElementById('modal-title').innerText = `恭喜通關${chName}的乘法！`;
           document.getElementById('modal-stars-earned').innerHTML = renderStars(stars);
-          document.getElementById('modal-message').innerHTML =
-            `<span class="inline-block whitespace-nowrap">太棒了！答對 ${stars} 題，榮獲 ${stars} 顆星！</span> <span class="inline-block whitespace-nowrap">點擊返回島嶼繼續探索！</span>`;
           document.getElementById('modal-celebrate').classList.remove('hidden');
         }, 600);
       } else {
@@ -2557,7 +2935,227 @@
       }, 500);
     }
 
-        function showIsland3ExplanationAnimation(B, M1, M2, D, totalDiff, type) {
+            // ==================== 第三島：乘法大會考 (抽背挑戰) ====================
+
+    function startIsland3Stage(base) {
+      gameState.selectedBase = base;
+      gameState.selectedIsland = 3;
+      gameState.currentView = 'island3';
+      island3QIndex = 0;
+      island3CorrectCount = 0;
+
+      // 隨機抽考 5 題不同的乘數 (1 ~ 9 隨機取 5 個)
+      const pool = [1, 2, 3, 4, 5, 6, 7, 8, 9].sort(() => Math.random() - 0.5);
+      const multipliers = pool.slice(0, 5);
+
+      island3Questions = multipliers.map(k => ({
+        base: base,
+        k: k,
+        total: base * k
+      }));
+
+      document.getElementById('screen-3d-world').classList.add('hidden');
+      document.getElementById('screen-island1').classList.add('hidden');
+      document.getElementById('screen-island2').classList.add('hidden');
+      document.getElementById('screen-island3').classList.remove('hidden');
+      document.getElementById('global-keypad').classList.remove('hidden');
+
+      const chName = CH_NUM_MAP[base];
+      document.getElementById('island3-stage-title').innerText = `${chName}的乘法大會考`;
+
+      loadIsland3Question();
+      window.scrollTo(0, 0);
+    }
+
+    function loadIsland3Question() {
+      if (island3TimerInterval) clearInterval(island3TimerInterval);
+
+      const q = island3Questions[island3QIndex];
+      island3CanAnswer = true;
+
+      // 更新進度與題目
+      document.getElementById('island3-question-progress').innerText = `第 ${island3QIndex + 1} / 5 題`;
+      document.getElementById('i3-q-base').innerText = q.base;
+      document.getElementById('i3-q-k').innerText = q.k;
+
+      const slot = document.getElementById('slot-i3-answer');
+      slot.innerText = '';
+      slot.className = 'slot-blank math-font';
+      focusSlot('slot-i3-answer');
+
+      const fb = document.getElementById('island3-feedback');
+      fb.classList.add('hidden');
+      fb.innerHTML = '';
+
+      // 5 秒倒數計時器
+      island3TimeRemaining = 5.0;
+      updateIsland3TimerUI(5.0);
+
+      const startTime = Date.now();
+      const DURATION = 5000;
+
+      island3TimerInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, (DURATION - elapsed) / 1000);
+        island3TimeRemaining = remaining;
+        updateIsland3TimerUI(remaining);
+
+        if (remaining <= 0) {
+          clearInterval(island3TimerInterval);
+          island3TimerInterval = null;
+          handleIsland3Timeout();
+        }
+      }, 50);
+    }
+
+    function updateIsland3TimerUI(remainingSec) {
+      const bar = document.getElementById('island3-timer-bar');
+      const label = document.getElementById('island3-timer-label');
+      const pct = Math.max(0, Math.min(100, (remainingSec / 5.0) * 100));
+
+      if (bar) {
+        bar.style.width = `${pct}%`;
+        if (pct > 50) {
+          bar.className = 'h-full bg-emerald-500 rounded-full transition-all duration-75';
+        } else if (pct > 25) {
+          bar.className = 'h-full bg-amber-500 rounded-full transition-all duration-75';
+        } else {
+          bar.className = 'h-full bg-rose-500 rounded-full transition-all duration-75 animate-pulse';
+        }
+      }
+      if (label) {
+        label.innerText = `⏳ 剩餘 ${remainingSec.toFixed(1)} 秒`;
+        if (remainingSec <= 1.5) {
+          label.className = 'text-rose-600 font-black animate-pulse';
+        } else {
+          label.className = 'text-purple-700 font-black';
+        }
+      }
+    }
+
+    function checkIsland3Input() {
+      if (!island3CanAnswer) return;
+      const q = island3Questions[island3QIndex];
+      const slot = document.getElementById('slot-i3-answer');
+      if (!slot) return;
+
+      const expectedTotal = q.total;
+      const expectedLen = String(expectedTotal).length;
+
+      // 等候輸入完整二位數
+      if (slot.innerText.trim().length < expectedLen) {
+        return;
+      }
+
+      island3CanAnswer = false;
+      if (island3TimerInterval) {
+        clearInterval(island3TimerInterval);
+        island3TimerInterval = null;
+      }
+
+      const userVal = parseInt(slot.innerText.trim(), 10);
+      const fb = document.getElementById('island3-feedback');
+      fb.classList.remove('hidden');
+
+      if (userVal === expectedTotal && island3TimeRemaining > 0) {
+        playSound('correct');
+        island3CorrectCount++;
+        slot.className = 'slot-blank math-font filled';
+        fb.className = 'text-center text-xl font-black mt-3 text-emerald-600';
+        fb.innerHTML = '<span class="bpmf-font">⚡ 太棒了！答對了！</span>';
+        setTimeout(() => {
+          nextIsland3Question();
+        }, 600);
+      } else {
+        playSound('wrong');
+        slot.className = 'slot-blank math-font wrong';
+        fb.className = 'text-center text-lg font-black mt-3 text-rose-600';
+        fb.innerHTML = `<span class="bpmf-font">答錯囉！正確答案是 ${expectedTotal}</span>`;
+        setTimeout(() => {
+          nextIsland3Question();
+        }, 1200);
+      }
+    }
+
+    function handleIsland3Timeout() {
+      if (!island3CanAnswer) return;
+      island3CanAnswer = false;
+      const q = island3Questions[island3QIndex];
+      const slot = document.getElementById('slot-i3-answer');
+      playSound('wrong');
+      if (slot) slot.className = 'slot-blank math-font wrong';
+
+      const fb = document.getElementById('island3-feedback');
+      fb.classList.remove('hidden');
+      fb.className = 'text-center text-lg font-black mt-3 text-rose-600';
+      fb.innerHTML = `<span class="bpmf-font">⏰ 時間到！正確答案是 ${q.total}</span>`;
+
+      setTimeout(() => {
+        nextIsland3Question();
+      }, 1200);
+    }
+
+    function nextIsland3Question() {
+      island3QIndex++;
+      if (island3QIndex < 5) {
+        loadIsland3Question();
+      } else {
+        finishIsland3Stage();
+      }
+    }
+
+    function finishIsland3Stage() {
+      const base = gameState.selectedBase;
+      const chName = CH_NUM_MAP[base];
+
+      // 5 題中：答對 3 題得 1 星，4 題得 2 星，5 題全對得 3 星
+      let stars = 0;
+      if (island3CorrectCount === 5) {
+        stars = 3;
+      } else if (island3CorrectCount === 4) {
+        stars = 2;
+      } else if (island3CorrectCount === 3) {
+        stars = 1;
+      } else {
+        stars = 0;
+      }
+
+      const prevBest = gameState.island3Progress[String(base)] || 0;
+      gameState.island3Progress[String(base)] = Math.max(prevBest, stars);
+      updateStarsDisplay();
+
+      setTimeout(() => {
+        if (stars > 0) {
+          playSound('fanfare');
+        } else {
+          playSound('wrong');
+        }
+
+        document.getElementById('modal-stars-earned').innerHTML = renderStars(stars);
+
+        if (stars === 3) {
+          document.getElementById('modal-title').innerText = `🎉 恭喜通關【${chName}的乘法大會考】！`;
+          document.getElementById('modal-message').innerHTML =
+            `<span class="inline-block whitespace-nowrap">太神了！5 題全部答對，獲得 3 顆星！🌟🌟🌟</span><br>` +
+            `<span class="inline-block whitespace-nowrap text-purple-600 font-bold mt-1">🌸 第三座島嶼種下了一棵專屬魔法星光樹！🌸</span>`;
+        } else if (stars > 0) {
+          document.getElementById('modal-title').innerText = `恭喜完成【${chName}的乘法大會考】！`;
+          document.getElementById('modal-message').innerHTML =
+            `<span class="inline-block whitespace-nowrap">答對 ${island3CorrectCount} 題，獲得 ${stars} 顆星！</span><br>` +
+            `<span class="inline-block whitespace-nowrap mt-1">挑戰 5 題全對，就能種出專屬魔法星光樹喔！</span>`;
+        } else {
+          document.getElementById('modal-title').innerText = `完成【${chName}的乘法大會考】！`;
+          document.getElementById('modal-message').innerHTML =
+            `<span class="inline-block whitespace-nowrap">答對 ${island3CorrectCount} 題，獲得 0 顆星。</span><br>` +
+            `<span class="inline-block whitespace-nowrap mt-1">別灰心，多練習幾次一定能通過！</span>`;
+        }
+
+        document.getElementById('modal-celebrate').classList.remove('hidden');
+      }, 500);
+    }
+
+
+    function showIsland3ExplanationAnimation(B, M1, M2, D, totalDiff, type) {
       playSound('notice');
       guideState = {
         active: true,
@@ -2945,6 +3543,11 @@
           const isTotal = activeSlotId.includes('total');
           maxLen = isTotal ? String(island1CurrentQuestion.total).length : 2;
         }
+      } else if (gameState.currentView === 'island3') {
+        const q = island3Questions[island3QIndex];
+        if (q) {
+          maxLen = String(q.total).length;
+        }
       }
 
       if (target.innerText === '') {
@@ -2975,10 +3578,21 @@
           const k = parseInt(parts[2], 10);
           checkIsland2Row(k);
         }
+      } else if (gameState.currentView === 'island3') {
+        if (island3CanAnswer) {
+          checkIsland3Input();
+        }
       }
     }
 
     // 初始化 3D 世界與星數顯示
+
+    // 鎖定螢幕比例，防止手勢或雙擊縮放
+    document.addEventListener('gesturestart', function(e) { e.preventDefault(); }, { passive: false });
+    document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false });
+    document.addEventListener('gestureend', function(e) { e.preventDefault(); }, { passive: false });
+    document.addEventListener('dblclick', function(e) { e.preventDefault(); }, { passive: false });
+    document.addEventListener('wheel', function(e) { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
     window.addEventListener('DOMContentLoaded', () => {
       init3DWorld();
       updateStarsDisplay();
