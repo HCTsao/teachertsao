@@ -146,6 +146,10 @@
       top: 0;
       left: 0;
       z-index: 10;
+      touch-action: none;
+    }
+    #three-canvas {
+      touch-action: none;
     }
   </style>
 </head>
@@ -770,6 +774,10 @@
     let currentNearWaypoint = 0; // 0: none, 1: island1, 2: island2
     let isMenuManuallyClosed = false;
     let walkTime = 0;
+    const clock = new THREE.Clock();
+    let targetMarkerMesh = null;
+    let targetWaypoints = [];
+    const WALK_SPEED = 9.0; // 每秒 9.0 單位，流暢自然且在 60Hz/120Hz 設備速度完全一致
 
     function init3DWorld() {
       const container = document.getElementById('canvas-container');
@@ -831,6 +839,31 @@
 
       // 建構主角角色 (站在第一座島嶼白點稍前方，往前走幾步即可踏上白點)
       createCharacter();
+
+      // 點擊移動目標光圈標記 (Tap-to-move target ring)
+      const ringOuterGeo = new THREE.RingGeometry(0.55, 0.95, 32);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0xfbbf24,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.88
+      });
+      targetMarkerMesh = new THREE.Mesh(ringOuterGeo, ringMat);
+      targetMarkerMesh.rotation.x = -Math.PI / 2;
+      targetMarkerMesh.position.set(0, 3.06, 0);
+
+      const dotGeo = new THREE.CircleGeometry(0.22, 16);
+      const dotMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.95
+      });
+      const dotMesh = new THREE.Mesh(dotGeo, dotMat);
+      targetMarkerMesh.add(dotMesh);
+
+      targetMarkerMesh.visible = false;
+      scene.add(targetMarkerMesh);
 
       window.addEventListener('resize', onWindowResize, false);
 
@@ -1268,51 +1301,217 @@
       dpadState[dir] = isPressed;
     }
 
+    // ==================== 平板與手機點擊移動 (Tap-to-Move) 系統 ====================
+    let pointerStartX = 0;
+    let pointerStartY = 0;
+    let pointerStartTime = 0;
+
+    function handlePointerDown(e) {
+      if (gameState.currentView !== '3d-world') return;
+      if (e.target && typeof e.target.closest === 'function') {
+        if (e.target.closest('button, nav, #virtual-dpad, .card-candy, [role="dialog"]')) return;
+      }
+      pointerStartX = e.clientX;
+      pointerStartY = e.clientY;
+      pointerStartTime = Date.now();
+    }
+
+    function handlePointerUp(e) {
+      if (gameState.currentView !== '3d-world') return;
+      if (e.target && typeof e.target.closest === 'function') {
+        if (e.target.closest('button, nav, #virtual-dpad, .card-candy, [role="dialog"]')) return;
+      }
+
+      const dist = Math.hypot(e.clientX - pointerStartX, e.clientY - pointerStartY);
+      const elapsed = Date.now() - pointerStartTime;
+
+      // 判定為點擊/輕觸 (非長按拖曳滑動手勢)
+      if (dist < 18 && elapsed < 650) {
+        handleGroundTap(e.clientX, e.clientY);
+      }
+    }
+
+    function handleGroundTap(clientX, clientY) {
+      if (!renderer || !camera) return;
+      const rect = renderer.domElement.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((clientX - rect.left) / rect.width) * 2 - 1,
+        -((clientY - rect.top) / rect.height) * 2 + 1
+      );
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(mouse, camera);
+      const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -3.0);
+      const hit = new THREE.Vector3();
+      if (raycaster.ray.intersectPlane(groundPlane, hit)) {
+        navigateGroundTo(hit.x, hit.z);
+      }
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown, { passive: true });
+    window.addEventListener('pointerup', handlePointerUp, { passive: true });
+
+    function canMoveTo(x, z) {
+      const distToIs1 = Math.hypot(x - (-28), z);
+      if (distToIs1 <= 17.5) return true;
+      const distToIs2 = Math.hypot(x - 28, z);
+      if (distToIs2 <= 17.5) return true;
+      // 東西向木橋 (連結島嶼 1 與 2，半寬約 2.1)
+      if (x >= -14 && x <= 14 && Math.abs(z) <= 2.2) return true;
+      return false;
+    }
+
+    function navigateGroundTo(rawTargetX, rawTargetZ) {
+      let finalX = rawTargetX;
+      let finalZ = rawTargetZ;
+
+      const dist1 = Math.hypot(finalX - (-28), finalZ);
+      const dist2 = Math.hypot(finalX - 28, finalZ);
+      const onBridgeArea = (finalX >= -13.5 && finalX <= 13.5 && Math.abs(finalZ) <= 3.2);
+
+      // 邊界修正：吸附至最靠近的合法陸地範圍
+      if (dist1 <= 17.2) {
+        // 在島嶼 1 範圍內
+      } else if (dist2 <= 17.2) {
+        // 在島嶼 2 範圍內
+      } else if (onBridgeArea) {
+        finalZ = Math.max(-1.8, Math.min(1.8, finalZ));
+      } else if (dist1 < 25.0) {
+        const ang = Math.atan2(finalZ, finalX - (-28));
+        finalX = -28 + 16.5 * Math.cos(ang);
+        finalZ = 16.5 * Math.sin(ang);
+      } else if (dist2 < 25.0) {
+        const ang = Math.atan2(finalZ, finalX - 28);
+        finalX = 28 + 16.5 * Math.cos(ang);
+        finalZ = 16.5 * Math.sin(ang);
+      } else {
+        if (dist1 <= dist2) {
+          const ang = Math.atan2(finalZ, finalX - (-28));
+          finalX = -28 + 16.0 * Math.cos(ang);
+          finalZ = 16.0 * Math.sin(ang);
+        } else {
+          const ang = Math.atan2(finalZ, finalX - 28);
+          finalX = 28 + 16.0 * Math.cos(ang);
+          finalZ = 16.0 * Math.sin(ang);
+        }
+      }
+
+      const currX = charGroup.position.x;
+      const currOnIsland1 = currX < -11.5;
+      const currOnIsland2 = currX > 11.5;
+      const currOnBridge = !currOnIsland1 && !currOnIsland2;
+
+      const targetOnIsland1 = finalX < -11.5;
+      const targetOnIsland2 = finalX > 11.5;
+      const targetOnBridge = !targetOnIsland1 && !targetOnIsland2;
+
+      const waypoints = [];
+      // 跨島導航：自動規劃經由木橋出入口，防止抄近路跳水或卡在懸崖
+      if (currOnIsland1 && targetOnIsland2) {
+        waypoints.push({ x: -11.5, z: 0 });
+        waypoints.push({ x: 11.5, z: 0 });
+      } else if (currOnIsland2 && targetOnIsland1) {
+        waypoints.push({ x: 11.5, z: 0 });
+        waypoints.push({ x: -11.5, z: 0 });
+      } else if (currOnIsland1 && targetOnBridge) {
+        waypoints.push({ x: -11.5, z: 0 });
+      } else if (currOnIsland2 && targetOnBridge) {
+        waypoints.push({ x: 11.5, z: 0 });
+      } else if (currOnBridge && targetOnIsland1) {
+        waypoints.push({ x: -11.5, z: 0 });
+      } else if (currOnBridge && targetOnIsland2) {
+        waypoints.push({ x: 11.5, z: 0 });
+      }
+      waypoints.push({ x: finalX, z: finalZ });
+
+      targetWaypoints = waypoints;
+
+      if (targetMarkerMesh) {
+        targetMarkerMesh.position.set(finalX, 3.06, finalZ);
+        targetMarkerMesh.visible = true;
+      }
+      playSound('tap');
+    }
+
     function animate3D() {
       requestAnimationFrame(animate3D);
 
       if (gameState.currentView !== '3d-world') return;
 
-      let vx = 0;
-      let vz = 0;
-      const speed = 0.38;
+      const dt = Math.min(clock.getDelta(), 0.05); // 防止分頁切換時產生巨大位移
 
-      if (keys['ArrowUp'] || dpadState.up) vz -= speed;
-      if (keys['ArrowDown'] || dpadState.down) vz += speed;
-      if (keys['ArrowLeft'] || dpadState.left) vx -= speed;
-      if (keys['ArrowRight'] || dpadState.right) vx += speed;
+      // 動態旋轉與脈動目標光圈標記
+      if (targetMarkerMesh && targetMarkerMesh.visible) {
+        targetMarkerMesh.rotation.z += dt * 2.5;
+        const pulse = 1.0 + Math.sin(Date.now() * 0.007) * 0.12;
+        targetMarkerMesh.scale.set(pulse, pulse, 1);
+      }
 
-      const isMoving = vx !== 0 || vz !== 0;
+      let isMoving = false;
+      let dirX = 0;
+      let dirZ = 0;
 
-      if (isMoving) {
-        const nextX = charGroup.position.x + vx;
-        const nextZ = charGroup.position.z + vz;
+      if (keys['ArrowUp'] || dpadState.up) dirZ -= 1;
+      if (keys['ArrowDown'] || dpadState.down) dirZ += 1;
+      if (keys['ArrowLeft'] || dpadState.left) dirX -= 1;
+      if (keys['ArrowRight'] || dpadState.right) dirX += 1;
 
-        let canMove = false;
-        const distToIs1 = Math.hypot(nextX - (-28), nextZ - 0);
-        if (distToIs1 <= 17.5) canMove = true;
-        const distToIs2 = Math.hypot(nextX - 28, nextZ - 0);
-        if (distToIs2 <= 17.5) canMove = true;
-        const distToIs3 = Math.hypot(nextX - 0, nextZ - (-44));
-        if (distToIs3 <= 17.5) canMove = true;
-        // 東西向木橋 (連結島嶼 1 與 2)
-        if (nextX >= -14 && nextX <= 14 && Math.abs(nextZ) <= 2.2) canMove = true;
-        // 北向木橋 (連結中央至島嶼 3)
-        if (Math.abs(nextX) <= 2.2 && nextZ <= 1.0 && nextZ >= -28) canMove = true;
-        if (canMove) {
+      // 1. 若玩家使用鍵盤或虛擬 D-pad，手動操控優先，中斷點擊導航路徑
+      if (dirX !== 0 || dirZ !== 0) {
+        targetWaypoints = [];
+        if (targetMarkerMesh) targetMarkerMesh.visible = false;
+
+        const len = Math.hypot(dirX, dirZ);
+        const normX = dirX / len;
+        const normZ = dirZ / len;
+        const moveDist = WALK_SPEED * dt;
+        const nextX = charGroup.position.x + normX * moveDist;
+        const nextZ = charGroup.position.z + normZ * moveDist;
+
+        if (canMoveTo(nextX, nextZ)) {
           charGroup.position.x = nextX;
           charGroup.position.z = nextZ;
         }
+        charGroup.rotation.y = Math.atan2(normX, normZ);
+        isMoving = true;
+      } else if (targetWaypoints.length > 0) {
+        // 2. 點擊移動導航路徑
+        const wp = targetWaypoints[0];
+        const dx = wp.x - charGroup.position.x;
+        const dz = wp.z - charGroup.position.z;
+        const dist = Math.hypot(dx, dz);
 
-        const targetAngle = Math.atan2(vx, vz);
-        charGroup.rotation.y = targetAngle;
+        if (dist < 0.3) {
+          targetWaypoints.shift();
+          if (targetWaypoints.length === 0) {
+            if (targetMarkerMesh) targetMarkerMesh.visible = false;
+          }
+        } else {
+          isMoving = true;
+          const step = Math.min(dist, WALK_SPEED * dt);
+          const nextX = charGroup.position.x + (dx / dist) * step;
+          const nextZ = charGroup.position.z + (dz / dist) * step;
 
-        walkTime += 0.28;
+          if (canMoveTo(nextX, nextZ)) {
+            charGroup.position.x = nextX;
+            charGroup.position.z = nextZ;
+          } else {
+            // 若遇到邊界障礙物，取消當前點
+            targetWaypoints.shift();
+            if (targetWaypoints.length === 0 && targetMarkerMesh) {
+              targetMarkerMesh.visible = false;
+            }
+          }
+          charGroup.rotation.y = Math.atan2(dx, dz);
+        }
+      }
+
+      if (isMoving) {
+        walkTime += dt * 10;
         charLegL.rotation.x = Math.sin(walkTime) * 0.65;
         charLegR.rotation.x = -Math.sin(walkTime) * 0.65;
         charBody.position.y = 1.8 + Math.abs(Math.sin(walkTime * 2)) * 0.15;
 
-        if (Math.floor(walkTime / Math.PI) > Math.floor((walkTime - 0.28) / Math.PI)) {
+        if (Math.floor(walkTime / Math.PI) > Math.floor((walkTime - dt * 10) / Math.PI)) {
           playSound('step');
         }
       } else {
@@ -1321,8 +1520,10 @@
         charBody.position.y = 1.8;
       }
 
-      camera.position.x += (charGroup.position.x - camera.position.x) * 0.05;
-      camera.position.z += (charGroup.position.z + 32 - camera.position.z) * 0.05;
+      // 視角平滑跟隨 (獨立於畫面更新率)
+      const camLerp = 1.0 - Math.exp(-3.5 * dt);
+      camera.position.x += (charGroup.position.x - camera.position.x) * camLerp;
+      camera.position.z += (charGroup.position.z + 32 - camera.position.z) * camLerp;
       camera.lookAt(charGroup.position.x, charGroup.position.y + 1.5, charGroup.position.z);
 
       if (waypointBeacon1) waypointBeacon1.rotation.z += 0.02;
@@ -1370,6 +1571,8 @@
 
     function teleportToIsland(islandNum) {
       playSound('tap');
+      targetWaypoints = [];
+      if (targetMarkerMesh) targetMarkerMesh.visible = false;
       manuallyClosedWaypoint = 0;
       if (islandNum === 1) {
         charGroup.position.set(-28, 3.1, 0);
@@ -1395,6 +1598,9 @@
       gameState.currentView = '3d-world';
 
       isMenuManuallyClosed = false;
+
+      targetWaypoints = [];
+      if (targetMarkerMesh) targetMarkerMesh.visible = false;
 
       // Ensure character is on the island white spot
       if (gameState.selectedIsland === 1) {
