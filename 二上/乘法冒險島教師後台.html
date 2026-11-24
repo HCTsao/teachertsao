@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>乘法冒險島 - 教師管理後台</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Firebase Compat SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  
+  <!-- SheetJS (Excel 匯出庫) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+    }
+    .tab-btn.active {
+      background: #4f46e5;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 sm:p-6 md:p-8">
+
+  <!-- ==================== 登入卡片 (預設密碼 8888) ==================== -->
+  <div id="login-overlay" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 text-center">
+      <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl shadow-sm">
+        👨‍🏫
+      </div>
+      <h2 class="text-2xl font-black text-slate-800 mb-1">教師管理後台驗證</h2>
+      <p class="text-sm font-bold text-slate-500 mb-6">請輸入後台通關密碼以存取學生作答紀錄</p>
+      
+      <form id="login-form" onsubmit="handleTeacherLogin(event)" class="space-y-4">
+        <div>
+          <input type="password" id="input-teacher-pass" placeholder="請輸入密碼 (預設 8888)" autofocus
+            class="w-full px-4 py-3 text-center text-xl tracking-widest font-black rounded-xl border-2 border-slate-200 focus:border-indigo-500 focus:outline-none transition">
+          <p id="login-error-msg" class="text-rose-500 text-xs font-bold mt-1.5 hidden">密碼錯誤，請重新輸入</p>
+        </div>
+        <div class="flex space-x-3">
+          <a href="乘法冒險島.html" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition text-center">
+            🎮 返回遊戲
+          </a>
+          <button type="submit" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-md transition">
+            🔓 登入後台
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== 後台主容器 ==================== -->
+  <div id="dashboard-content" class="max-w-7xl mx-auto space-y-6 hidden">
+    
+    <!-- 頂部導覽列 -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+      <div class="flex items-center space-x-3">
+        <span class="text-3xl">🏝️</span>
+        <div>
+          <h1 class="text-xl sm:text-2xl font-black text-slate-800">乘法冒險島・教師管理後台</h1>
+          <p class="text-xs font-bold text-slate-400">即時監控學生三座島嶼作答歷程與各乘法表闖關星數進度</p>
+        </div>
+      </div>
+      <div class="flex items-center flex-wrap gap-2.5">
+        <button onclick="refreshData()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs sm:text-sm flex items-center space-x-1.5 transition">
+          <span>🔄</span><span>重新整理</span>
+        </button>
+        <button onclick="exportToExcel()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs sm:text-sm shadow flex items-center space-x-1.5 transition">
+          <span>📥</span><span>匯出 Excel</span>
+        </button>
+        <button onclick="clearAllData()" class="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold rounded-xl text-xs sm:text-sm flex items-center space-x-1.5 transition">
+          <span>🧹</span><span>清空紀錄</span>
+        </button>
+        <a href="乘法冒險島.html" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs sm:text-sm shadow flex items-center space-x-1.5 transition">
+          <span>🎮</span><span>回到遊戲</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- 分頁按鈕 -->
+    <div class="flex border-b border-slate-200 space-x-2">
+      <button id="tab-btn-progress" onclick="switchTab('progress')" class="tab-btn active px-5 py-2.5 font-black text-sm rounded-t-xl transition">
+        📑 學生闖關進度總覽 (<span id="badge-total-students">0</span> 人)
+      </button>
+      <button id="tab-btn-logs" onclick="switchTab('logs')" class="tab-btn px-5 py-2.5 font-black text-sm text-slate-600 hover:bg-slate-100 rounded-t-xl transition">
+        📝 詳細作答紀錄日誌 (<span id="badge-total-records">0</span> 筆)
+      </button>
+    </div>
+
+    <!-- ==================== 分頁 1：學生闖關進度總覽 ==================== -->
+    <section id="tab-progress-section" class="space-y-6">
+      <!-- 統計卡片 -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm text-center">
+          <p class="text-xs font-bold text-slate-500 mb-1">註冊學生總數</p>
+          <p id="stat-student-count" class="text-3xl font-black text-indigo-600">0</p>
+          <p class="text-xs text-slate-400 mt-1">位學生擁有闖關帳號</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm text-center">
+          <p class="text-xs font-bold text-slate-500 mb-1">全體平均星數</p>
+          <p id="stat-avg-stars" class="text-3xl font-black text-amber-500">0.0</p>
+          <p class="text-xs text-slate-400 mt-1">顆星（滿分 72 顆）</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm text-center">
+          <p class="text-xs font-bold text-slate-500 mb-1">第一島（連加）總星數</p>
+          <p id="stat-island1-stars" class="text-3xl font-black text-emerald-600">0</p>
+          <p class="text-xs text-slate-400 mt-1">全體獲得總星數</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm text-center">
+          <p class="text-xs font-bold text-slate-500 mb-1">第三島（抽背）總星數</p>
+          <p id="stat-island3-stars" class="text-3xl font-black text-purple-600">0</p>
+          <p class="text-xs text-slate-400 mt-1">大會考達成總星數</p>
+        </div>
+      </div>
+
+      <!-- 進度篩選列 -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center">
+        <div class="flex items-center space-x-2">
+          <span class="text-sm font-bold text-slate-600">🏫 學校：</span>
+          <select id="filter-user-school" onchange="renderStudentsTable()" class="px-3 py-1.5 rounded-xl border border-slate-300 text-sm font-bold">
+            <option value="">全部學校</option>
+          </select>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="text-sm font-bold text-slate-600">👥 班級：</span>
+          <select id="filter-user-class" onchange="renderStudentsTable()" class="px-3 py-1.5 rounded-xl border border-slate-300 text-sm font-bold">
+            <option value="">全部班級</option>
+          </select>
+        </div>
+        <div class="flex items-center space-x-2 flex-1 min-w-[200px]">
+          <span class="text-sm font-bold text-slate-600">🔍 搜尋學生：</span>
+          <input type="text" id="filter-user-name" oninput="renderStudentsTable()" placeholder="輸入學生姓名或座號..."
+            class="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 text-sm">
+        </div>
+      </div>
+
+      <!-- 學生進度表格 -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-black">
+              <tr>
+                <th class="py-3 px-4">學校</th>
+                <th class="py-3 px-3">班級</th>
+                <th class="py-3 px-3">座號</th>
+                <th class="py-3 px-4">姓名</th>
+                <th class="py-3 px-4 text-center">第一島 (連加轉乘法)</th>
+                <th class="py-3 px-4 text-center">第二島 (乘法表填空)</th>
+                <th class="py-3 px-4 text-center">第三島 (乘法大會考)</th>
+                <th class="py-3 px-4 text-center">總獲得星星 ⭐</th>
+                <th class="py-3 px-4 text-center">最後登入時間</th>
+                <th class="py-3 px-3 text-center">操作</th>
+              </tr>
+            </thead>
+            <tbody id="student-progress-tbody" class="divide-y divide-slate-100">
+              <tr>
+                <td colspan="10" class="py-8 text-center text-slate-400 font-bold">載入中...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 分頁 2：詳細作答紀錄日誌 ==================== -->
+    <section id="tab-logs-section" class="space-y-6 hidden">
+      <!-- 統計卡片 -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm text-center">
+          <p class="text-xs font-bold text-slate-500 mb-1">累計作答題數</p>
+          <p id="stat-total-attempts" class="text-3xl font-black text-indigo-600">0</p>
+          <p class="text-xs text-slate-400 mt-1">次題型判斷與填空</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm text-center">
+          <p class="text-xs font-bold text-slate-500 mb-1">全體平均答對率</p>
+          <p id="stat-accuracy-rate" class="text-3xl font-black text-emerald-600">0%</p>
+          <p class="text-xs text-slate-400 mt-1">正解題數佔比</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm text-center">
+          <p class="text-xs font-bold text-slate-500 mb-1">累計錯誤次數</p>
+          <p id="stat-wrong-count" class="text-3xl font-black text-rose-600">0</p>
+          <p class="text-xs text-slate-400 mt-1">次作答錯誤</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm text-center">
+          <p class="text-xs font-bold text-slate-500 mb-1">最常出錯乘法段</p>
+          <p id="stat-top-mistake-base" class="text-3xl font-black text-amber-600">-</p>
+          <p class="text-xs text-slate-400 mt-1">需要重點補救複習</p>
+        </div>
+      </div>
+
+      <!-- 日誌篩選列 -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center">
+        <div class="flex items-center space-x-2">
+          <span class="text-sm font-bold text-slate-600">📅 日期區間：</span>
+          <input type="date" id="filter-log-start" onchange="renderLogsTable()" class="px-2.5 py-1.5 rounded-xl border border-slate-300 text-sm font-bold">
+          <span class="text-slate-400">～</span>
+          <input type="date" id="filter-log-end" onchange="renderLogsTable()" class="px-2.5 py-1.5 rounded-xl border border-slate-300 text-sm font-bold">
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="text-sm font-bold text-slate-600">🏝️ 島嶼關卡：</span>
+          <select id="filter-log-island" onchange="renderLogsTable()" class="px-3 py-1.5 rounded-xl border border-slate-300 text-sm font-bold">
+            <option value="">全部島嶼關卡</option>
+            <option value="1">第一島：連加到乘法</option>
+            <option value="2">第二島：十十乘法表</option>
+            <option value="3">第三島：乘法大會考</option>
+          </select>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="text-sm font-bold text-slate-600">🔢 乘法段：</span>
+          <select id="filter-log-base" onchange="renderLogsTable()" class="px-3 py-1.5 rounded-xl border border-slate-300 text-sm font-bold">
+            <option value="">全部 (2~9)</option>
+            <option value="2">2 的乘法</option>
+            <option value="3">3 的乘法</option>
+            <option value="4">4 的乘法</option>
+            <option value="5">5 的乘法</option>
+            <option value="6">6 的乘法</option>
+            <option value="7">7 的乘法</option>
+            <option value="8">8 的乘法</option>
+            <option value="9">9 的乘法</option>
+          </select>
+        </div>
+        <div class="flex items-center space-x-2">
+          <label class="flex items-center space-x-1.5 cursor-pointer text-sm font-bold text-rose-600">
+            <input type="checkbox" id="filter-log-wrong-only" onchange="renderLogsTable()" class="w-4 h-4 rounded text-rose-600">
+            <span>❌ 只看錯題</span>
+          </label>
+        </div>
+        <div class="flex items-center space-x-2 flex-1 min-w-[180px]">
+          <span class="text-sm font-bold text-slate-600">🔍 學生搜尋：</span>
+          <input type="text" id="filter-log-keyword" oninput="renderLogsTable()" placeholder="搜尋姓名/學校/班級..."
+            class="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 text-sm">
+        </div>
+      </div>
+
+      <!-- 作答紀錄表格 -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-black">
+              <tr>
+                <th class="py-3 px-4">作答時間</th>
+                <th class="py-3 px-3">學校</th>
+                <th class="py-3 px-3">班級</th>
+                <th class="py-3 px-2">座號</th>
+                <th class="py-3 px-3">姓名</th>
+                <th class="py-3 px-3">島嶼</th>
+                <th class="py-3 px-2 text-center">段</th>
+                <th class="py-3 px-4">題目情境 / 算式</th>
+                <th class="py-3 px-3">學生作答</th>
+                <th class="py-3 px-3">正確解答</th>
+                <th class="py-3 px-3 text-center">結果</th>
+                <th class="py-3 px-3 text-center">操作</th>
+              </tr>
+            </thead>
+            <tbody id="records-log-tbody" class="divide-y divide-slate-100">
+              <tr>
+                <td colspan="12" class="py-8 text-center text-slate-400 font-bold">載入中...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    // ==================== Firebase 配置與密碼體系 ====================
+    const ADMIN_PASSWORD = '0987912307'; // 敏感操作管理員密碼
+    const TEACHER_ENTRY_PASSWORD = '8888'; // 進入後台密碼
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCFNaVRETt062_As1hF7Mfyr22pKMG-lvk",
+      authDomain: "chickenrabbit-ea442.firebaseapp.com",
+      databaseURL: "https://chickenrabbit-ea442-default-rtdb.firebaseio.com",
+      projectId: "chickenrabbit-ea442",
+      storageBucket: "chickenrabbit-ea442.firebasestorage.app",
+      messagingSenderId: "65728951973",
+      appId: "1:65728951973:web:eb52738ca86ed7175abf4c"
+    };
+
+    let database = null;
+    let rawUsers = {};
+    let rawRecords = [];
+
+    // 初始化 Firebase
+    try {
+      if (typeof firebase !== 'undefined') {
+        if (!firebase.apps.length) {
+          firebase.initializeApp(firebaseConfig);
+        }
+        database = firebase.database();
+      }
+    } catch (e) {
+      console.error("Firebase init failed:", e);
+    }
+
+    // 檢查 Session 登入狀態
+    window.addEventListener('DOMContentLoaded', () => {
+      const isAuth = sessionStorage.getItem('teacher_auth_passed');
+      if (isAuth === 'true') {
+        unlockDashboard();
+      }
+    });
+
+    function handleTeacherLogin(e) {
+      e.preventDefault();
+      const input = document.getElementById('input-teacher-pass').value.trim();
+      if (input === TEACHER_ENTRY_PASSWORD || input === ADMIN_PASSWORD) {
+        sessionStorage.setItem('teacher_auth_passed', 'true');
+        unlockDashboard();
+      } else {
+        const err = document.getElementById('login-error-msg');
+        err.classList.remove('hidden');
+        document.getElementById('input-teacher-pass').focus();
+      }
+    }
+
+    function unlockDashboard() {
+      document.getElementById('login-overlay').classList.add('hidden');
+      document.getElementById('dashboard-content').classList.remove('hidden');
+      listenToFirebase();
+    }
+
+    function switchTab(tab) {
+      const btnProg = document.getElementById('tab-btn-progress');
+      const btnLogs = document.getElementById('tab-btn-logs');
+      const secProg = document.getElementById('tab-progress-section');
+      const secLogs = document.getElementById('tab-logs-section');
+
+      if (tab === 'progress') {
+        btnProg.classList.add('active');
+        btnProg.classList.remove('text-slate-600');
+        btnLogs.classList.remove('active');
+        btnLogs.classList.add('text-slate-600');
+        secProg.classList.remove('hidden');
+        secLogs.classList.add('hidden');
+      } else {
+        btnLogs.classList.add('active');
+        btnLogs.classList.remove('text-slate-600');
+        btnProg.classList.remove('active');
+        btnProg.classList.add('text-slate-600');
+        secLogs.classList.remove('hidden');
+        secProg.classList.add('hidden');
+      }
+    }
+
+    // ==================== 即時監聽 Firebase ====================
+    function listenToFirebase() {
+      if (!database) {
+        console.warn("Database not initialized");
+        return;
+      }
+
+      // 1. 監聽學生進度表
+      database.ref('multiplication_island/users').on('value', snapshot => {
+        rawUsers = snapshot.val() || {};
+        updateFilterDropdowns();
+        renderStudentsTable();
+      });
+
+      // 2. 監聽作答日誌
+      database.ref('multiplication_island/records').on('value', snapshot => {
+        const val = snapshot.val() || {};
+        rawRecords = Object.keys(val).map(k => Object.assign({ id: k }, val[k]));
+        // 依時間倒序
+        rawRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        renderLogsTable();
+      });
+    }
+
+    function refreshData() {
+      if (!database) return;
+      database.ref('multiplication_island/users').once('value').then(s => {
+        rawUsers = s.val() || {};
+        renderStudentsTable();
+      });
+      database.ref('multiplication_island/records').once('value').then(s => {
+        const val = s.val() || {};
+        rawRecords = Object.keys(val).map(k => Object.assign({ id: k }, val[k]));
+        rawRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        renderLogsTable();
+      });
+    }
+
+    // ==================== 下拉選單動態更新 ====================
+    function updateFilterDropdowns() {
+      const schoolSet = new Set();
+      const classSet = new Set();
+
+      Object.values(rawUsers).forEach(u => {
+        if (u.school) schoolSet.add(u.school);
+        if (u.className) classSet.add(u.className);
+      });
+
+      const selSchool = document.getElementById('filter-user-school');
+      const curSchool = selSchool.value;
+      selSchool.innerHTML = '<option value="">全部學校</option>';
+      Array.from(schoolSet).sort().forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.innerText = s;
+        selSchool.appendChild(opt);
+      });
+      selSchool.value = curSchool;
+
+      const selClass = document.getElementById('filter-user-class');
+      const curClass = selClass.value;
+      selClass.innerHTML = '<option value="">全部班級</option>';
+      Array.from(classSet).sort().forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.innerText = c;
+        selClass.appendChild(opt);
+      });
+      selClass.value = curClass;
+    }
+
+    // ==================== 渲染學生進度總覽 ====================
+    function renderStudentsTable() {
+      const schoolFilter = document.getElementById('filter-user-school').value;
+      const classFilter = document.getElementById('filter-user-class').value;
+      const nameFilter = document.getElementById('filter-user-name').value.trim().toLowerCase();
+
+      const userList = Object.values(rawUsers).filter(u => {
+        if (schoolFilter && u.school !== schoolFilter) return false;
+        if (classFilter && u.className !== classFilter) return false;
+        if (nameFilter) {
+          const matched = (u.name && u.name.toLowerCase().includes(nameFilter)) ||
+                          (u.seat && String(u.seat).includes(nameFilter));
+          if (!matched) return false;
+        }
+        return true;
+      });
+
+      // 排序：學校 > 班級 > 座號
+      userList.sort((a, b) => {
+        if (a.school !== b.school) return (a.school || '').localeCompare(b.school || '');
+        if (a.className !== b.className) return (a.className || '').localeCompare(b.className || '');
+        return parseInt(a.seat || 0, 10) - parseInt(b.seat || 0, 10);
+      });
+
+      // 統計數據更新
+      document.getElementById('badge-total-students').innerText = Object.keys(rawUsers).length;
+      document.getElementById('stat-student-count').innerText = userList.length;
+
+      let totalStarsSum = 0;
+      let i1StarsSum = 0;
+      let i3StarsSum = 0;
+
+      userList.forEach(u => {
+        const i1Stars = Object.values(u.island1Progress || {}).reduce((a, b) => a + b, 0);
+        const i3Stars = Object.values(u.island3Progress || {}).reduce((a, b) => a + b, 0);
+        const tStars = u.totalStars !== undefined ? u.totalStars : (i1Stars + Object.values(u.island2Progress || {}).reduce((a, b) => a + b, 0) + i3Stars);
+        totalStarsSum += tStars;
+        i1StarsSum += i1Stars;
+        i3StarsSum += i3Stars;
+      });
+
+      const avgStars = userList.length > 0 ? (totalStarsSum / userList.length).toFixed(1) : '0.0';
+      document.getElementById('stat-avg-stars').innerText = avgStars;
+      document.getElementById('stat-island1-stars').innerText = i1StarsSum;
+      document.getElementById('stat-island3-stars').innerText = i3StarsSum;
+
+      const tbody = document.getElementById('student-progress-tbody');
+      if (userList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" class="py-8 text-center text-slate-400 font-bold">無符合條件之學生資料</td></tr>`;
+        return;
+      }
+
+      function renderMiniStarsBar(progObj) {
+        let starsTotal = 0;
+        let badges = [];
+        for (let b = 2; b <= 9; b++) {
+          const s = (progObj && progObj[String(b)]) || 0;
+          starsTotal += s;
+          const bgCol = s === 3 ? 'bg-amber-100 text-amber-800 border-amber-300' :
+                        s > 0 ? 'bg-sky-50 text-sky-700 border-sky-200' :
+                        'bg-slate-50 text-slate-400 border-slate-200';
+          badges.push(`<span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-black border ${bgCol}">${b}★${s}</span>`);
+        }
+        return `<div class="flex flex-wrap gap-1 justify-center max-w-[240px] mx-auto">${badges.join('')}</div>`;
+      }
+
+      tbody.innerHTML = userList.map(u => {
+        const i1Total = Object.values(u.island1Progress || {}).reduce((a, b) => a + b, 0);
+        const i2Total = Object.values(u.island2Progress || {}).reduce((a, b) => a + b, 0);
+        const i3Total = Object.values(u.island3Progress || {}).reduce((a, b) => a + b, 0);
+        const total = u.totalStars !== undefined ? u.totalStars : (i1Total + i2Total + i3Total);
+        const lastActive = u.lastActiveAt || u.lastLoginAt ? new Date(u.lastActiveAt || u.lastLoginAt).toLocaleString('zh-TW', { hour12: false }) : '-';
+
+        return `
+          <tr class="hover:bg-slate-50/80 transition font-bold">
+            <td class="py-3 px-4 font-black text-slate-800">${u.school || '-'}</td>
+            <td class="py-3 px-3 text-indigo-700">${u.className || '-'}</td>
+            <td class="py-3 px-3 text-slate-600">${u.seat || '-'}</td>
+            <td class="py-3 px-4 text-slate-900 font-black">${u.name || '-'}</td>
+            <td class="py-3 px-4 text-center">
+              <div class="font-black text-emerald-700 mb-1">共 ${i1Total}/24 顆星</div>
+              ${renderMiniStarsBar(u.island1Progress)}
+            </td>
+            <td class="py-3 px-4 text-center">
+              <div class="font-black text-amber-700 mb-1">共 ${i2Total}/24 顆星</div>
+              ${renderMiniStarsBar(u.island2Progress)}
+            </td>
+            <td class="py-3 px-4 text-center">
+              <div class="font-black text-purple-700 mb-1">共 ${i3Total}/24 顆星</div>
+              ${renderMiniStarsBar(u.island3Progress)}
+            </td>
+            <td class="py-3 px-4 text-center">
+              <span class="inline-flex items-center px-3 py-1 bg-amber-50 text-amber-900 border border-amber-300 rounded-full font-black text-base shadow-sm">
+                ⭐ ${total}
+              </span>
+            </td>
+            <td class="py-3 px-4 text-center text-xs text-slate-500 font-medium">${lastActive}</td>
+            <td class="py-3 px-3 text-center">
+              <button onclick="resetStudentProgress('${u.userKey}', '${u.name}')" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition" title="重置該學生星數進度">
+                🔄
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ==================== 渲染作答紀錄日誌 ====================
+    function renderLogsTable() {
+      const startDate = document.getElementById('filter-log-start').value;
+      const endDate = document.getElementById('filter-log-end').value;
+      const islandFilter = document.getElementById('filter-log-island').value;
+      const baseFilter = document.getElementById('filter-log-base').value;
+      const wrongOnly = document.getElementById('filter-log-wrong-only').checked;
+      const keyword = document.getElementById('filter-log-keyword').value.trim().toLowerCase();
+
+      const filtered = rawRecords.filter(r => {
+        if (wrongOnly && r.isCorrect) return false;
+        if (islandFilter && String(r.island) !== islandFilter) return false;
+        if (baseFilter && String(r.base) !== baseFilter) return false;
+
+        if (startDate || endDate) {
+          const recDate = r.timestamp ? new Date(r.timestamp).toISOString().split('T')[0] : '';
+          if (startDate && recDate < startDate) return false;
+          if (endDate && recDate > endDate) return false;
+        }
+
+        if (keyword) {
+          const text = [r.studentName, r.school, r.className, r.questionText, r.studentAnswer].join(' ').toLowerCase();
+          if (!text.includes(keyword)) return false;
+        }
+
+        return true;
+      });
+
+      // 統計數據
+      document.getElementById('badge-total-records').innerText = rawRecords.length;
+      document.getElementById('stat-total-attempts').innerText = filtered.length;
+
+      const correctCount = filtered.filter(r => r.isCorrect).length;
+      const wrongCount = filtered.length - correctCount;
+      const acc = filtered.length > 0 ? Math.round((correctCount / filtered.length) * 100) : 0;
+
+      document.getElementById('stat-accuracy-rate').innerText = `${acc}%`;
+      document.getElementById('stat-wrong-count').innerText = wrongCount;
+
+      // 計算最常出錯的乘法表段
+      const baseMistakes = {};
+      filtered.filter(r => !r.isCorrect).forEach(r => {
+        if (r.base) {
+          baseMistakes[r.base] = (baseMistakes[r.base] || 0) + 1;
+        }
+      });
+      let topMistakeBase = '-';
+      let maxCount = 0;
+      for (const b in baseMistakes) {
+        if (baseMistakes[b] > maxCount) {
+          maxCount = baseMistakes[b];
+          topMistakeBase = `${b} 的乘法 (${maxCount} 次錯誤)`;
+        }
+      }
+      document.getElementById('stat-top-mistake-base').innerText = topMistakeBase;
+
+      const tbody = document.getElementById('records-log-tbody');
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="12" class="py-8 text-center text-slate-400 font-bold">無符合條件之作答紀錄</td></tr>`;
+        return;
+      }
+
+      const islandBadges = {
+        1: '<span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-xs font-black">第1島:連加</span>',
+        2: '<span class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-xs font-black">第2島:乘法表</span>',
+        3: '<span class="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-full text-xs font-black">第3島:會考</span>'
+      };
+
+      tbody.innerHTML = filtered.map(r => {
+        const timeStr = r.timestamp ? new Date(r.timestamp).toLocaleString('zh-TW', { hour12: false }) : (r.dateStr || '-');
+        const islandBadge = islandBadges[r.island] || `<span class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full text-xs font-black">島嶼 ${r.island}</span>`;
+        const resultBadge = r.isCorrect
+          ? '<span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-xl text-xs font-black border border-emerald-300">✓ 正確</span>'
+          : '<span class="px-2.5 py-1 bg-rose-100 text-rose-800 rounded-xl text-xs font-black border border-rose-300">✗ 錯誤</span>';
+
+        const rowBg = r.isCorrect ? 'hover:bg-slate-50/80' : 'bg-rose-50/40 hover:bg-rose-50/70';
+
+        return `
+          <tr class="${rowBg} transition font-bold">
+            <td class="py-3 px-4 text-xs text-slate-500 font-medium whitespace-nowrap">${timeStr}</td>
+            <td class="py-3 px-3 text-slate-700">${r.school || '-'}</td>
+            <td class="py-3 px-3 text-indigo-700">${r.className || '-'}</td>
+            <td class="py-3 px-2 text-slate-600">${r.seat || '-'}</td>
+            <td class="py-3 px-3 text-slate-900 font-black">${r.studentName || '-'}</td>
+            <td class="py-3 px-3 whitespace-nowrap">${islandBadge}</td>
+            <td class="py-3 px-2 text-center text-slate-800 font-black">${r.base ? `${r.base}段` : '-'}</td>
+            <td class="py-3 px-4 text-slate-800 max-w-xs break-words">${r.questionText || '-'}</td>
+            <td class="py-3 px-3 font-mono font-black ${r.isCorrect ? 'text-emerald-700' : 'text-rose-600'}">${r.studentAnswer || '-'}</td>
+            <td class="py-3 px-3 font-mono font-black text-slate-700">${r.correctAnswer || '-'}</td>
+            <td class="py-3 px-3 text-center whitespace-nowrap">${resultBadge}</td>
+            <td class="py-3 px-3 text-center">
+              <button onclick="deleteSingleRecord('${r.id}')" class="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-100 transition" title="刪除此筆作答">
+                🗑️
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ==================== 管理動作與安全密碼驗證 ====================
+    function deleteSingleRecord(recordId) {
+      const pass = prompt('請輸入管理員密碼以確認刪除該筆紀錄：');
+      if (pass !== ADMIN_PASSWORD) {
+        alert('密碼錯誤，操作取消！');
+        return;
+      }
+      if (!database) return;
+      database.ref(`multiplication_island/records/${recordId}`).remove().then(() => {
+        alert('該筆作答紀錄已成功刪除！');
+      }).catch(err => {
+        alert('刪除失敗：' + err.message);
+      });
+    }
+
+    function resetStudentProgress(userKey, studentName) {
+      const pass = prompt(`請輸入管理員密碼以確認重置學生「${studentName}」的星星闖關進度：`);
+      if (pass !== ADMIN_PASSWORD) {
+        alert('密碼錯誤，操作取消！');
+        return;
+      }
+      if (!database) return;
+      const resetData = {
+        island1Progress: { '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 },
+        island2Progress: { '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 },
+        island3Progress: { '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 },
+        totalStars: 0
+      };
+      database.ref(`multiplication_island/users/${userKey}`).update(resetData).then(() => {
+        alert(`學生「${studentName}」的進度已成功重置為 0 星！`);
+      }).catch(err => {
+        alert('重置失敗：' + err.message);
+      });
+    }
+
+    function clearAllData() {
+      const pass = prompt('【高危險操作】請輸入管理員密碼以確認清空全部學生的作答紀錄日誌：');
+      if (pass !== ADMIN_PASSWORD) {
+        alert('密碼錯誤，操作取消！');
+        return;
+      }
+      const confirmTwice = confirm('您確定要清空資料庫中所有的學生作答紀錄嗎？（此動作無法復原）');
+      if (!confirmTwice) return;
+
+      if (!database) return;
+      database.ref('multiplication_island/records').remove().then(() => {
+        alert('所有作答紀錄已全數清空！');
+      }).catch(err => {
+        alert('清空失敗：' + err.message);
+      });
+    }
+
+    // ==================== SheetJS 匯出 Excel ====================
+    function exportToExcel() {
+      if (rawRecords.length === 0 && Object.keys(rawUsers).length === 0) {
+        alert('目前無任何作答或進度資料可供匯出！');
+        return;
+      }
+
+      // 建立工作表 1：學生進度總覽
+      const progressRows = Object.values(rawUsers).map(u => ({
+        '學校': u.school || '',
+        '班級': u.className || '',
+        '座號': u.seat || '',
+        '姓名': u.name || '',
+        '第一島總星數': Object.values(u.island1Progress || {}).reduce((a, b) => a + b, 0),
+        '第二島總星數': Object.values(u.island2Progress || {}).reduce((a, b) => a + b, 0),
+        '第三島總星數': Object.values(u.island3Progress || {}).reduce((a, b) => a + b, 0),
+        '總累積星星': u.totalStars || 0,
+        '最後活動時間': u.lastActiveAt ? new Date(u.lastActiveAt).toLocaleString('zh-TW') : ''
+      }));
+
+      // 建立工作表 2：詳細作答歷程
+      const logRows = rawRecords.map(r => ({
+        '時間': r.timestamp ? new Date(r.timestamp).toLocaleString('zh-TW') : '',
+        '學校': r.school || '',
+        '班級': r.className || '',
+        '座號': r.seat || '',
+        '姓名': r.studentName || '',
+        '島嶼關卡': r.island === 1 ? '第1島:連加到乘法' : r.island === 2 ? '第2島:乘法表' : '第3島:乘法大會考',
+        '乘法表段': r.base ? `${r.base}的乘法` : '',
+        '題目情境': r.questionText || '',
+        '學生作答': r.studentAnswer || '',
+        '正確解答': r.correctAnswer || '',
+        '結果': r.isCorrect ? '正確' : '錯誤'
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const wsProgress = XLSX.utils.json_to_sheet(progressRows);
+      const wsLogs = XLSX.utils.json_to_sheet(logRows);
+
+      XLSX.utils.book_append_sheet(wb, wsProgress, '學生闖關進度總覽');
+      XLSX.utils.book_append_sheet(wb, wsLogs, '作答紀錄明細');
+
+      const today = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(wb, `乘法冒險島_教師後台成果報表_${today}.xlsx`);
+    }
+  </script>
+</body>
+</html>
