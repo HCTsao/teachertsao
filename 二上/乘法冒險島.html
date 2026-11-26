@@ -115,6 +115,24 @@
       transition: all 0.2s ease;
       padding: 0 0.5rem;
     }
+    @media (max-width: 640px) {
+      .slot-blank {
+        min-width: 2.3rem;
+        height: 2.3rem;
+        font-size: 1.15rem;
+        padding: 0 0.25rem;
+        border-radius: 0.65rem;
+      }
+    }
+    @media (max-width: 380px) {
+      .slot-blank {
+        min-width: 1.95rem;
+        height: 1.95rem;
+        font-size: 1rem;
+        padding: 0 0.15rem;
+        border-radius: 0.5rem;
+      }
+    }
     .slot-blank:hover {
       border-color: #38bdf8;
       background-color: #f0f9ff;
@@ -186,7 +204,7 @@
     <div class="max-w-6xl mx-auto flex items-center justify-between gap-2">
       <!-- 左上角：玩家身分資料與目前種植樹木數量 -->
       <div class="flex items-center space-x-1.5 sm:space-x-2.5 overflow-hidden">
-        <div id="user-display-badge" onclick="openLoginModal()" class="cursor-pointer bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 text-xs sm:text-sm flex items-center space-x-1 shadow-sm transition shrink-0" title="點擊切換使用者或登入">
+        <div id="user-display-badge" onclick="openPlayerProfileModal()" class="cursor-pointer bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 text-xs sm:text-sm flex items-center space-x-1 shadow-sm transition shrink-0" title="點擊切換使用者或登入">
           <span class="text-sm sm:text-base">👤</span>
           <span id="user-display-name" class="font-black truncate max-w-[120px] sm:max-w-none">訪客</span>
         </div>
@@ -266,8 +284,26 @@
       <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-3 text-3xl shadow-sm">
         🎒
       </div>
-      <h2 class="bpmf-font text-2xl sm:text-3xl font-black text-amber-700 mb-1">乘法冒險島・學生登入</h2>
-      <p class="text-xs sm:text-sm font-bold text-slate-500 mb-4">輸入資料即可自動註冊或同步上一󠇡次的冒險進度！</p>
+      <h2 class="bpmf-font text-2xl sm:text-3xl font-black text-amber-700 mb-1">乘法冒險島・冒險者登入</h2>
+      <p class="text-xs sm:text-sm font-bold text-slate-500 mb-4">輸入資料即可自動儲存或載入進度繼續遊玩！</p>
+
+      <!-- 發現本機存檔快捷載入卡片 -->
+      <div id="login-saved-player-card" class="hidden bg-amber-50/95 border-2 border-amber-300 rounded-2xl p-4 text-center mb-4 shadow-sm transition-all">
+        <div class="inline-flex items-center space-x-1 text-xs font-black text-amber-800 bg-amber-200/80 px-3 py-1 rounded-full mb-2">
+          <span>💾</span> <span>發現本機冒險存檔</span>
+        </div>
+        <h4 id="saved-player-name-display" class="bpmf-font text-base sm:text-lg font-black text-slate-800"></h4>
+        <p id="saved-player-stars-display" class="text-xs sm:text-sm font-bold text-amber-800 mt-1"></p>
+
+        <div class="mt-3.5 space-y-2">
+          <button type="button" onclick="loadSavedPlayerAndContinue()" class="btn-cute w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-base rounded-2xl shadow-md border border-emerald-400 flex items-center justify-center space-x-2">
+            <span>🚀</span> <span>繼續冒險（載入此進度）</span>
+          </button>
+          <button type="button" onclick="toggleNewPlayerForm()" id="btn-toggle-new-player" class="w-full py-2 bg-white hover:bg-slate-100 text-slate-600 font-bold text-xs sm:text-sm rounded-xl border border-slate-300 transition">
+            更換冒險者 / 輸入其他資料 ▼
+          </button>
+        </div>
+      </div>
 
       <form id="student-login-form" onsubmit="handleStudentLogin(event)" class="space-y-3.5 text-left">
         <div>
@@ -300,6 +336,53 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ==================== 冒險者檔案與存檔管理彈窗 ==================== -->
+  <div id="modal-player-profile" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all">
+    <div class="card-candy max-w-md w-full p-6 sm:p-7 text-center border-4 border-amber-400 bg-white/95 shadow-2xl rounded-3xl">
+      <div class="flex items-center justify-between border-b pb-3 mb-4 border-amber-200">
+        <div class="flex items-center space-x-2">
+          <span class="text-2xl">👤</span>
+          <h3 class="bpmf-font text-xl font-black text-amber-800">冒險者檔案與存檔</h3>
+        </div>
+        <button onclick="closeModals()" class="text-slate-400 hover:text-slate-600 text-xl font-black px-2">✕</button>
+      </div>
+
+      <div class="space-y-4 text-left">
+        <!-- 學生基本資料 -->
+        <div class="bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200">
+          <div class="text-xs text-amber-700 font-bold">目前冒險者</div>
+          <div id="profile-modal-name" class="bpmf-font text-lg font-black text-slate-800 mt-0.5"></div>
+          <div id="profile-modal-school-class" class="text-xs font-bold text-slate-500 mt-0.5"></div>
+        </div>
+
+        <!-- 各島星星進度總覽 -->
+        <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-black text-slate-600">總累積星星</span>
+            <span id="profile-modal-total-stars" class="font-black text-amber-600 text-base">⭐ 0 顆星</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-xs font-bold text-slate-600 pt-1 border-t border-slate-200/60">
+            <div>第 1 島：<span id="profile-prog-i1" class="font-black text-rose-600">0/6★</span></div>
+            <div>第 2 島：<span id="profile-prog-i2" class="font-black text-amber-600">0/24★</span></div>
+            <div>第 3 島：<span id="profile-prog-i3" class="font-black text-sky-600">0/24★</span></div>
+            <div>第 4 島：<span id="profile-prog-i4" class="font-black text-purple-600">0/24★</span></div>
+            <div class="col-span-2">第 5 島：<span id="profile-prog-i5" class="font-black text-slate-600">0/24★</span></div>
+          </div>
+        </div>
+
+        <!-- 存檔提示與按鈕 -->
+        <div class="pt-1 space-y-2.5">
+          <button type="button" onclick="manualSaveProgress()" class="btn-cute w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-sm rounded-xl shadow-md border border-emerald-400 flex items-center justify-center space-x-1.5">
+            <span>💾</span> <span>立即儲存目前進度</span>
+          </button>
+          <button type="button" onclick="switchPlayerAccount()" class="w-full py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-black text-xs sm:text-sm rounded-xl border border-amber-300 transition text-center flex items-center justify-center space-x-1.5">
+            <span>🔄</span> <span>更換冒險者 / 切換帳號</span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -850,33 +933,33 @@
             </div>
 
             <!-- 第一句：2 代表 [每 ________ ] ， -->
-            <div class="flex items-center justify-center gap-2 sm:gap-3 w-full">
-              <span id="i2-badge-base-rep" class="bpmf-font text-xs sm:text-sm md:text-base font-black text-amber-900 bg-amber-100 border-2 border-amber-300 px-3 py-1.5 rounded-xl whitespace-nowrap shadow-xs shrink-0">2 代表</span>
-              <div class="relative flex items-center bg-white border-2 border-amber-400 rounded-xl px-3 py-1.5 shadow-xs focus-within:ring-4 focus-within:ring-amber-300/50 w-full max-w-xs sm:max-w-md cursor-text" onclick="focusMeaningSlot(1)">
-                <span id="i2-placeholder-1" class="absolute left-3 pointer-events-none select-none bpmf-font font-black text-slate-400 text-base sm:text-xl">每</span>
-                <input type="text" id="i2-meaning-slot1" onfocus="handleMeaningFocus(1)" onblur="handleMeaningBlur(1)" oninput="handleMeaningInput(1)" onkeydown="handleMeaningKeydown(event, 1)" class="bpmf-font w-full text-base sm:text-xl font-black text-amber-900 bg-transparent border-none outline-none relative z-10" autocomplete="off" />
+            <div class="flex items-center justify-center gap-1.5 sm:gap-3 w-full max-w-xl mx-auto">
+              <span id="i2-badge-base-rep" class="bpmf-font text-xs sm:text-sm md:text-base font-black text-amber-900 bg-amber-100 border-2 border-amber-300 px-2 sm:px-3 py-1.5 rounded-xl whitespace-nowrap shadow-xs shrink-0">2 代表</span>
+              <div class="relative flex items-center bg-white border-2 border-amber-400 rounded-xl px-2.5 sm:px-3 py-1.5 shadow-xs focus-within:ring-4 focus-within:ring-amber-300/50 flex-1 min-w-0 cursor-text" onclick="focusMeaningSlot(1)">
+                <span id="i2-placeholder-1" class="absolute left-2.5 sm:left-3 pointer-events-none select-none bpmf-font font-black text-slate-400 text-xs sm:text-base md:text-xl">每</span>
+                <input type="text" id="i2-meaning-slot1" onfocus="handleMeaningFocus(1)" onblur="handleMeaningBlur(1)" oninput="handleMeaningInput(1)" onkeydown="handleMeaningKeydown(event, 1)" class="bpmf-font w-full text-xs sm:text-base md:text-xl font-black text-amber-900 bg-transparent border-none outline-none relative z-10" autocomplete="off" />
               </div>
-              <span class="whitespace-nowrap font-bold">，</span>
+              <span class="whitespace-nowrap font-bold text-sm sm:text-base">，</span>
             </div>
 
             <!-- 第二句：×3 代表 [有 ________ ] ， -->
-            <div class="flex items-center justify-center gap-2 sm:gap-3 w-full">
-              <span id="i2-badge-count-rep" class="bpmf-font text-xs sm:text-sm md:text-base font-black text-amber-900 bg-amber-100 border-2 border-amber-300 px-3 py-1.5 rounded-xl whitespace-nowrap shadow-xs shrink-0">×3 代表</span>
-              <div class="relative flex items-center bg-white border-2 border-amber-400 rounded-xl px-3 py-1.5 shadow-xs focus-within:ring-4 focus-within:ring-amber-300/50 w-full max-w-xs sm:max-w-md cursor-text" onclick="focusMeaningSlot(2)">
-                <span id="i2-placeholder-2" class="absolute left-3 pointer-events-none select-none bpmf-font font-black text-slate-400 text-base sm:text-xl">有</span>
-                <input type="text" id="i2-meaning-slot2" onfocus="handleMeaningFocus(2)" onblur="handleMeaningBlur(2)" oninput="handleMeaningInput(2)" onkeydown="handleMeaningKeydown(event, 2)" class="bpmf-font w-full text-base sm:text-xl font-black text-amber-900 bg-transparent border-none outline-none relative z-10" autocomplete="off" />
+            <div class="flex items-center justify-center gap-1.5 sm:gap-3 w-full max-w-xl mx-auto">
+              <span id="i2-badge-count-rep" class="bpmf-font text-xs sm:text-sm md:text-base font-black text-amber-900 bg-amber-100 border-2 border-amber-300 px-2 sm:px-3 py-1.5 rounded-xl whitespace-nowrap shadow-xs shrink-0">×3 代表</span>
+              <div class="relative flex items-center bg-white border-2 border-amber-400 rounded-xl px-2.5 sm:px-3 py-1.5 shadow-xs focus-within:ring-4 focus-within:ring-amber-300/50 flex-1 min-w-0 cursor-text" onclick="focusMeaningSlot(2)">
+                <span id="i2-placeholder-2" class="absolute left-2.5 sm:left-3 pointer-events-none select-none bpmf-font font-black text-slate-400 text-xs sm:text-base md:text-xl">有</span>
+                <input type="text" id="i2-meaning-slot2" onfocus="handleMeaningFocus(2)" onblur="handleMeaningBlur(2)" oninput="handleMeaningInput(2)" onkeydown="handleMeaningKeydown(event, 2)" class="bpmf-font w-full text-xs sm:text-base md:text-xl font-black text-amber-900 bg-transparent border-none outline-none relative z-10" autocomplete="off" />
               </div>
-              <span class="whitespace-nowrap font-bold">，</span>
+              <span class="whitespace-nowrap font-bold text-sm sm:text-base">，</span>
             </div>
 
             <!-- 第三句：6 代表 [合起來是 ________ ] 。 -->
-            <div class="flex items-center justify-center gap-2 sm:gap-3 w-full">
-              <span id="i2-badge-total-rep" class="bpmf-font text-xs sm:text-sm md:text-base font-black text-amber-900 bg-amber-100 border-2 border-amber-300 px-3 py-1.5 rounded-xl whitespace-nowrap shadow-xs shrink-0">6 代表</span>
-              <div class="relative flex items-center bg-white border-2 border-amber-400 rounded-xl px-3 py-1.5 shadow-xs focus-within:ring-4 focus-within:ring-amber-300/50 w-full max-w-xs sm:max-w-md cursor-text" onclick="focusMeaningSlot(3)">
-                <span id="i2-placeholder-3" class="absolute left-3 pointer-events-none select-none bpmf-font font-black text-slate-400 text-base sm:text-xl">合起來是󠇡</span>
-                <input type="text" id="i2-meaning-slot3" onfocus="handleMeaningFocus(3)" onblur="handleMeaningBlur(3)" oninput="handleMeaningInput(3)" onkeydown="handleMeaningKeydown(event, 3)" class="bpmf-font w-full text-base sm:text-xl font-black text-amber-900 bg-transparent border-none outline-none relative z-10" autocomplete="off" />
+            <div class="flex items-center justify-center gap-1.5 sm:gap-3 w-full max-w-xl mx-auto">
+              <span id="i2-badge-total-rep" class="bpmf-font text-xs sm:text-sm md:text-base font-black text-amber-900 bg-amber-100 border-2 border-amber-300 px-2 sm:px-3 py-1.5 rounded-xl whitespace-nowrap shadow-xs shrink-0">6 代表</span>
+              <div class="relative flex items-center bg-white border-2 border-amber-400 rounded-xl px-2.5 sm:px-3 py-1.5 shadow-xs focus-within:ring-4 focus-within:ring-amber-300/50 flex-1 min-w-0 cursor-text" onclick="focusMeaningSlot(3)">
+                <span id="i2-placeholder-3" class="absolute left-2.5 sm:left-3 pointer-events-none select-none bpmf-font font-black text-slate-400 text-xs sm:text-base md:text-xl">合起來是󠇡</span>
+                <input type="text" id="i2-meaning-slot3" onfocus="handleMeaningFocus(3)" onblur="handleMeaningBlur(3)" oninput="handleMeaningInput(3)" onkeydown="handleMeaningKeydown(event, 3)" class="bpmf-font w-full text-xs sm:text-base md:text-xl font-black text-amber-900 bg-transparent border-none outline-none relative z-10" autocomplete="off" />
               </div>
-              <span class="whitespace-nowrap font-bold">。</span>
+              <span class="whitespace-nowrap font-bold text-sm sm:text-base">。</span>
             </div>
           </div>
 
@@ -1312,20 +1395,97 @@
       console.warn("Firebase 初始化異常，將使用離線本機儲存模式:", e);
     }
 
+    function generateUserKey(school, grade, seat, name) {
+      const cleanSchool = (school || '').trim().replace(/[\.\#\$\/[\]]/g, '_');
+      const cleanGrade = (grade || '').trim().replace(/[\.\#\$\/[\]]/g, '_');
+      const cleanSeat = (seat || '').trim().replace(/[\.\#\$\/[\]]/g, '_');
+      const cleanName = (name || '').trim().replace(/[\.\#\$\/[\]]/g, '_');
+      return `${cleanSchool}_${cleanGrade}_${cleanSeat}_${cleanName}`;
+    }
+
     function initUserLogin() {
+      // 檢查本機是否有存檔或記錄的玩家
+      const savedUserKey = localStorage.getItem('multiplication_island_current_user');
+      const savedSchool = localStorage.getItem('multiplication_island_school') || '';
+      const savedGrade = localStorage.getItem('multiplication_island_grade') || '';
+      const savedSeat = localStorage.getItem('multiplication_island_seat') || '';
+      const savedName = localStorage.getItem('multiplication_island_name') || '';
+
       const schoolInput = document.getElementById('login-school');
-      if (schoolInput) schoolInput.value = '';
+      if (schoolInput) schoolInput.value = savedSchool;
       const gradeInput = document.getElementById('login-grade') || document.getElementById('login-class');
-      if (gradeInput) gradeInput.value = '';
+      if (gradeInput) gradeInput.value = savedGrade;
       const seatInput = document.getElementById('login-seat');
-      if (seatInput) seatInput.value = '';
+      if (seatInput) seatInput.value = savedSeat;
       const nameInput = document.getElementById('login-name');
-      if (nameInput) nameInput.value = '';
+      if (nameInput) nameInput.value = savedName;
+
+      const savedCard = document.getElementById('login-saved-player-card');
+      const formEl = document.getElementById('student-login-form');
+
+      let hasValidSave = false;
+      let effectiveUserKey = savedUserKey;
+      if (!effectiveUserKey && savedSchool && savedGrade && savedSeat && savedName) {
+        effectiveUserKey = generateUserKey(savedSchool, savedGrade, savedSeat, savedName);
+      }
+
+      if (effectiveUserKey) {
+        // 讀取存檔資料
+        let saveObj = null;
+        try {
+          const raw = localStorage.getItem(`multiplication_island_save_${effectiveUserKey}`);
+          if (raw) saveObj = JSON.parse(raw);
+        } catch (e) {}
+
+        if (saveObj || savedName) {
+          hasValidSave = true;
+          const stars = saveObj ? (saveObj.totalStars || 0) : 0;
+          const nameDisplay = `${savedSchool ? savedSchool + ' ' : ''}${savedGrade ? savedGrade + '班 ' : ''}${savedSeat ? savedSeat + '號 ' : ''}${savedName || '冒險者'}`;
+          document.getElementById('saved-player-name-display').innerText = nameDisplay;
+          document.getElementById('saved-player-stars-display').innerText = `⭐ 目前累積 ${stars} 顆星星 ｜ 存檔完整`;
+
+          if (savedCard) savedCard.classList.remove('hidden');
+          if (formEl) formEl.classList.add('hidden');
+        }
+      }
+
+      if (!hasValidSave) {
+        if (savedCard) savedCard.classList.add('hidden');
+        if (formEl) formEl.classList.remove('hidden');
+      }
 
       openLoginModal();
     }
 
+    function toggleNewPlayerForm() {
+      const formEl = document.getElementById('student-login-form');
+      const btn = document.getElementById('btn-toggle-new-player');
+      if (formEl.classList.contains('hidden')) {
+        formEl.classList.remove('hidden');
+        btn.innerText = '收起輸入表單 ▲';
+      } else {
+        formEl.classList.add('hidden');
+        btn.innerText = '更換冒險者 / 輸入其他資料 ▼';
+      }
+    }
+
+    function loadSavedPlayerAndContinue() {
+      const savedUserKey = localStorage.getItem('multiplication_island_current_user');
+      const savedSchool = localStorage.getItem('multiplication_island_school') || '';
+      const savedGrade = localStorage.getItem('multiplication_island_grade') || '';
+      const savedSeat = localStorage.getItem('multiplication_island_seat') || '';
+      const savedName = localStorage.getItem('multiplication_island_name') || '';
+
+      const key = savedUserKey || generateUserKey(savedSchool, savedGrade, savedSeat, savedName);
+      if (key) {
+        loadUserProgress(key);
+      } else {
+        toggleNewPlayerForm();
+      }
+    }
+
     function openLoginModal() {
+      closeAllModalsExcept('modal-login');
       const modal = document.getElementById('modal-login');
       if (modal) modal.classList.remove('hidden');
     }
@@ -1343,67 +1503,108 @@
       const seat = (seatEl ? seatEl.value : '').trim();
 
       if (!school || !grade || !name || !seat) {
-        alert('請填寫學校、班級、姓名與座號！');
+        alert('請完整填寫學校、班級、座號與學生姓名！');
         return;
       }
 
+      const userKey = generateUserKey(school, grade, seat, name);
       gameState.studentName = name;
       gameState.seatNumber = seat;
       gameState.school = school;
       gameState.gradeClass = grade;
       gameState.grade = grade;
+      currentUserKey = userKey;
+      isGuestMode = false;
 
       try {
         localStorage.setItem('multiplication_island_school', school);
         localStorage.setItem('multiplication_island_grade', grade);
         localStorage.setItem('multiplication_island_name', name);
         localStorage.setItem('multiplication_island_seat', seat);
+        localStorage.setItem('multiplication_island_current_user', userKey);
+        localStorage.removeItem('multiplication_island_is_guest');
       } catch (err) {}
 
-      updateUserBadge();
-      closeModals();
-      loadUserProgressFromFirebase();
+      loadUserProgress(userKey);
     }
 
-    function loadUserProgressFromFirebase(userKey) {
-      if (!db || !userKey) return;
-      db.ref(`multiplication_island_users/${userKey}`).once('value').then(snapshot => {
-        if (snapshot.exists()) {
-          const data = snapshot.val();
-          gameState.studentName = data.name || gameState.studentName;
-          gameState.seatNumber = data.seat || gameState.seatNumber;
-          gameState.school = data.school || gameState.school;
-          gameState.grade = data.grade || gameState.grade;
+    function loadUserProgress(userKey) {
+      if (!userKey) return;
+      currentUserKey = userKey;
+      isGuestMode = false;
 
-          // 相容性映射：若為舊版3島資料
-          if (data.island4Progress === undefined && data.island1Progress && data.island1Progress['2'] !== undefined) {
-            gameState.island2Progress = Object.assign({}, data.island1Progress);
-            gameState.island3Progress = Object.assign({}, data.island2Progress);
-            gameState.island5Progress = Object.assign({}, data.island3Progress);
-            gameState.island1Progress = { frog: 0 };
-            gameState.island4Progress = { '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 };
+      // 1. 先讀取本機 LocalStorage 存檔（最快、支援完全離線）
+      let localData = null;
+      try {
+        const raw = localStorage.getItem(`multiplication_island_save_${userKey}`);
+        if (raw) localData = JSON.parse(raw);
+      } catch (err) {}
+
+      if (localData) {
+        applySaveDataToGameState(localData);
+      } else {
+        // 若為全新玩家，初始化該玩家的進度物件
+        gameState.island1Progress = { stage1: 0, stage2: 0, frog: 0 };
+        gameState.island2Progress = { '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 };
+        gameState.island3Progress = { '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 };
+        gameState.island4Progress = { '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 };
+        gameState.island5Progress = { '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 };
+      }
+
+      // 2. 雲端 Firebase 同步與合併進度（多裝置相容）
+      if (db) {
+        db.ref(`multiplication_island/users/${userKey}`).once('value').then(snapshot => {
+          if (snapshot.exists()) {
+            const cloudData = snapshot.val();
+            mergeSaveDataToGameState(cloudData);
+            saveAllProgress();
           } else {
-            if (data.island1Progress) gameState.island1Progress = Object.assign({}, data.island1Progress);
-            if (data.island2Progress) gameState.island2Progress = Object.assign({}, data.island2Progress);
-            if (data.island3Progress) gameState.island3Progress = Object.assign({}, data.island3Progress);
-            if (data.island4Progress) gameState.island4Progress = Object.assign({}, data.island4Progress);
-            if (data.island5Progress) gameState.island5Progress = Object.assign({}, data.island5Progress);
+            saveAllProgress();
           }
+        }).catch(err => {
+          console.warn("雲端進度讀取失敗，使用本機存檔:", err);
+          saveAllProgress();
+        });
+      } else {
+        saveAllProgress();
+      }
 
-          updateIslandTrees();
-          updateStarsDisplay();
-        } else {
-          syncUserProgressToFirebase();
+      updateIslandTrees();
+      updateStarsDisplay();
+      updateUserBadge();
+      closeModals();
+    }
+
+    function applySaveDataToGameState(data) {
+      if (!data) return;
+      gameState.studentName = data.name || gameState.studentName;
+      gameState.seatNumber = data.seat || gameState.seatNumber;
+      gameState.school = data.school || gameState.school;
+      gameState.grade = data.grade || data.className || gameState.grade;
+
+      if (data.island1Progress) gameState.island1Progress = Object.assign({}, data.island1Progress);
+      if (data.island2Progress) gameState.island2Progress = Object.assign({}, data.island2Progress);
+      if (data.island3Progress) gameState.island3Progress = Object.assign({}, data.island3Progress);
+      if (data.island4Progress) gameState.island4Progress = Object.assign({}, data.island4Progress);
+      if (data.island5Progress) gameState.island5Progress = Object.assign({}, data.island5Progress);
+    }
+
+    function mergeSaveDataToGameState(cloudData) {
+      if (!cloudData) return;
+      applySaveDataToGameState(cloudData);
+
+      function mergeMax(progTarget, progSource) {
+        if (!progSource) return;
+        for (const k in progSource) {
+          progTarget[k] = Math.max(progTarget[k] || 0, progSource[k] || 0);
         }
-        updateUserBadge();
-        const modal = document.getElementById('modal-login');
-        if (modal) modal.classList.add('hidden');
-      }).catch(err => {
-        console.warn("載入雲端進度失敗:", err);
-        updateUserBadge();
-        const modal = document.getElementById('modal-login');
-        if (modal) modal.classList.add('hidden');
-      });
+      }
+
+      mergeMax(gameState.island1Progress, cloudData.island1Progress);
+      mergeMax(gameState.island2Progress, cloudData.island2Progress);
+      mergeMax(gameState.island3Progress, cloudData.island3Progress);
+      mergeMax(gameState.island4Progress, cloudData.island4Progress);
+      mergeMax(gameState.island5Progress, cloudData.island5Progress);
     }
 
     function playAsGuest() {
@@ -1414,10 +1615,54 @@
       gameState.school = '';
       gameState.grade = '';
       localStorage.setItem('multiplication_island_is_guest', 'true');
-      localStorage.removeItem('multiplication_island_user_key');
       updateUserBadge();
-      const modal = document.getElementById('modal-login');
-      if (modal) modal.classList.add('hidden');
+      closeModals();
+    }
+
+    function openPlayerProfileModal() {
+      if (isGuestMode || !currentUserKey) {
+        openLoginModal();
+        return;
+      }
+      closeAllModalsExcept('modal-player-profile');
+      const modal = document.getElementById('modal-player-profile');
+      if (!modal) return;
+
+      document.getElementById('profile-modal-name').innerText = gameState.studentName || '冒險者';
+      document.getElementById('profile-modal-school-class').innerText = `${gameState.school || ''} ${gameState.grade ? gameState.grade + '班' : ''} ${gameState.seatNumber ? gameState.seatNumber + '號' : ''}`;
+
+      // 各島星星統計
+      const i1Prog = gameState.island1Progress || {};
+      const i1Stars = (i1Prog.stage1 !== undefined ? i1Prog.stage1 : (i1Prog.frog || 0)) + (i1Prog.stage2 || 0);
+      const i2Stars = Object.values(gameState.island2Progress || {}).reduce((a, b) => a + b, 0);
+      const i3Stars = Object.values(gameState.island3Progress || {}).reduce((a, b) => a + b, 0);
+      const i4Stars = Object.values(gameState.island4Progress || {}).reduce((a, b) => a + b, 0);
+      const i5Stars = Object.values(gameState.island5Progress || {}).reduce((a, b) => a + b, 0);
+      const totalStars = i1Stars + i2Stars + i3Stars + i4Stars + i5Stars;
+
+      document.getElementById('profile-modal-total-stars').innerText = `⭐ ${totalStars} 顆星`;
+      document.getElementById('profile-prog-i1').innerText = `${i1Stars}/6★`;
+      document.getElementById('profile-prog-i2').innerText = `${i2Stars}/24★`;
+      document.getElementById('profile-prog-i3').innerText = `${i3Stars}/24★`;
+      document.getElementById('profile-prog-i4').innerText = `${i4Stars}/24★`;
+      document.getElementById('profile-prog-i5').innerText = `${i5Stars}/24★`;
+
+      modal.classList.remove('hidden');
+    }
+
+    function manualSaveProgress() {
+      saveAllProgress();
+      alert('進度已成功儲存在本機與雲端！💾');
+    }
+
+    function switchPlayerAccount() {
+      closeModals();
+      // 開啟登入視窗並直接展開新玩家表單
+      openLoginModal();
+      const formEl = document.getElementById('student-login-form');
+      const btn = document.getElementById('btn-toggle-new-player');
+      if (formEl) formEl.classList.remove('hidden');
+      if (btn) btn.innerText = '收起輸入表單 ▲';
     }
 
     function updateUserBadge() {
@@ -1461,22 +1706,26 @@
       if (badge) badge.classList.remove('hidden');
     }
 
-    function syncUserProgressToFirebase() {
-      if (!db || isGuestMode || !currentUserKey) return;
+    function saveAllProgress(extraData) {
+      if (isGuestMode || !currentUserKey) return;
+
       let total = 0;
       const i1Prog = gameState.island1Progress || {};
       total += (i1Prog.stage1 !== undefined ? i1Prog.stage1 : (i1Prog.frog || 0));
       total += (i1Prog.stage2 || 0);
-      for (const k in gameState.island2Progress) total += gameState.island2Progress[k];
-      for (const k in gameState.island3Progress) total += gameState.island3Progress[k];
-      for (const k in gameState.island4Progress) total += gameState.island4Progress[k];
-      for (const k in gameState.island5Progress) total += gameState.island5Progress[k];
+      for (const k in gameState.island2Progress) total += (gameState.island2Progress[k] || 0);
+      for (const k in gameState.island3Progress) total += (gameState.island3Progress[k] || 0);
+      for (const k in gameState.island4Progress) total += (gameState.island4Progress[k] || 0);
+      for (const k in gameState.island5Progress) total += (gameState.island5Progress[k] || 0);
+      gameState.totalStars = total;
 
-      const updates = {
+      const savePayload = {
+        userKey: currentUserKey,
         name: gameState.studentName,
         seat: gameState.seatNumber,
         school: gameState.school,
         grade: gameState.grade,
+        className: gameState.grade,
         totalStars: total,
         island1Progress: gameState.island1Progress,
         island2Progress: gameState.island2Progress,
@@ -1485,25 +1734,48 @@
         island5Progress: gameState.island5Progress,
         lastPlayed: new Date().toISOString()
       };
-      db.ref(`multiplication_island_users/${currentUserKey}`).update(updates).catch(e => {
-        console.warn("同步進度失敗:", e);
-      });
+
+      // 1. 寫入本機 LocalStorage（支援完全離線遊玩）
+      try {
+        localStorage.setItem(`multiplication_island_save_${currentUserKey}`, JSON.stringify(savePayload));
+        localStorage.setItem('multiplication_island_current_user', currentUserKey);
+      } catch (err) {}
+
+      // 2. 寫入雲端 Firebase（若在線，即時同步至教師後台架構）
+      if (db) {
+        db.ref(`multiplication_island/users/${currentUserKey}`).update(savePayload).catch(e => {
+          console.warn("雲端同步失敗:", e);
+        });
+
+        if (extraData) {
+          const record = Object.assign({
+            userKey: currentUserKey,
+            studentName: gameState.studentName,
+            school: gameState.school,
+            className: gameState.grade,
+            grade: gameState.grade,
+            seat: gameState.seatNumber,
+            timestamp: Date.now(),
+            dateStr: new Date().toISOString().split('T')[0]
+          }, extraData);
+
+          db.ref('multiplication_island/records').push(record).catch(e => {
+            console.warn("寫入紀錄失敗:", e);
+          });
+        }
+      }
+
+      updateIslandTrees();
+      updateStarsDisplay();
+      updateUserBadge();
+    }
+
+    function syncUserProgressToFirebase() {
+      saveAllProgress();
     }
 
     function logAttemptToFirebase(data) {
-      if (!db || isGuestMode || !currentUserKey) return;
-      const logEntry = Object.assign({
-        userKey: currentUserKey,
-        studentName: gameState.studentName,
-        school: gameState.school,
-        grade: gameState.grade,
-        seat: gameState.seatNumber,
-        timestamp: new Date().toISOString()
-      }, data);
-
-      db.ref('multiplication_island_logs').push(logEntry).catch(e => {
-        console.warn("寫入記錄失敗:", e);
-      });
+      saveAllProgress(data);
     }
 
     function openTeacherDashboard() {
@@ -2961,6 +3233,7 @@
     const ALL_DIALOG_MODAL_IDS = [
       'modal-fast-island-menu',
       'modal-login',
+      'modal-player-profile',
       'modal-island1-menu',
       'modal-island2-menu',
       'modal-island3-menu',
@@ -3160,6 +3433,8 @@
     let island1Questions = [];
     let island1QIndex = 0;
     let island1CorrectCount = 0;
+    let island1FirstAttemptCorrectCount = 0;
+    let island1CurrentQuestionHadError = false;
     let island1CurrentQuestion = null;
     let currentStepI1 = 1;
 
@@ -3188,6 +3463,8 @@
       island1CurrentStage = stage;
       island1QIndex = 0;
       island1CorrectCount = 0;
+      island1FirstAttemptCorrectCount = 0;
+      island1CurrentQuestionHadError = false;
 
       // 更新關卡標題
       const titleEl = document.getElementById('island1-stage-title');
@@ -3241,6 +3518,7 @@
 
     function loadCurrentIsland1Question() {
       island1CurrentQuestion = island1Questions[island1QIndex];
+      island1CurrentQuestionHadError = false;
       currentStepI1 = 1;
 
       document.getElementById('island1-question-progress').innerText = `第 ${island1QIndex + 1} / 3 題`;
@@ -3377,64 +3655,72 @@
         const slot = document.getElementById(`slot-i1-add-${i}`);
         if (!slot || slot.innerText.trim() === '') {
           allFilled = false;
-          if (activeSlotId === `slot-i1-add-${i - 1}`) {
-            focusSlot(`slot-i1-add-${i}`);
-          }
           break;
         }
       }
 
       const totalSlot = document.getElementById('slot-i1-add-total');
-      if (allFilled && (!totalSlot || totalSlot.innerText.trim() === '')) {
-        focusSlot('slot-i1-add-total');
-        return;
+      if (!totalSlot || totalSlot.innerText.trim() === '') {
+        allFilled = false;
       }
 
-      if (allFilled && totalSlot && totalSlot.innerText.trim().length >= String(total).length) {
-        let isCorrect = true;
-        for (let i = 0; i < count; i++) {
-          const slot = document.getElementById(`slot-i1-add-${i}`);
-          if (parseInt(slot.innerText.trim(), 10) !== base) {
-            isCorrect = false;
-          }
-        }
-        if (parseInt(totalSlot.innerText.trim(), 10) !== total) {
+      if (!allFilled) return;
+
+      let isCorrect = true;
+      for (let i = 0; i < count; i++) {
+        const slot = document.getElementById(`slot-i1-add-${i}`);
+        if (parseInt(slot.innerText.trim(), 10) !== base) {
           isCorrect = false;
         }
+      }
+      if (parseInt(totalSlot.innerText.trim(), 10) !== total) {
+        isCorrect = false;
+      }
 
-        const fb = document.getElementById('i1-step1-feedback');
-        fb.classList.remove('hidden');
+      const fb = document.getElementById('i1-step1-feedback');
+      fb.classList.remove('hidden');
 
-        if (isCorrect) {
-          playSound('correct');
-          for (let i = 0; i < count; i++) {
-            document.getElementById(`slot-i1-add-${i}`).classList.add('filled');
-          }
-          totalSlot.classList.add('filled');
-          fb.className = 'text-center text-base font-black text-emerald-600 mt-2';
-          fb.innerText = '連加算式完全正確！🎉';
-
-          if (island1CurrentStage === 'stage1') {
-            // 關卡一：步驟 1 正確後，消除步驟 1，跳出步驟 2
-            currentStepI1 = 2;
-            document.getElementById('i1-step1-container').classList.add('hidden');
-            const s1s2 = document.getElementById('i1s1-step2-container');
-            s1s2.classList.remove('hidden', 'opacity-40', 'pointer-events-none');
-            focusSlot('slot-i1s1-count1');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          } else {
-            // 關卡二：檢查步驟 2 是否也已正確，若已正確則跳出步驟 3
-            if (isIsland1Step2MultCorrect()) {
-              unlockIsland1Step3();
-            } else {
-              focusSlot('slot-i1-mult-base');
-            }
-          }
-        } else {
-          playSound('wrong');
-          fb.className = 'text-center text-base font-black text-rose-500 mt-2';
-          fb.innerText = `再想想看，每隻青蛙有 ${base} 個󠇡/條，共有 ${count} 隻喔！`;
+      if (isCorrect) {
+        playSound('correct');
+        for (let i = 0; i < count; i++) {
+          const s = document.getElementById(`slot-i1-add-${i}`);
+          if (s) { s.classList.remove('wrong'); s.classList.add('filled'); }
         }
+        totalSlot.classList.remove('wrong');
+        totalSlot.classList.add('filled');
+        fb.className = 'text-center text-base font-black text-emerald-600 mt-2';
+        fb.innerText = '連加算式完全正確！🎉';
+
+        if (island1CurrentStage === 'stage1') {
+          // 關卡一：步驟 1 正確後，消除步驟 1，跳出步驟 2
+          currentStepI1 = 2;
+          document.getElementById('i1-step1-container').classList.add('hidden');
+          const s1s2 = document.getElementById('i1s1-step2-container');
+          s1s2.classList.remove('hidden', 'opacity-40', 'pointer-events-none');
+          focusSlot('slot-i1s1-count1');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          // 關卡二：檢查步驟 2 是否也已正確，若已正確則跳出步驟 3
+          if (isIsland1Step2MultCorrect()) {
+            unlockIsland1Step3();
+          } else {
+            focusSlot('slot-i1-mult-base');
+          }
+        }
+      } else {
+        playSound('wrong');
+        island1CurrentQuestionHadError = true;
+        for (let i = 0; i < count; i++) {
+          const slot = document.getElementById(`slot-i1-add-${i}`);
+          if (slot && parseInt(slot.innerText.trim(), 10) !== base) {
+            slot.classList.add('wrong');
+          }
+        }
+        if (totalSlot && parseInt(totalSlot.innerText.trim(), 10) !== total) {
+          totalSlot.classList.add('wrong');
+        }
+        fb.className = 'text-center text-base font-black text-rose-500 mt-2';
+        fb.innerText = '再想一想喔！';
       }
     }
 
@@ -3448,39 +3734,39 @@
       const slotB = document.getElementById('slot-i1s1-base');
       const slotC3 = document.getElementById('slot-i1s1-count3');
 
-      // 自動跳轉焦點
-      if (activeSlotId === 'slot-i1s1-count1' && slotC1.innerText.trim() !== '') {
-        focusSlot('slot-i1s1-count2');
-      } else if (activeSlotId === 'slot-i1s1-count2' && slotC2.innerText.trim() !== '') {
-        focusSlot('slot-i1s1-base');
-      } else if (activeSlotId === 'slot-i1s1-base' && slotB.innerText.trim() !== '') {
-        focusSlot('slot-i1s1-count3');
-      }
-
       const slots = [slotC1, slotC2, slotB, slotC3];
-      if (slots.every(s => s && s.innerText.trim() !== '')) {
-        const valC1 = parseInt(slotC1.innerText.trim(), 10);
-        const valC2 = parseInt(slotC2.innerText.trim(), 10);
-        const valB = parseInt(slotB.innerText.trim(), 10);
-        const valC3 = parseInt(slotC3.innerText.trim(), 10);
+      if (!slots.every(s => s && s.innerText.trim() !== '')) return;
 
-        const fb = document.getElementById('i1s1-step2-feedback');
-        fb.classList.remove('hidden');
+      const valC1 = parseInt(slotC1.innerText.trim(), 10);
+      const valC2 = parseInt(slotC2.innerText.trim(), 10);
+      const valB = parseInt(slotB.innerText.trim(), 10);
+      const valC3 = parseInt(slotC3.innerText.trim(), 10);
 
-        if (valC1 === count && valC2 === count && valB === base && valC3 === count) {
-          playSound('correct');
-          slots.forEach(s => s.classList.add('filled'));
-          fb.className = 'text-center text-base font-black text-emerald-600 mt-2';
-          fb.innerText = '太棒了！算式的意思完全正確！🌟';
+      const fb = document.getElementById('i1s1-step2-feedback');
+      fb.classList.remove('hidden');
 
-          island1CorrectCount++;
-          document.getElementById('i1-next-action-area').classList.remove('hidden');
-          document.getElementById('global-keypad').classList.add('hidden');
-        } else {
-          playSound('wrong');
-          fb.className = 'text-center text-base font-black text-rose-500 mt-2';
-          fb.innerText = `想一想，是有幾個󠇡 ${base} 相󠇡加，也就是 ${base} 的幾倍呢？`;
+      if (valC1 === count && valC2 === count && valB === base && valC3 === count) {
+        playSound('correct');
+        slots.forEach(s => { s.classList.remove('wrong'); s.classList.add('filled'); });
+        fb.className = 'text-center text-base font-black text-emerald-600 mt-2';
+        fb.innerText = '太棒了！算式的意思完全正確！🌟';
+
+        if (!island1CurrentQuestionHadError) {
+          island1FirstAttemptCorrectCount++;
         }
+        island1CorrectCount = island1FirstAttemptCorrectCount;
+
+        document.getElementById('i1-next-action-area').classList.remove('hidden');
+        document.getElementById('global-keypad').classList.add('hidden');
+      } else {
+        playSound('wrong');
+        island1CurrentQuestionHadError = true;
+        if (valC1 !== count) slotC1.classList.add('wrong');
+        if (valC2 !== count) slotC2.classList.add('wrong');
+        if (valB !== base) slotB.classList.add('wrong');
+        if (valC3 !== count) slotC3.classList.add('wrong');
+        fb.className = 'text-center text-base font-black text-rose-500 mt-2';
+        fb.innerText = '再想一想喔！';
       }
     }
 
@@ -3508,44 +3794,41 @@
       const slotCount = document.getElementById('slot-i1-mult-count');
       const slotTotal = document.getElementById('slot-i1-mult-total');
 
-      if (activeSlotId === 'slot-i1-mult-base' && slotBase.innerText.trim() !== '') {
-        focusSlot('slot-i1-mult-count');
-      } else if (activeSlotId === 'slot-i1-mult-count' && slotCount.innerText.trim() !== '') {
-        focusSlot('slot-i1-mult-total');
-      }
+      if (!slotBase || !slotCount || !slotTotal) return;
+      if (slotBase.innerText.trim() === '' || slotCount.innerText.trim() === '' || slotTotal.innerText.trim() === '') return;
 
-      if (slotBase.innerText.trim() !== '' && slotCount.innerText.trim() !== '' && slotTotal.innerText.trim() !== '') {
-        if (slotTotal.innerText.trim().length >= String(total).length) {
-          const valB = parseInt(slotBase.innerText.trim(), 10);
-          const valC = parseInt(slotCount.innerText.trim(), 10);
-          const valT = parseInt(slotTotal.innerText.trim(), 10);
+      const valB = parseInt(slotBase.innerText.trim(), 10);
+      const valC = parseInt(slotCount.innerText.trim(), 10);
+      const valT = parseInt(slotTotal.innerText.trim(), 10);
 
-          const fb = document.getElementById('i1-step2-feedback');
-          fb.classList.remove('hidden');
+      const fb = document.getElementById('i1-step2-feedback');
+      fb.classList.remove('hidden');
 
-          if (valB === base && valC === count && valT === total) {
-            playSound('correct');
-            slotBase.classList.add('filled');
-            slotCount.classList.add('filled');
-            slotTotal.classList.add('filled');
-            fb.className = 'text-center text-base font-black text-emerald-600 mt-2';
-            fb.innerText = '乘法算式完全正確！🎉';
+      if (valB === base && valC === count && valT === total) {
+        playSound('correct');
+        slotBase.classList.remove('wrong'); slotBase.classList.add('filled');
+        slotCount.classList.remove('wrong'); slotCount.classList.add('filled');
+        slotTotal.classList.remove('wrong'); slotTotal.classList.add('filled');
+        fb.className = 'text-center text-base font-black text-emerald-600 mt-2';
+        fb.innerText = '乘法算式完全正確！🎉';
 
-            // 檢查步驟 1 是否也已填妥並正確
-            const totalSlot1 = document.getElementById('slot-i1-add-total');
-            const isStep1Done = totalSlot1 && totalSlot1.classList.contains('filled');
+        // 檢查步驟 1 是否也已填妥並正確
+        const totalSlot1 = document.getElementById('slot-i1-add-total');
+        const isStep1Done = totalSlot1 && totalSlot1.classList.contains('filled');
 
-            if (isStep1Done) {
-              unlockIsland1Step3();
-            } else {
-              focusSlot('slot-i1-add-0');
-            }
-          } else {
-            playSound('wrong');
-            fb.className = 'text-center text-base font-black text-rose-500 mt-2';
-            fb.innerText = `被乘數是 ${base}，乘數是 ${count} 喔！`;
-          }
+        if (isStep1Done) {
+          unlockIsland1Step3();
+        } else {
+          focusSlot('slot-i1-add-0');
         }
+      } else {
+        playSound('wrong');
+        island1CurrentQuestionHadError = true;
+        if (valB !== base) slotBase.classList.add('wrong');
+        if (valC !== count) slotCount.classList.add('wrong');
+        if (valT !== total) slotTotal.classList.add('wrong');
+        fb.className = 'text-center text-base font-black text-rose-500 mt-2';
+        fb.innerText = '再想一想喔！';
       }
     }
 
@@ -3567,7 +3850,6 @@
       const base = island1CurrentQuestion.base;
       const count = island1CurrentQuestion.count;
       const total = island1CurrentQuestion.total;
-      const totalDigits = String(total).length;
 
       const slotBase1 = document.getElementById('slot-i1-verbal-base1');
       const slotCount1 = document.getElementById('slot-i1-verbal-count1');
@@ -3576,49 +3858,44 @@
       const slotCount2 = document.getElementById('slot-i1-verbal-count2');
       const slotTotal2 = document.getElementById('slot-i1-verbal-total2');
 
-      // 自動跳轉焦點
-      if (activeSlotId === 'slot-i1-verbal-base1' && slotBase1.innerText.trim() !== '') {
-        focusSlot('slot-i1-verbal-count1');
-      } else if (activeSlotId === 'slot-i1-verbal-count1' && slotCount1.innerText.trim() !== '') {
-        focusSlot('slot-i1-verbal-total1');
-      } else if (activeSlotId === 'slot-i1-verbal-total1' && slotTotal1.innerText.trim().length >= totalDigits) {
-        focusSlot('slot-i1-verbal-base2');
-      } else if (activeSlotId === 'slot-i1-verbal-base2' && slotBase2.innerText.trim() !== '') {
-        focusSlot('slot-i1-verbal-count2');
-      } else if (activeSlotId === 'slot-i1-verbal-count2' && slotCount2.innerText.trim() !== '') {
-        focusSlot('slot-i1-verbal-total2');
-      }
-
       const slots = [slotBase1, slotCount1, slotTotal1, slotBase2, slotCount2, slotTotal2];
-      const allFilled = slots.every(s => s && s.innerText.trim() !== '');
-      const totalsComplete = slotTotal1.innerText.trim().length >= totalDigits && slotTotal2.innerText.trim().length >= totalDigits;
+      if (!slots.every(s => s && s.innerText.trim() !== '')) return;
 
-      if (allFilled && totalsComplete) {
-        const valB1 = parseInt(slotBase1.innerText.trim(), 10);
-        const valC1 = parseInt(slotCount1.innerText.trim(), 10);
-        const valT1 = parseInt(slotTotal1.innerText.trim(), 10);
-        const valB2 = parseInt(slotBase2.innerText.trim(), 10);
-        const valC2 = parseInt(slotCount2.innerText.trim(), 10);
-        const valT2 = parseInt(slotTotal2.innerText.trim(), 10);
+      const valB1 = parseInt(slotBase1.innerText.trim(), 10);
+      const valC1 = parseInt(slotCount1.innerText.trim(), 10);
+      const valT1 = parseInt(slotTotal1.innerText.trim(), 10);
+      const valB2 = parseInt(slotBase2.innerText.trim(), 10);
+      const valC2 = parseInt(slotCount2.innerText.trim(), 10);
+      const valT2 = parseInt(slotTotal2.innerText.trim(), 10);
 
-        const fb = document.getElementById('i1-step3-feedback');
-        fb.classList.remove('hidden');
+      const fb = document.getElementById('i1-step3-feedback');
+      fb.classList.remove('hidden');
 
-        if (valB1 === base && valC1 === count && valT1 === total &&
-            valB2 === base && valC2 === count && valT2 === total) {
-          playSound('correct');
-          slots.forEach(s => s.classList.add('filled'));
-          fb.className = 'text-center text-base font-black text-emerald-600 mt-2';
-          fb.innerText = '太棒了！算式的意思完全理解！🌟';
+      if (valB1 === base && valC1 === count && valT1 === total &&
+          valB2 === base && valC2 === count && valT2 === total) {
+        playSound('correct');
+        slots.forEach(s => { s.classList.remove('wrong'); s.classList.add('filled'); });
+        fb.className = 'text-center text-base font-black text-emerald-600 mt-2';
+        fb.innerText = '太棒了！算式的意思完全理解！🌟';
 
-          island1CorrectCount++;
-          document.getElementById('i1-next-action-area').classList.remove('hidden');
-          document.getElementById('global-keypad').classList.add('hidden');
-        } else {
-          playSound('wrong');
-          fb.className = 'text-center text-base font-black text-rose-500 mt-2';
-          fb.innerText = `想一想，是 ${base} 有幾個󠇡、${base} 的幾倍呢？`;
+        if (!island1CurrentQuestionHadError) {
+          island1FirstAttemptCorrectCount++;
         }
+        island1CorrectCount = island1FirstAttemptCorrectCount;
+
+        document.getElementById('i1-next-action-area').classList.remove('hidden');
+        document.getElementById('global-keypad').classList.add('hidden');
+      } else {
+        playSound('wrong');
+        island1CurrentQuestionHadError = true;
+        if (valB1 !== base) slotBase1.classList.add('wrong');
+        if (valC1 !== count) slotCount1.classList.add('wrong');
+        if (valT1 !== total) slotTotal1.classList.add('wrong');
+        if (valB2 !== base) slotBase2.classList.add('wrong');
+        if (valC2 !== count) slotCount2.classList.add('wrong');
+        if (valT2 !== total) slotTotal2.classList.add('wrong');
+        fb.className = 'text-center text-base font-black text-rose-500 mt-2';
+        fb.innerText = '再想一想喔！';
       }
     }
 
@@ -3636,7 +3913,8 @@
 
     function finishIsland1Stage() {
       playSound('win');
-      const stars = island1CorrectCount; // 答對 3 題獲得 3 顆星
+      document.getElementById('global-keypad').classList.add('hidden');
+      const stars = island1FirstAttemptCorrectCount; // 3 題中第一次就答對的題數給予對應星星
       if (!gameState.island1Progress) gameState.island1Progress = {};
       gameState.island1Progress[island1CurrentStage] = Math.max(gameState.island1Progress[island1CurrentStage] || 0, stars);
       if (island1CurrentStage === 'stage1') {
@@ -3646,12 +3924,12 @@
       updateIslandTrees();
       updateStarsDisplay();
       updateUserBadge();
-      syncUserProgressToFirebase();
+      saveAllProgress();
 
       logAttemptToFirebase({
         island: 1,
         stage: island1CurrentStage,
-        correctCount: island1CorrectCount,
+        correctCount: island1FirstAttemptCorrectCount,
         totalQuestions: 3,
         starsEarned: stars
       });
@@ -3663,7 +3941,13 @@
 
       title.innerText = '挑戰完成！';
       starsEarned.innerText = '★'.repeat(stars) + '☆'.repeat(3 - stars);
-      msg.innerHTML = `答對 ${island1CorrectCount} 題，獲得 ${stars} 顆星！`;
+      if (stars === 3) {
+        msg.innerHTML = `太棒了！3 題全部第一次就答對，獲得 3 顆星！🌟`;
+      } else if (stars > 0) {
+        msg.innerHTML = `3 題中第一次就答對 ${stars} 題，獲得 ${stars} 顆星！🌟`;
+      } else {
+        msg.innerHTML = `本次沒有在第一次就答對題目，獲得 0 顆星。再挑戰一次吧！`;
+      }
 
       modal.classList.remove('hidden');
     }
@@ -3673,6 +3957,8 @@
     let island2QuestionsPool = [];
     let island2QuestionIndex = 0;
     let island2CorrectQuestions = 0;
+    let island2FirstAttemptCorrectCount = 0;
+    let island2CurrentQuestionHadError = false;
     let island2CurrentQuestion = null;
     let currentStepI2 = 1;
     let speechRecognitionInstance = null;
@@ -3685,6 +3971,8 @@
       gameState.currentView = 'island2';
       island2QuestionIndex = 0;
       island2CorrectQuestions = 0;
+      island2FirstAttemptCorrectCount = 0;
+      island2CurrentQuestionHadError = false;
 
       generateIsland2Questions(base);
 
@@ -3779,6 +4067,7 @@
 
     function loadCurrentIsland2Question() {
       island2CurrentQuestion = island2QuestionsPool[island2QuestionIndex];
+      island2CurrentQuestionHadError = false;
       document.getElementById('island2-question-progress').innerText = `第 ${island2QuestionIndex + 1} / 4 題`;
       document.getElementById('i2-next-action-area').classList.add('hidden');
       const kp = document.getElementById('global-keypad');
@@ -4002,7 +4291,40 @@
       } else {
         ph.classList.remove('hidden');
       }
+      fitInputText(`i2-meaning-slot${row}`, `i2-placeholder-${row}`);
     }
+
+    // 平板與手機響應式字體縮放：若文字長度超出輸入框，自動逐步縮小字體以完整呈現
+    function fitInputText(slotId, placeholderId) {
+      const input = document.getElementById(slotId);
+      const ph = document.getElementById(placeholderId);
+      if (!input) return;
+
+      const isMobile = window.innerWidth < 640;
+      const isTablet = window.innerWidth < 1024;
+      const baseRem = isMobile ? 1.0 : (isTablet ? 1.15 : 1.3);
+      const minRem = 0.65;
+
+      let currentRem = baseRem;
+      input.style.fontSize = `${currentRem}rem`;
+      if (ph) ph.style.fontSize = `${currentRem}rem`;
+
+      // 檢查是否超出可視寬度 (scrollWidth > clientWidth)
+      const text = input.value || (ph && !ph.classList.contains('hidden') ? ph.innerText : '');
+      if (!text) return;
+
+      while (input.scrollWidth > input.clientWidth && currentRem > minRem) {
+        currentRem -= 0.04;
+        input.style.fontSize = `${currentRem.toFixed(2)}rem`;
+        if (ph) ph.style.fontSize = `${currentRem.toFixed(2)}rem`;
+      }
+    }
+
+    window.addEventListener('resize', () => {
+      fitInputText('i2-meaning-slot1', 'i2-placeholder-1');
+      fitInputText('i2-meaning-slot2', 'i2-placeholder-2');
+      fitInputText('i2-meaning-slot3', 'i2-placeholder-3');
+    });
 
     function resetIsland2Placeholders() {
       for (let r = 1; r <= 3; r++) {
@@ -4026,54 +4348,53 @@
       const slotCount = document.getElementById('i2-slot-mult-count');
       const slotTotal = document.getElementById('i2-slot-mult-total');
 
-      if (activeSlotId === 'i2-slot-mult-base' && slotBase.innerText.trim() !== '') {
-        focusSlot('i2-slot-mult-count');
-      } else if (activeSlotId === 'i2-slot-mult-count' && slotCount.innerText.trim() !== '') {
-        focusSlot('i2-slot-mult-total');
-      }
+      if (!slotBase || !slotCount || !slotTotal) return;
+      if (slotBase.innerText.trim() === '' || slotCount.innerText.trim() === '' || slotTotal.innerText.trim() === '') return;
 
-      if (slotBase.innerText.trim() !== '' && slotCount.innerText.trim() !== '' && slotTotal.innerText.trim() !== '') {
-        if (slotTotal.innerText.trim().length >= String(total).length) {
-          const valB = parseInt(slotBase.innerText.trim(), 10);
-          const valC = parseInt(slotCount.innerText.trim(), 10);
-          const valT = parseInt(slotTotal.innerText.trim(), 10);
+      const valB = parseInt(slotBase.innerText.trim(), 10);
+      const valC = parseInt(slotCount.innerText.trim(), 10);
+      const valT = parseInt(slotTotal.innerText.trim(), 10);
 
-          const fb = document.getElementById('i2-step1-feedback');
-          fb.classList.remove('hidden');
+      const fb = document.getElementById('i2-step1-feedback');
+      fb.classList.remove('hidden');
 
-          if (valB === base && valC === count && valT === total) {
-            playSound('correct');
-            slotBase.classList.add('filled');
-            slotCount.classList.add('filled');
-            slotTotal.classList.add('filled');
-            fb.className = 'text-center text-base font-black text-emerald-600 mt-2';
-            fb.innerText = '乘法算式完全正確！🎉';
+      if (valB === base && valC === count && valT === total) {
+        playSound('correct');
+        slotBase.classList.remove('wrong'); slotBase.classList.add('filled');
+        slotCount.classList.remove('wrong'); slotCount.classList.add('filled');
+        slotTotal.classList.remove('wrong'); slotTotal.classList.add('filled');
+        fb.className = 'text-center text-base font-black text-emerald-600 mt-2';
+        fb.innerText = '乘法算式完全正確！🎉';
 
-            // 步驟 1 正確後，消除步驟 1，跳出步驟 2
-            currentStepI2 = 2;
-            document.getElementById('i2-step1-container').classList.add('hidden');
-            const s2 = document.getElementById('i2-step2-container');
-            s2.classList.remove('hidden', 'opacity-40', 'pointer-events-none');
-            const kp = document.getElementById('global-keypad');
-            if (kp) kp.classList.add('hidden');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+        // 步驟 1 正確後，消除步驟 1，跳出步驟 2
+        currentStepI2 = 2;
+        document.getElementById('i2-step1-container').classList.add('hidden');
+        const s2 = document.getElementById('i2-step2-container');
+        s2.classList.remove('hidden', 'opacity-40', 'pointer-events-none');
+        const kp = document.getElementById('global-keypad');
+        if (kp) kp.classList.add('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
 
-            const introEl = document.getElementById('i2-meaning-intro-text');
-            if (introEl) introEl.innerText = `在 ${base} × ${count} = ${total} 的算式中：`;
-            const badgeB = document.getElementById('i2-badge-base-rep');
-            if (badgeB) badgeB.innerText = `${base} 代表`;
-            const badgeC = document.getElementById('i2-badge-count-rep');
-            if (badgeC) badgeC.innerText = `×${count} 代表`;
-            const badgeT = document.getElementById('i2-badge-total-rep');
-            if (badgeT) badgeT.innerText = `${total} 代表`;
+        const introEl = document.getElementById('i2-meaning-intro-text');
+        if (introEl) introEl.innerText = `在 ${base} × ${count} = ${total} 的算式中：`;
+        const badgeB = document.getElementById('i2-badge-base-rep');
+        if (badgeB) badgeB.innerText = `${base} 代表`;
+        const badgeC = document.getElementById('i2-badge-count-rep');
+        if (badgeC) badgeC.innerText = `×${count} 代表`;
+        const badgeT = document.getElementById('i2-badge-total-rep');
+        if (badgeT) badgeT.innerText = `${total} 代表`;
 
-            document.getElementById('i2-meaning-slot1').focus();
-          } else {
-            playSound('wrong');
-            fb.className = 'text-center text-base font-black text-rose-500 mt-2';
-            fb.innerText = '再想一想喔！';
-          }
-        }
+        // 預設游標不自動置入黃色框框，待學生主動點入才放置游標
+        activeMeaningInput = null;
+        resetIsland2Placeholders();
+      } else {
+        playSound('wrong');
+        island2CurrentQuestionHadError = true;
+        if (valB !== base) slotBase.classList.add('wrong');
+        if (valC !== count) slotCount.classList.add('wrong');
+        if (valT !== total) slotTotal.classList.add('wrong');
+        fb.className = 'text-center text-base font-black text-rose-500 mt-2';
+        fb.innerText = '再想一想喔！';
       }
     }
 
@@ -4167,11 +4488,16 @@
         document.getElementById('i2-meaning-slot2').disabled = true;
         document.getElementById('i2-meaning-slot3').disabled = true;
 
-        island2CorrectQuestions++;
+        if (!island2CurrentQuestionHadError) {
+          island2FirstAttemptCorrectCount++;
+        }
+        island2CorrectQuestions = island2FirstAttemptCorrectCount;
+
         document.getElementById('i2-next-action-area').classList.remove('hidden');
         document.getElementById('global-keypad').classList.add('hidden');
       } else {
         playSound('wrong');
+        island2CurrentQuestionHadError = true;
         fb.className = 'text-center text-base font-black text-rose-500 mt-2';
         fb.innerText = '再想一想喔！';
       }
@@ -4228,25 +4554,34 @@
       const slotTotal = document.getElementById('slot-i2-q4-total-diff');
       const fb = document.getElementById('island2-q4-feedback');
 
+      if (!slotDiff || !slotTotal || slotDiff.innerText.trim() === '' || slotTotal.innerText.trim() === '') {
+        return;
+      }
+
       const valD = parseInt(slotDiff.innerText.trim(), 10);
       const valT = parseInt(slotTotal.innerText.trim(), 10);
 
       if (isNaN(valD) || isNaN(valT)) {
         playSound('wrong');
+        island2CurrentQuestionHadError = true;
         fb.classList.remove('hidden');
         fb.className = 'text-center text-xl font-black text-rose-500 mt-4';
-        fb.innerText = '請完整填寫兩個󠇡空格喔！';
+        fb.innerText = '再想一想喔！';
         return;
       }
 
       fb.classList.remove('hidden');
       if (valD === q.diff && valT === q.totalDiff) {
         playSound('win');
-        slotDiff.classList.add('filled');
-        slotTotal.classList.add('filled');
+        slotDiff.classList.remove('wrong'); slotDiff.classList.add('filled');
+        slotTotal.classList.remove('wrong'); slotTotal.classList.add('filled');
         fb.className = 'text-center text-xl font-black text-emerald-600 mt-4';
         fb.innerText = '答對了！非常優秀！🎉';
-        island2CorrectQuestions++;
+
+        if (!island2CurrentQuestionHadError) {
+          island2FirstAttemptCorrectCount++;
+        }
+        island2CorrectQuestions = island2FirstAttemptCorrectCount;
 
         document.getElementById('i2-next-action-area').classList.remove('hidden');
         const kp = document.getElementById('global-keypad');
@@ -4254,8 +4589,9 @@
         document.getElementById('btn-i2-next-question').innerText = '完成關卡 🎉';
       } else {
         playSound('wrong');
-        slotDiff.classList.add('wrong');
-        slotTotal.classList.add('wrong');
+        island2CurrentQuestionHadError = true;
+        if (valD !== q.diff) slotDiff.classList.add('wrong');
+        if (valT !== q.totalDiff) slotTotal.classList.add('wrong');
         fb.className = 'text-center text-xl font-black text-rose-500 mt-4';
         fb.innerText = '再想一想喔！';
       }
@@ -4277,16 +4613,30 @@
       document.getElementById('global-keypad').classList.add('hidden');
       const base = gameState.selectedBase;
       const chName = CH_NUM_MAP[base];
-      const stars = 3; // 通關獲得 3 顆星
+
+      // 4題裡面對1~2題得一顆星，對3題得二顆星，對4題得三顆星
+      let stars = 0;
+      if (island2FirstAttemptCorrectCount === 4) {
+        stars = 3;
+      } else if (island2FirstAttemptCorrectCount === 3) {
+        stars = 2;
+      } else if (island2FirstAttemptCorrectCount >= 1) {
+        stars = 1;
+      } else {
+        stars = 0;
+      }
 
       gameState.island2Progress[String(base)] = Math.max(gameState.island2Progress[String(base)] || 0, stars);
       updateIslandTrees();
       updateStarsDisplay();
-      syncUserProgressToFirebase();
+      updateUserBadge();
+      saveAllProgress();
 
       logAttemptToFirebase({
         island: 2,
         base: base,
+        correctCount: island2FirstAttemptCorrectCount,
+        totalQuestions: 4,
         starsEarned: stars
       });
 
@@ -4295,9 +4645,15 @@
       const starsEarned = document.getElementById('modal-stars-earned');
       const msg = document.getElementById('modal-message');
 
-      title.innerText = `✨ ${chName}的乘法算式與意義 通關！`;
-      starsEarned.innerText = '★★★';
-      msg.innerHTML = `太厲害了！你已完全掌握 ${chName}的乘法算式與意義！<br>第二座島嶼上已經種下金晶松樹！🌟`;
+      title.innerText = `✨ ${chName}的乘法算式與意義 挑戰完成！`;
+      starsEarned.innerText = '★'.repeat(stars) + '☆'.repeat(3 - stars);
+      if (stars === 3) {
+        msg.innerHTML = `太厲害了！4 題全部一次就答對，獲得 3 顆星！🌟<br>第二座島嶼上已經種下金晶松樹！`;
+      } else if (stars > 0) {
+        msg.innerHTML = `4 題中第一次就答對 ${island2FirstAttemptCorrectCount} 題，獲得 ${stars} 顆星！🌟<br>再接再厲爭取 4 題全對獲得 3 顆星喔！`;
+      } else {
+        msg.innerHTML = `本次沒有在第一次就答對題目，獲得 0 顆星。再挑戰一次吧！`;
+      }
 
       modal.classList.remove('hidden');
     }
@@ -4305,8 +4661,14 @@
 
     // ==================== 第三座島嶼：十十乘法表 ====================
     let island3RowsData = [];
+    let island3FirstAttemptRowsCount = 0;
+    let island3RowErrors = {};
+    let island3ChallengeHadError = false;
 
     function startIsland3Stage(base) {
+      island3FirstAttemptRowsCount = 0;
+      island3RowErrors = {};
+      island3ChallengeHadError = false;
       gameState.selectedBase = base;
       gameState.selectedIsland = 3;
       gameState.currentView = 'island3';
@@ -4451,6 +4813,9 @@
       if (isCorrect) {
         row.solved = true;
         playSound('correct');
+        if (!island3RowErrors[k]) {
+          island3FirstAttemptRowsCount++;
+        }
         const rowEl = document.getElementById(`table-row-i3-${k}`);
         if (rowEl) rowEl.className = 'flex items-center justify-between p-2.5 sm:p-3.5 rounded-2xl bg-emerald-50 border-2 border-emerald-300 shadow-xs transition';
 
@@ -4471,9 +4836,19 @@
         }
       } else {
         playSound('wrong');
+        island3RowErrors[k] = true;
+        row.blanks.forEach(bType => {
+          const slot = document.getElementById(`slot-tbl3-${k}-${bType}`);
+          const val = slot ? parseInt(slot.innerText.trim(), 10) : NaN;
+          let expected = (bType === 'total') ? row.total : ((bType === 'count') ? row.k : row.base);
+          if (slot && val !== expected) slot.classList.add('wrong');
+        });
         const fb = document.getElementById('island3-feedback');
-        fb.classList.remove('hidden');
-        setTimeout(() => fb.classList.add('hidden'), 2000);
+        if (fb) {
+          fb.classList.remove('hidden');
+          fb.innerText = '再想一想喔！';
+          setTimeout(() => fb.classList.add('hidden'), 2000);
+        }
       }
     }
 
@@ -4535,8 +4910,10 @@
         setTimeout(() => focusSlot('slot-i3-chal-11'), 200);
       } else {
         playSound('wrong');
+        island3ChallengeHadError = true;
+        slot.classList.add('wrong');
         fb.className = 'text-center font-bold text-sm sm:text-base mt-2 min-h-[1.5rem] text-rose-500';
-        fb.innerText = `想一想，${base} 的乘法，每往下一行是多幾個󠇡呢？答案就是 ${base} 喔！`;
+        fb.innerText = '再想一想喔！';
       }
     }
 
@@ -4553,6 +4930,7 @@
             focusSlot('slot-i3-chal-12');
           } else {
             playSound('wrong');
+            island3ChallengeHadError = true;
             slot.classList.add('wrong');
           }
         }
@@ -4567,6 +4945,7 @@
             focusSlot('slot-i3-chal-13');
           } else {
             playSound('wrong');
+            island3ChallengeHadError = true;
             slot.classList.add('wrong');
           }
         }
@@ -4583,6 +4962,7 @@
             }, 500);
           } else {
             playSound('wrong');
+            island3ChallengeHadError = true;
             slot.classList.add('wrong');
           }
         }
@@ -4594,16 +4974,29 @@
       document.getElementById('global-keypad').classList.add('hidden');
       const base = gameState.selectedBase;
       const chName = CH_NUM_MAP[base];
-      const stars = 3;
+
+      let stars = 0;
+      if (island3FirstAttemptRowsCount === 10 && !island3ChallengeHadError) {
+        stars = 3;
+      } else if (island3FirstAttemptRowsCount >= 8) {
+        stars = 2;
+      } else if (island3FirstAttemptRowsCount >= 6) {
+        stars = 1;
+      } else {
+        stars = 0;
+      }
 
       gameState.island3Progress[String(base)] = Math.max(gameState.island3Progress[String(base)] || 0, stars);
       updateIslandTrees();
       updateStarsDisplay();
-      syncUserProgressToFirebase();
+      updateUserBadge();
+      saveAllProgress();
 
       logAttemptToFirebase({
         island: 3,
         base: base,
+        correctCount: island3FirstAttemptRowsCount,
+        totalQuestions: 10,
         starsEarned: stars
       });
 
@@ -4612,17 +5005,27 @@
       const starsEarned = document.getElementById('modal-stars-earned');
       const msg = document.getElementById('modal-message');
 
-      title.innerText = `📖 ${chName}的順背乘法表 通關！`;
-      starsEarned.innerText = '★★★';
-      msg.innerHTML = `太棒了！順背乘法表完全正確！<br>第三座島嶼上已經種下晶藍水晶樹！🌟`;
+      title.innerText = `📖 ${chName}的順背乘法表 挑戰完成！`;
+      starsEarned.innerText = '★'.repeat(stars) + '☆'.repeat(3 - stars);
+      if (stars === 3) {
+        msg.innerHTML = `太棒了！順背乘法表完全正確且全無失誤！<br>第三座島嶼上已經種下晶藍水晶樹！🌟`;
+      } else if (stars > 0) {
+        msg.innerHTML = `10 行中第一次就答對 ${island3FirstAttemptRowsCount} 行，獲得 ${stars} 顆星！🌟`;
+      } else {
+        msg.innerHTML = `本次失誤較多，獲得 0 顆星。多練習幾次一定能拿到 3 顆星！`;
+      }
 
       modal.classList.remove('hidden');
     }
 
     // ==================== 第四座島嶼：倒背十十乘法表 (全新新增) ====================
     let island4RowsData = [];
+    let island4FirstAttemptRowsCount = 0;
+    let island4RowErrors = {};
 
     function startIsland4Stage(base) {
+      island4FirstAttemptRowsCount = 0;
+      island4RowErrors = {};
       gameState.selectedBase = base;
       gameState.selectedIsland = 4;
       gameState.currentView = 'island4';
@@ -4754,6 +5157,9 @@
       if (isCorrect) {
         row.solved = true;
         playSound('correct');
+        if (!island4RowErrors[k]) {
+          island4FirstAttemptRowsCount++;
+        }
         const rowEl = document.getElementById(`table-row-i4-${k}`);
         if (rowEl) rowEl.className = 'flex items-center justify-between p-3 sm:p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-300 shadow-xs transition';
 
@@ -4774,9 +5180,19 @@
         }
       } else {
         playSound('wrong');
+        island4RowErrors[k] = true;
+        row.blanks.forEach(bType => {
+          const slot = document.getElementById(`slot-tbl4-${k}-${bType}`);
+          const val = slot ? parseInt(slot.innerText.trim(), 10) : NaN;
+          let expected = (bType === 'total') ? row.total : ((bType === 'count') ? row.k : row.base);
+          if (slot && val !== expected) slot.classList.add('wrong');
+        });
         const fb = document.getElementById('island4-feedback');
-        fb.classList.remove('hidden');
-        setTimeout(() => fb.classList.add('hidden'), 2000);
+        if (fb) {
+          fb.classList.remove('hidden');
+          fb.innerText = '再想一想喔！';
+          setTimeout(() => fb.classList.add('hidden'), 2000);
+        }
       }
     }
 
@@ -4785,16 +5201,29 @@
       document.getElementById('global-keypad').classList.add('hidden');
       const base = gameState.selectedBase;
       const chName = CH_NUM_MAP[base];
-      const stars = 3;
+
+      let stars = 0;
+      if (island4FirstAttemptRowsCount === 10) {
+        stars = 3;
+      } else if (island4FirstAttemptRowsCount >= 8) {
+        stars = 2;
+      } else if (island4FirstAttemptRowsCount >= 6) {
+        stars = 1;
+      } else {
+        stars = 0;
+      }
 
       gameState.island4Progress[String(base)] = Math.max(gameState.island4Progress[String(base)] || 0, stars);
       updateIslandTrees();
       updateStarsDisplay();
-      syncUserProgressToFirebase();
+      updateUserBadge();
+      saveAllProgress();
 
       logAttemptToFirebase({
         island: 4,
         base: base,
+        correctCount: island4FirstAttemptRowsCount,
+        totalQuestions: 10,
         starsEarned: stars
       });
 
@@ -4803,9 +5232,15 @@
       const starsEarned = document.getElementById('modal-stars-earned');
       const msg = document.getElementById('modal-message');
 
-      title.innerText = `🔄 ${chName}的倒背乘法表 通關！`;
-      starsEarned.innerText = '★★★';
-      msg.innerHTML = `太不可思議了！倒背乘法表完全難不倒你！<br>第四座島嶼上已經種下金紅珊瑚樹！🌟`;
+      title.innerText = `🔄 ${chName}的倒背乘法表 挑戰完成！`;
+      starsEarned.innerText = '★'.repeat(stars) + '☆'.repeat(3 - stars);
+      if (stars === 3) {
+        msg.innerHTML = `太不可思議了！倒背乘法表 10 行全數一次過關！<br>第四座島嶼上已經種下金紅珊瑚樹！🌟`;
+      } else if (stars > 0) {
+        msg.innerHTML = `10 行中第一次就答對 ${island4FirstAttemptRowsCount} 行，獲得 ${stars} 顆星！🌟`;
+      } else {
+        msg.innerHTML = `本次失誤較多，獲得 0 顆星。倒背需要熟練度，再挑戰一次吧！`;
+      }
 
       modal.classList.remove('hidden');
     }
@@ -5030,8 +5465,267 @@
       document.getElementById('modal-island5-animation').classList.add('hidden');
     }
 
-    // ==================== 全域鍵盤輸入與選格 ====================
+    // ==================== 全域空格與動態跳轉邏輯 ====================
     let activeSlotId = null;
+
+    // 取得該空格正確答案所需的位數（1位或2位或3位）
+    function getSlotExpectedLength(slotId) {
+      if (!slotId) return 1;
+
+      // 第一座島嶼
+      if (slotId.startsWith('slot-i1-add-')) {
+        if (slotId === 'slot-i1-add-total') {
+          const tot = island1CurrentQuestion ? island1CurrentQuestion.total : 0;
+          return String(tot).length;
+        }
+        const base = island1CurrentQuestion ? island1CurrentQuestion.base : 0;
+        return String(base).length;
+      }
+      if (slotId.startsWith('slot-i1s1-')) {
+        if (slotId === 'slot-i1s1-base') {
+          const base = island1CurrentQuestion ? island1CurrentQuestion.base : 0;
+          return String(base).length;
+        }
+        const count = island1CurrentQuestion ? island1CurrentQuestion.count : 0;
+        return String(count).length;
+      }
+      if (slotId.startsWith('slot-i1-mult-')) {
+        if (slotId === 'slot-i1-mult-total') {
+          const tot = island1CurrentQuestion ? island1CurrentQuestion.total : 0;
+          return String(tot).length;
+        }
+        if (slotId === 'slot-i1-mult-count') {
+          const count = island1CurrentQuestion ? island1CurrentQuestion.count : 0;
+          return String(count).length;
+        }
+        const base = island1CurrentQuestion ? island1CurrentQuestion.base : 0;
+        return String(base).length;
+      }
+      if (slotId.startsWith('slot-i1-verbal-')) {
+        if (slotId === 'slot-i1-verbal-total1' || slotId === 'slot-i1-verbal-total2') {
+          const tot = island1CurrentQuestion ? island1CurrentQuestion.total : 0;
+          return String(tot).length;
+        }
+        if (slotId.includes('count')) {
+          const count = island1CurrentQuestion ? island1CurrentQuestion.count : 0;
+          return String(count).length;
+        }
+        const base = island1CurrentQuestion ? island1CurrentQuestion.base : 0;
+        return String(base).length;
+      }
+
+      // 第二座島嶼
+      if (slotId === 'i2-slot-mult-total') {
+        const tot = island2CurrentQuestion ? island2CurrentQuestion.total : 0;
+        return String(tot).length;
+      }
+      if (slotId === 'i2-slot-mult-count') {
+        const count = island2CurrentQuestion ? island2CurrentQuestion.count : 0;
+        return String(count).length;
+      }
+      if (slotId === 'i2-slot-mult-base') {
+        const base = island2CurrentQuestion ? island2CurrentQuestion.base : 0;
+        return String(base).length;
+      }
+      if (slotId === 'slot-i2-q4-diff') {
+        const diff = island2CurrentQuestion ? island2CurrentQuestion.diff : 0;
+        return String(diff).length;
+      }
+      if (slotId === 'slot-i2-q4-total-diff') {
+        const totalDiff = island2CurrentQuestion ? island2CurrentQuestion.totalDiff : 0;
+        return String(totalDiff).length;
+      }
+
+      // 第三座島嶼
+      if (slotId.startsWith('slot-tbl3-')) {
+        const parts = slotId.split('-');
+        const k = parseInt(parts[2], 10);
+        const bType = parts[3];
+        const row = island3RowsData.find(r => r.k === k);
+        if (row) {
+          if (bType === 'total') return String(row.total).length;
+          if (bType === 'count') return String(row.k).length;
+          return String(row.base).length;
+        }
+        return 1;
+      }
+      if (slotId === 'slot-i3-pattern-diff') {
+        const base = gameState.selectedBase || 2;
+        return String(base).length;
+      }
+      if (slotId === 'slot-i3-chal-11') {
+        const base = gameState.selectedBase || 2;
+        return String(base * 11).length;
+      }
+      if (slotId === 'slot-i3-chal-12') {
+        const base = gameState.selectedBase || 2;
+        return String(base * 12).length;
+      }
+      if (slotId === 'slot-i3-chal-13') {
+        const base = gameState.selectedBase || 2;
+        return String(base * 13).length;
+      }
+
+      // 第四座島嶼
+      if (slotId.startsWith('slot-tbl4-')) {
+        const parts = slotId.split('-');
+        const k = parseInt(parts[2], 10);
+        const bType = parts[3];
+        const row = island4RowsData.find(r => r.k === k);
+        if (row) {
+          if (bType === 'total') return String(row.total).length;
+          if (bType === 'count') return String(row.k).length;
+          return String(row.base).length;
+        }
+        return 1;
+      }
+
+      // 第五座島嶼
+      if (slotId === 'slot-i5-answer') {
+        const q = island5Questions[island5QIndex];
+        return q ? String(q.ans).length : 2;
+      }
+
+      return 1;
+    }
+
+    // 取得下一個應跳轉的空格 ID（若為該關最後一格則回傳 null）
+    function getNextSlotId(slotId) {
+      if (!slotId) return null;
+
+      // 第一座島嶼步驟一 (連加):
+      if (slotId.startsWith('slot-i1-add-')) {
+        if (slotId === 'slot-i1-add-total') return null;
+        const count = island1CurrentQuestion ? island1CurrentQuestion.count : 0;
+        const match = slotId.match(/slot-i1-add-(\d+)/);
+        if (match) {
+          const idx = parseInt(match[1], 10);
+          if (idx + 1 < count) {
+            return `slot-i1-add-${idx + 1}`;
+          } else {
+            return 'slot-i1-add-total';
+          }
+        }
+        return null;
+      }
+
+      // 第一座島嶼關卡一步驟二:
+      if (slotId === 'slot-i1s1-count1') return 'slot-i1s1-count2';
+      if (slotId === 'slot-i1s1-count2') return 'slot-i1s1-base';
+      if (slotId === 'slot-i1s1-base') return 'slot-i1s1-count3';
+      if (slotId === 'slot-i1s1-count3') return null;
+
+      // 第一座島嶼關卡二步驟二:
+      if (slotId === 'slot-i1-mult-base') return 'slot-i1-mult-count';
+      if (slotId === 'slot-i1-mult-count') return 'slot-i1-mult-total';
+      if (slotId === 'slot-i1-mult-total') return null;
+
+      // 第一座島嶼關卡二步驟三:
+      if (slotId === 'slot-i1-verbal-base1') return 'slot-i1-verbal-count1';
+      if (slotId === 'slot-i1-verbal-count1') return 'slot-i1-verbal-total1';
+      if (slotId === 'slot-i1-verbal-total1') return 'slot-i1-verbal-base2';
+      if (slotId === 'slot-i1-verbal-base2') return 'slot-i1-verbal-count2';
+      if (slotId === 'slot-i1-verbal-count2') return 'slot-i1-verbal-total2';
+      if (slotId === 'slot-i1-verbal-total2') return null;
+
+      // 第二座島嶼步驟一:
+      if (slotId === 'i2-slot-mult-base') return 'i2-slot-mult-count';
+      if (slotId === 'i2-slot-mult-count') return 'i2-slot-mult-total';
+      if (slotId === 'i2-slot-mult-total') return null;
+
+      // 第二座島嶼第四題 (比一比):
+      if (slotId === 'slot-i2-q4-diff') return 'slot-i2-q4-total-diff';
+      if (slotId === 'slot-i2-q4-total-diff') return null;
+
+      // 第三座島嶼乘法表:
+      if (slotId.startsWith('slot-tbl3-')) {
+        const parts = slotId.split('-');
+        const k = parseInt(parts[2], 10);
+        const bType = parts[3];
+        const row = island3RowsData.find(r => r.k === k);
+        if (row && row.blanks) {
+          const curIdx = row.blanks.indexOf(bType);
+          if (curIdx >= 0 && curIdx + 1 < row.blanks.length) {
+            return `slot-tbl3-${k}-${row.blanks[curIdx + 1]}`;
+          }
+        }
+        return null;
+      }
+
+      // 第三座島嶼挑戰題由專屬流程管控
+      if (slotId === 'slot-i3-pattern-diff') return null;
+      if (slotId === 'slot-i3-chal-11') return null;
+      if (slotId === 'slot-i3-chal-12') return null;
+      if (slotId === 'slot-i3-chal-13') return null;
+
+      // 第四座島嶼乘法表:
+      if (slotId.startsWith('slot-tbl4-')) {
+        const parts = slotId.split('-');
+        const k = parseInt(parts[2], 10);
+        const bType = parts[3];
+        const row = island4RowsData.find(r => r.k === k);
+        if (row && row.blanks) {
+          const curIdx = row.blanks.indexOf(bType);
+          if (curIdx >= 0 && curIdx + 1 < row.blanks.length) {
+            return `slot-tbl4-${k}-${row.blanks[curIdx + 1]}`;
+          }
+        }
+        return null;
+      }
+
+      // 第五座島嶼大會考:
+      if (slotId === 'slot-i5-answer') return null;
+
+      return null;
+    }
+
+    // 觸發對應關卡或步驟的檢核
+    function triggerStepCheck(slotId) {
+      if (!slotId) return;
+      if (gameState.currentView === 'island1') {
+        if (island1CurrentStage === 'stage1') {
+          if (currentStepI1 === 1 || slotId.startsWith('slot-i1-add-')) {
+            checkIsland1Step1();
+          } else if (currentStepI1 === 2 || slotId.startsWith('slot-i1s1-')) {
+            checkIsland1Stage1Step2();
+          }
+        } else {
+          if (currentStepI1 === 1 || slotId.startsWith('slot-i1-add-')) {
+            checkIsland1Step1();
+          } else if (currentStepI1 === 2 || slotId.startsWith('slot-i1-mult-')) {
+            checkIsland1Step2Mult();
+          } else if (currentStepI1 === 3 || slotId.startsWith('slot-i1-verbal-')) {
+            checkIsland1Step3();
+          }
+        }
+      } else if (gameState.currentView === 'island2') {
+        if (currentStepI2 === 1 || slotId.startsWith('i2-slot-mult-')) {
+          checkIsland2Step1();
+        } else if (currentStepI2 === 4 || slotId.startsWith('slot-i2-q4-')) {
+          checkIsland2Q4Answer();
+        }
+      } else if (gameState.currentView === 'island3') {
+        if (slotId.startsWith('slot-tbl3-')) {
+          const parts = slotId.split('-');
+          const k = parseInt(parts[2], 10);
+          checkIsland3Row(k);
+        } else if (slotId === 'slot-i3-pattern-diff') {
+          checkIsland3Pattern();
+        } else if (slotId.startsWith('slot-i3-chal-')) {
+          checkIsland3ChallengeSlot();
+        }
+      } else if (gameState.currentView === 'island4') {
+        if (slotId.startsWith('slot-tbl4-')) {
+          const parts = slotId.split('-');
+          const k = parseInt(parts[2], 10);
+          checkIsland4Row(k);
+        }
+      } else if (gameState.currentView === 'island5') {
+        if (island5CanAnswer) {
+          checkIsland5Input();
+        }
+      }
+    }
 
     function focusSlot(slotId) {
       activeSlotId = slotId;
@@ -5182,79 +5876,22 @@
         return;
       }
 
-      let maxLen = 2;
-      if (activeSlotId.includes('slot-tbl3-')) {
-        const parts = activeSlotId.split('-');
-        const k = parseInt(parts[2], 10);
-        const bType = parts[3];
-        const row = island3RowsData.find(r => r.k === k);
-        if (row) {
-          if (bType === 'total') maxLen = String(row.total).length;
-          else if (bType === 'count') maxLen = String(row.k).length;
-          else maxLen = String(row.base).length;
-        }
-      } else if (activeSlotId.includes('slot-tbl4-')) {
-        const parts = activeSlotId.split('-');
-        const k = parseInt(parts[2], 10);
-        const bType = parts[3];
-        const row = island4RowsData.find(r => r.k === k);
-        if (row) {
-          if (bType === 'total') maxLen = String(row.total).length;
-          else if (bType === 'count') maxLen = String(row.k).length;
-          else maxLen = String(row.base).length;
-        }
-      } else if (activeSlotId === 'i2-slot-mult-total' || activeSlotId === 'slot-i1-mult-total' || activeSlotId === 'slot-i1-add-total' || activeSlotId.startsWith('slot-i3-chal-')) {
-        maxLen = 3;
-      } else if (activeSlotId === 'slot-i3-pattern-diff') {
-        maxLen = 2;
-      }
+      const expectedLen = getSlotExpectedLength(activeSlotId);
 
-      // 確實將輸入數字放入當前格子中
-      if (target.innerText === '') {
-        target.innerText = key;
+      // 輸入數字：若尚未達到預期位數則追加；若已達到或超過預期位數則覆蓋新數字
+      if (target.innerText.length < expectedLen) {
+        target.innerText += key;
       } else {
-        if (target.innerText.length < maxLen) {
-          target.innerText += key;
-        } else {
-          target.innerText = key;
-        }
+        target.innerText = key;
       }
 
-      // 輸入後即時判斷
-      if (gameState.currentView === 'island1') {
-        if (island1CurrentStage === 'stage1') {
-          if (activeSlotId.startsWith('slot-i1-add-')) {
-            checkIsland1Step1();
-          } else if (activeSlotId.startsWith('slot-i1s1-')) {
-            checkIsland1Stage1Step2();
-          }
-        } else {
-          if (activeSlotId.startsWith('slot-i1-add-')) {
-            checkIsland1Step1();
-          } else if (activeSlotId.startsWith('slot-i1-mult-')) {
-            checkIsland1Step2Mult();
-          } else if (activeSlotId.startsWith('slot-i1-verbal-')) {
-            checkIsland1Step3();
-          }
+      // 檢查是否已達到該格正確答案所需的位數（1位填1位跳，2位填2位跳）
+      if (target.innerText.trim().length >= expectedLen) {
+        const nextSlot = getNextSlotId(activeSlotId);
+        if (nextSlot) {
+          focusSlot(nextSlot);
         }
-      } else if (gameState.currentView === 'island2') {
-        if (currentStepI2 === 1) checkIsland2Step1();
-      } else if (gameState.currentView === 'island3') {
-        if (activeSlotId.startsWith('slot-tbl3-')) {
-          const parts = activeSlotId.split('-');
-          const k = parseInt(parts[2], 10);
-          checkIsland3Row(k);
-        } else if (activeSlotId === 'slot-i3-pattern-diff') {
-          checkIsland3Pattern();
-        } else if (activeSlotId.startsWith('slot-i3-chal-')) {
-          checkIsland3ChallengeSlot();
-        }
-      } else if (gameState.currentView === 'island4') {
-        const parts = activeSlotId.split('-');
-        const k = parseInt(parts[2], 10);
-        checkIsland4Row(k);
-      } else if (gameState.currentView === 'island5') {
-        if (island5CanAnswer) checkIsland5Input();
+        triggerStepCheck(activeSlotId);
       }
     }
 
