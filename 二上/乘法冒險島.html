@@ -1339,17 +1339,15 @@
     </div>
   </div>
 
-  <!-- ==================== 左下角水晶生命值與剩餘時間浮動看板 ==================== -->
-  <div id="hud-crystal-battle" class="fixed bottom-4 left-4 z-40 bg-white/95 backdrop-blur-md border-2 border-indigo-300 rounded-2xl shadow-2xl p-3.5 sm:p-4 w-72 sm:w-80 transition-all select-none pointer-events-auto">
+  <!-- ==================== 左下角水晶生命值與剩餘時間浮動看板 (僅攻打水晶時出現) ==================== -->
+  <div id="hud-crystal-battle" class="hidden fixed bottom-4 left-4 z-40 bg-white/95 backdrop-blur-md border-2 border-indigo-300 rounded-2xl shadow-2xl p-3.5 sm:p-4 w-72 sm:w-80 transition-all select-none pointer-events-auto">
     <div class="flex items-center justify-between mb-2">
       <div class="flex items-center space-x-1.5">
         <span id="hud-crystal-icon" class="text-xl">💎</span>
         <span id="hud-crystal-name" class="font-black text-sm sm:text-base text-indigo-950">紅水晶</span>
-        <span id="hud-crystal-status-badge" class="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-100 text-slate-600">待命中</span>
+        <span id="hud-crystal-status-badge" class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">攻打中 ⚔️</span>
       </div>
-      <button onclick="openCrystalBattleModal()" id="hud-btn-action" class="btn-cute text-xs font-black text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-xl border border-indigo-200 transition shadow-xs">
-        選擇小精靈
-      </button>
+      <div id="hud-crystal-stage-tag" class="text-xs font-black text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200 shadow-2xs">第 1/5 關</div>
     </div>
 
     <!-- 生命值條 -->
@@ -1362,7 +1360,7 @@
     <div class="grid grid-cols-2 gap-2 text-xs font-bold text-slate-600 pt-1.5 border-t border-indigo-100">
       <div>
         <span class="text-slate-400">剩餘時間：</span>
-        <div id="hud-crystal-eta" class="font-black text-indigo-900 font-mono mt-0.5">尚未開始</div>
+        <div id="hud-crystal-eta" class="font-black text-indigo-900 font-mono mt-0.5">尚未出擊</div>
       </div>
       <div class="text-right">
         <span class="text-slate-400">出擊戰力：</span>
@@ -1909,6 +1907,29 @@
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
         osc.start(now);
         osc.stop(now + 0.3);
+      } else if (type === 'crystalHit') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(650 + Math.random() * 250, now);
+        osc.frequency.exponentialRampToValueAtTime(280, now + 0.08);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        osc.start(now);
+        osc.stop(now + 0.08);
+      } else if (type === 'shatter') {
+        const shatterNotes = [880, 1174, 1567, 2093, 2793];
+        shatterNotes.forEach((freq, idx) => {
+          const t = now + idx * 0.05;
+          const o = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          o.type = 'sawtooth';
+          o.connect(g);
+          g.connect(audioCtx.destination);
+          o.frequency.setValueAtTime(freq, t);
+          g.gain.setValueAtTime(0.08, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+          o.start(t);
+          o.stop(t + 0.25);
+        });
       } else if (type === 'win') {
         osc.type = 'sine';
         const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
@@ -2042,13 +2063,13 @@
       island5Progress: { '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 }
     };
 
-    // 六座島嶼核心座標 (環形群島幾何 + 中央第6島攻打水晶)
+    // 六座島嶼核心座標 (環形群島外圍半徑拉開至約80，讓中央第6島成為孤島)
     const ISLAND_COORDS = {
-      1: { x: -50, y: 0, z: 10 },
-      2: { x: 0,   y: 0, z: 35 },
-      3: { x: 50,  y: 0, z: 10 },
-      4: { x: 32,  y: 0, z: -38 },
-      5: { x: -32, y: 0, z: -38 },
+      1: { x: -75, y: 0, z: 25 },
+      2: { x: 0,   y: 0, z: 80 },
+      3: { x: 75,  y: 0, z: 25 },
+      4: { x: 50,  y: 0, z: -62 },
+      5: { x: -50, y: 0, z: -62 },
       6: { x: 0,   y: 0, z: -2 }
     };
 
@@ -2063,6 +2084,10 @@
     let crystalMainMesh = null;
     let crystalHpSprite = null;
     let crystalMaterial = null;
+    let crystalSubCrystals = [];
+    let crystalCrackMesh = null;
+    let battleParticles = [];
+    let lastHitSoundTime = 0;
 
     // ==================== 攻打水晶 (水晶爭奪戰核心系統) ====================
     const CRYSTAL_CONFIGS = [
@@ -2523,7 +2548,8 @@
       crystalMainMesh.castShadow = true;
       crystalRoot.add(crystalMainMesh);
 
-      // 環繞的小型伴生晶簇
+      // 環繞的小型伴生晶簇 (隨血量逐一崩落)
+      crystalSubCrystals = [];
       for (let i = 0; i < 6; i++) {
         const ang = (i / 6) * Math.PI * 2;
         const subGeo = new THREE.ConeGeometry(0.55, 2.2, 5);
@@ -2532,7 +2558,21 @@
         subMesh.rotation.x = (Math.random() - 0.5) * 0.4;
         subMesh.rotation.z = (Math.random() - 0.5) * 0.4;
         crystalRoot.add(subMesh);
+        crystalSubCrystals.push(subMesh);
       }
+
+      // 表面裂紋網格 (隨血量減少漸漸顯現加深)
+      const crackGeo = new THREE.OctahedronGeometry(2.44, 1);
+      crackGeo.scale(1.0, 1.8, 1.0);
+      const crackMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.0
+      });
+      crystalCrackMesh = new THREE.Mesh(crackGeo, crackMat);
+      crystalCrackMesh.position.set(0, 4.6, 0);
+      crystalRoot.add(crystalCrackMesh);
 
       // 3D 浮動血條看板 (Canvas Sprite)
       const cvs = document.createElement('canvas');
@@ -2548,6 +2588,68 @@
 
       islandGroup.add(crystalRoot);
       updateCrystalHp3DSprite();
+      updateCrystalVisualDamage();
+    }
+
+    // 水晶破壞外觀即時更新 (伴生晶簇崩解 + 裂紋加深)
+    function updateCrystalVisualDamage() {
+      if (!crystalMainMesh) return;
+      const curHp = Math.max(0, crystalBattleState.currentHp);
+      const maxHp = crystalBattleState.maxHp || 600;
+      const ratio = curHp / maxHp;
+
+      // 1. 伴生晶簇依序崩解消失
+      if (crystalSubCrystals && crystalSubCrystals.length > 0) {
+        crystalSubCrystals.forEach((sub, idx) => {
+          const threshold = (idx + 1) / 7;
+          sub.visible = (ratio >= threshold);
+        });
+      }
+
+      // 2. 裂紋透明度加深
+      if (crystalCrackMesh && crystalCrackMesh.material) {
+        crystalCrackMesh.material.opacity = Math.max(0, (1 - ratio) * 0.85);
+      }
+    }
+
+    // 小精靈跳擊水晶的火花特效與音效
+    function triggerCrystalHitEffect(hitPos, colorHex) {
+      const now = Date.now();
+      if (now - lastHitSoundTime > 160) {
+        playSound('crystalHit');
+        lastHitSoundTime = now;
+      }
+
+      // 水晶短暫高亮閃爍
+      if (crystalMaterial) {
+        crystalMaterial.emissiveIntensity = 0.85;
+      }
+
+      // 噴發打擊火花星芒粒子
+      const pColor = colorHex ? parseInt(colorHex.replace('#', '0x')) : 0xffd700;
+      for (let i = 0; i < 4; i++) {
+        const pGeo = new THREE.OctahedronGeometry(0.12 + Math.random() * 0.12, 0);
+        const pMat = new THREE.MeshBasicMaterial({
+          color: pColor,
+          transparent: true,
+          opacity: 1.0
+        });
+        const pMesh = new THREE.Mesh(pGeo, pMat);
+        pMesh.position.copy(hitPos);
+        pMesh.position.y += (Math.random() - 0.2) * 0.4;
+        scene.add(pMesh);
+
+        const angle = Math.random() * Math.PI * 2;
+        const spd = 0.05 + Math.random() * 0.08;
+        battleParticles.push({
+          mesh: pMesh,
+          vx: Math.cos(angle) * spd,
+          vy: 0.06 + Math.random() * 0.07,
+          vz: Math.sin(angle) * spd,
+          life: 1.0,
+          decay: 0.04 + Math.random() * 0.02
+        });
+      }
     }
 
     // 連接兩座島嶼的木橋產生器
@@ -2582,10 +2684,12 @@
       bridge.add(railL);
       bridge.add(railR);
 
-      // 橋墩
+      // 橋墩 (均勻排列)
       const pillarGeo = new THREE.CylinderGeometry(0.6, 0.6, 4.0, 8);
       const pillarMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.9 });
-      for (let zOffset = -bridgeLen / 3; zOffset <= bridgeLen / 3; zOffset += bridgeLen / 3) {
+      const numPillars = Math.max(3, Math.floor(bridgeLen / 16));
+      for (let i = 0; i <= numPillars; i++) {
+        const zOffset = -bridgeLen / 2 + 5 + (i * (bridgeLen - 10)) / numPillars;
         const pL = new THREE.Mesh(pillarGeo, pillarMat);
         pL.position.set(-1.8, -1.8, zOffset);
         const pR = new THREE.Mesh(pillarGeo, pillarMat);
@@ -3527,37 +3631,41 @@
       // ==================== 水晶爭奪戰即時傷害與小精靈行軍/攻擊更新 ====================
       try {
         const now = Date.now();
-        const dtBattle = Math.min((now - crystalBattleState.lastTimestamp) / 1000, 3600);
-        crystalBattleState.lastTimestamp = now;
+        stepCrystalBattle(now);
 
-        if (crystalBattleState.currentHp > 0 && crystalBattleState.dispatchedFlorakinIds.length > 0) {
-          let teamPower = 0;
-          const allMeta = getAllFlorakinMeta();
-          crystalBattleState.dispatchedFlorakinIds.forEach(id => {
-            const item = allMeta.find(m => m.id === id);
-            if (item && item.mesh && item.mesh.visible) {
-              teamPower += getFlorakinPower(item.mesh);
-            }
-          });
-
-          if (teamPower > 0) {
-            // 戰力值 10 的精靈打 600 HP 水晶需 1 小時 (60分鐘)，即每秒扣 teamPower/60 點 HP
-            const dHp = (teamPower / 60) * dtBattle;
-            crystalBattleState.currentHp = Math.max(0, crystalBattleState.currentHp - dHp);
-            if (crystalBattleState.currentHp <= 0) {
-              crystalBattleState.currentHp = 0;
-              onCrystalShattered();
-            }
-          }
-        }
-
-        // 水晶本體微幅旋轉與呼吸浮動
+        // 水晶本體微幅旋轉、呼吸浮動與裂痕同步
         if (crystalMainMesh) {
           if (crystalBattleState.currentHp > 0) {
             crystalMainMesh.rotation.y += 0.015;
             crystalMainMesh.position.y = 4.6 + Math.sin(elapsedTime * 2.5) * 0.2;
+            if (crystalCrackMesh) {
+              crystalCrackMesh.rotation.y = crystalMainMesh.rotation.y;
+              crystalCrackMesh.position.y = crystalMainMesh.position.y;
+            }
+            if (crystalMaterial && crystalMaterial.emissiveIntensity > 0.35) {
+              crystalMaterial.emissiveIntensity = THREE.MathUtils.lerp(crystalMaterial.emissiveIntensity, 0.35, 0.08);
+            }
           } else {
             crystalMainMesh.scale.lerp(new THREE.Vector3(0.01, 0.01, 0.01), 0.1);
+            if (crystalCrackMesh) crystalCrackMesh.scale.lerp(new THREE.Vector3(0.01, 0.01, 0.01), 0.1);
+          }
+        }
+
+        // 更新打擊火花與爆破粒子
+        for (let i = battleParticles.length - 1; i >= 0; i--) {
+          const p = battleParticles[i];
+          p.mesh.position.x += p.vx;
+          p.mesh.position.y += p.vy;
+          p.mesh.position.z += p.vz;
+          p.vy -= 0.003;
+          p.life -= p.decay;
+          p.mesh.scale.multiplyScalar(0.96);
+          p.mesh.material.opacity = Math.max(0, p.life);
+          if (p.life <= 0) {
+            scene.remove(p.mesh);
+            if (p.mesh.geometry) p.mesh.geometry.dispose();
+            if (p.mesh.material) p.mesh.material.dispose();
+            battleParticles.splice(i, 1);
           }
         }
 
@@ -3576,12 +3684,11 @@
               const dist = Math.hypot(dx, dz);
               if (dist > 0.4) {
                 f.rotation.y = Math.atan2(dx, dz);
-                const spd = ud.walkSpeed || 0.09;
+                const spd = ud.walkSpeed || 0.11;
                 f.position.x += (dx / dist) * spd;
                 f.position.z += (dz / dist) * spd;
                 const zone = getZone(f.position.x, f.position.z);
                 if (zone.type === 'sea') {
-                  // 跨海飛行模式：頭頂葉子/花朵如竹蜻蜓旋轉，優雅懸浮滑翔
                   if (ud.stalkGroup) ud.stalkGroup.rotation.y += 0.35;
                   f.position.y = 3.6 + Math.sin(elapsedTime * 6 + (ud.walkPhase || 0)) * 0.25;
                   if (ud.leftLegGroup) ud.leftLegGroup.rotation.x = 0.2;
@@ -3600,9 +3707,9 @@
                   const slotIdx = crystalBattleState.dispatchedFlorakinIds.indexOf(meta.id);
                   const angle = (slotIdx / Math.max(1, crystalBattleState.dispatchedFlorakinIds.length)) * Math.PI * 2;
                   ud.attackTargetPos = new THREE.Vector3(
-                    ISLAND_COORDS[6].x + Math.cos(angle) * 4.8,
+                    ISLAND_COORDS[6].x + Math.cos(angle) * 4.6,
                     3.1,
-                    ISLAND_COORDS[6].z + Math.sin(angle) * 4.8
+                    ISLAND_COORDS[6].z + Math.sin(angle) * 4.6
                   );
                 }
               }
@@ -3615,9 +3722,17 @@
             const dz = ISLAND_COORDS[6].z - f.position.z;
             f.rotation.y = Math.atan2(dx, dz);
 
-            const hitCycle = elapsedTime * 9 + (ud.walkPhase || 0);
-            f.position.y = 3.0 + Math.abs(Math.sin(hitCycle)) * 0.4;
-            if (ud.stalkGroup) ud.stalkGroup.rotation.z = Math.sin(hitCycle) * 0.35;
+            const hitCycle = elapsedTime * 8.5 + (ud.walkPhase || 0);
+            const prevY = f.position.y;
+            f.position.y = 3.0 + Math.abs(Math.sin(hitCycle)) * 0.45;
+            if (ud.stalkGroup) ud.stalkGroup.rotation.z = Math.sin(hitCycle) * 0.4;
+
+            // 當精靈躍起落地打擊時觸發火花與打擊反饋
+            if (prevY > 3.32 && f.position.y <= 3.32) {
+              const hitX = f.position.x + dx * 0.35;
+              const hitZ = f.position.z + dz * 0.35;
+              triggerCrystalHitEffect(new THREE.Vector3(hitX, 4.2, hitZ), meta.colorHex);
+            }
           } else if (ud.battleRole === 'returning' && ud.marchPath) {
             const targetPt = ud.marchPath[ud.marchIdx];
             if (targetPt) {
@@ -3626,7 +3741,7 @@
               const dist = Math.hypot(dx, dz);
               if (dist > 0.4) {
                 f.rotation.y = Math.atan2(dx, dz);
-                const spd = ud.walkSpeed || 0.09;
+                const spd = ud.walkSpeed || 0.11;
                 f.position.x += (dx / dist) * spd;
                 f.position.z += (dz / dist) * spd;
                 const zone = getZone(f.position.x, f.position.z);
@@ -3655,11 +3770,17 @@
           }
         });
 
-        const bModal = document.getElementById('modal-crystal-battle');
-        if (bModal && !bModal.classList.contains('hidden')) {
-          updateCrystalBattleUI();
+        // 持續更新左下角 HUD 與 3D 浮動血條、外觀破損
+        if (crystalBattleState.isFighting) {
+          updateCrystalBattleUI(false);
+        } else {
+          const bModal = document.getElementById('modal-crystal-battle');
+          if (bModal && !bModal.classList.contains('hidden')) {
+            updateCrystalBattleUI(false);
+          }
         }
         updateCrystalHp3DSprite();
+        updateCrystalVisualDamage();
       } catch (eBattle) {
         console.warn("Crystal battle animate error:", eBattle);
       }
@@ -3860,8 +3981,7 @@
       document.getElementById('global-keypad').classList.add('hidden');
       document.getElementById('screen-3d-world').classList.remove('hidden');
       gameState.currentView = '3d-world';
-      const hudEl = document.getElementById('hud-crystal-battle');
-      if (hudEl) hudEl.classList.remove('hidden');
+      updateCrystalBattleUI(false);
 
       isMenuManuallyClosed = false;
       targetWaypoints = [];
@@ -6456,18 +6576,50 @@
     
     
 
+    // 水晶爭奪戰傷害核心步進器 (幀循環與背景定時器共用，確保時間與生命值即時精準倒數)
+    function stepCrystalBattle(now) {
+      if (!crystalBattleState.isFighting || crystalBattleState.currentHp <= 0 || crystalBattleState.dispatchedFlorakinIds.length === 0) {
+        crystalBattleState.lastTimestamp = now;
+        return;
+      }
+      const dtBattle = Math.min((now - crystalBattleState.lastTimestamp) / 1000, 3600);
+      crystalBattleState.lastTimestamp = now;
+      if (dtBattle <= 0) return;
+
+      let teamPower = 0;
+      const allMeta = getAllFlorakinMeta();
+      crystalBattleState.dispatchedFlorakinIds.forEach(id => {
+        const item = allMeta.find(m => m.id === id);
+        if (item && item.mesh && item.mesh.visible) {
+          teamPower += getFlorakinPower(item.mesh);
+        }
+      });
+
+      if (teamPower > 0) {
+        // 戰力值 10 的精靈打 600 HP 水晶需 1 小時 (60分鐘)，每秒扣 (teamPower / 60) 點 HP
+        const dHp = (teamPower / 60) * dtBattle;
+        crystalBattleState.currentHp = Math.max(0, crystalBattleState.currentHp - dHp);
+        if (crystalBattleState.currentHp <= 0) {
+          crystalBattleState.currentHp = 0;
+          onCrystalShattered();
+        }
+      }
+    }
+
     function openCrystalBattleModal() {
       closeAllModalsExcept('modal-crystal-battle');
       isMenuManuallyClosed = false;
+      isCrystalModalManuallyOpened = true;
       const modal = document.getElementById('modal-crystal-battle');
       if (modal) modal.classList.remove('hidden');
-      updateCrystalBattleUI();
+      updateCrystalBattleUI(true);
     }
 
     function closeCrystalBattleModal() {
       const modal = document.getElementById('modal-crystal-battle');
       if (modal) modal.classList.add('hidden');
       isMenuManuallyClosed = true;
+      isCrystalModalManuallyOpened = false;
     }
 
     function setupBattleCrystal(idx) {
@@ -6482,13 +6634,21 @@
       if (crystalMaterial) {
         crystalMaterial.color.setHex(cfg.color);
         crystalMaterial.emissive.setHex(cfg.id === 4 ? 0x94a3b8 : (cfg.color > 0x888888 ? cfg.color >> 1 : cfg.color));
+        crystalMaterial.emissiveIntensity = 0.35;
       }
       if (crystalMainMesh) {
-        crystalMainMesh.scale.set(1.0, 1.7, 1.0);
+        crystalMainMesh.scale.set(1.0, 1.8, 1.0);
+      }
+      if (crystalSubCrystals) {
+        crystalSubCrystals.forEach(sub => { sub.visible = true; });
+      }
+      if (crystalCrackMesh && crystalCrackMesh.material) {
+        crystalCrackMesh.material.opacity = 0;
       }
 
-      updateCrystalBattleUI();
+      updateCrystalBattleUI(true);
       updateCrystalHp3DSprite();
+      updateCrystalVisualDamage();
     }
 
     function toggleFlorakinDispatch(id) {
@@ -6508,7 +6668,7 @@
           dispatchSingleFlorakin(id);
         }
       }
-      updateCrystalBattleUI();
+      updateCrystalBattleUI(true);
       playSound('tap');
     }
 
@@ -6529,7 +6689,7 @@
       }
 
       crystalBattleState.dispatchedFlorakinIds = top10;
-      updateCrystalBattleUI();
+      updateCrystalBattleUI(true);
       playSound('tap');
     }
 
@@ -6538,7 +6698,7 @@
         crystalBattleState.dispatchedFlorakinIds.forEach(id => recallSingleFlorakin(id));
       }
       crystalBattleState.dispatchedFlorakinIds = [];
-      updateCrystalBattleUI();
+      updateCrystalBattleUI(true);
       playSound('tap');
     }
 
@@ -6548,13 +6708,12 @@
         recallSingleFlorakin(id);
       });
       crystalBattleState.dispatchedFlorakinIds = [];
-      updateCrystalBattleUI();
+      updateCrystalBattleUI(true);
       playSound('tap');
     }
 
     function confirmAndStartCrystalBattle() {
       if (crystalBattleState.dispatchedFlorakinIds.length === 0) {
-        // 若尚未手動選擇，自動派出最強精靈
         autoDispatchStrongestFlorakins();
         if (crystalBattleState.dispatchedFlorakinIds.length === 0) {
           alert('尚未解鎖任何小精靈！請先在其他島嶼完成闖關喔！');
@@ -6571,7 +6730,7 @@
       });
 
       closeCrystalBattleModal();
-      updateCrystalBattleUI();
+      updateCrystalBattleUI(true);
       updateCrystalHp3DSprite();
       playSound('win');
     }
@@ -6582,7 +6741,6 @@
       const f = meta.mesh;
       const ud = f.userData;
 
-      // 轉換至 scene 世界座標
       if (f.parent && f.parent !== scene) {
         const wp = new THREE.Vector3();
         f.getWorldPosition(wp);
@@ -6595,7 +6753,7 @@
       ud.battleRole = 'marching';
       ud.marchPath = [targetPos];
       ud.marchIdx = 0;
-      ud.walkSpeed = 0.10 + Math.random() * 0.03;
+      ud.walkSpeed = 0.11 + Math.random() * 0.03;
     }
 
     function recallSingleFlorakin(id) {
@@ -6621,18 +6779,47 @@
     }
 
     function onCrystalShattered() {
+      playSound('shatter');
       playSound('win');
       crystalBattleState.isFighting = false;
+
+      // 噴發擊碎大爆炸粒子
+      if (crystalMainMesh) {
+        const curCfg = CRYSTAL_CONFIGS[crystalBattleState.crystalIdx];
+        const pColor = curCfg ? curCfg.color : 0xffffff;
+        for (let i = 0; i < 35; i++) {
+          const pGeo = new THREE.TetrahedronGeometry(0.22 + Math.random() * 0.28, 0);
+          const pMat = new THREE.MeshStandardMaterial({
+            color: pColor,
+            emissive: pColor,
+            emissiveIntensity: 0.6,
+            transparent: true,
+            opacity: 1.0
+          });
+          const pMesh = new THREE.Mesh(pGeo, pMat);
+          pMesh.position.set(ISLAND_COORDS[6].x, 4.6, ISLAND_COORDS[6].z);
+          scene.add(pMesh);
+          const theta = Math.random() * Math.PI * 2;
+          const phi = (Math.random() - 0.5) * Math.PI;
+          const spd = 0.15 + Math.random() * 0.25;
+          battleParticles.push({
+            mesh: pMesh,
+            vx: Math.cos(theta) * Math.cos(phi) * spd,
+            vy: Math.sin(phi) * spd + 0.12,
+            vz: Math.sin(theta) * Math.cos(phi) * spd,
+            life: 1.5,
+            decay: 0.02
+          });
+        }
+        crystalMainMesh.scale.set(0.01, 0.01, 0.01);
+        if (crystalCrackMesh) crystalCrackMesh.scale.set(0.01, 0.01, 0.01);
+      }
 
       // 召回所有小精靈
       crystalBattleState.dispatchedFlorakinIds.forEach(id => {
         recallSingleFlorakin(id);
       });
       crystalBattleState.dispatchedFlorakinIds = [];
-
-      if (crystalMainMesh) {
-        crystalMainMesh.scale.set(0.01, 0.01, 0.01);
-      }
 
       const prevCfg = CRYSTAL_CONFIGS[crystalBattleState.crystalIdx];
       crystalBattleState.clearedCount = (crystalBattleState.clearedCount || 0) + 1;
@@ -6647,7 +6834,7 @@
 
       const nextCfg = CRYSTAL_CONFIGS[nextIdx];
 
-      updateCrystalBattleUI();
+      updateCrystalBattleUI(true);
       updateCrystalHp3DSprite();
 
       setTimeout(() => {
@@ -6659,7 +6846,7 @@
       }, 700);
     }
 
-    function updateCrystalBattleUI() {
+    function updateCrystalBattleUI(updateGrid = false) {
       const cfg = CRYSTAL_CONFIGS[crystalBattleState.crystalIdx];
       const curHp = Math.max(0, Math.round(crystalBattleState.currentHp));
       const maxHp = crystalBattleState.maxHp;
@@ -6675,8 +6862,8 @@
         }
       });
 
-      // 計算預估時間
-      let etaText = '尚未開始';
+      // 計算預估時間 (每秒精確倒數秒數)
+      let etaText = '尚未出擊';
       if (curHp <= 0) {
         etaText = '已擊碎！🎉';
       } else if (!crystalBattleState.isFighting || teamPower <= 0) {
@@ -6686,7 +6873,8 @@
         if (totalSeconds >= 3600) {
           const hours = Math.floor(totalSeconds / 3600);
           const mins = Math.floor((totalSeconds % 3600) / 60);
-          etaText = `${hours}小時 ${mins}分`;
+          const secs = totalSeconds % 60;
+          etaText = `${hours}小時 ${mins}分 ${secs}秒`;
         } else {
           const mins = Math.floor(totalSeconds / 60);
           const secs = totalSeconds % 60;
@@ -6744,45 +6932,47 @@
         }
       }
 
-      // 渲染彈窗內精靈選單列表
-      const grid = document.getElementById('battle-florakins-grid');
-      if (grid) {
-        const unlockedList = allMeta.filter(m => m.mesh && m.mesh.visible && getFlorakinPower(m.mesh) > 0);
-        if (unlockedList.length === 0) {
-          grid.innerHTML = '<div class="col-span-full py-6 text-center text-slate-400 font-bold text-xs sm:text-sm">尚未解鎖小精靈！請先在其他島嶼挑戰通關召喚精靈喔！</div>';
-        } else {
-          grid.innerHTML = unlockedList.map(m => {
-            const isDispatched = crystalBattleState.dispatchedFlorakinIds.includes(m.id);
-            const p = getFlorakinPower(m.mesh);
-            const s = m.mesh.userData.stars || 0;
-            const stageIcon = s >= 3 ? '🌺' : (s === 2 ? '🌸' : '🌱');
-            const stageName = s >= 3 ? '繁花' : (s === 2 ? '花苞' : '嫩葉');
+      // 僅在初次打開或選單異動時重繪精靈卡片按鈕，避免高頻刷新搶佔點擊事件
+      if (updateGrid) {
+        const grid = document.getElementById('battle-florakins-grid');
+        if (grid) {
+          const unlockedList = allMeta.filter(m => m.mesh && m.mesh.visible && getFlorakinPower(m.mesh) > 0);
+          if (unlockedList.length === 0) {
+            grid.innerHTML = '<div class="col-span-full py-6 text-center text-slate-400 font-bold text-xs sm:text-sm">尚未解鎖小精靈！請先在其他島嶼挑戰通關召喚精靈喔！</div>';
+          } else {
+            grid.innerHTML = unlockedList.map(m => {
+              const isDispatched = crystalBattleState.dispatchedFlorakinIds.includes(m.id);
+              const p = getFlorakinPower(m.mesh);
+              const s = m.mesh.userData.stars || 0;
+              const stageIcon = s >= 3 ? '🌺' : (s === 2 ? '🌸' : '🌱');
+              const stageName = s >= 3 ? '繁花' : (s === 2 ? '花苞' : '嫩葉');
 
-            return `
-              <div onclick="toggleFlorakinDispatch('${m.id}')" class="btn-cute cursor-pointer p-2.5 rounded-2xl border-2 transition text-left flex flex-col justify-between ${isDispatched ? 'border-indigo-500 bg-indigo-50 shadow-sm ring-2 ring-indigo-400' : 'border-slate-200 bg-white hover:bg-slate-50'}">
-                <div class="flex items-center justify-between mb-1">
-                  <div class="flex items-center space-x-1.5">
-                    <span class="w-3 h-3 rounded-full shrink-0" style="background-color: ${m.colorHex};"></span>
-                    <span class="font-black text-xs sm:text-sm text-slate-800">${m.name}</span>
+              return `
+                <button type="button" onclick="toggleFlorakinDispatch('${m.id}')" class="btn-cute cursor-pointer p-3 rounded-2xl border-2 transition text-left flex flex-col justify-between w-full select-none ${isDispatched ? 'border-indigo-500 bg-indigo-50 shadow-md ring-2 ring-indigo-400 scale-[1.02]' : 'border-slate-200 bg-white hover:bg-slate-50 hover:border-indigo-200'}">
+                  <div class="flex items-center justify-between w-full mb-1.5">
+                    <div class="flex items-center space-x-2">
+                      <span class="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs" style="background-color: ${m.colorHex};"></span>
+                      <span class="font-black text-xs sm:text-sm text-slate-800">${m.name}</span>
+                    </div>
+                    <span class="text-base shrink-0" title="${stageName}">${stageIcon}</span>
                   </div>
-                  <span class="text-sm shrink-0" title="${stageName}">${stageIcon}</span>
-                </div>
-                <div class="flex items-center justify-between text-xs font-bold mt-1 pt-1 border-t border-slate-100">
-                  <span class="text-indigo-800 font-black">⚔️ ${p}</span>
-                  <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${isDispatched ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}">
-                    ${isDispatched ? '✓ 已選擇' : '+ 選擇'}
-                  </span>
-                </div>
-              </div>
-            `;
-          }).join('');
+                  <div class="flex items-center justify-between w-full text-xs font-bold pt-1.5 border-t border-slate-100">
+                    <span class="text-indigo-800 font-black">⚔️ 戰力 ${p}</span>
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black ${isDispatched ? 'bg-indigo-600 text-white shadow-xs' : 'bg-slate-100 text-slate-400'}">
+                      ${isDispatched ? '✓ 已選中' : '點擊選取'}
+                    </span>
+                  </div>
+                </button>
+              `;
+            }).join('');
+          }
         }
       }
 
-      // ==================== 2. 更新左下角浮動 HUD ====================
+      // ==================== 2. 更新左下角浮動 HUD (僅開始攻打時出現，平常不出現) ====================
       const hud = document.getElementById('hud-crystal-battle');
       if (hud) {
-        if (gameState.currentView !== '3d-world') {
+        if (!crystalBattleState.isFighting || curHp <= 0 || gameState.currentView !== '3d-world') {
           hud.classList.add('hidden');
         } else {
           hud.classList.remove('hidden');
@@ -6790,18 +6980,13 @@
           const hudName = document.getElementById('hud-crystal-name');
           if (hudName) hudName.innerText = cfg.name;
 
+          const hudStageTag = document.getElementById('hud-crystal-stage-tag');
+          if (hudStageTag) hudStageTag.innerText = stageText;
+
           const hudBadge = document.getElementById('hud-crystal-status-badge');
           if (hudBadge) {
-            if (curHp <= 0) {
-              hudBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800';
-              hudBadge.innerText = '已擊碎！🎉';
-            } else if (crystalBattleState.isFighting) {
-              hudBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800';
-              hudBadge.innerText = '攻打中 ⚔️';
-            } else {
-              hudBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-100 text-slate-600';
-              hudBadge.innerText = '待命中';
-            }
+            hudBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800';
+            hudBadge.innerText = '攻打中 ⚔️';
           }
 
           const hudHpBar = document.getElementById('hud-crystal-hp-bar');
@@ -6818,11 +7003,6 @@
 
           const hudPower = document.getElementById('hud-crystal-power');
           if (hudPower) hudPower.innerText = `⚔️ ${teamPower} (${crystalBattleState.dispatchedFlorakinIds.length}隻)`;
-
-          const hudBtn = document.getElementById('hud-btn-action');
-          if (hudBtn) {
-            hudBtn.innerText = crystalBattleState.isFighting ? '調整隊伍' : '選擇小精靈';
-          }
         }
       }
     }
@@ -6946,37 +7126,13 @@
 
     // ==================== 初始化啟動 ====================
     
-    // 背景持續計算水晶爭奪戰傷害
+    // 背景持續計算水晶爭奪戰傷害與 HUD 更新
     setInterval(() => {
       try {
-        if (crystalBattleState.currentHp > 0 && crystalBattleState.dispatchedFlorakinIds.length > 0) {
-          const now = Date.now();
-          const dtBattle = Math.min((now - crystalBattleState.lastTimestamp) / 1000, 3600);
-          crystalBattleState.lastTimestamp = now;
-
-          let teamPower = 0;
-          const allMeta = getAllFlorakinMeta();
-          crystalBattleState.dispatchedFlorakinIds.forEach(id => {
-            const item = allMeta.find(m => m.id === id);
-            if (item && item.mesh && item.mesh.visible) {
-              teamPower += getFlorakinPower(item.mesh);
-            }
-          });
-
-          if (teamPower > 0) {
-            const dHp = (teamPower / 60) * dtBattle;
-            crystalBattleState.currentHp = Math.max(0, crystalBattleState.currentHp - dHp);
-            if (crystalBattleState.currentHp <= 0) {
-              crystalBattleState.currentHp = 0;
-              onCrystalShattered();
-            }
-            const bModal = document.getElementById('modal-crystal-battle');
-            if (bModal && !bModal.classList.contains('hidden')) {
-              updateCrystalBattleUI();
-            }
-          }
-        } else {
-          crystalBattleState.lastTimestamp = Date.now();
+        const now = Date.now();
+        stepCrystalBattle(now);
+        if (crystalBattleState.isFighting) {
+          updateCrystalBattleUI(false);
         }
       } catch (e) {
         // quiet background fail
