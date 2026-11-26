@@ -303,6 +303,8 @@
             const rpsChoicesRef = useRef({});
             const cachedVoiceRef = useRef(null);
             const pendingClientPlayRef = useRef(null);
+            const activeCardRef = useRef(null); // 當前翻開卡牌的權威狀態 { card, callValue, isMatch, fromSeat }
+            const aiSlapTimersRef = useRef([]); // 追蹤所有電腦拍牌定時器，換回合或受罰時精準清理
 
 
             const timeoutRef = useRef(null);
@@ -413,6 +415,15 @@
             }, []);
 
             const isDealing = gameState === 'dealing';
+
+            // 清理所有已排程的電腦拍牌定時器，徹底杜絕幽靈出掌與跨回合誤拍
+            const clearAiSlapTimers = () => {
+                if (aiSlapTimersRef.current && aiSlapTimersRef.current.length > 0) {
+                    aiSlapTimersRef.current.forEach(t => clearTimeout(t));
+                    aiSlapTimersRef.current = [];
+                }
+                aiSlapScheduledRef.current = false;
+            };
 
             const triggerSlapHand = (playerIndex) => {
                 const id = Date.now() + Math.random();
@@ -597,6 +608,8 @@
                 setConnStatus('');
                 setMySeatIndex(0);
                 mySeatIndexRef.current = 0;
+                clearAiSlapTimers();
+                activeCardRef.current = null;
             };
 
             // 廣播給所有連線客戶端 (Host 專用)
@@ -837,11 +850,11 @@
                     setGameState('slapping');
                     setSlapResults(data.slapResults);
                 } else if (data.type === 'SYNC_PENALTY') {
-                    applyPenalty(data.loserIndex, data.pileSnapshot, data.nextTurn, data.nextStep, data.updatedPlayers);
+                    applyPenalty(data.loserIndex, data.pileSnapshot, data.nextTurn, data.nextStep, data.updatedPlayers, '拍最慢，收下所有牌！');
                 } else if (data.type === 'SYNC_MISSLAP_PENALTY') {
                     playSoundEffect('error');
                     setErrorMsg(data.errorMsg);
-                    applyPenalty(data.playerIndex, data.pileSnapshot, data.nextTurn, data.nextStep, data.updatedPlayers);
+                    applyPenalty(data.playerIndex, data.pileSnapshot, data.nextTurn, data.nextStep, data.updatedPlayers, '拍錯了，收下所有牌！');
                 } else if (data.type === 'SYNC_GAME_OVER') {
                     playSoundEffect('win');
                     setWinner(data.winner);
@@ -892,6 +905,8 @@
                 setShowIdleHint(false);
                 aiSlapScheduledRef.current = false;
                 penaltyScheduledRef.current = false;
+                clearAiSlapTimers();
+                activeCardRef.current = null;
 
                 // 由系統隨機決定先後攻順序 (0 到 playerCount - 1)
                 const startingTurnVal = Math.floor(Math.random() * playerCount);
@@ -939,6 +954,8 @@
                 setShowIdleHint(false);
                 aiSlapScheduledRef.current = false;
                 penaltyScheduledRef.current = false;
+                clearAiSlapTimers();
+                activeCardRef.current = null;
 
                 // 系統隨機決定出牌順序 (0 ~ initialPlayers.length - 1)，跳過猜拳直接發牌
                 const startingTurnVal = Math.floor(Math.random() * initialPlayers.length);
@@ -1157,16 +1174,18 @@
                 return loops >= countTotal ? null : next;
             };
 
-            // 執行受罰回歸動畫與手牌歸屬
-            const applyPenalty = (loserIndex, pileSnapshot, nextTurn, nextStep, updatedPlayers) => {
+            // 執行受罰回歸動畫與手牌歸屬 (支援區分「拍最慢」與「拍錯了」的準確提示)
+            const applyPenalty = (loserIndex, pileSnapshot, nextTurn, nextStep, updatedPlayers, penaltyReason = '拍最慢，收下所有牌！') => {
                 if (punishingCardRef.current) return;
+                clearAiSlapTimers();
+                activeCardRef.current = null;
                 playSoundEffect('slap');
                 isAnimatingRef.current = false;
                 setIsAnimating(false);
                 setPunishingCard({ toPlayer: loserIndex, pileSnapshot: pileSnapshot.slice(-8) });
                 setCurrentCall(null);
 
-                // 第一階段：出牌飛到最慢拍的玩家動畫 (800ms)
+                // 第一階段：出牌飛到受罰玩家的動畫 (800ms)
                 setTimeout(() => {
                     setPlayers(updatedPlayers);
                     setCenterPile([]);
@@ -1179,7 +1198,7 @@
                     isPenaltyCoolingRef.current = true;
 
                     const loserName = updatedPlayers[loserIndex]?.name || '';
-                    setErrorMsg(`${loserName} 拍最慢，收下所有牌！`);
+                    setErrorMsg(`${loserName} ${penaltyReason}`);
 
                     // 第二階段：明確間隔冷卻時間 (800ms)，確保動畫結束後不黏在一起，再翻開下一張牌
                     setTimeout(() => {
@@ -1282,7 +1301,16 @@
 
                 setFlyingCard({ value: data.card.value, fromPlayer: data.fromSeat });
 
-                // 單機模式：翻出相符牌 (isMatch) 時，電腦排程拍牌！
+                // 註冊當前翻出卡牌的真值狀態與清理舊定時器
+                clearAiSlapTimers();
+                activeCardRef.current = {
+                    card: data.card,
+                    callValue: data.callValue,
+                    isMatch: data.isMatch,
+                    fromSeat: data.fromSeat
+                };
+
+                // 單機模式：僅在「真正翻出相符牌 (isMatch)」時，電腦才排程拍牌！徹底移除電腦故意亂拍的錯誤邏輯
                 if (!isOnlineRef.current && data.isMatch) {
                     aiSlapScheduledRef.current = true;
                     const curPls = playersRef.current;
@@ -1295,27 +1323,12 @@
                             const baseTime = aiLevel === 'easy' ? 2600 : (aiLevel === 'normal' ? 1800 : 1000);
                             const stagger = idx * 250;
                             const delay = baseTime + Math.random() * 400 + stagger;
-                            setTimeout(() => {
+                            const t = setTimeout(() => {
                                 if ((gameStateRef.current === 'playing' || gameStateRef.current === 'slapping') && !punishingCardRef.current && !penaltyScheduledRef.current) {
                                     executeSlapAction(idx);
                                 }
                             }, delay);
-                        }
-                    });
-                } else if (!isOnlineRef.current && !data.isMatch) {
-                    // 電腦誘敵拍錯
-                    const curPls = playersRef.current;
-                    curPls.forEach((p, idx) => {
-                        if (p.isAI && isDangerousPair(data.card.value, data.callValue)) {
-                            const chance = aiLevel === 'easy' ? 0.35 : aiLevel === 'normal' ? 0.20 : 0.06;
-                            if (Math.random() < chance) {
-                                const delay = (aiLevel === 'easy' ? 2200 : (aiLevel === 'normal' ? 1500 : 900)) + Math.random() * 400;
-                                setTimeout(() => {
-                                    if (gameStateRef.current === 'playing' && !punishingCardRef.current && !penaltyScheduledRef.current) {
-                                        executeSlapAction(idx);
-                                    }
-                                }, delay);
-                            }
+                            aiSlapTimersRef.current.push(t);
                         }
                     });
                 }
@@ -1336,6 +1349,10 @@
                         isAnimatingRef.current = false;
                         setIsAnimating(false);
                     } else {
+                        // 牌已落地且不是相符牌，該張牌拍牌時效結束，清除活躍卡牌
+                        activeCardRef.current = null;
+                        clearAiSlapTimers();
+
                         setTurn(data.nextTurn);
                         turnRef.current = data.nextTurn;
                         setCurrentStep(data.nextStep);
@@ -1381,18 +1398,12 @@
                 }
             };
 
-            // 執行拍牌動作
+            // 執行拍牌動作 (精準根據當前翻開牌權威真值判定相符搶拍或誤拍受罰)
             const executeSlapAction = (playerIndex) => {
                 if (punishingCardRef.current || isPenaltyCoolingRef.current) return;
                 if ('speechSynthesis' in window) window.speechSynthesis.cancel();
                 if (chantAudioRef.current) { chantAudioRef.current.pause(); }
-                const curPile = centerPileRef.current;
-                const curCardVal = flyingCard ? flyingCard.value : (curPile.length > 0 ? curPile[curPile.length - 1].value : (flippedCardRef.current ? flippedCardRef.current.value : null));
-                if (curCardVal === null) return;
 
-                const curMult = multiplierRef.current;
-                const curStep = currentStepRef.current;
-                const isMatch = (curCardVal === curMult * curStep);
                 const curPls = playersRef.current;
                 const totalCount = curPls.length;
 
@@ -1406,8 +1417,11 @@
                     broadcastToClients({ type: 'SYNC_SLAP_TRIGGER', playerIndex });
                 }
 
-                // 正確拍牌
-                if ((gameStateRef.current === 'playing' && isMatch) || gameStateRef.current === 'slapping') {
+                // 核心關鍵判定：以當前活躍卡牌的真值 isMatch 為準，杜絕回合推進後步數漂移造成的誤判
+                const isCurrentMatch = Boolean(activeCardRef.current && activeCardRef.current.isMatch);
+
+                // 1. 正確拍牌流程 (牌面數字確實等於乘法得數)
+                if (isCurrentMatch && (gameStateRef.current === 'playing' || gameStateRef.current === 'slapping')) {
                     if (gameStateRef.current === 'playing') {
                         if (!isFlipResolvedRef.current && flippedCardRef.current) {
                             isFlipResolvedRef.current = true;
@@ -1419,6 +1433,7 @@
                             setIsAnimating(false);
                         }
                         setGameState('slapping');
+                        gameStateRef.current = 'slapping';
                     }
 
                     setSlapResults(prev => {
@@ -1432,6 +1447,7 @@
                         // 如果該玩家手牌已為0，且成功在前 (N-1) 名拍下，則獲勝！
                         if (curPls[playerIndex].cards.length === 0 && newResults.length <= totalCount - 1) {
                             const winPl = curPls[playerIndex];
+                            clearAiSlapTimers();
                             playSoundEffect('win');
                             setWinner(winPl);
                             setGameState('gameOver');
@@ -1444,6 +1460,7 @@
                         // 當已有 (playerCount - 1) 位玩家拍牌，剩下最後 1 人即為輸家受罰！
                         if (newResults.length === totalCount - 1 && !penaltyScheduledRef.current) {
                             penaltyScheduledRef.current = true;
+                            clearAiSlapTimers();
                             const allSeats = Array.from({ length: totalCount }, (_, i) => i);
                             const loserIndex = allSeats.find(idx => !newResults.includes(idx));
                             const activePile = centerPileRef.current.length > 0 ? centerPileRef.current : (flippedCardRef.current ? [flippedCardRef.current] : []);
@@ -1470,21 +1487,23 @@
                                         updatedPlayers: updatedPlayers
                                     });
                                 }
-                                applyPenalty(loserIndex, activePile, loserIndex, nextStepVal, updatedPlayers);
+                                applyPenalty(loserIndex, activePile, loserIndex, nextStepVal, updatedPlayers, '拍最慢，收下所有牌！');
                             }, 850);
                         }
                         return newResults;
                     });
-                } else if (gameStateRef.current === 'playing' && !isMatch) {
-                    // 拍錯了！單獨受罰
-                    if (slapResults.length === 0 && !penaltyScheduledRef.current) {
+                } else if (!isCurrentMatch && (gameStateRef.current === 'playing' || gameStateRef.current === 'slapping')) {
+                    // 2. 拍錯了！單獨受罰 (非相符牌時拍牌，由該特定點擊拍牌的玩家單獨收下所有牌)
+                    if (!penaltyScheduledRef.current) {
                         penaltyScheduledRef.current = true;
+                        clearAiSlapTimers();
+                        activeCardRef.current = null;
                         playSoundEffect('error');
-                        triggerSlapHand(playerIndex);
                         const err = `${curPls[playerIndex].name} 拍錯了！`;
                         setErrorMsg(err);
                         setSlapResults([playerIndex]);
-                        setGameState('slapping');
+                        setIsPenaltyCooling(true);
+                        isPenaltyCoolingRef.current = true;
 
                         let activePile = centerPileRef.current;
                         if (!isFlipResolvedRef.current && flippedCardRef.current) {
@@ -1518,7 +1537,7 @@
                                     updatedPlayers: updatedPlayers
                                 });
                             }
-                            applyPenalty(playerIndex, activePile, playerIndex, nextStepVal, updatedPlayers);
+                            applyPenalty(playerIndex, activePile, playerIndex, nextStepVal, updatedPlayers, '拍錯了，收下所有牌！');
                         }, 850);
                     }
                 }
