@@ -1407,6 +1407,11 @@
           <div id="crystal-hp-bar" class="h-full bg-gradient-to-r from-rose-500 to-pink-500 transition-all duration-300" style="width: 100%;"></div>
           <span id="crystal-hp-percent" class="absolute inset-0 flex items-center justify-center text-[10px] font-black text-slate-800 drop-shadow">100%</span>
         </div>
+
+        <!-- 屬性加成提示 -->
+        <div id="crystal-bonus-hint" class="mt-2 text-xs font-black text-indigo-900 bg-white/90 py-1.5 px-3 rounded-xl border border-indigo-200/80 flex items-center shadow-xs">
+          🔥 屬性加成：派出【紅色小精靈】攻打【紅水晶】，戰力加成 2 倍！
+        </div>
       </div>
 
       <!-- 出擊隊伍選擇 -->
@@ -2139,11 +2144,11 @@
 
     // ==================== 攻打水晶 (水晶爭奪戰核心系統) ====================
     const CRYSTAL_CONFIGS = [
-      { id: 0, name: '紅水晶', hp: 600,  color: 0xef4444, hex: '#ef4444', desc: '初級・最脆弱' },
-      { id: 1, name: '黃水晶', hp: 1950, color: 0xf59e0b, hex: '#f59e0b', desc: '普通・略具硬度' },
-      { id: 2, name: '藍水晶', hp: 3300, color: 0x0ea5e9, hex: '#0ea5e9', desc: '進階・堅固耐打' },
-      { id: 3, name: '紫水晶', hp: 4650, color: 0xa855f7, hex: '#a855f7', desc: '專家・極其堅韌' },
-      { id: 4, name: '白水晶', hp: 6000, color: 0xf8fafc, hex: '#e2e8f0', desc: '傳奇・至高無上' }
+      { id: 0, name: '紅水晶', hp: 600,  color: 0xef4444, hex: '#ef4444', desc: '初級・最脆弱', bonusIsland: 1, bonusColorName: '紅色', bonusColorHex: '#f43f5e' },
+      { id: 1, name: '黃水晶', hp: 1950, color: 0xf59e0b, hex: '#f59e0b', desc: '普通・略具硬度', bonusIsland: 2, bonusColorName: '黃色', bonusColorHex: '#f59e0b' },
+      { id: 2, name: '藍水晶', hp: 3300, color: 0x0ea5e9, hex: '#0ea5e9', desc: '進階・堅固耐打', bonusIsland: 3, bonusColorName: '藍色', bonusColorHex: '#0284c7' },
+      { id: 3, name: '紫水晶', hp: 4650, color: 0xa855f7, hex: '#a855f7', desc: '專家・極其堅韌', bonusIsland: 4, bonusColorName: '紫色', bonusColorHex: '#9333ea' },
+      { id: 4, name: '白水晶', hp: 6000, color: 0xf8fafc, hex: '#e2e8f0', desc: '傳奇・至高無上', bonusIsland: 5, bonusColorName: '白色', bonusColorHex: '#475569' }
     ];
 
     let crystalBattleState = {
@@ -2191,13 +2196,35 @@
       return list;
     }
 
-    function getFlorakinPower(mesh) {
+    function getFlorakinBasePower(mesh) {
       if (!mesh || !mesh.visible) return 0;
       const s = mesh.userData.stars || 0;
       if (s >= 3) return 20; // 盛開
       if (s === 2) return 12; // 花苞
       if (s >= 1) return 10; // 翠綠葉子
       return 0;
+    }
+
+    // 檢查小精靈打當前目標水晶是否有屬性同色加成 (戰力 2 倍)
+    function hasFlorakinColorBonus(mesh, targetCrystalIdx = crystalBattleState.crystalIdx) {
+      if (!mesh || !mesh.visible) return false;
+      const curTargetIdx = (targetCrystalIdx !== null && targetCrystalIdx !== undefined)
+        ? targetCrystalIdx
+        : crystalBattleState.crystalIdx;
+      const cfg = CRYSTAL_CONFIGS[curTargetIdx];
+      if (!cfg) return false;
+      const island = mesh.userData ? mesh.userData.island : 0;
+      return (island === cfg.bonusIsland || island === (cfg.id + 1));
+    }
+
+    // 取得小精靈對水晶的實際戰力 (同色加成戰力 2 倍)
+    function getFlorakinPower(mesh, targetCrystalIdx = crystalBattleState.crystalIdx) {
+      const base = getFlorakinBasePower(mesh);
+      if (base <= 0) return 0;
+      if (hasFlorakinColorBonus(mesh, targetCrystalIdx)) {
+        return base * 2;
+      }
+      return base;
     }
 
     // ==================== 3D 場景系統 (Three.js) ====================
@@ -2752,7 +2779,7 @@
     }
 
     // 小精靈跳擊水晶的火花打擊特效、光圈與音效（回到其他座島嶼時停止播放攻打音效）
-    function triggerCrystalHitEffect(hitPos, colorHex) {
+    function triggerCrystalHitEffect(hitPos, colorHex, isCritical = false) {
       const isNearIsland6 = (charGroup && Math.hypot(charGroup.position.x - ISLAND_COORDS[6].x, charGroup.position.z - ISLAND_COORDS[6].z) < 22);
       const isViewingIsland6 = (cameraViewMode === 'island6');
       const shouldPlayBattleSound = (gameState.currentView === '3d-world') && (isViewingIsland6 || isNearIsland6);
@@ -2763,15 +2790,16 @@
         lastHitSoundTime = now;
       }
 
-      // 水晶短暫劇烈高亮閃爍
+      // 水晶短暫劇烈高亮閃爍 (屬性暴擊加成更耀眼)
       if (crystalMaterial) {
-        crystalMaterial.emissiveIntensity = 1.6;
+        crystalMaterial.emissiveIntensity = isCritical ? 2.4 : 1.6;
       }
 
-      // 產生衝擊波光圈
-      const ringGeo = new THREE.RingGeometry(0.2, 0.65, 16);
+      // 產生衝擊波光圈 (暴擊半徑更大、金色外圈)
+      const ringRadius = isCritical ? 0.95 : 0.65;
+      const ringGeo = new THREE.RingGeometry(0.2, ringRadius, 16);
       const ringMat = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
+        color: isCritical ? 0xffd700 : 0xffffff,
         side: THREE.DoubleSide,
         transparent: true,
         opacity: 0.95
@@ -2784,15 +2812,16 @@
         mesh: ring,
         isRing: true,
         life: 1.0,
-        decay: 0.09
+        decay: isCritical ? 0.07 : 0.09
       });
 
-      // 噴發打擊火花星芒粒子 (大顆清晰、明亮耀眼)
+      // 噴發打擊火花星芒粒子 (大顆清晰、明亮耀眼，暴擊時噴發更多金色星芒)
       const pColor = colorHex ? parseInt(colorHex.replace('#', '0x')) : 0xffd700;
-      for (let i = 0; i < 5; i++) {
-        const pGeo = new THREE.DodecahedronGeometry(0.35 + Math.random() * 0.25, 0);
+      const pCount = isCritical ? 9 : 5;
+      for (let i = 0; i < pCount; i++) {
+        const pGeo = new THREE.DodecahedronGeometry((isCritical ? 0.42 : 0.35) + Math.random() * 0.25, 0);
         const pMat = new THREE.MeshBasicMaterial({
-          color: pColor,
+          color: (isCritical && i % 2 === 0) ? 0xffd700 : pColor,
           transparent: true,
           opacity: 1.0
         });
@@ -2802,19 +2831,18 @@
         scene.add(pMesh);
 
         const angle = Math.random() * Math.PI * 2;
-        const spd = 0.12 + Math.random() * 0.16;
+        const spd = (isCritical ? 0.15 : 0.12) + Math.random() * 0.18;
         battleParticles.push({
           mesh: pMesh,
           vx: Math.cos(angle) * spd,
-          vy: 0.10 + Math.random() * 0.15,
+          vy: 0.10 + Math.random() * 0.18,
           vz: Math.sin(angle) * spd,
           life: 1.0,
-          decay: 0.04
+          decay: isCritical ? 0.035 : 0.04
         });
       }
     }
 
-    // 連接兩座島嶼的木橋產生器
     function createConnectingBridge(p1, p2) {
       const bridge = new THREE.Group();
       const dx = p2.x - p1.x;
@@ -3089,6 +3117,7 @@
         f.position.set(p.x, 3.0, p.z);
         f.userData.homePos.set(p.x, 3.0, p.z);
         f.userData.targetPos.set(p.x, 3.0, p.z);
+        f.userData.island = 1;
         islandGroup.add(f);
         island1Florakins.push(f);
       });
@@ -3105,6 +3134,7 @@
         f.position.set(p.x, 3.0, p.z);
         f.userData.homePos.set(p.x, 3.0, p.z);
         f.userData.targetPos.set(p.x, 3.0, p.z);
+        f.userData.island = 2;
         islandGroup.add(f);
         island2Florakins.push(f);
       });
@@ -3121,6 +3151,7 @@
         f.position.set(p.x, 3.0, p.z);
         f.userData.homePos.set(p.x, 3.0, p.z);
         f.userData.targetPos.set(p.x, 3.0, p.z);
+        f.userData.island = 3;
         islandGroup.add(f);
         island3Florakins.push(f);
       });
@@ -3137,6 +3168,7 @@
         f.position.set(p.x, 3.0, p.z);
         f.userData.homePos.set(p.x, 3.0, p.z);
         f.userData.targetPos.set(p.x, 3.0, p.z);
+        f.userData.island = 4;
         islandGroup.add(f);
         island4Florakins.push(f);
       });
@@ -3153,6 +3185,7 @@
         f.position.set(p.x, 3.0, p.z);
         f.userData.homePos.set(p.x, 3.0, p.z);
         f.userData.targetPos.set(p.x, 3.0, p.z);
+        f.userData.island = 5;
         islandGroup.add(f);
         island5Florakins.push(f);
       });
@@ -3996,7 +4029,8 @@
             if (jumpVal < 0 && (ud.prevJumpVal === undefined || ud.prevJumpVal >= 0)) {
               const hitX = f.position.x + dx * 0.4;
               const hitZ = f.position.z + dz * 0.4;
-              triggerCrystalHitEffect(new THREE.Vector3(hitX, 3.8, hitZ), meta.colorHex);
+              const isCrit = hasFlorakinColorBonus(f);
+              triggerCrystalHitEffect(new THREE.Vector3(hitX, 3.8, hitZ), meta.colorHex, isCrit);
             }
             ud.prevJumpVal = jumpVal;
           } else if (ud.battleRole === 'returning' && ud.marchPath) {
@@ -4356,7 +4390,7 @@
       const allMeta = getAllFlorakinMeta();
       allMeta.forEach(m => {
         if (m.mesh && m.mesh.visible) {
-          const p = getFlorakinPower(m.mesh);
+          const p = getFlorakinBasePower(m.mesh);
           totalPower += p;
           if ((m.mesh.userData.stars || 0) >= 3) {
             totalFlowers++;
@@ -8138,7 +8172,7 @@
       const maxHp = crystalBattleState.maxHp;
       const pct = Math.max(0, Math.min(100, Math.round((curHp / maxHp) * 100)));
 
-      // 計算隊伍總戰力
+      // 計算隊伍總戰力 (包含同色小精靈 2 倍加成)
       const allMeta = getAllFlorakinMeta();
       let teamPower = 0;
       crystalBattleState.dispatchedFlorakinIds.forEach(id => {
@@ -8191,6 +8225,12 @@
       const hpPct = document.getElementById('crystal-hp-percent');
       if (hpPct) hpPct.innerText = `${pct}%`;
 
+      // 更新屬性剋制加成提示
+      const bonusHint = document.getElementById('crystal-bonus-hint');
+      if (bonusHint) {
+        bonusHint.innerHTML = `🔥 屬性加成：派出 <span class="font-black px-1.5 py-0.5 rounded text-white text-xs" style="background-color: ${cfg.bonusColorHex || cfg.hex};">【${cfg.bonusColorName}小精靈】</span> 攻打【${cfg.name}】，戰力加成 <strong class="text-rose-600 font-black text-sm">2 倍</strong>！`;
+      }
+
       const dCount = document.getElementById('battle-dispatched-count');
       if (dCount) dCount.innerText = `${crystalBattleState.dispatchedFlorakinIds.length} / 10 隻`;
 
@@ -8223,7 +8263,7 @@
         }
       }
 
-      // 精靈卡片按鈕：直接使用該隻小精靈的「正面照」（無多餘文字），點擊立即切換選取狀態
+      // 精靈卡片按鈕：直接使用該隻小精靈的「正面照」，若享有同色加成則顯示加成標籤與高亮戰力
       if (updateGrid) {
         const grid = document.getElementById('battle-florakins-grid');
         if (grid) {
@@ -8234,17 +8274,18 @@
             grid.innerHTML = unlockedList.map(m => {
               const isDispatched = crystalBattleState.dispatchedFlorakinIds.includes(m.id);
               const p = getFlorakinPower(m.mesh);
+              const hasBonus = hasFlorakinColorBonus(m.mesh);
               const stars = (m.mesh && m.mesh.userData && m.mesh.userData.stars) || 1;
               const type = m.island === 1 ? 'red' : (m.island === 2 ? 'yellow' : (m.island === 3 ? 'blue' : (m.island === 4 ? 'purple' : 'white')));
               const avatarSvg = getFlorakinAvatarSvg(type, m.colorHex, stars);
 
               return `
                 <button type="button" onclick="toggleFlorakinDispatch('${m.id}')"
-                  title="小精靈 (戰力 ${p})"
+                  title="${m.name} (戰力 ${p}${hasBonus ? ' - 同色 2 倍加成！' : ''})"
                   class="btn-cute relative p-2 rounded-2xl border-2 transition-all flex flex-col items-center justify-between aspect-square select-none cursor-pointer group ${
                     isDispatched
                       ? 'bg-gradient-to-b from-indigo-50 to-purple-100 border-indigo-500 shadow-lg ring-4 ring-indigo-300 scale-105'
-                      : 'bg-white border-slate-200 hover:border-indigo-300 hover:bg-slate-50 shadow-xs hover:scale-102'
+                      : (hasBonus ? 'bg-amber-50/80 border-amber-300 hover:border-amber-400 hover:bg-amber-100/70 shadow-xs hover:scale-102 ring-1 ring-amber-200' : 'bg-white border-slate-200 hover:border-indigo-300 hover:bg-slate-50 shadow-xs hover:scale-102')
                   }">
                   
                   <!-- 勾選標記 -->
@@ -8254,16 +8295,25 @@
                     </div>
                   ` : ''}
 
+                  <!-- 屬性同色 2 倍加成標籤 -->
+                  ${hasBonus ? `
+                    <div class="absolute -top-1.5 -left-1.5 px-1.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-white font-black text-[10px] shadow-md border-2 border-white z-10 animate-pulse whitespace-nowrap">
+                      🔥 2倍
+                    </div>
+                  ` : ''}
+
                   <!-- 小精靈正面照大圖 (無任何名稱文字) -->
                   <div class="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center my-auto transition-transform group-hover:scale-110">
                     ${avatarSvg}
                   </div>
 
-                  <!-- 簡潔微型戰力標籤 (不顯示文字) -->
+                  <!-- 簡潔微型戰力標籤 -->
                   <div class="w-full mt-1 py-0.5 px-1.5 rounded-lg text-center text-[11px] font-black tracking-tight leading-none ${
-                    isDispatched ? 'bg-indigo-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-700'
+                    isDispatched
+                      ? (hasBonus ? 'bg-gradient-to-r from-rose-600 to-indigo-600 text-white shadow-2xs' : 'bg-indigo-600 text-white shadow-2xs')
+                      : (hasBonus ? 'bg-amber-200 text-amber-950 border border-amber-300 font-black' : 'bg-slate-100 text-slate-700')
                   }">
-                    ⚔️ ${p}
+                    ⚔️ ${p}${hasBonus ? ' (2倍)' : ''}
                   </div>
                 </button>
               `;
