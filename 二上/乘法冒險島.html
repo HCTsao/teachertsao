@@ -5233,34 +5233,55 @@
       if (packUnit === '') packUnit = '個';
       let itemUnit = clean(u.item_name || '個');
 
-      // 1. 被乘數意義：不強制包含「每」，寫「一串櫻桃有2顆」、「每串櫻桃有2顆」、「每一串櫻桃有2顆」皆給過
-      const basePatterns = [String(base) + itemUnit, CH_NUM_MAP[base] + itemUnit];
-      if (base === 2) basePatterns.push('兩' + itemUnit);
-      if (itemUnit === '個') {
-        basePatterns.push(String(base) + '個', CH_NUM_MAP[base] + '個');
-        if (base === 2) basePatterns.push('兩個');
-      }
+      // 1. 被乘數意義：支援阿拉伯數字與中文數字（如 4、四、2、二、兩），以及完整/簡寫單位
+      const baseNumVariants = [String(base), toChineseNumber(base)];
+      if (base === 2) baseNumVariants.push('兩');
+
+      let shortItemUnit = itemUnit.replace(/(葉子|花瓣|黑點|蘋果)/g, '');
+      if (!shortItemUnit) shortItemUnit = itemUnit[0];
+      const itemUnitVariants = [...new Set([itemUnit, shortItemUnit, '個', '顆', '片', '點'])].filter(Boolean);
+
+      const basePatterns = [];
+      baseNumVariants.forEach(n => {
+        itemUnitVariants.forEach(iu => {
+          basePatterns.push(n + iu);
+        });
+      });
       const hasBaseItem = basePatterns.some(p => c1.includes(p));
-      const hasPack1 = c1.includes('一' + packUnit) || c1.includes('1' + packUnit) || c1.includes('每' + packUnit) || c1.includes(packUnit);
-      const ok1 = hasBaseItem && (hasPack1 || c1.includes('每'));
+      const hasPack1 = c1.includes('一' + packUnit) || c1.includes('1' + packUnit) || c1.includes('每') || c1.includes(packUnit) || c1.includes('有');
+      const ok1 = hasBaseItem && hasPack1;
 
-      // 2. 乘數意義：有幾份/幾串
-      const countPatterns = [String(count) + packUnit, CH_NUM_MAP[count] + packUnit];
-      if (count === 2) countPatterns.push('兩' + packUnit);
-      const hasCountPack = countPatterns.some(p => c2.includes(p));
-      const ok2 = c2.includes('有') && hasCountPack;
+      // 2. 乘數意義：有幾份/幾株/幾盒/幾籃/幾朵/幾隻/幾排（支援「有7株」、「有七株」、「7株」、「七株」、「有7個」、「有七個」等）
+      const countNumVariants = [String(count), toChineseNumber(count)];
+      if (count === 2) countNumVariants.push('兩');
 
-      // 3. 積的意義：合起來是 / 總共有 / 全部有 / 共有 / 一共 等廣義詞彙皆可
-      const totalPrefixes = ['合起來', '合起來是', '總共', '全部', '共有', '一共', '總計', '總數', '加起來'];
+      const packUnitVariants = [...new Set([packUnit, clean(u.unit_name), '個', '份'])].filter(Boolean);
+
+      const countPatterns = [];
+      countNumVariants.forEach(n => {
+        packUnitVariants.forEach(pu => {
+          countPatterns.push(n + pu);
+          countPatterns.push('有' + n + pu);
+        });
+      });
+      const ok2 = countPatterns.some(p => c2.includes(p));
+
+      // 3. 積的意義：合起來是 / 總共有 / 全部有 / 共有 / 一共 等廣義詞彙，且數字可為阿拉伯或中文
+      const totalPrefixes = ['合起來', '合起來是', '總共', '全部', '共有', '一共', '總計', '總數', '加起來', '是', '有', '全部是', '一共是', '共有是'];
       const hasTotalPrefix = totalPrefixes.some(p => c3.includes(p));
-      const totalPatterns = [String(total) + itemUnit, toChineseNumber(total) + itemUnit];
-      if (total === 2) totalPatterns.push('兩' + itemUnit);
-      if (itemUnit === '個') {
-        totalPatterns.push(String(total) + '個', toChineseNumber(total) + '個');
-        if (total === 2) totalPatterns.push('兩個');
-      }
+
+      const totalNumVariants = [String(total), toChineseNumber(total)];
+      if (total === 2) totalNumVariants.push('兩');
+
+      const totalPatterns = [];
+      totalNumVariants.forEach(n => {
+        itemUnitVariants.forEach(iu => {
+          totalPatterns.push(n + iu);
+        });
+        totalPatterns.push(n);
+      });
       const hasTotalItem = totalPatterns.some(p => c3.includes(p));
-      const ok3 = hasTotalPrefix && hasTotalItem;
+      const ok3 = (hasTotalPrefix && hasTotalItem) || (totalNumVariants.some(n => c3.includes(n + itemUnit)));
 
       if (ok1 && ok2 && ok3) {
         playSound('correct');
@@ -5890,9 +5911,9 @@
         const phEl = document.getElementById(`i3-chal-hint-placeholder-${m}`);
         if (textEl) {
           textEl.classList.add('hidden');
-          if (m === '11') textEl.innerText = `${base} × 10 ＝ ${base * 10}，再多 ${base} 是？`;
-          if (m === '12') textEl.innerText = `${base} × 11 ＝ ${base * 11}，再多 ${base} 是？`;
-          if (m === '13') textEl.innerText = `${base} × 12 ＝ ${base * 12}，再多 ${base} 是？`;
+          const prevM = parseInt(m, 10) - 1;
+          const prevVal = base * prevM;
+          textEl.innerText = `${base} × ${prevM} ＝ ${prevVal}，再加 ${base} 是多少？`;
         }
         if (phEl) phEl.classList.remove('hidden');
       });
@@ -6094,9 +6115,9 @@
           const phEl = document.getElementById(`i3-chal-hint-placeholder-${m}`);
           if (textEl) {
             textEl.classList.add('hidden');
-            if (m === '11') textEl.innerText = `${base} × 10 ＝ ${base * 10}，再多 ${base} 是？`;
-            if (m === '12') textEl.innerText = `${base} × 11 ＝ ${base * 11}，再多 ${base} 是？`;
-            if (m === '13') textEl.innerText = `${base} × 12 ＝ ${base * 12}，再多 ${base} 是？`;
+            const prevM = parseInt(m, 10) - 1;
+            const prevVal = base * prevM;
+            textEl.innerText = `${base} × ${prevM} ＝ ${prevVal}，再加 ${base} 是多少？`;
           }
           if (phEl) phEl.classList.remove('hidden');
         });
@@ -6113,9 +6134,14 @@
     }
 
     function toggleI3Hint(m) {
+      const base = gameState.selectedBase || 2;
       const textEl = document.getElementById(`i3-chal-hint-${m}`);
       const phEl = document.getElementById(`i3-chal-hint-placeholder-${m}`);
       if (textEl && phEl) {
+        const prevM = parseInt(m, 10) - 1;
+        const prevVal = base * prevM;
+        textEl.innerText = `${base} × ${prevM} ＝ ${prevVal}，再加 ${base} 是多少？`;
+
         if (textEl.classList.contains('hidden')) {
           textEl.classList.remove('hidden');
           phEl.classList.add('hidden');
@@ -6305,6 +6331,10 @@
         const rowDiv = document.createElement('div');
         rowDiv.id = `table-row-i4-${k}`;
         rowDiv.className = 'flex items-center justify-between p-3 sm:p-4 rounded-2xl bg-orange-50/50 border border-orange-200 transition';
+        // 倒背十十乘法表一題一題出：只有 10 倍初始顯示，9 倍到 1 倍等前一題答對後才陸續出現
+        if (k < 10) {
+          rowDiv.classList.add('hidden');
+        }
 
         // 左側：倍數文字 (不給答案，通通不給圖示)
         const leftWrap = document.createElement('div');
@@ -6352,11 +6382,14 @@
     function focusNextEmptySlotI4() {
       for (const row of island4RowsData) {
         if (!row.solved) {
-          for (const bType of row.blanks) {
-            const slot = document.getElementById(`slot-tbl4-${row.k}-${bType}`);
-            if (slot && slot.innerText.trim() === '') {
-              focusSlot(slot.id);
-              return;
+          const rowEl = document.getElementById(`table-row-i4-${row.k}`);
+          if (rowEl && !rowEl.classList.contains('hidden')) {
+            for (const bType of row.blanks) {
+              const slot = document.getElementById(`slot-tbl4-${row.k}-${bType}`);
+              if (slot && slot.innerText.trim() === '') {
+                focusSlot(slot.id);
+                return;
+              }
             }
           }
         }
@@ -6407,6 +6440,13 @@
         if (allDone) {
           finishIsland4Stage();
         } else {
+          // 答對第 k 題後，解鎖下一題 (k - 1)
+          const nextK = k - 1;
+          const nextRowEl = document.getElementById(`table-row-i4-${nextK}`);
+          if (nextRowEl) {
+            nextRowEl.classList.remove('hidden');
+            nextRowEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
           focusNextEmptySlotI4();
         }
       } else {
@@ -6479,6 +6519,7 @@
     let island5TimerInterval = null;
     let island5TimeRemaining = 5.0;
     let island5CanAnswer = false;
+    let island5IsTimedOut = false;
 
     function startIsland5Stage(base) {
       gameState.selectedBase = base;
@@ -6561,6 +6602,7 @@
 
       island5TimeRemaining = 5.0;
       island5CanAnswer = true;
+      island5IsTimedOut = false;
       updateIsland5TimerUI(island5TimeRemaining);
 
       if (island5TimerInterval) clearInterval(island5TimerInterval);
@@ -6617,7 +6659,10 @@
           slot.classList.add('filled');
           fb.className = 'text-center text-lg font-black text-emerald-600 mt-2';
           fb.innerText = '答對了！⚡';
-          island5CorrectCount++;
+          // 系統機制：若在時間內答對才計入題數，超時填完就算答對也不計入答對題數（不額外跳文字提示學生）
+          if (!island5IsTimedOut) {
+            island5CorrectCount++;
+          }
           setTimeout(() => nextIsland5Question(), 900);
         } else {
           playSound('wrong');
@@ -6630,20 +6675,26 @@
     }
 
     function handleIsland5Timeout() {
-      if (!island5CanAnswer) return;
-      island5CanAnswer = false;
-      playSound('wrong');
+      if (!island5CanAnswer || island5IsTimedOut) return;
+      island5IsTimedOut = true;
+      if (island5TimerInterval) {
+        clearInterval(island5TimerInterval);
+        island5TimerInterval = null;
+      }
+      playSound('tap');
 
-      const q = island5Questions[island5QIndex];
-      const slot = document.getElementById('slot-i5-answer');
-      slot.classList.add('wrong');
-
+      // 時間到時顯示「時間到！」，不公布正確答案，讓學生繼續填完
       const fb = document.getElementById('island5-feedback');
-      fb.classList.remove('hidden');
-      fb.className = 'text-center text-lg font-black text-rose-500 mt-2';
-      fb.innerText = `時間到！正確答案是 ${q.ans}`;
+      if (fb) {
+        fb.classList.remove('hidden');
+        fb.className = 'text-center text-lg font-black text-amber-600 mt-2';
+        fb.innerText = '時間到！';
+      }
 
-      setTimeout(() => nextIsland5Question(), 1600);
+      const lbl = document.getElementById('island5-timer-label');
+      if (lbl) {
+        lbl.innerText = '⌛ 時間到！請填完答案';
+      }
     }
 
     function nextIsland5Question() {
