@@ -4055,6 +4055,8 @@
 
     function checkWaypointProximity() {
       if (gameState.currentView !== '3d-world' || !charGroup) return;
+      // 當處於特寫攻打水晶島嶼 (第6島) 視角時，絕不自動彈出任何島嶼關卡選單！
+      if (cameraViewMode === 'island6') return;
       const dist1 = Math.hypot(charGroup.position.x - ISLAND_COORDS[1].x, charGroup.position.z - ISLAND_COORDS[1].z);
       const dist2 = Math.hypot(charGroup.position.x - ISLAND_COORDS[2].x, charGroup.position.z - ISLAND_COORDS[2].z);
       const dist3 = Math.hypot(charGroup.position.x - ISLAND_COORDS[3].x, charGroup.position.z - ISLAND_COORDS[3].z);
@@ -4174,15 +4176,27 @@
 
     function teleportAndOpenIsland(islandNum) {
       closeAllModalsExcept(null);
-      returnTo3DWorld();
+
+      // 隱藏 2D 關卡挑戰畫面，顯示 3D 世界
+      for (let i = 1; i <= 5; i++) {
+        const sc = document.getElementById(`screen-island${i}`);
+        if (sc) sc.classList.add('hidden');
+      }
+      document.getElementById('global-keypad').classList.add('hidden');
+      document.getElementById('screen-3d-world').classList.remove('hidden');
+      gameState.currentView = '3d-world';
 
       if (islandNum === 6) {
-        // 就算從右上角的選單到攻打水晶的地方，主角也不會跟著過去，主角是不會移動到攻打水晶的島嶼上面的
+        // 攻打水晶島嶼：主角不傳送，僅視角切換至第6島，絕不跳出選單
         viewCrystalBattleIsland();
         return;
       }
 
-      // 將主角瞬間傳送至該島嶼中心台座旁 (第 1~5 島)
+      // 第 1 ~ 5 島嶼：視角跟隨主角，主角傳送至該島，並打開對應島嶼選單
+      cameraViewMode = 'char';
+      gameState.selectedIsland = islandNum;
+      isMenuManuallyClosed = false;
+
       const coord = ISLAND_COORDS[islandNum];
       if (coord && charGroup) {
         charGroup.position.set(coord.x, 3.12, coord.z + 3.0);
@@ -4191,6 +4205,8 @@
         targetWaypoints = [];
         if (targetMarkerMesh) targetMarkerMesh.visible = false;
       }
+
+      updateCrystalBattleUI(false);
 
       setTimeout(() => {
         openIslandModal(islandNum);
@@ -4406,6 +4422,11 @@
       gameState.selectedBase = base;
       gameState.selectedIsland = 1;
       gameState.currentView = 'island1';
+      cameraViewMode = 'char';
+
+      island1QIndex = 0;
+      island1CorrectCount = 0;
+      island1CurrentQuestionHadError = false;
       currentStepI1 = 1;
       island1StepErrors = { step1: false, step2: false, step3: false, step4: false };
 
@@ -4415,7 +4436,7 @@
         titleEl.innerText = `${base} 的乘法：從連加算式到乘法算式`;
       }
 
-      generateIsland1Question(base);
+      generateIsland1Questions(base);
 
       // 切換畫面
       document.getElementById('screen-3d-world').classList.add('hidden');
@@ -4430,63 +4451,58 @@
       window.scrollTo(0, 0);
     }
 
-    // 題目生成：乘數最多到 6 (2..6)，答案小於 45，且乘數與被乘數不相同 (count !== base && base * count < 45)
+    // 題目生成：共三題，至少有三個數相加 (startCount >= 3)，且這三題的數字是逐次 +1 (例如 3, 4, 5 倍)
+    function generateIsland1Questions(base) {
+      // 至少 3 個數相加；若 base 為 3 則從 4 開始 (4, 5, 6) 避開 count === base
+      const startCount = (base === 3) ? 4 : 3;
+      island1Questions = [0, 1, 2].map(idx => {
+        const count = startCount + idx;
+        const total = base * count;
+        const u = UNITS[String(base)] || { name: '物品', unit_name: '份', item_name: '個' };
+        let problemText = '';
+        if (base === 2) problemText = `一串櫻桃有 2 顆，${count} 串櫻桃共有幾顆？`;
+        else if (base === 3) problemText = `一籃鵝蛋有 3 顆，${count} 籃鵝蛋共有幾顆？`;
+        else if (base === 4) problemText = `一株四葉草有 4 片葉子󠇡，${count} 株四葉草共有幾片葉子󠇡？`;
+        else if (base === 5) problemText = `一朵梅花有 5 片花瓣，${count} 朵梅花共有幾片花瓣？`;
+        else if (base === 6) problemText = `一盒蛋黃酥有 6 個󠇡，${count} 盒蛋黃酥共有幾個󠇡？`;
+        else if (base === 7) problemText = `一隻瓢蟲有 7 個󠇡黑點，${count} 隻瓢蟲共有幾個󠇡黑點？`;
+        else if (base === 8) problemText = `一盒章魚燒有 8 顆，${count} 盒章魚燒共有幾顆？`;
+        else if (base === 9) problemText = `一排有 9 個󠇡蘋果，${count} 排共有幾個󠇡蘋果？`;
+
+        return {
+          base: base,
+          count: count,
+          total: total,
+          problemText: problemText,
+          unitInfo: u
+        };
+      });
+    }
+
     function generateIsland1Question(base) {
-      const candidates = [];
-      for (let c = 2; c <= 6; c++) {
-        if (c !== base && (base * c) < 45) {
-          candidates.push(c);
-        }
-      }
-      if (candidates.length === 0) {
-        for (let c = 2; c <= 6; c++) {
-          if (c !== base) { candidates.push(c); break; }
-        }
-      }
-      const count = candidates[Math.floor(Math.random() * candidates.length)] || (base === 2 ? 3 : 2);
-      const total = base * count;
-
-      // 依教材情境產生生活化題目
-      const u = UNITS[String(base)] || { name: '物品', unit_name: '份', item_name: '個' };
-      let problemText = '';
-      if (base === 2) {
-        problemText = `一串櫻桃有 2 顆，${count} 串櫻桃共有幾顆？`;
-      } else if (base === 3) {
-        problemText = `一籃鵝蛋有 3 顆，${count} 籃鵝蛋共有幾顆？`;
-      } else if (base === 4) {
-        problemText = `一株四葉草有 4 片葉子󠇡，${count} 株四葉草共有幾片葉子󠇡？`;
-      } else if (base === 5) {
-        problemText = `一朵梅花有 5 片花瓣，${count} 朵梅花共有幾片花瓣？`;
-      } else if (base === 6) {
-        problemText = `一盒蛋黃酥有 6 個󠇡，${count} 盒蛋黃酥共有幾個󠇡？`;
-      } else if (base === 7) {
-        problemText = `一隻瓢蟲有 7 個󠇡黑點，${count} 隻瓢蟲共有幾個󠇡黑點？`;
-      } else if (base === 8) {
-        problemText = `一盒章魚燒有 8 顆，${count} 盒章魚燒共有幾顆？`;
-      } else if (base === 9) {
-        problemText = `一排有 9 個󠇡蘋果，${count} 排共有幾個󠇡蘋果？`;
-      }
-
-      island1CurrentQuestion = {
-        base: base,
-        count: count,
-        total: total,
-        problemText: problemText,
-        unitInfo: u
-      };
+      generateIsland1Questions(base);
+      island1CurrentQuestion = island1Questions[0];
     }
 
     function loadCurrentIsland1Question() {
-      const q = island1CurrentQuestion;
+      const q = island1Questions[island1QIndex];
       if (!q) return;
+      island1CurrentQuestion = q;
 
       currentStepI1 = 1;
+      island1CurrentQuestionHadError = false;
       island1StepErrors = { step1: false, step2: false, step3: false, step4: false };
 
-      document.getElementById('island1-question-progress').innerText = `共 1 題`;
+      document.getElementById('island1-question-progress').innerText = `第 ${island1QIndex + 1}/3 題`;
       document.getElementById('i1-next-action-area').classList.add('hidden');
       const kp = document.getElementById('global-keypad');
       if (kp) kp.classList.remove('hidden');
+
+      // 重置反饋訊息
+      const fb2 = document.getElementById('i1-step2-feedback');
+      if (fb2) { fb2.classList.add('hidden'); fb2.innerText = ''; }
+      const fb3 = document.getElementById('i1-step3-feedback');
+      if (fb3) { fb3.classList.add('hidden'); fb3.innerText = ''; }
 
       // 設定題目文字
       document.getElementById('i1-problem-text').innerHTML = q.problemText;
@@ -4615,6 +4631,7 @@
         focusSlot('slot-i1s2-count1');
       } else {
         playSound('wrong');
+        island1CurrentQuestionHadError = true;
         island1StepErrors.step1 = true;
         for (let i = 0; i < count; i++) {
           const slot = document.getElementById(`slot-i1-add-${i}`);
@@ -4667,6 +4684,7 @@
         focusSlot('slot-i1s3-mult-base');
       } else {
         playSound('wrong');
+        island1CurrentQuestionHadError = true;
         island1StepErrors.step2 = true;
         if (valC1 !== count) slotC1.classList.add('wrong');
         if (valB1 !== base) slotB1.classList.add('wrong');
@@ -4705,15 +4723,26 @@
         playSound('correct');
         slots.forEach(s => { s.classList.remove('wrong'); s.classList.add('filled'); });
         fb.className = 'text-center text-base font-black text-emerald-600 mt-2';
-        fb.innerText = '乘法算式記錄完全正確！🎉';
 
-        // 步驟 3 完成，第一座島嶼通關！直接進入結算
-        currentStepI1 = 3;
-        setTimeout(() => {
-          finishIsland1Stage();
-        }, 800);
+        if (!island1CurrentQuestionHadError) {
+          island1CorrectCount++;
+        }
+
+        if (island1QIndex < 2) {
+          fb.innerText = `第 ${island1QIndex + 1} 題答對了！🎉 準備進入下一題...`;
+          setTimeout(() => {
+            island1QIndex++;
+            loadCurrentIsland1Question();
+          }, 900);
+        } else {
+          fb.innerText = '3 題全部完成！🎉 正在結算星星冒險成果...';
+          setTimeout(() => {
+            finishIsland1Stage();
+          }, 900);
+        }
       } else {
         playSound('wrong');
+        island1CurrentQuestionHadError = true;
         island1StepErrors.step3 = true;
         if (valB !== base) slotB.classList.add('wrong');
         if (valC !== count) slotC.classList.add('wrong');
@@ -4722,9 +4751,6 @@
         fb.innerText = '再想一想喔！';
       }
     }
-
-    // 步驟 4 檢查：乘法算式的意思
-    
 
     // 第一座島嶼通關結算：以四個步驟計算星星
     // 1. 學生第一次四個步驟就全對：得到三顆星
@@ -4735,22 +4761,9 @@
       playSound('win');
       document.getElementById('global-keypad').classList.add('hidden');
 
-      let correctSteps = 0;
-      if (!island1StepErrors.step1) correctSteps++;
-      if (!island1StepErrors.step2) correctSteps++;
-      if (!island1StepErrors.step3) correctSteps++;
-
-      // 3 個步驟計分：全對 3 星，對 2 步 2 星，對 1 步 1 星
-      let stars = 0;
-      if (correctSteps === 3) {
-        stars = 3;
-      } else if (correctSteps === 2) {
-        stars = 2;
-      } else if (correctSteps === 1) {
-        stars = 1;
-      } else {
-        stars = 0;
-      }
+      let stars = island1CorrectCount;
+      if (stars > 3) stars = 3;
+      if (stars < 0) stars = 0;
 
       const baseStr = String(island1CurrentBase);
       if (!gameState.island1Progress) gameState.island1Progress = {};
@@ -4764,8 +4777,8 @@
       logAttemptToFirebase({
         island: 1,
         stage: island1CurrentBase,
-        correctSteps: correctSteps,
-        totalSteps: 3,
+        correctQuestions: island1CorrectCount,
+        totalQuestions: 3,
         starsEarned: stars
       });
 
@@ -4777,13 +4790,13 @@
       title.innerText = '挑戰完成！';
       starsEarned.innerText = '★'.repeat(stars) + '☆'.repeat(3 - stars);
       if (stars === 3) {
-        msg.innerHTML = `太厲害了！第一次 3 個步驟全部答對，獲得 3 顆星！🌟`;
+        msg.innerHTML = `太厲害了！3 題全部回答正確，獲得 3 顆星！🌟`;
       } else if (stars === 2) {
-        msg.innerHTML = `很棒喔！第一次答對了 2 個步驟，獲得 2 顆星！🌟`;
+        msg.innerHTML = `很棒喔！回答正確 2 題，獲得 2 顆星！🌟`;
       } else if (stars === 1) {
-        msg.innerHTML = `答對了 1 個步驟，獲得 1 顆星！繼續加油！🌟`;
+        msg.innerHTML = `加油！回答正確 1 題，獲得 1 顆星！🌟`;
       } else {
-        msg.innerHTML = `未答對任何步驟，沒有獲得星星。再接再厲！💪`;
+        msg.innerHTML = `未答對任何題目，沒有獲得星星。再接再厲！💪`;
       }
 
       modal.classList.remove('hidden');
@@ -7862,7 +7875,17 @@
     // 玩家查看結果：鏡頭平滑返回攻打水晶的第6島，重新播放震撼擊碎動畫，然後小精靈直接瞬間移動回到各自的島嶼
     function claimCrystalBattleVictory() {
       closeModals();
-      returnTo3DWorld();
+      isMenuManuallyClosed = true;
+
+      // 隱藏 2D 關卡挑戰畫面，顯示 3D 世界
+      for (let i = 1; i <= 5; i++) {
+        const sc = document.getElementById(`screen-island${i}`);
+        if (sc) sc.classList.add('hidden');
+      }
+      document.getElementById('global-keypad').classList.add('hidden');
+      document.getElementById('screen-3d-world').classList.remove('hidden');
+      gameState.currentView = '3d-world';
+
       cameraViewMode = 'island6';
 
       // 鏡頭聚焦第6島特寫
@@ -7874,11 +7897,6 @@
       replayCrystalShatterSequence();
     }
 
-    function onCrystalShattered() {
-      replayCrystalShatterSequence();
-    }
-
-    // 重播水晶擊碎震撼畫面與小精靈直接瞬間移動回母島
     function replayCrystalShatterSequence() {
       crystalBattleState.isFighting = false;
       crystalBattleState.isFinishedPendingClaim = false;
@@ -8096,11 +8114,21 @@
 
     function viewCrystalBattleIsland() {
       closeModals();
-      returnTo3DWorld();
+      isMenuManuallyClosed = true;
+
+      // 隱藏 2D 關卡挑戰畫面，顯示 3D 世界
+      for (let i = 1; i <= 5; i++) {
+        const sc = document.getElementById(`screen-island${i}`);
+        if (sc) sc.classList.add('hidden');
+      }
+      document.getElementById('global-keypad').classList.add('hidden');
+      document.getElementById('screen-3d-world').classList.remove('hidden');
+      gameState.currentView = '3d-world';
+
       cameraViewMode = 'island6';
       targetWaypoints = [];
       if (targetMarkerMesh) targetMarkerMesh.visible = false;
-      // 主角絕對不傳送到第6島！島嶼上僅有小精靈與水晶，不跳出選單
+      // 主角絕對不傳送到第6島！島嶼上僅有小精靈與水晶，絕不跳出任何選單
       updateCrystalBattleUI(false);
     }
 
