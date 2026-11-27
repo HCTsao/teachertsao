@@ -382,16 +382,10 @@
 
       <div class="space-y-3.5 text-left">
         <!-- 學生基本資料 -->
-        <div class="bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200 flex items-center justify-between">
-          <div>
-            <div class="text-xs text-amber-700 font-bold">目前冒險者</div>
-            <div id="profile-modal-name" class="bpmf-font text-lg font-black text-slate-800 mt-0.5"></div>
-            <div id="profile-modal-school-class" class="text-xs font-bold text-slate-500 mt-0.5"></div>
-          </div>
-          <div class="text-right">
-            <span class="text-xs font-bold text-slate-500 block">總冒險星數</span>
-            <span id="profile-modal-total-stars" class="font-black text-amber-600 text-lg">⭐ 0</span>
-          </div>
+        <div class="bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200">
+          <div class="text-xs text-amber-700 font-bold">目前冒險者</div>
+          <div id="profile-modal-name" class="bpmf-font text-lg font-black text-slate-800 mt-0.5"></div>
+          <div id="profile-modal-school-class" class="text-xs font-bold text-slate-500 mt-0.5"></div>
         </div>
 
         <!-- 總體獲取進度統計 -->
@@ -410,7 +404,7 @@
         <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2">
           <div class="text-xs font-black text-slate-700 flex items-center justify-between pb-1 border-b border-slate-200">
             <span>各島嶼關卡進度</span>
-            <span class="text-[11px] text-slate-400 font-normal">小精靈 ｜ 花朵 ｜ 星星</span>
+            <span class="text-[11px] text-slate-400 font-normal">小精靈 ｜ 花朵</span>
           </div>
           <div id="profile-islands-breakdown" class="space-y-1.5 text-xs font-bold">
             <!-- 動態填入 5 座島嶼進度 -->
@@ -1394,6 +1388,21 @@
     </button>
   </div>
 
+  <!-- ==================== 水晶擊破勝利結算彈窗 (遊戲內視窗) ==================== -->
+  <div id="modal-crystal-victory" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all select-none">
+    <div class="card-candy max-w-sm w-full p-6 sm:p-7 text-center border-4 border-amber-400 bg-white/95 shadow-2xl rounded-3xl animate-bounce-in my-auto">
+      <div class="w-16 h-16 bg-gradient-to-tr from-amber-400 to-yellow-300 text-white rounded-2xl flex items-center justify-center mx-auto mb-3.5 text-3xl shadow-md border-2 border-white">
+        🎉
+      </div>
+      <h3 class="bpmf-font text-xl sm:text-2xl font-black text-slate-800 mb-2 leading-relaxed">
+        恭喜！你擊破了<span id="crystal-victory-name" class="text-rose-600">紅水晶</span>！
+      </h3>
+      <button type="button" onclick="confirmCrystalVictoryReward()" class="btn-cute w-full mt-4 py-3 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-amber-950 font-black text-base rounded-2xl shadow-lg border border-amber-300 transition active:scale-95 cursor-pointer">
+        確定
+      </button>
+    </div>
+  </div>
+
   <!-- ==================== 攻打水晶彈窗 (極簡化版) ==================== -->
   <div id="modal-crystal-battle" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm transition-all overflow-y-auto">
     <div class="card-candy max-w-lg w-full p-5 sm:p-6 text-center border-4 border-indigo-400 bg-white/95 shadow-2xl rounded-3xl my-auto">
@@ -1816,10 +1825,9 @@
               <span>${cfg.icon}</span>
               <span class="font-black text-slate-800 text-xs sm:text-sm">${cfg.name}</span>
             </div>
-            <div class="flex items-center space-x-2.5 sm:space-x-3 text-xs font-mono font-black">
+            <div class="flex items-center space-x-3 text-xs font-mono font-black">
               <span class="text-indigo-700" title="已獲得小精靈數">🧚 ${fCount}/8</span>
               <span class="text-pink-600" title="已盛開花朵數">🌸 ${flCount}/8</span>
-              <span class="text-amber-600" title="累積星數">⭐ ${sCount}/24</span>
             </div>
           </div>
         `;
@@ -1828,8 +1836,7 @@
       const breakdownEl = document.getElementById('profile-islands-breakdown');
       if (breakdownEl) breakdownEl.innerHTML = breakdownHtml;
 
-      const totStarsEl = document.getElementById('profile-modal-total-stars');
-      if (totStarsEl) totStarsEl.innerText = `⭐ ${totalStars} / 120`;
+
 
       const totCreaturesEl = document.getElementById('profile-total-creatures');
       if (totCreaturesEl) totCreaturesEl.innerText = `${totalFlorakins} / 40 隻`;
@@ -1926,7 +1933,8 @@
           currentHp: crystalBattleState.currentHp,
           maxHp: crystalBattleState.maxHp,
           isFighting: crystalBattleState.isFighting,
-          isFinishedPendingClaim: crystalBattleState.isFinishedPendingClaim
+          isFinishedPendingClaim: crystalBattleState.isFinishedPendingClaim,
+          cooldownUntil: crystalBattleState.cooldownUntil || 0
         },
         lastPlayed: new Date().toISOString()
       };
@@ -2673,10 +2681,12 @@
     }
 
     let crystalRoot = null;
+    let crystalGroup = null;
     let crystalPieces = [];
 
     function buildIsland6Crystal(islandGroup) {
       crystalRoot = new THREE.Group();
+      crystalGroup = crystalRoot;
       crystalRoot.position.set(0, 3.0, 0);
 
       const curCfg = CRYSTAL_CONFIGS[crystalBattleState.crystalIdx] || CRYSTAL_CONFIGS[0];
@@ -2766,6 +2776,13 @@
     // 水晶破壞外觀即時更新 (多結晶塊逐一崩解 + 裂紋加深)
     function updateCrystalVisualDamage() {
       if (!crystalPieces || crystalPieces.length === 0) return;
+      if (typeof isCrystalInCooldown === 'function' && isCrystalInCooldown()) {
+        crystalPieces.forEach(p => { p.visible = false; });
+        if (crystalMainMesh) crystalMainMesh.visible = false;
+        if (crystalCrackMesh) crystalCrackMesh.visible = false;
+        if (crystalRoot) { crystalRoot.visible = false; if (crystalGroup) crystalGroup.visible = false; }
+        return;
+      }
       const curHp = Math.max(0, crystalBattleState.currentHp);
       const maxHp = crystalBattleState.maxHp || 600;
       const ratio = curHp / maxHp;
@@ -2870,7 +2887,7 @@
       });
 
       // 噴發打擊火花星芒粒子 (大顆清晰、明亮耀眼，暴擊時噴發更多金色星芒)
-      const pColor = colorHex ? parseInt(colorHex.replace('#', '0x')) : 0xffd700;
+      const pColor = (typeof colorHex === 'number') ? colorHex : (typeof colorHex === 'string' ? parseInt(colorHex.replace('#', '0x')) : 0xffd700);
       const pCount = isCritical ? 9 : 5;
       for (let i = 0; i < pCount; i++) {
         const pGeo = new THREE.DodecahedronGeometry((isCritical ? 0.42 : 0.35) + Math.random() * 0.25, 0);
@@ -7715,7 +7732,8 @@
           teamPower: teamPower,
           lastTimestamp: Date.now(),
           clearedCount: crystalBattleState.clearedCount || 0,
-          isFinishedPendingClaim: crystalBattleState.isFinishedPendingClaim || false
+          isFinishedPendingClaim: crystalBattleState.isFinishedPendingClaim || false,
+          cooldownUntil: crystalBattleState.cooldownUntil || 0
         };
         localStorage.setItem('multiplication_island_crystal_battle_state', JSON.stringify(stateToSave));
         if (currentUserKey) {
@@ -7757,6 +7775,8 @@
         const cfg = CRYSTAL_CONFIGS[crystalBattleState.crystalIdx] || CRYSTAL_CONFIGS[0];
         crystalBattleState.maxHp = cfg.hp;
         crystalBattleState.dispatchedFlorakinIds = saved.dispatchedFlorakinIds || [];
+        crystalBattleState.cooldownUntil = saved.cooldownUntil || 0;
+        checkCrystalCooldownRespawn();
 
         const now = Date.now();
         const elapsedSec = Math.max(0, (now - (saved.lastTimestamp || now)) / 1000);
@@ -7843,6 +7863,25 @@
       if (modal) modal.classList.add('hidden');
       isMenuManuallyClosed = true;
       isCrystalModalManuallyOpened = false;
+    }
+
+
+    function isCrystalInCooldown() {
+      return !!(crystalBattleState.cooldownUntil && Date.now() < crystalBattleState.cooldownUntil);
+    }
+
+    function checkCrystalCooldownRespawn() {
+      if (crystalBattleState.cooldownUntil && Date.now() >= crystalBattleState.cooldownUntil) {
+        // 1 小時冷卻完畢，新水晶在島上凝聚出現！
+        crystalBattleState.cooldownUntil = 0;
+        setupBattleCrystal(crystalBattleState.crystalIdx, true);
+        if (crystalRoot) { crystalRoot.visible = true; if (crystalGroup) crystalGroup.visible = true; }
+        if (crystalPieces) crystalPieces.forEach(p => { p.visible = true; p.scale.set(1.0, 1.0, 1.0); });
+        if (crystalMainMesh) { crystalMainMesh.visible = true; crystalMainMesh.scale.set(1.0, 1.0, 1.0); }
+        saveCrystalBattleStorage();
+        saveAllProgress();
+        updateCrystalBattleUI(true);
+      }
     }
 
     function setupBattleCrystal(idx, resetHp = true) {
@@ -8029,7 +8068,7 @@
       returnFlorakinToHome(meta, true);
     }
 
-    // 玩家查看結果：鏡頭平滑返回攻打水晶的第6島，重新播放震撼擊碎動畫，然後小精靈直接瞬間移動回到各自的島嶼
+    // 玩家查看結果：鏡頭平滑返回第6島，先播放小精靈猛烈跳擊將水晶打碎的震撼動畫，再跳出遊戲內視窗，確認後島上空無一物一小時
     function claimCrystalBattleVictory() {
       closeModals();
       isMenuManuallyClosed = true;
@@ -8047,8 +8086,8 @@
 
       // 鏡頭聚焦第6島特寫
       if (camera) {
-        camera.position.set(ISLAND_COORDS[6].x, 14, ISLAND_COORDS[6].z + 22);
-        camera.lookAt(ISLAND_COORDS[6].x, 3.5, ISLAND_COORDS[6].z);
+        camera.position.set(ISLAND_COORDS[6].x, 13, ISLAND_COORDS[6].z + 20);
+        camera.lookAt(ISLAND_COORDS[6].x, 3.8, ISLAND_COORDS[6].z);
       }
 
       replayCrystalShatterSequence();
@@ -8058,98 +8097,151 @@
       crystalBattleState.isFighting = false;
       crystalBattleState.isFinishedPendingClaim = false;
 
-      // 1. 先將水晶與裂痕短暫還原展示，重溫擊碎前夕震撼瞬間
+      const curCfg = CRYSTAL_CONFIGS[crystalBattleState.crystalIdx] || CRYSTAL_CONFIGS[0];
+      const pColor = curCfg ? curCfg.color : 0xffffff;
+
+      // 1. 水晶本體與裂痕呈現滿布裂紋即將崩解的震撼瞬間
+      if (crystalRoot) crystalGroup.visible = true;
       if (crystalMainMesh) {
+        crystalMainMesh.visible = true;
         crystalMainMesh.scale.set(1.0, 1.0, 1.0);
         crystalMainMesh.position.set(ISLAND_COORDS[6].x, 4.6, ISLAND_COORDS[6].z);
       }
       if (crystalPieces) {
-        crystalPieces.forEach(p => p.scale.set(1.0, 1.0, 1.0));
+        crystalPieces.forEach(p => { p.visible = true; p.scale.set(1.0, 1.0, 1.0); });
       }
       if (crystalCrackMesh) {
+        crystalCrackMesh.visible = true;
         crystalCrackMesh.scale.set(1.0, 1.0, 1.0);
         crystalCrackMesh.material.opacity = 1.0;
       }
 
-      // 2. 播放擊碎與勝利音效
-      playSound('shatter');
-      playSound('win');
+      // 2. 出擊小精靈在水晶周圍展開猛烈跳擊連打
+      crystalBattleState.dispatchedFlorakinIds.forEach(id => {
+        dispatchSingleFlorakin(id, true);
+      });
 
-      // 3. 巨量晶體爆炸碎片與光芒粒子四射 (50+ 粒子)
-      const curCfg = CRYSTAL_CONFIGS[crystalBattleState.crystalIdx];
-      const pColor = curCfg ? curCfg.color : 0xffffff;
-      for (let i = 0; i < 50; i++) {
-        const pGeo = new THREE.TetrahedronGeometry(0.25 + Math.random() * 0.35, 0);
-        const pMat = new THREE.MeshStandardMaterial({
-          color: pColor,
-          emissive: pColor,
-          emissiveIntensity: 0.8,
-          transparent: true,
-          opacity: 1.0
-        });
-        const pMesh = new THREE.Mesh(pGeo, pMat);
-        pMesh.position.set(ISLAND_COORDS[6].x, 4.2, ISLAND_COORDS[6].z);
-        scene.add(pMesh);
-        const theta = Math.random() * Math.PI * 2;
-        const phi = (Math.random() - 0.5) * Math.PI;
-        const spd = 0.18 + Math.random() * 0.32;
-        battleParticles.push({
-          mesh: pMesh,
-          vx: Math.cos(theta) * Math.cos(phi) * spd,
-          vy: Math.sin(phi) * spd + 0.16,
-          vz: Math.sin(theta) * Math.cos(phi) * spd,
-          life: 1.6,
-          decay: 0.016
-        });
-      }
+      // 連打火花與音效
+      let flurryCount = 0;
+      const flurryInterval = setInterval(() => {
+        flurryCount++;
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 1.8 + Math.random() * 2.2;
+        const fx = ISLAND_COORDS[6].x + Math.cos(angle) * dist;
+        const fz = ISLAND_COORDS[6].z + Math.sin(angle) * dist;
+        triggerCrystalHitEffect(new THREE.Vector3(fx, 3.2, fz), curCfg ? curCfg.hex : 0xffd700, true);
+        if (crystalMaterial) {
+          crystalMaterial.emissiveIntensity = 2.4;
+        }
+        playSound('tap');
+        if (flurryCount >= 6) {
+          clearInterval(flurryInterval);
+        }
+      }, 160);
 
-      // 4. 水晶崩解縮小消失
+      // 3. 1.1 秒時：小精靈完成最後一擊，水晶大爆炸碎裂！
+      setTimeout(() => {
+        clearInterval(flurryInterval);
+        playSound('shatter');
+        playSound('win');
+
+        // 噴發 60+ 枚晶體碎片大爆炸
+        for (let i = 0; i < 60; i++) {
+          const pGeo = new THREE.TetrahedronGeometry(0.25 + Math.random() * 0.35, 0);
+          const pMat = new THREE.MeshStandardMaterial({
+            color: pColor,
+            emissive: pColor,
+            emissiveIntensity: 0.9,
+            transparent: true,
+            opacity: 1.0
+          });
+          const pMesh = new THREE.Mesh(pGeo, pMat);
+          pMesh.position.set(ISLAND_COORDS[6].x, 4.2, ISLAND_COORDS[6].z);
+          scene.add(pMesh);
+          const theta = Math.random() * Math.PI * 2;
+          const phi = (Math.random() - 0.5) * Math.PI;
+          const spd = 0.2 + Math.random() * 0.35;
+          battleParticles.push({
+            mesh: pMesh,
+            vx: Math.cos(theta) * Math.cos(phi) * spd,
+            vy: Math.sin(phi) * spd + 0.18,
+            vz: Math.sin(theta) * Math.cos(phi) * spd,
+            life: 1.7,
+            decay: 0.015
+          });
+        }
+
+        // 大範圍白色衝擊波環
+        triggerCrystalHitEffect(new THREE.Vector3(ISLAND_COORDS[6].x, 3.2, ISLAND_COORDS[6].z), 0xffffff, true);
+
+        // 水晶碎裂消失
+        if (crystalPieces) {
+          crystalPieces.forEach(p => p.scale.set(0.001, 0.001, 0.001));
+        }
+        if (crystalCrackMesh) crystalCrackMesh.scale.set(0.001, 0.001, 0.001);
+        if (crystalMainMesh) crystalMainMesh.scale.set(0.001, 0.001, 0.001);
+
+        // 4. 動畫播放完畢後，跳出遊戲內視窗（絕不用 alert 瀏覽器彈窗）
+        setTimeout(() => {
+          const vName = document.getElementById('crystal-victory-name');
+          if (vName) vName.innerText = curCfg.name;
+          const modalVic = document.getElementById('modal-crystal-victory');
+          if (modalVic) modalVic.classList.remove('hidden');
+        }, 700);
+
+      }, 1100);
+    }
+
+    // 玩家點擊遊戲內視窗「確定」：島上暫時空無一物，一小時後才會出現新的水晶
+    function confirmCrystalVictoryReward() {
+      const modalVic = document.getElementById('modal-crystal-victory');
+      if (modalVic) modalVic.classList.add('hidden');
+
+      // 1. 隱藏左下角 HUD
+      const hud = document.getElementById('hud-crystal-battle');
+      if (hud) hud.classList.add('hidden');
+
+      // 2. 出擊的小精靈瞬間移動回到各自的島嶼
+      crystalBattleState.dispatchedFlorakinIds.forEach(id => {
+        const meta = getAllFlorakinMeta().find(m => m.id === id);
+        if (meta) {
+          returnFlorakinToHome(meta, false);
+        }
+      });
+      crystalBattleState.dispatchedFlorakinIds = [];
+
+      // 3. 島上暫時空無一物 (完全隱藏水晶群與主晶體)
       if (crystalPieces) {
-        crystalPieces.forEach(p => p.scale.set(0.01, 0.01, 0.01));
+        crystalPieces.forEach(p => { p.visible = false; p.scale.set(0.001, 0.001, 0.001); });
       }
-      if (crystalCrackMesh) crystalCrackMesh.scale.set(0.01, 0.01, 0.01);
-      if (crystalMainMesh) crystalMainMesh.scale.set(0.01, 0.01, 0.01);
+      if (crystalCrackMesh) { crystalCrackMesh.visible = false; crystalCrackMesh.scale.set(0.001, 0.001, 0.001); }
+      if (crystalMainMesh) { crystalMainMesh.visible = false; crystalMainMesh.scale.set(0.001, 0.001, 0.001); }
+      if (crystalRoot) { crystalRoot.visible = false; if (crystalGroup) crystalGroup.visible = false; }
 
-      const prevCfg = CRYSTAL_CONFIGS[crystalBattleState.crystalIdx];
+      // 4. 設定 1 小時冷卻時間 (3600 秒)
+      const COOLDOWN_MS = 60 * 60 * 1000;
+      crystalBattleState.cooldownUntil = Date.now() + COOLDOWN_MS;
+      crystalBattleState.isFighting = false;
+      crystalBattleState.isFinishedPendingClaim = false;
+
+      // 5. 推進至下一個水晶目標
       crystalBattleState.clearedCount = (crystalBattleState.clearedCount || 0) + 1;
-
-      // 前5次依序為：0:紅 -> 1:黃 -> 2:藍 -> 3:紫 -> 4:白。五個都攻打完一次之後隨機出現
       let nextIdx;
       if (crystalBattleState.clearedCount < 5) {
         nextIdx = crystalBattleState.clearedCount;
       } else {
         nextIdx = Math.floor(Math.random() * CRYSTAL_CONFIGS.length);
       }
-
+      crystalBattleState.crystalIdx = nextIdx;
       const nextCfg = CRYSTAL_CONFIGS[nextIdx];
+      crystalBattleState.currentHp = nextCfg.hp;
+      crystalBattleState.maxHp = nextCfg.hp;
+      crystalBattleState.lastTimestamp = Date.now();
 
-      // 5. 擊碎畫面播放 1.2 秒後，出擊的小精靈直接瞬間移動回到原本的島嶼上
-      setTimeout(() => {
-        crystalBattleState.dispatchedFlorakinIds.forEach(id => {
-          const meta = getAllFlorakinMeta().find(m => m.id === id);
-          if (meta) {
-            returnFlorakinToHome(meta, false); // false = 直接瞬間移動回到原本的島嶼上！
-          }
-        });
-        crystalBattleState.dispatchedFlorakinIds = [];
-
-        // 推進至下一個水晶並存檔
-        crystalBattleState.crystalIdx = nextIdx;
-        crystalBattleState.currentHp = nextCfg.hp;
-        crystalBattleState.maxHp = nextCfg.hp;
-        crystalBattleState.isFighting = false;
-        crystalBattleState.isFinishedPendingClaim = false;
-        crystalBattleState.lastTimestamp = Date.now();
-
-        setupBattleCrystal(nextIdx, true);
-        saveCrystalBattleStorage();
-        saveAllProgress();
-        updateCrystalBattleUI(true);
-
-        setTimeout(() => {
-          alert(`🎉 太棒了！在大家同心協力下，成功擊碎了【${prevCfg.name}】！\n✨ 小精靈們已瞬間移動回到各自的島嶼！\n💎 下一個目標【${nextCfg.name}】已出現！`);
-        }, 500);
-      }, 1200);
+      // 6. 存檔與更新 UI
+      saveCrystalBattleStorage();
+      saveAllProgress();
+      updateCrystalBattleUI(true);
     }
 
         // 產生小精靈超萌正面照向量頭像 (依島嶼特徵與星星成長階段 1:葉子 2:花苞 3:盛開花朵)
@@ -8325,6 +8417,71 @@
         }
       }
 
+      checkCrystalCooldownRespawn();
+
+      // 若水晶正處於 1 小時冷卻期中，島上暫時空無一物
+      if (isCrystalInCooldown()) {
+        const remSec = Math.max(0, Math.ceil((crystalBattleState.cooldownUntil - Date.now()) / 1000));
+        const mins = Math.floor(remSec / 60);
+        const secs = remSec % 60;
+        const cooldownStr = `${mins}分 ${secs}秒`;
+
+        // 確保島上空無一物
+        if (crystalPieces) crystalPieces.forEach(p => p.visible = false);
+        if (crystalCrackMesh) crystalCrackMesh.visible = false;
+        if (crystalMainMesh) crystalMainMesh.visible = false;
+        if (crystalRoot) { crystalRoot.visible = false; if (crystalGroup) crystalGroup.visible = false; }
+
+        const nameEl = document.getElementById('crystal-name-display');
+        if (nameEl) nameEl.innerText = `${cfg.name} (能量凝聚中)`;
+
+        const stageBadge = document.getElementById('crystal-stage-badge');
+        if (stageBadge) {
+          stageBadge.innerText = '冷卻中 ⏳';
+          stageBadge.classList.remove('hidden');
+        }
+
+        const hpRatioEl = document.getElementById('crystal-hp-ratio');
+        if (hpRatioEl) hpRatioEl.innerText = '島上暫無水晶';
+
+        const hpBar = document.getElementById('crystal-hp-bar');
+        if (hpBar) hpBar.style.width = '0%';
+
+        const hpPct = document.getElementById('crystal-hp-percent');
+        if (hpPct) hpPct.innerText = '0%';
+
+        const bonusHint = document.getElementById('crystal-bonus-hint');
+        if (bonusHint) {
+          bonusHint.innerHTML = `⏳ <strong>島上暫時空無一物</strong>：下一座水晶【${cfg.name}】正在凝聚能量，將於 <strong class="text-amber-600">${cooldownStr}</strong> 後出現！`;
+        }
+
+        const dCount = document.getElementById('battle-dispatched-count');
+        if (dCount) dCount.innerText = '0 / 10 隻';
+
+        const pCount = document.getElementById('battle-team-power');
+        if (pCount) pCount.innerText = '⚔️ 0';
+
+        const etaEl = document.getElementById('battle-eta-text');
+        if (etaEl) etaEl.innerText = `出現倒數：${cooldownStr}`;
+
+        const btnStart = document.getElementById('btn-start-crystal-battle');
+        if (btnStart) {
+          btnStart.innerText = `⏳ 能量凝聚中 (${cooldownStr})`;
+          btnStart.disabled = true;
+          btnStart.className = 'w-full py-3 bg-slate-200 text-slate-400 font-black text-sm rounded-xl cursor-not-allowed';
+          btnStart.onclick = null;
+        }
+
+        const btnRecall = document.getElementById('btn-recall-all-battle');
+        if (btnRecall) btnRecall.classList.add('hidden');
+
+        // 左下角浮動 HUD 冷卻期間隱藏
+        const hud = document.getElementById('hud-crystal-battle');
+        if (hud) hud.classList.add('hidden');
+
+        return;
+      }
+
       // 關卡進度文字 (左下角與彈窗在第5關後不再顯示「隨機挑戰模式」)
       const cleared = crystalBattleState.clearedCount || 0;
       const stageText = cleared < 5 ? `第 ${cleared + 1}/5 關` : '';
@@ -8381,6 +8538,8 @@
           btnStart.onclick = () => confirmAndStartCrystalBattle();
         } else {
           btnStart.innerText = '⚔️ 開始攻打水晶！';
+          btnStart.disabled = false;
+          btnStart.className = 'btn-cute w-full py-3 bg-gradient-to-r from-rose-500 to-indigo-600 hover:from-rose-600 hover:to-indigo-700 text-white font-black text-sm sm:text-base rounded-2xl shadow-lg border border-rose-300 transition active:scale-95 cursor-pointer';
           btnStart.onclick = () => confirmAndStartCrystalBattle();
         }
       }
@@ -8652,7 +8811,7 @@
       try {
         const now = Date.now();
         stepCrystalBattle(now);
-        if (crystalBattleState.isFighting) {
+        if (crystalBattleState.isFighting || isCrystalInCooldown()) {
           updateCrystalBattleUI(false);
         }
       } catch (e) {
