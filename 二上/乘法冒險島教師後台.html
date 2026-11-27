@@ -33,7 +33,7 @@
 </head>
 <body class="min-h-screen p-4 sm:p-6 md:p-8">
 
-  <!-- ==================== 登入卡片 (預設密碼 8888) ==================== -->
+  <!-- ==================== 登入卡片 ==================== -->
   <div id="login-overlay" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
     <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 text-center">
       <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl shadow-sm">
@@ -44,7 +44,7 @@
       
       <form id="login-form" onsubmit="handleTeacherLogin(event)" class="space-y-4">
         <div>
-          <input type="password" id="input-teacher-pass" placeholder="請輸入密碼 (預設 8888)" autofocus
+          <input type="password" id="input-teacher-pass" placeholder="請輸入後台管理密碼" autofocus
             class="w-full px-4 py-3 text-center text-xl tracking-widest font-black rounded-xl border-2 border-slate-200 focus:border-indigo-500 focus:outline-none transition">
           <p id="login-error-msg" class="text-rose-500 text-xs font-bold mt-1.5 hidden">密碼錯誤，請重新輸入</p>
         </div>
@@ -54,6 +54,52 @@
           </a>
           <button type="submit" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-md transition">
             🔓 登入後台
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ==================== 編輯學生登錄資料彈窗 ==================== -->
+  <div id="modal-edit-student" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+    <div class="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-slate-100 text-left">
+      <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+        <div class="flex items-center space-x-2">
+          <span class="text-2xl">✏️</span>
+          <h3 class="text-lg font-black text-slate-800">編輯學生登錄資料</h3>
+        </div>
+        <button onclick="closeEditStudentModal()" class="text-slate-400 hover:text-slate-600 font-bold text-xl px-2">✕</button>
+      </div>
+      <form onsubmit="handleSaveStudentEdit(event)" class="space-y-4">
+        <input type="hidden" id="edit-student-old-key">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1">🏫 學校名稱</label>
+          <input type="text" id="edit-student-school" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-bold text-sm focus:border-indigo-500 focus:outline-none">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">👥 班級 (如 201)</label>
+            <input type="text" id="edit-student-class" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-bold text-sm focus:border-indigo-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">🔢 座號</label>
+            <input type="number" id="edit-student-seat" required min="1" max="99" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-bold text-sm focus:border-indigo-500 focus:outline-none">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1">👤 學生姓名</label>
+          <input type="text" id="edit-student-name" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-bold text-sm focus:border-indigo-500 focus:outline-none">
+        </div>
+        <p class="text-xs text-slate-500 bg-amber-50/70 p-3 rounded-xl border border-amber-200">
+          💡 <strong>自動同步提示</strong>：修改後系統將自動遷移該學生的闖關星星進度與所有作答日誌，學生下次以此正確資料登入即可直接接續遊玩！
+        </p>
+        <div class="flex space-x-3 pt-2">
+          <button type="button" onclick="closeEditStudentModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition">
+            取消
+          </button>
+          <button type="submit" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow transition">
+            💾 儲存修改
           </button>
         </div>
       </form>
@@ -385,6 +431,9 @@
       // 1. 監聽學生進度表
       database.ref('multiplication_island/users').on('value', snapshot => {
         rawUsers = snapshot.val() || {};
+        Object.keys(rawUsers).forEach(k => {
+          if (rawUsers[k]) rawUsers[k].userKey = rawUsers[k].userKey || k;
+        });
         updateFilterDropdowns();
         renderStudentsTable();
       });
@@ -567,6 +616,9 @@
             <td class="py-3 px-3 text-center text-xs text-slate-500 font-medium">${lastActive}</td>
             <td class="py-3 px-3 text-center">
               <div class="flex items-center justify-center space-x-1.5">
+                <button onclick="openEditStudentModal('${u.userKey}')" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 transition cursor-pointer" title="編輯學生登錄資料（學校、班級、座號、姓名）">
+                  ✏️
+                </button>
                 <button onclick="resetStudentProgress('${u.userKey}', '${u.name}')" class="p-1.5 text-slate-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 transition cursor-pointer" title="重置該學生星數進度">
                   🔄
                 </button>
@@ -678,6 +730,126 @@
           </tr>
         `;
       }).join('');
+    }
+
+
+    // ==================== 學生登錄資料編輯與管理 ====================
+    function generateUserKey(school, grade, seat, name) {
+      const cleanSchool = (school || '').trim().replace(/[\.\#\$\/[\]]/g, '_');
+      const cleanGrade = (grade || '').trim().replace(/[\.\#\$\/[\]]/g, '_');
+      const cleanSeat = (seat || '').trim().replace(/[\.\#\$\/[\]]/g, '_');
+      const cleanName = (name || '').trim().replace(/[\.\#\$\/[\]]/g, '_');
+      return `${cleanSchool}_${cleanGrade}_${cleanSeat}_${cleanName}`;
+    }
+
+    function openEditStudentModal(userKey) {
+      const u = rawUsers[userKey];
+      if (!u) {
+        alert('找不到該學生資料！');
+        return;
+      }
+      document.getElementById('edit-student-old-key').value = userKey;
+      document.getElementById('edit-student-school').value = u.school || '';
+      document.getElementById('edit-student-class').value = u.className || u.grade || '';
+      document.getElementById('edit-student-seat').value = u.seat || '';
+      document.getElementById('edit-student-name').value = u.name || '';
+      document.getElementById('modal-edit-student').classList.remove('hidden');
+    }
+
+    function closeEditStudentModal() {
+      document.getElementById('modal-edit-student').classList.add('hidden');
+    }
+
+    function handleSaveStudentEdit(e) {
+      e.preventDefault();
+      const oldKey = document.getElementById('edit-student-old-key').value;
+      const newSchool = document.getElementById('edit-student-school').value.trim();
+      const newClass = document.getElementById('edit-student-class').value.trim();
+      const newSeat = document.getElementById('edit-student-seat').value.trim();
+      const newName = document.getElementById('edit-student-name').value.trim();
+
+      if (!newSchool || !newClass || !newSeat || !newName) {
+        alert('請完整填寫學校、班級、座號與學生姓名！');
+        return;
+      }
+
+      const u = rawUsers[oldKey];
+      if (!u) {
+        alert('找不到該學生原始資料！');
+        return;
+      }
+
+      const newUserKey = generateUserKey(newSchool, newClass, newSeat, newName);
+
+      // 建立更新後的學生資料物件
+      const updatedUser = Object.assign({}, u, {
+        userKey: newUserKey,
+        school: newSchool,
+        className: newClass,
+        grade: newClass,
+        seat: newSeat,
+        name: newName,
+        lastEditedByTeacher: new Date().toISOString()
+      });
+
+      // 樂觀更新 (Optimistic update)：先立即更新本地記憶體與畫面
+      delete rawUsers[oldKey];
+      rawUsers[newUserKey] = updatedUser;
+      closeEditStudentModal();
+      updateFilterDropdowns();
+      renderStudentsTable();
+
+      if (!database) {
+        alert(`已修正學生「${newName}」登錄資料！`);
+        return;
+      }
+
+      // 若 key 有所改變（例如修改了姓名、班級或座號）
+      if (newUserKey !== oldKey) {
+        database.ref(`multiplication_island/users/${newUserKey}`).set(updatedUser).then(() => {
+          return database.ref(`multiplication_island/users/${oldKey}`).remove();
+        }).then(() => {
+          // 同步修正該學生的歷史作答日誌
+          return database.ref('multiplication_island/records').once('value');
+        }).then(snapshot => {
+          const records = snapshot.val() || {};
+          const updates = {};
+          Object.keys(records).forEach(recId => {
+            const r = records[recId];
+            if (r && (r.userKey === oldKey || (r.studentName === u.name && r.school === u.school && r.className === u.className))) {
+              updates[`multiplication_island/records/${recId}/userKey`] = newUserKey;
+              updates[`multiplication_island/records/${recId}/studentName`] = newName;
+              updates[`multiplication_island/records/${recId}/school`] = newSchool;
+              updates[`multiplication_island/records/${recId}/className`] = newClass;
+              updates[`multiplication_island/records/${recId}/grade`] = newClass;
+              updates[`multiplication_island/records/${recId}/seat`] = newSeat;
+            }
+          });
+          if (Object.keys(updates).length > 0) {
+            return database.ref().update(updates);
+          }
+        }).then(() => {
+          closeEditStudentModal();
+          alert(`學生登錄資料已成功修正！\n\n🏫 學校：${newSchool}\n👥 班級：${newClass}\n🔢 座號：${newSeat}\n👤 姓名：${newName}\n\n學生下次以此資料登入即可無縫接續進度！`);
+        }).catch(err => {
+          alert('儲存修改時發生錯誤：' + err.message);
+        });
+      } else {
+        // key 相同，直接更新屬性
+        database.ref(`multiplication_island/users/${oldKey}`).update({
+          school: newSchool,
+          className: newClass,
+          grade: newClass,
+          seat: newSeat,
+          name: newName,
+          lastEditedByTeacher: new Date().toISOString()
+        }).then(() => {
+          closeEditStudentModal();
+          alert(`學生「${newName}」登錄資料已成功修正！`);
+        }).catch(err => {
+          alert('儲存修改失敗：' + err.message);
+        });
+      }
     }
 
     // ==================== 管理動作與安全密碼驗證 ====================
