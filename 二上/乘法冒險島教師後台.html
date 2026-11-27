@@ -525,7 +525,7 @@
       }
 
       tbody.innerHTML = userList.map(u => {
-        const i1Total = (u.island1Progress && (u.island1Progress.frog !== undefined ? u.island1Progress.frog : Object.values(u.island1Progress).reduce((a, b) => a + b, 0))) || 0;
+        const i1Total = (u.island1Progress && (typeof u.island1Progress === 'object' ? Object.values(u.island1Progress).reduce((a, b) => a + (Number(b) || 0), 0) : 0)) || 0;
         const i2Total = Object.values(u.island2Progress || {}).reduce((a, b) => a + b, 0);
         const i3Total = Object.values(u.island3Progress || {}).reduce((a, b) => a + b, 0);
         const i4Total = Object.values(u.island4Progress || {}).reduce((a, b) => a + b, 0);
@@ -540,9 +540,8 @@
             <td class="py-3 px-3 text-slate-600">${u.seat || '-'}</td>
             <td class="py-3 px-4 text-slate-900 font-black">${u.name || '-'}</td>
             <td class="py-3 px-2 text-center">
-              <span class="inline-block px-2.5 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
-                ⭐ ${i1Total}/3
-              </span>
+              <div class="font-black text-emerald-700 text-xs mb-1">${i1Total}/24星</div>
+              ${renderMiniStarsBar(u.island1Progress)}
             </td>
             <td class="py-3 px-2 text-center">
               <div class="font-black text-amber-700 text-xs mb-1">${i2Total}/24星</div>
@@ -567,9 +566,14 @@
             </td>
             <td class="py-3 px-3 text-center text-xs text-slate-500 font-medium">${lastActive}</td>
             <td class="py-3 px-3 text-center">
-              <button onclick="resetStudentProgress('${u.userKey}', '${u.name}')" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition" title="重置該學生星數進度">
-                🔄
-              </button>
+              <div class="flex items-center justify-center space-x-1.5">
+                <button onclick="resetStudentProgress('${u.userKey}', '${u.name}')" class="p-1.5 text-slate-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 transition cursor-pointer" title="重置該學生星數進度">
+                  🔄
+                </button>
+                <button onclick="deleteSingleUser('${u.userKey}', '${u.name}')" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer" title="永久移除此使用者資料">
+                  🗑️
+                </button>
+              </div>
             </td>
           </tr>
         `;
@@ -691,6 +695,27 @@
       });
     }
 
+    function deleteSingleUser(userKey, studentName) {
+      const pass = prompt(`【危險操作】請輸入管理員密碼以確認永久移除學生「${studentName}」的所有使用者資料：`);
+      if (pass !== ADMIN_PASSWORD) {
+        alert('密碼錯誤，操作取消！');
+        return;
+      }
+      if (!confirm(`確定要永久刪除學生「${studentName}」嗎？\n此動作將一併清除該學生的存檔資料，且無法復原！`)) {
+        return;
+      }
+      if (!database) {
+        alert('尚未連線至資料庫！');
+        return;
+      }
+
+      database.ref(`multiplication_island/users/${userKey}`).remove().then(() => {
+        alert(`已成功移除學生「${studentName}」的使用者資料！`);
+      }).catch(err => {
+        alert('移除失敗：' + err.message);
+      });
+    }
+
     function resetStudentProgress(userKey, studentName) {
       const pass = prompt(`請輸入管理員密碼以確認重置學生「${studentName}」的星星闖關進度：`);
       if (pass !== ADMIN_PASSWORD) {
@@ -699,7 +724,7 @@
       }
       if (!database) return;
       const resetData = {
-        island1Progress: { frog: 0 },
+        island1Progress: { '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 },
         island2Progress: { '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 },
         island3Progress: { '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 },
         island4Progress: { '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 },
