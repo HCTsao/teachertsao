@@ -2065,12 +2065,12 @@
 
     // 六座島嶼核心座標 (環形群島外圍半徑拉開至約80，讓中央第6島成為孤島)
     const ISLAND_COORDS = {
-      1: { x: -75, y: 0, z: 25 },
-      2: { x: 0,   y: 0, z: 80 },
-      3: { x: 75,  y: 0, z: 25 },
-      4: { x: 50,  y: 0, z: -62 },
-      5: { x: -50, y: 0, z: -62 },
-      6: { x: 0,   y: 0, z: -2 }
+      1: { x: -53, y: 0, z: 17 },
+      2: { x: 0,   y: 0, z: 56 },
+      3: { x: 53,  y: 0, z: 17 },
+      4: { x: 33,  y: 0, z: -45 },
+      5: { x: -33, y: 0, z: -45 },
+      6: { x: 0,   y: 0, z: 0 }
     };
 
     let island1Florakins = [];
@@ -2506,12 +2506,12 @@
     }
 
     function createIsland6() {
-      // 第六座島嶼：中央水晶孤島 (無標籤、純淨島嶼與水晶)
-      const island = buildIslandBase(ISLAND_COORDS[6].x, ISLAND_COORDS[6].z, '#6366f1', 0x312e81, '#4338ca', '#a5b4fc');
+      // 第六座島嶼：中央水晶島嶼 (翠綠生機孤島與水晶)
+      const island = buildIslandBase(ISLAND_COORDS[6].x, ISLAND_COORDS[6].z, '#10b981', 0x064e3b, '#047857', '#a7f3d0');
       buildIsland6Crystal(island);
 
       const ringGeo = new THREE.TorusGeometry(3.8, 0.28, 16, 32);
-      const ringMat = new THREE.MeshBasicMaterial({ color: 0x818cf8 });
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x34d399 });
       waypointBeacon6 = new THREE.Mesh(ringGeo, ringMat);
       waypointBeacon6.rotation.x = Math.PI / 2;
       waypointBeacon6.position.set(0, 3.2, 0);
@@ -2815,7 +2815,7 @@
       group.add(body);
 
       // 可愛雙眼與高光亮點
-      const eyeColor = (type === 'white') ? 0xef4444 : 0x1e293b;
+      const eyeColor = 0x1e293b; // 眼睛統一為深黑褐色，消除抄襲疑慮
       const eyeMat = new THREE.MeshBasicMaterial({ color: eyeColor });
       const pupilMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
@@ -3348,31 +3348,50 @@
       return [startId, targetId];
     }
 
-    function findBridgePath(start, target) {
-      const zStart = getZone(start.x, start.z);
-      const zTarget = getZone(target.x, target.z);
+    function hasDirectClearPath(start, target) {
+      const steps = 14;
+      for (let s = 1; s <= steps; s++) {
+        const t = s / steps;
+        const px = start.x + (target.x - start.x) * t;
+        const pz = start.z + (target.z - start.z) * t;
+        if (!canMoveTo(px, pz)) {
+          return false;
+        }
+      }
+      return true;
+    }
 
-      if (zTarget.type === 'sea' || !canMoveTo(target.x, target.z)) {
+    function findBridgePath(start, target) {
+      if (!canMoveTo(target.x, target.z)) {
         return [];
       }
 
-      // 同一座島嶼內，直接行走至目標
-      if (zStart.type === 'island' && zTarget.type === 'island' && zStart.id === zTarget.id) {
+      // 如果從目前位置到點選目標直線通暢 (都在島內或都在同一座木橋上)，直接筆直邁向目標，絕不往回走！
+      if (hasDirectClearPath(start, target)) {
+        return [target];
+      }
+
+      const zStart = getZone(start.x, start.z);
+      const zTarget = getZone(target.x, target.z);
+
+      // 同一座島嶼或同一座橋段內，直接行走至目標
+      if ((zStart.type === 'island' && zTarget.type === 'island' && zStart.id === zTarget.id) ||
+          (zStart.type === 'bridge' && zTarget.type === 'bridge' && zStart.id1 === zTarget.id1 && zStart.id2 === zTarget.id2)) {
         return [target];
       }
 
       let startId;
-      const targetId = zTarget.type === 'island' ? zTarget.id : zTarget.id1;
+      const targetId = zTarget.type === 'island' ? zTarget.id : (
+        Math.hypot(target.x - ISLAND_COORDS[zTarget.id1].x, target.z - ISLAND_COORDS[zTarget.id1].z) <
+        Math.hypot(target.x - ISLAND_COORDS[zTarget.id2].x, target.z - ISLAND_COORDS[zTarget.id2].z) ? zTarget.id1 : zTarget.id2
+      );
 
       if (zStart.type === 'island') {
         startId = zStart.id;
       } else if (zStart.type === 'bridge') {
-        // 若當前在木橋上：依據前進方向決定橋段端點，絕對不往回走！
-        if (targetId >= zStart.id2) {
-          startId = zStart.id1;
-        } else {
-          startId = zStart.id2;
-        }
+        const d1 = Math.hypot(start.x - ISLAND_COORDS[zStart.id1].x, start.z - ISLAND_COORDS[zStart.id1].z);
+        const d2 = Math.hypot(start.x - ISLAND_COORDS[zStart.id2].x, start.z - ISLAND_COORDS[zStart.id2].z);
+        startId = (targetId === zStart.id1 || targetId === zStart.id2) ? targetId : (d1 < d2 ? zStart.id1 : zStart.id2);
       } else {
         let minD = Infinity;
         startId = 1;
@@ -3396,31 +3415,27 @@
         const ux = dx / dist;
         const uz = dz / dist;
 
-        // 橋頭入口 (島緣內側 13.5)、橋中央、橋尾出口 (相鄰島緣內側 13.5)
         const entry = { x: p1.x + 13.5 * ux, z: p1.z + 13.5 * uz };
         const mid = { x: (p1.x + p2.x) / 2, z: (p1.z + p2.z) / 2 };
         const exitP = { x: p2.x - 13.5 * ux, z: p2.z - 13.5 * uz };
 
         const bridgePts = [entry, mid, exitP];
 
-        // 若是當前正在走的第一段橋：過濾掉身後已走過的路徑點，只保留前方點，避免回頭往後走！
         if (idx === 0) {
           const charProj = (start.x - p1.x) * ux + (start.z - p1.z) * uz;
           for (const pt of bridgePts) {
             const ptProj = (pt.x - p1.x) * ux + (pt.z - p1.z) * uz;
-            // 必須在人物前方至少 1.0 單位，才需要前往
-            if (ptProj > charProj + 1.0) {
+            if (ptProj > charProj + 0.8) {
               waypoints.push(pt);
             }
           }
-          if (waypoints.length === 0 && islandSeq.length > 2) {
+          if (waypoints.length === 0) {
             waypoints.push(exitP);
           }
         } else {
           waypoints.push(entry, mid, exitP);
         }
 
-        // 若不是最後一座目標島，加入中間島的安全中轉點
         if (idx + 1 < islandSeq.length - 1) {
           const nextNextId = islandSeq[idx + 2];
           const pNext = ISLAND_COORDS[nextNextId];
@@ -3929,9 +3944,12 @@
       } else if (charGroup && Math.hypot(charGroup.position.x - ISLAND_COORDS[6].x, charGroup.position.z - ISLAND_COORDS[6].z) <= WHITE_POINT_RADIUS) {
         currentNearWaypoint = 6;
         if (!isMenuManuallyClosed) {
-          // 只有還沒開始攻打的時候會跳出選擇小精靈畫面，開始攻打後就不會跳出選單了
+          // 只有在彈窗處於隱藏狀態時才開啟，防止每幀反覆重建 DOM 導致小精靈按鈕無法點選
           if (!crystalBattleState.isFighting) {
-            openCrystalBattleModal();
+            const bModal = document.getElementById('modal-crystal-battle');
+            if (bModal && bModal.classList.contains('hidden')) {
+              openCrystalBattleModal();
+            }
           }
         }
       } else {
@@ -4193,23 +4211,30 @@
     let currentStepI1 = 1;
 
     
-    // 確保畫面上所有「相」字統一為一聲 ㄒㄧㄤ (附帶 \uE01E1 變體選擇器)
-    function ensureXiangTone() {
+    // 確保注音字型正確渲染：「相」統一為一聲 ㄒㄧㄤ；「行」統一為 ㄏㄤˊ (變體選擇器 U+E01E1)
+    function ensurePhoneticFixes() {
+      const VS18 = '\u{E01E1}';
+      const regexXiang = /相(?!\u{E01E1})/gu;
+      const regexHang = /行(?!\u{E01E1})/gu;
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
         acceptNode: function(node) {
-          if (node.parentElement && (node.parentElement.tagName === 'SCRIPT' || node.parentElement.tagName === 'STYLE')) {
+          if (node.parentElement && (node.parentElement.tagName === 'SCRIPT' || node.parentElement.tagName === 'STYLE' || node.parentElement.tagName === 'INPUT' || node.parentElement.tagName === 'TEXTAREA')) {
             return NodeFilter.FILTER_REJECT;
           }
           return NodeFilter.FILTER_ACCEPT;
         }
       });
       let node;
-      while (node = walker.nextNode()) {
-        if (node.nodeValue && node.nodeValue.includes('相')) {
-          node.nodeValue = node.nodeValue.replace(/相(?!\uE01E1)/g, '相\uE01E1');
+      while ((node = walker.nextNode())) {
+        if (node.nodeValue) {
+          let val = node.nodeValue;
+          if (val.includes('相')) val = val.replace(regexXiang, '相' + VS18);
+          if (val.includes('行')) val = val.replace(regexHang, '行' + VS18);
+          if (val !== node.nodeValue) node.nodeValue = val;
         }
       }
     }
+    const ensureXiangTone = ensurePhoneticFixes;
 
     function startIsland1Stage(stage = 'stage1') {
       gameState.selectedIsland = 1;
@@ -5030,27 +5055,9 @@
 
     function handleMeaningInput(row) {
       updateMeaningPlaceholder(row);
-      const input = document.getElementById(`i2-meaning-slot${row}`);
-      if (!input || !island2CurrentQuestion) return;
-
-      const u = island2CurrentQuestion.unitInfo;
-      let targetTone = '\uE01E1'; // 預設二聲 (ㄧˊ)
-      if (u && u.template) {
-        if (u.template.includes('一\uE01E2')) targetTone = '\uE01E2';
-        else if (u.template.includes('一\uE01E1')) targetTone = '\uE01E1';
-      }
-
-      // 動態對齊題幹「一」的聲調，且「個」強制使用輕聲「個󠇡」
-      const oldVal = input.value;
-      const cursorPos = input.selectionStart;
-      let newVal = oldVal.replace(/一[\uE0100-\uE01EF]?/g, '一' + targetTone);
-      newVal = newVal.replace(/個[\uE0100-\uE01EF]?/g, '個\uE01E1');
-
-      if (newVal !== oldVal) {
-        input.value = newVal;
-        if (cursorPos !== null) {
-          try { input.setSelectionRange(cursorPos, cursorPos); } catch (e) {}
-        }
+      const input = document.getElementById(i2-meaning-slot);
+      if (input) {
+        fitInputText(input);
       }
     }
 
@@ -5208,7 +5215,7 @@
       }
 
       // 去除空格、標點符號與所有字形變體選擇符 (IVS)，使比對精準包容
-      const clean = (s) => s.replace(/[\s，,。.]/g, '').replace(/[\uE0100-\uE01EF]/g, '');
+      const clean = (s) => s.replace(/[\s，,。.]/g, '').replace(/[\u{E0100}-\u{E01EF}]/gu, '').replace(/[\uDB40][\uDD00-\uDDEF]/g, '').replace(/[\uE000-\uF8FF]/g, '');
       const c1 = clean(v1);
       const c2 = clean(v2);
       const c3 = clean(v3);
@@ -5440,6 +5447,25 @@
       const chName = CH_NUM_MAP[base];
       document.getElementById('island3-stage-title').innerText = `${base} 的乘法表`;
 
+      // 即時重設並設定挑戰題卡片題號與底數 (防止殘留 2)
+      const chalCard = document.getElementById('island3-challenge-card');
+      if (chalCard) chalCard.classList.add('hidden');
+      ['11', '12', '13'].forEach(m => {
+        const bEl = document.getElementById(`i3-chal-base-${m}`);
+        if (bEl) bEl.innerText = base;
+        const sEl = document.getElementById(`slot-i3-chal-${m}`);
+        if (sEl) { sEl.innerText = ''; sEl.className = 'slot-blank math-font'; }
+        const textEl = document.getElementById(`i3-chal-hint-${m}`);
+        const phEl = document.getElementById(`i3-chal-hint-placeholder-${m}`);
+        if (textEl) {
+          textEl.classList.add('hidden');
+          if (m === '11') textEl.innerText = `${base} × 10 ＝ ${base * 10}，再多 ${base} 是？`;
+          if (m === '12') textEl.innerText = `${base} × 11 ＝ ${base * 11}，再多 ${base} 是？`;
+          if (m === '13') textEl.innerText = `${base} × 12 ＝ ${base * 12}，再多 ${base} 是？`;
+        }
+        if (phEl) phEl.classList.remove('hidden');
+      });
+
       buildIsland3TableRows(base);
       window.scrollTo(0, 0);
     }
@@ -5618,7 +5644,7 @@
       const card = document.getElementById('island3-challenge-card');
       if (card) {
         card.classList.remove('hidden');
-        document.getElementById('i3-pattern-base-name').innerText = base;
+        const pBaseEl = document.getElementById('i3-pattern-base-name'); if (pBaseEl) pBaseEl.innerText = base;
         
         // 重設空格
         const pSlot = document.getElementById('slot-i3-pattern-diff');
@@ -5681,7 +5707,7 @@
         playSound('correct');
         slot.classList.add('filled');
         fb.className = 'text-center font-bold text-sm sm:text-base mt-2 min-h-[1.5rem] text-emerald-600';
-        fb.innerText = `🎉 太棒了！${base} 的乘法每一行\uE01E1都多 ${base}！請利用這個󠇡規律挑戰接下來的 3 題！`;
+        fb.innerText = `🎉 太棒了！${base} 的乘法每一行\u{E01E1}都多 ${base}！請利用這個󠇡規律挑戰接下來的 3 題！`;
         island3ChallengeStep = 2;
         const qSec = document.getElementById('i3-challenge-questions-section');
         if (qSec) qSec.classList.remove('opacity-40', 'pointer-events-none');
@@ -5784,7 +5810,7 @@
       if (stars === 3) {
         msg.innerHTML = `太棒了！順背乘法表完全正確且全無失誤，獲得 3 顆星！🌟`;
       } else if (stars > 0) {
-        msg.innerHTML = `10 行\uE01E1中第一次就答對 ${island3FirstAttemptRowsCount} 行\uE01E1，獲得 ${stars} 顆星！🌟`;
+        msg.innerHTML = `10 行\u{E01E1}中第一次就答對 ${island3FirstAttemptRowsCount} 行\u{E01E1}，獲得 ${stars} 顆星！🌟`;
       } else {
         msg.innerHTML = `本次失誤較多，獲得 0 顆星。多練習幾次一定能拿到 3 顆星！`;
       }
@@ -6005,9 +6031,9 @@
       title.innerText = `🔄 ${chName}的倒背乘法表 挑戰完成！`;
       starsEarned.innerText = '★'.repeat(stars) + '☆'.repeat(3 - stars);
       if (stars === 3) {
-        msg.innerHTML = `太不可思議了！倒背乘法表 10 行\uE01E1全數一次過關，獲得 3 顆星！🌟`;
+        msg.innerHTML = `太不可思議了！倒背乘法表 10 行\u{E01E1}全數一次過關，獲得 3 顆星！🌟`;
       } else if (stars > 0) {
-        msg.innerHTML = `10 行\uE01E1中第一次就答對 ${island4FirstAttemptRowsCount} 行\uE01E1，獲得 ${stars} 顆星！🌟`;
+        msg.innerHTML = `10 行\u{E01E1}中第一次就答對 ${island4FirstAttemptRowsCount} 行\u{E01E1}，獲得 ${stars} 顆星！🌟`;
       } else {
         msg.innerHTML = `本次失誤較多，獲得 0 顆星。倒背需要熟練度，再挑戰一次吧！`;
       }
@@ -6954,27 +6980,43 @@
       }
     }
 
-    function recallSingleFlorakin(id) {
-      const meta = getAllFlorakinMeta().find(m => m.id === id);
+    function returnFlorakinToHome(meta, animated = true) {
       if (!meta || !meta.mesh) return;
       const f = meta.mesh;
       const ud = f.userData;
+      const homeX = ISLAND_COORDS[meta.island].x + ud.homePos.x;
+      const homeZ = ISLAND_COORDS[meta.island].z + ud.homePos.z;
 
       ud.inBattle = false;
-      ud.battleRole = 'returning';
+      ud.battleRole = 'idle';
 
-      const homeWorld = new THREE.Vector3();
-      if (meta.islandGroup) {
-        homeWorld.copy(ud.homePos);
-        meta.islandGroup.localToWorld(homeWorld);
+      if (animated) {
+        let jumpStep = 0;
+        const startX = f.position.x;
+        const startY = f.position.y;
+        const startZ = f.position.z;
+        const totalFrames = 26;
+        const jumpTimer = setInterval(() => {
+          jumpStep++;
+          const t = jumpStep / totalFrames;
+          f.position.x = startX + (homeX - startX) * t;
+          f.position.z = startZ + (homeZ - startZ) * t;
+          f.position.y = 3.0 + Math.sin(t * Math.PI) * 4.5;
+          if (jumpStep >= totalFrames) {
+            clearInterval(jumpTimer);
+            f.position.set(homeX, 3.0, homeZ);
+            ud.battleRole = 'idle';
+          }
+        }, 16);
       } else {
-        homeWorld.set(ISLAND_COORDS[meta.island].x + ud.homePos.x, 3.0, ISLAND_COORDS[meta.island].z + ud.homePos.z);
+        f.position.set(homeX, 3.0, homeZ);
       }
+    }
 
-      ud.marchPath = [{ x: homeWorld.x, z: homeWorld.z }];
-      ud.marchIdx = 0;
-      ud.homeWorldPos = homeWorld;
-      ud.walkSpeed = 0.55;
+    function recallSingleFlorakin(id) {
+      const meta = getAllFlorakinMeta().find(m => m.id === id);
+      if (!meta || !meta.mesh) return;
+      returnFlorakinToHome(meta, true);
     }
 
     // 玩家點擊左下角「🎉 查看結果」領取勝利與擊碎特效
@@ -7022,9 +7064,12 @@
       }
       if (crystalCrackMesh) crystalCrackMesh.scale.set(0.01, 0.01, 0.01);
 
-      // 召回所有小精靈
+      // 攻打完水晶，出擊小精靈自動高高躍起跳回對應顏色的母島
       crystalBattleState.dispatchedFlorakinIds.forEach(id => {
-        recallSingleFlorakin(id);
+        const meta = getAllFlorakinMeta().find(m => m.id === id);
+        if (meta) {
+          returnFlorakinToHome(meta, true);
+        }
       });
       crystalBattleState.dispatchedFlorakinIds = [];
 
@@ -7353,6 +7398,30 @@
     }, 1000);
 
     window.addEventListener('DOMContentLoaded', () => {
+      ensurePhoneticFixes();
+      try {
+        const phoneticObserver = new MutationObserver((mutations) => {
+          let shouldFix = false;
+          for (const m of mutations) {
+            if (m.type === 'childList') {
+              shouldFix = true;
+              break;
+            } else if (m.type === 'characterData' && m.target && m.target.nodeValue) {
+              if (m.target.nodeValue.includes('行') || m.target.nodeValue.includes('相')) {
+                shouldFix = true;
+                break;
+              }
+            }
+          }
+          if (shouldFix) {
+            phoneticObserver.disconnect();
+            ensurePhoneticFixes();
+            phoneticObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+          }
+        });
+        phoneticObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+      } catch (eObs) {}
+
       init3DWorld();
       initUserLogin();
       updateStarsDisplay();
