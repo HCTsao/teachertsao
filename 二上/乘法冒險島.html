@@ -4486,10 +4486,13 @@
           window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
           // 關卡二：檢查步驟 2 是否也已正確，若已正確則跳出步驟 3
+          currentStepI1 = 2;
           if (isIsland1Step2MultCorrect()) {
             unlockIsland1Step3();
           } else {
-            focusSlot('slot-i1-mult-base');
+            if (!activeSlotId || !activeSlotId.startsWith('slot-i1-mult-')) {
+              focusSlot('slot-i1-mult-base');
+            }
           }
         }
       } else {
@@ -5368,9 +5371,430 @@
         if (valD !== q.diff) slotDiff.classList.add('wrong');
         if (valT !== q.totalDiff) slotTotal.classList.add('wrong');
         fb.className = 'text-center text-xl font-black text-rose-500 mt-4';
-        fb.innerText = '再想一想喔！';
+        fb.innerText = '再想一想喔！為你準備了積木解題引導...';
+
+        // 答錯時自動跳出互動式積木解題引導
+        setTimeout(() => {
+          showComparisonExplanationAnimation(q.base, q.m1, q.m2, q.diff, q.totalDiff, q.type);
+        }, 800);
       }
     }
+
+    // ==================== 多幾個幾/少幾個幾 互動式積木解題引導系統 ====================
+    let guideState = {
+      active: false,
+      base: 0,
+      m1: 0,
+      m2: 0,
+      diff: 0,
+      totalDiff: 0,
+      type: 'more',
+      step1Blocks: 0,
+      step1Confirmed: false,
+      step2Blocks: 0,
+      step2Confirmed: false,
+      step3q1Answered: false,
+      step3q2Answered: false
+    };
+
+    function showComparisonExplanationAnimation(B, M1, M2, D, totalDiff, type) {
+      playSound('notice');
+      guideState = {
+        active: true,
+        base: B,
+        m1: M1,
+        m2: M2,
+        diff: D,
+        totalDiff: totalDiff,
+        type: type,
+        step1Blocks: 0,
+        step1Confirmed: false,
+        step2Blocks: 0,
+        step2Confirmed: false,
+        step3q1Answered: false,
+        step3q2Answered: false
+      };
+
+      const isMore = (type === 'more');
+      const modal = document.getElementById('modal-island5-animation');
+      if (modal) modal.classList.remove('hidden');
+
+      // 頂部題目提示 (完整單行不折斷)
+      const qEl = document.getElementById('anim-guide-question');
+      if (qEl) {
+        qEl.innerText = `${B} × ${M1} 比 ${B} × ${M2} ${isMore ? '多' : '少'}多少呢？`;
+      }
+
+      // 初始化步驟一
+      const s1Box = document.getElementById('guide-step1-box');
+      if (s1Box) s1Box.classList.remove('opacity-60');
+      const s1Title = document.getElementById('guide-step1-title');
+      if (s1Title) s1Title.innerText = `步驟一：${B} × ${M1} 是幾個󠇡 ${B} 呢？`;
+      const btnB1 = document.getElementById('guide-btn-b1');
+      if (btnB1) btnB1.innerText = String(B);
+      const b1Badge = document.getElementById('guide-step1-count-badge');
+      if (b1Badge) b1Badge.innerText = `${B} 有 0 個󠇡`;
+      const s1Blocks = document.getElementById('guide-step1-blocks');
+      if (s1Blocks) s1Blocks.innerHTML = '';
+      const s1Ctrl = document.getElementById('guide-step1-controls');
+      if (s1Ctrl) s1Ctrl.classList.remove('hidden');
+      const fb1 = document.getElementById('guide-step1-feedback');
+      if (fb1) {
+        fb1.className = 'bpmf-font mt-2 text-base font-bold min-h-[1.5rem] hidden';
+        fb1.innerHTML = '';
+      }
+
+      // 步驟二、步驟三預設隱藏
+      const s2Box = document.getElementById('guide-step2-box');
+      if (s2Box) s2Box.classList.add('hidden');
+      const s3Box = document.getElementById('guide-step3-box');
+      if (s3Box) s3Box.classList.add('hidden');
+      const s3q2Area = document.getElementById('guide-step3-q2-area');
+      if (s3q2Area) s3q2Area.classList.add('hidden');
+      const s3SumCard = document.getElementById('guide-step3-summary-card');
+      if (s3SumCard) s3SumCard.classList.add('hidden');
+    }
+
+    function guideAddBlock(row) {
+      if (row === 1) {
+        if (guideState.step1Confirmed) return;
+        if (guideState.step1Blocks >= 12) return;
+        guideState.step1Blocks++;
+        renderGuideRowBlocks(1);
+      } else if (row === 2) {
+        if (guideState.step2Confirmed) return;
+        if (guideState.step2Blocks >= 12) return;
+        guideState.step2Blocks++;
+        renderGuideRowBlocks(2);
+      }
+      playSound('tap');
+    }
+
+    function guideClearBlocks(row) {
+      if (row === 1 && !guideState.step1Confirmed) {
+        guideState.step1Blocks = 0;
+        renderGuideRowBlocks(1);
+        const fb1 = document.getElementById('guide-step1-feedback');
+        if (fb1) fb1.classList.add('hidden');
+      } else if (row === 2 && !guideState.step2Confirmed) {
+        guideState.step2Blocks = 0;
+        renderGuideRowBlocks(2);
+        const fb2 = document.getElementById('guide-step2-feedback');
+        if (fb2) fb2.classList.add('hidden');
+      }
+      playSound('tap');
+    }
+
+    function renderGuideRowBlocks(row) {
+      const B = guideState.base;
+      if (row === 1) {
+        const count = guideState.step1Blocks;
+        const badge = document.getElementById('guide-step1-count-badge');
+        if (badge) badge.innerText = `${B} 有 ${count} 個󠇡`;
+        const container = document.getElementById('guide-step1-blocks');
+        if (container) {
+          container.innerHTML = '';
+          for (let i = 0; i < count; i++) {
+            const el = document.createElement('div');
+            el.className = 'w-10 h-10 md:w-12 md:h-12 rounded-xl bg-purple-100 text-purple-800 border-2 border-purple-400 font-black text-xl flex items-center justify-center math-font shadow';
+            el.innerText = String(B);
+            container.appendChild(el);
+          }
+        }
+      } else if (row === 2) {
+        const count = guideState.step2Blocks;
+        const badge = document.getElementById('guide-step2-count-badge');
+        if (badge) badge.innerText = `${B} 有 ${count} 個󠇡`;
+        const container = document.getElementById('guide-step2-blocks');
+        if (container) {
+          container.innerHTML = '';
+          for (let i = 0; i < count; i++) {
+            const el = document.createElement('div');
+            el.className = 'w-10 h-10 md:w-12 md:h-12 rounded-xl bg-indigo-100 text-indigo-800 border-2 border-indigo-400 font-black text-xl flex items-center justify-center math-font shadow';
+            el.innerText = String(B);
+            container.appendChild(el);
+          }
+        }
+      }
+    }
+
+    function guideConfirmStep1() {
+      if (guideState.step1Confirmed) return;
+      const fb1 = document.getElementById('guide-step1-feedback');
+      if (fb1) fb1.classList.remove('hidden');
+
+      if (guideState.step1Blocks === guideState.m1) {
+        playSound('correct');
+        guideState.step1Confirmed = true;
+        if (fb1) fb1.classList.add('hidden');
+        const s1Ctrl = document.getElementById('guide-step1-controls');
+        if (s1Ctrl) s1Ctrl.classList.add('hidden');
+
+        const step2Box = document.getElementById('guide-step2-box');
+        if (step2Box) {
+          step2Box.classList.remove('hidden');
+          const s2Title = document.getElementById('guide-step2-title');
+          if (s2Title) s2Title.innerText = `步驟二：${guideState.base} × ${guideState.m2} 是幾個󠇡 ${guideState.base} 呢？`;
+          const btnB2 = document.getElementById('guide-btn-b2');
+          if (btnB2) btnB2.innerText = String(guideState.base);
+          const s2Badge = document.getElementById('guide-step2-count-badge');
+          if (s2Badge) s2Badge.innerText = `${guideState.base} 有 0 個󠇡`;
+          const s2Blocks = document.getElementById('guide-step2-blocks');
+          if (s2Blocks) s2Blocks.innerHTML = '';
+          const s2Ctrl = document.getElementById('guide-step2-controls');
+          if (s2Ctrl) s2Ctrl.classList.remove('hidden');
+          const fb2 = document.getElementById('guide-step2-feedback');
+          if (fb2) {
+            fb2.className = 'bpmf-font mt-2 text-base font-bold min-h-[1.5rem] hidden';
+            fb2.innerHTML = '';
+          }
+          step2Box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      } else {
+        playSound('wrong');
+        if (fb1) {
+          fb1.className = 'bpmf-font mt-2 text-base font-bold min-h-[1.5rem] text-rose-600 animate-pulse';
+          fb1.innerHTML = `<span class="inline-block whitespace-nowrap">再想想看～${guideState.base} × ${guideState.m1} 是幾個󠇡 ${guideState.base} 呢？</span><span class="inline-block whitespace-nowrap">目前放了 ${guideState.step1Blocks} 個󠇡 ${guideState.base}！</span>`;
+        }
+      }
+    }
+
+    function guideConfirmStep2() {
+      if (guideState.step2Confirmed) return;
+      const fb2 = document.getElementById('guide-step2-feedback');
+      if (fb2) fb2.classList.remove('hidden');
+
+      if (guideState.step2Blocks === guideState.m2) {
+        playSound('correct');
+        guideState.step2Confirmed = true;
+        if (fb2) fb2.classList.add('hidden');
+        const s2Ctrl = document.getElementById('guide-step2-controls');
+        if (s2Ctrl) s2Ctrl.classList.add('hidden');
+
+        initStep3Comparison();
+      } else {
+        playSound('wrong');
+        if (fb2) {
+          fb2.className = 'bpmf-font mt-2 text-base font-bold min-h-[1.5rem] text-rose-600 animate-pulse';
+          fb2.innerHTML = `<span class="inline-block whitespace-nowrap">再想想看～${guideState.base} × ${guideState.m2} 是幾個󠇡 ${guideState.base} 呢？</span><span class="inline-block whitespace-nowrap">目前放了 ${guideState.step2Blocks} 個󠇡 ${guideState.base}！</span>`;
+        }
+      }
+    }
+
+    function initStep3Comparison() {
+      const B = guideState.base;
+      const M1 = guideState.m1;
+      const M2 = guideState.m2;
+      const D = guideState.diff;
+      const isMore = (guideState.type === 'more');
+
+      const c1 = document.getElementById('guide-step1-blocks');
+      if (c1) {
+        c1.innerHTML = '';
+        for (let i = 0; i < M1; i++) {
+          const isExtra = isMore && (i >= M2);
+          const el = document.createElement('div');
+          if (isExtra) {
+            el.className = 'w-10 h-10 md:w-12 md:h-12 rounded-xl bg-amber-300 text-amber-900 border-2 border-amber-500 font-black text-xl flex items-center justify-center math-font shadow-lg ring-4 ring-amber-200 animate-pulse';
+          } else {
+            el.className = 'w-10 h-10 md:w-12 md:h-12 rounded-xl bg-purple-100 text-purple-800 border-2 border-purple-400 font-black text-xl flex items-center justify-center math-font shadow';
+          }
+          el.innerText = String(B);
+          c1.appendChild(el);
+        }
+      }
+
+      const c2 = document.getElementById('guide-step2-blocks');
+      if (c2) {
+        c2.innerHTML = '';
+        for (let i = 0; i < M2; i++) {
+          const isExtra = (!isMore) && (i >= M1);
+          const el = document.createElement('div');
+          if (isExtra) {
+            el.className = 'w-10 h-10 md:w-12 md:h-12 rounded-xl bg-amber-300 text-amber-900 border-2 border-amber-500 font-black text-xl flex items-center justify-center math-font shadow-lg ring-4 ring-amber-200 animate-pulse';
+          } else {
+            el.className = 'w-10 h-10 md:w-12 md:h-12 rounded-xl bg-indigo-100 text-indigo-800 border-2 border-indigo-400 font-black text-xl flex items-center justify-center math-font shadow';
+          }
+          el.innerText = String(B);
+          c2.appendChild(el);
+        }
+      }
+
+      const step3Box = document.getElementById('guide-step3-box');
+      if (step3Box) {
+        step3Box.classList.remove('hidden');
+
+        const q1Sub = document.getElementById('guide-step3-q1-sub');
+        if (q1Sub) q1Sub.innerText = `${B} × ${M1} 比 ${B} × ${M2} ${isMore ? '多' : '少'}幾個󠇡 ${B} 呢？`;
+
+        const compLabel = document.getElementById('guide-step3-comp-label');
+        if (compLabel) compLabel.innerText = isMore ? '多了：' : '少了：';
+
+        const diffContainer = document.getElementById('guide-step3-diff-options');
+        if (diffContainer) {
+          diffContainer.innerHTML = '';
+          [1, 2, 3].forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'btn-cute px-4 py-2 bg-white hover:bg-amber-100 text-amber-900 border-2 border-amber-300 rounded-xl font-black text-base shadow whitespace-nowrap';
+            btn.id = `guide-diff-btn-${opt}`;
+            btn.innerText = `${opt} 個󠇡 ${B}`;
+            btn.onclick = () => guideSelectDiff(opt);
+            diffContainer.appendChild(btn);
+          });
+        }
+
+        const fb3a = document.getElementById('guide-step3-q1-feedback');
+        if (fb3a) {
+          fb3a.className = 'bpmf-font text-base font-bold min-h-[1.5rem] hidden mb-3';
+          fb3a.innerHTML = '';
+        }
+
+        const q2Area = document.getElementById('guide-step3-q2-area');
+        if (q2Area) q2Area.classList.add('hidden');
+        const sumCard = document.getElementById('guide-step3-summary-card');
+        if (sumCard) sumCard.classList.add('hidden');
+
+        step3Box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    function guideSelectDiff(val) {
+      if (guideState.step3q1Answered) return;
+      const fb3a = document.getElementById('guide-step3-q1-feedback');
+      if (fb3a) fb3a.classList.remove('hidden');
+
+      const isMore = (guideState.type === 'more');
+      const B = guideState.base;
+      const D = guideState.diff;
+
+      if (val === D) {
+        playSound('correct');
+        guideState.step3q1Answered = true;
+        const btn = document.getElementById(`guide-diff-btn-${val}`);
+        if (btn) {
+          btn.className = 'btn-cute px-4 py-2 bg-emerald-500 text-white border-2 border-emerald-600 rounded-xl font-black text-base shadow whitespace-nowrap';
+        }
+        if (fb3a) fb3a.classList.add('hidden');
+
+        initStep3Q2();
+      } else {
+        playSound('wrong');
+        if (fb3a) {
+          fb3a.className = 'bpmf-font text-base font-bold min-h-[1.5rem] text-rose-600 animate-pulse mb-3 whitespace-nowrap';
+          fb3a.innerHTML = `再想想看～請比一󠇡比兩排方塊相󠇡差幾個󠇡 ${B} 喔！`;
+        }
+      }
+    }
+
+    function initStep3Q2() {
+      const B = guideState.base;
+      const D = guideState.diff;
+      const total = guideState.totalDiff;
+      const isMore = (guideState.type === 'more');
+
+      const q2Area = document.getElementById('guide-step3-q2-area');
+      if (q2Area) q2Area.classList.remove('hidden');
+
+      const q2Sub = document.getElementById('guide-step3-q2-sub');
+      if (q2Sub) q2Sub.innerText = `${isMore ? '多' : '少'} ${D} 個󠇡 ${B} 是${isMore ? '多' : '少'}多少呢？`;
+
+      const formulaEl = document.getElementById('guide-step3-formula');
+      if (formulaEl) formulaEl.innerText = `算式：${B} × ${D} ＝`;
+
+      const options = [total];
+      const c1 = B * (D + 1);
+      const c2 = D > 1 ? B * (D - 1) : B * (D + 2);
+      if (!options.includes(c1)) options.push(c1);
+      if (!options.includes(c2)) options.push(c2);
+      while (options.length < 3) {
+        options.push(total + B);
+      }
+      options.sort((a, b) => a - b);
+
+      const totalContainer = document.getElementById('guide-step3-total-options');
+      if (totalContainer) {
+        totalContainer.innerHTML = '';
+        options.forEach(opt => {
+          const btn = document.createElement('button');
+          btn.className = 'btn-cute px-4 py-2 bg-white hover:bg-purple-100 text-purple-900 border-2 border-purple-300 rounded-xl font-black text-base shadow math-font whitespace-nowrap';
+          btn.id = `guide-total-btn-${opt}`;
+          btn.innerText = String(opt);
+          btn.onclick = () => guideSelectTotal(opt);
+          totalContainer.appendChild(btn);
+        });
+      }
+
+      const fb3b = document.getElementById('guide-step3-q2-feedback');
+      if (fb3b) {
+        fb3b.className = 'bpmf-font text-base font-bold min-h-[1.5rem] hidden mb-3';
+        fb3b.innerHTML = '';
+      }
+      if (q2Area) q2Area.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function guideSelectTotal(val) {
+      if (guideState.step3q2Answered) return;
+      const fb3b = document.getElementById('guide-step3-q2-feedback');
+      if (fb3b) fb3b.classList.remove('hidden');
+
+      const B = guideState.base;
+      const D = guideState.diff;
+      const total = guideState.totalDiff;
+      const isMore = (guideState.type === 'more');
+
+      if (val === total) {
+        playSound('correct');
+        guideState.step3q2Answered = true;
+        const btn = document.getElementById(`guide-total-btn-${val}`);
+        if (btn) {
+          btn.className = 'btn-cute px-4 py-2 bg-emerald-500 text-white border-2 border-emerald-600 rounded-xl font-black text-base shadow math-font whitespace-nowrap';
+        }
+        if (fb3b) fb3b.classList.add('hidden');
+
+        const sumCard = document.getElementById('guide-step3-summary-card');
+        if (sumCard) {
+          sumCard.classList.remove('hidden');
+          const sumText = document.getElementById('guide-step3-summary-text');
+          if (sumText) {
+            sumText.innerHTML = `<span class="inline-block whitespace-nowrap">所以 ${B} × ${guideState.m1} 比 ${B} × ${guideState.m2}</span> <span class="inline-block whitespace-nowrap">${isMore ? '多' : '少'}了 ${D} 個󠇡 ${B}，</span><span class="inline-block whitespace-nowrap">也就是${isMore ? '多' : '少'}了 ${total}！</span>`;
+          }
+          sumCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      } else {
+        playSound('wrong');
+        if (fb3b) {
+          fb3b.className = 'bpmf-font text-base font-bold min-h-[1.5rem] text-rose-600 animate-pulse mb-3 whitespace-nowrap';
+          fb3b.innerHTML = `再算算看～${B} × ${D} 是多少呢？`;
+        }
+      }
+    }
+
+    function dismissIsland5Animation() {
+      playSound('tap');
+      const modal = document.getElementById('modal-island5-animation');
+      if (modal) modal.classList.add('hidden');
+
+      const slotDiff = document.getElementById('slot-i2-q4-diff');
+      const slotTotal = document.getElementById('slot-i2-q4-total-diff');
+      if (slotDiff) {
+        slotDiff.innerText = '';
+        slotDiff.classList.remove('wrong', 'filled');
+      }
+      if (slotTotal) {
+        slotTotal.innerText = '';
+        slotTotal.classList.remove('wrong', 'filled');
+      }
+
+      const feedback = document.getElementById('island2-q4-feedback');
+      if (feedback) feedback.classList.add('hidden');
+
+      const kp = document.getElementById('global-keypad');
+      if (kp) kp.classList.remove('hidden');
+
+      focusSlot('slot-i2-q4-diff');
+    }
+    window.showComparisonExplanationAnimation = showComparisonExplanationAnimation;
+    window.dismissIsland5Animation = dismissIsland5Animation;
 
     function nextIsland2Question() {
       document.getElementById('global-keypad').classList.remove('hidden');
@@ -5406,6 +5830,7 @@
       saveAllProgress({
         island: 2,
         base: base,
+        correctCount: island2FirstAttemptCorrectCount,
         totalQuestions: 4,
         starsEarned: stars
       });
@@ -6488,24 +6913,24 @@
       if (!slotId) return;
       if (gameState.currentView === 'island1') {
         if (island1CurrentStage === 'stage1') {
-          if (currentStepI1 === 1 || slotId.startsWith('slot-i1-add-')) {
+          if (slotId.startsWith('slot-i1-add-')) {
             checkIsland1Step1();
-          } else if (currentStepI1 === 2 || slotId.startsWith('slot-i1s1-')) {
+          } else if (slotId.startsWith('slot-i1s1-')) {
             checkIsland1Stage1Step2();
           }
         } else {
-          if (currentStepI1 === 1 || slotId.startsWith('slot-i1-add-')) {
+          if (slotId.startsWith('slot-i1-add-')) {
             checkIsland1Step1();
-          } else if (currentStepI1 === 2 || slotId.startsWith('slot-i1-mult-')) {
+          } else if (slotId.startsWith('slot-i1-mult-')) {
             checkIsland1Step2Mult();
-          } else if (currentStepI1 === 3 || slotId.startsWith('slot-i1-verbal-')) {
+          } else if (slotId.startsWith('slot-i1-verbal-')) {
             checkIsland1Step3();
           }
         }
       } else if (gameState.currentView === 'island2') {
-        if (currentStepI2 === 1 || slotId.startsWith('i2-slot-mult-')) {
+        if (slotId.startsWith('i2-slot-mult-')) {
           checkIsland2Step1();
-        } else if (currentStepI2 === 4 || slotId.startsWith('slot-i2-q4-')) {
+        } else if (slotId.startsWith('slot-i2-q4-')) {
           checkIsland2Q4Answer();
         }
       } else if (gameState.currentView === 'island3') {
@@ -6538,6 +6963,17 @@
       if (target) {
         target.classList.add('active');
         playSound('tap');
+      }
+      // 根據點選/聚焦的格子即時同步對應步驟狀態
+      if (gameState.currentView === 'island1') {
+        if (island1CurrentStage === 'stage1') {
+          if (slotId.startsWith('slot-i1-add-')) currentStepI1 = 1;
+          else if (slotId.startsWith('slot-i1s1-')) currentStepI1 = 2;
+        } else {
+          if (slotId.startsWith('slot-i1-add-')) currentStepI1 = 1;
+          else if (slotId.startsWith('slot-i1-mult-')) currentStepI1 = 2;
+          else if (slotId.startsWith('slot-i1-verbal-')) currentStepI1 = 3;
+        }
       }
     }
 
@@ -6691,11 +7127,12 @@
 
       // 檢查是否已達到該格正確答案所需的位數（1位填1位跳，2位填2位跳）
       if (target.innerText.trim().length >= expectedLen) {
-        const nextSlot = getNextSlotId(activeSlotId);
+        const curSlot = activeSlotId;
+        const nextSlot = getNextSlotId(curSlot);
         if (nextSlot) {
           focusSlot(nextSlot);
         }
-        triggerStepCheck(activeSlotId);
+        triggerStepCheck(curSlot);
       }
     }
 
@@ -7204,12 +7641,14 @@
               const p = getFlorakinPower(m.mesh);
 
               return `
-                <button type="button" onclick="toggleFlorakinDispatch('${m.id}')" class="btn-cute cursor-pointer p-3 rounded-2xl border-2 transition-all flex items-center justify-between w-full select-none ${isDispatched ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-indigo-400 shadow-md ring-2 ring-indigo-300 scale-[1.02]' : 'bg-white text-slate-800 border-slate-200 hover:border-indigo-300 hover:bg-slate-50'}">
-                  <div class="flex items-center space-x-2">
-                    <span class="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs" style="background-color: ${m.colorHex};"></span>
-                    <span class="font-black text-xs sm:text-sm ${isDispatched ? 'text-white' : 'text-slate-800'}">${isDispatched ? '✓ ' : ''}${m.name}</span>
+                <button type="button" onclick="toggleFlorakinDispatch('${m.id}')" class="btn-cute cursor-pointer px-2.5 py-2 rounded-xl border-2 transition-all flex flex-col justify-center items-start w-full select-none ${isDispatched ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-indigo-400 shadow-md ring-2 ring-indigo-300 scale-[1.02]' : 'bg-white text-slate-800 border-slate-200 hover:border-indigo-300 hover:bg-slate-50'}">
+                  <div class="flex items-center space-x-1.5 w-full min-w-0">
+                    <span class="w-3 h-3 rounded-full shrink-0 shadow-xs" style="background-color: ${m.colorHex};"></span>
+                    <span class="font-black text-xs sm:text-sm truncate leading-tight ${isDispatched ? 'text-white' : 'text-slate-800'}">${isDispatched ? '✓ ' : ''}${m.name}</span>
                   </div>
-                  <span class="font-black text-xs sm:text-sm ${isDispatched ? 'text-amber-200' : 'text-indigo-600'}">⚔️ ${p}</span>
+                  <div class="font-black text-xs leading-tight mt-1 pl-4.5 ${isDispatched ? 'text-amber-200' : 'text-indigo-600'}">
+                    ⚔️ 戰力 ${p}
+                  </div>
                 </button>
               `;
             }).join('');
