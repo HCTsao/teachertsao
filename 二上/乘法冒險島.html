@@ -828,13 +828,13 @@
         <div id="i1-step2-feedback" class="text-center text-base font-bold min-h-[1.5rem] mt-2 hidden"></div>
       </section>
 
-      <!-- 步驟 3：用乘法算式記成『...』 -->
+      <!-- 步驟 3：｢x的y倍是m｣用乘法算式記成： -->
       <section id="i1-step3-container" class="card-candy p-5 transition-all duration-300 hidden">
         <div class="flex items-center justify-between mb-3 border-b pb-2 border-blue-100">
           <div class="flex items-center space-x-2">
             <span class="w-7 h-7 rounded-full bg-blue-500 text-white font-black flex items-center justify-center text-sm shadow-xs">3</span>
             <h3 id="i1-step3-title" class="bpmf-font text-base sm:text-lg md:text-xl font-black text-slate-800">
-              步驟 3：用乘法算式記成『2 的 8 倍是 16』
+              步驟 3：｢2的8倍是16｣用乘法算式記成：
             </h3>
           </div>
         </div>
@@ -1372,10 +1372,10 @@
       </div>
     </div>
 
-    <!-- 快速查看情況按鈕：點擊鏡頭與主角立即移動至中央水晶島嶼 -->
-    <button type="button" onclick="viewCrystalBattleIsland()" class="btn-cute w-full mt-2.5 py-1.5 px-3 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-black text-xs sm:text-sm rounded-xl shadow-md border border-indigo-300 flex items-center justify-center space-x-1.5 transition active:scale-95 cursor-pointer">
-      <span>👀</span>
-      <span>查看情況</span>
+    <!-- 快速查看情況 / 返回遊戲按鈕：點擊鏡頭切換特寫攻打水晶 / 返回原本主角所在關卡 -->
+    <button type="button" id="btn-hud-view-crystal" onclick="toggleViewCrystalBattleIsland()" class="btn-cute w-full mt-2.5 py-1.5 px-3 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-black text-xs sm:text-sm rounded-xl shadow-md border border-indigo-300 flex items-center justify-center space-x-1.5 transition active:scale-95 cursor-pointer">
+      <span id="btn-hud-view-crystal-icon">👀</span>
+      <span id="btn-hud-view-crystal-text">查看情況</span>
     </button>
   </div>
 
@@ -3567,9 +3567,7 @@
 
     function handleGroundTap(clientX, clientY) {
       if (!renderer || !camera) return;
-      closeModals();
-      cameraViewMode = 'char'; // 點選地面時若有開著的選單，直接關閉以利走動
-      
+
       const rect = renderer.domElement.getBoundingClientRect();
       const mouse = new THREE.Vector2(
         ((clientX - rect.left) / rect.width) * 2 - 1,
@@ -3577,9 +3575,47 @@
       );
       const raycaster = new THREE.Raycaster();
       raycaster.setFromCamera(mouse, camera);
+
+      // 1. 檢查是否點擊到水晶本體、子晶或水晶血條 (按下水晶來選擇小精靈進行攻打)
+      let clickedCrystal = false;
+      if (crystalRoot) {
+        const hits = raycaster.intersectObjects(crystalRoot.children, true);
+        if (hits.length > 0) clickedCrystal = true;
+      }
+      if (!clickedCrystal && crystalPieces && crystalPieces.length > 0) {
+        const hits = raycaster.intersectObjects(crystalPieces, true);
+        if (hits.length > 0) clickedCrystal = true;
+      }
+      if (!clickedCrystal && crystalHpSprite) {
+        const hits = raycaster.intersectObject(crystalHpSprite, true);
+        if (hits.length > 0) clickedCrystal = true;
+      }
+
+      // 射線檢測地面：若點擊在第 6 島水晶台座周圍半徑 4.5 內，判定為點擊水晶
       const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -3.0);
       const hit = new THREE.Vector3();
-      if (raycaster.ray.intersectPlane(groundPlane, hit)) {
+      const hasHit = raycaster.ray.intersectPlane(groundPlane, hit);
+      if (!clickedCrystal && hasHit) {
+        if (Math.hypot(hit.x - ISLAND_COORDS[6].x, hit.z - ISLAND_COORDS[6].z) < 4.5) {
+          clickedCrystal = true;
+        }
+      }
+
+      if (clickedCrystal) {
+        playSound('tap');
+        openCrystalBattleModal();
+        return;
+      }
+
+      // 當視角處於特寫第 6 島攻打畫面時，點擊空白背景不誤引導遠處主角走入海面
+      if (cameraViewMode === 'island6') {
+        return;
+      }
+
+      // 2. 正常地表點擊導航主角走動
+      closeModals();
+      cameraViewMode = 'char';
+      if (hasHit) {
         navigateGroundTo(hit.x, hit.z);
       }
     }
@@ -4140,7 +4176,13 @@
       closeAllModalsExcept(null);
       returnTo3DWorld();
 
-      // 將主角瞬間傳送至該島嶼中心台座旁
+      if (islandNum === 6) {
+        // 就算從右上角的選單到攻打水晶的地方，主角也不會跟著過去，主角是不會移動到攻打水晶的島嶼上面的
+        viewCrystalBattleIsland();
+        return;
+      }
+
+      // 將主角瞬間傳送至該島嶼中心台座旁 (第 1~5 島)
       const coord = ISLAND_COORDS[islandNum];
       if (coord && charGroup) {
         charGroup.position.set(coord.x, 3.12, coord.z + 3.0);
@@ -4157,11 +4199,7 @@
 
     function openIslandModal(islandNum) {
       if (islandNum === 6) {
-        isCrystalModalManuallyOpened = true;
-        // 若尚未開始攻打，才打開選擇小精靈畫面；若已在攻打中，純傳送不彈窗
-        if (!crystalBattleState.isFighting) {
-          openCrystalBattleModal();
-        }
+        // 到攻打水晶時不自動跳出選擇小精靈選單，玩家點擊水晶本體才打開
         return;
       }
       closeAllModalsExcept(`modal-island${islandNum}-menu`);
@@ -4181,6 +4219,11 @@
 
     function teleportToIsland(islandNum) {
       playSound('tap');
+      if (islandNum === 6) {
+        // 主角絕不移動到攻打水晶島嶼
+        viewCrystalBattleIsland();
+        return;
+      }
       cameraViewMode = 'char';
       targetWaypoints = [];
       if (targetMarkerMesh) targetMarkerMesh.visible = false;
@@ -4521,7 +4564,7 @@
 
       const s3Title = document.getElementById('i1-step3-title');
       if (s3Title) {
-        s3Title.innerHTML = `步驟 3：用乘法算式記成『<span class="math-font">${q.base}</span> 的 <span class="math-font">${q.count}</span> 倍是 <span class="math-font">${q.total}</span>』`;
+        s3Title.innerHTML = `步驟 3：｢<span class="math-font">${q.base}</span>的<span class="math-font">${q.count}</span>倍是<span class="math-font">${q.total}</span>｣用乘法算式記成：`;
       }
 
       focusSlot('slot-i1-add-0');
@@ -8037,14 +8080,28 @@
       `;
     }
 
-    function viewCrystalBattleIsland() {
+    // 切換「查看情況」與「返回遊戲」視角
+    function toggleViewCrystalBattleIsland() {
       playSound('tap');
+      if (cameraViewMode === 'island6') {
+        // 若已在攻打水晶畫面，按了之後回到原本主角所在的關卡
+        cameraViewMode = 'char';
+        closeModals();
+      } else {
+        // 若在原本主角關卡，按了之後跳到攻打水晶的畫面，主角不過去且不跳出選單
+        viewCrystalBattleIsland();
+      }
+      updateCrystalBattleUI(false);
+    }
+
+    function viewCrystalBattleIsland() {
       closeModals();
       returnTo3DWorld();
       cameraViewMode = 'island6';
       targetWaypoints = [];
       if (targetMarkerMesh) targetMarkerMesh.visible = false;
-      // 主角不傳送到第6島，島嶼上僅有小精靈與水晶，不跳出選單！
+      // 主角絕對不傳送到第6島！島嶼上僅有小精靈與水晶，不跳出選單
+      updateCrystalBattleUI(false);
     }
 
     function updateCrystalBattleUI(updateGrid = false) {
@@ -8237,6 +8294,19 @@
 
           const hudPower = document.getElementById('hud-crystal-power');
           if (hudPower) hudPower.innerText = `⚔️ ${teamPower} (${crystalBattleState.dispatchedFlorakinIds.length}隻)`;
+
+          // 動態同步更新「查看情況」與「返回遊戲」按鈕文字與圖標
+          const btnHudViewText = document.getElementById('btn-hud-view-crystal-text');
+          const btnHudViewIcon = document.getElementById('btn-hud-view-crystal-icon');
+          if (btnHudViewText) {
+            if (cameraViewMode === 'island6') {
+              btnHudViewText.innerText = '返回遊戲';
+              if (btnHudViewIcon) btnHudViewIcon.innerText = '🔙';
+            } else {
+              btnHudViewText.innerText = '查看情況';
+              if (btnHudViewIcon) btnHudViewIcon.innerText = '👀';
+            }
+          }
         }
       }
     }
