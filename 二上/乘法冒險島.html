@@ -1186,15 +1186,15 @@
         3
       </div>
       <div class="bpmf-font text-base sm:text-lg text-purple-200 font-bold mt-4">
-        每題限時 5 秒，集中精神作答！⚡
+        每題限時 10 秒，集中精神作答！⚡
       </div>
     </div>
 
     <!-- 計時器區域 -->
     <div class="card-candy p-4 mb-4 bg-white/95 shadow-md">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-xs font-black text-slate-500 uppercase tracking-wider">限時作答（5 秒）</span>
-        <span id="island5-timer-label" class="text-sm font-black text-purple-700">⏳ 剩餘 5.0 秒</span>
+        <span class="text-xs font-black text-slate-500 uppercase tracking-wider">限時作答（10 秒）</span>
+        <span id="island5-timer-label" class="text-sm font-black text-purple-700">⏳ 剩餘 10.0 秒</span>
       </div>
       <div class="w-full bg-slate-100 rounded-full h-3.5 overflow-hidden border border-slate-200">
         <div id="island5-timer-bar" class="h-full bg-emerald-500 rounded-full transition-all duration-75" style="width: 100%;"></div>
@@ -2410,7 +2410,7 @@
     }
 
     // 建立通用島嶼基座 (具備陸地顆粒質感、地表碎石與海岸浪花圈)
-    function buildIslandBase(x, z, topColor, botColor, darkHex = '#14532d', lightHex = '#86efac') {
+    function buildIslandBase(x, z, topColor, botColor, darkHex = '#14532d', lightHex = '#86efac', spotColor = 0xffffff, altarColor = 0xfffbeb) {
       const island = new THREE.Group();
       island.position.set(x, 0, z);
 
@@ -2436,9 +2436,9 @@
       botMesh.position.y = -6;
       island.add(botMesh);
 
-      // 白色傳送點
+      // 傳送點
       const whiteSpotGeo = new THREE.CylinderGeometry(3.0, 3.0, 0.18, 32);
-      const whiteSpotMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const whiteSpotMat = new THREE.MeshBasicMaterial({ color: spotColor });
       const whiteSpot = new THREE.Mesh(whiteSpotGeo, whiteSpotMat);
       whiteSpot.position.set(0, 3.14, 0);
       island.add(whiteSpot);
@@ -2446,7 +2446,7 @@
       // 台座
       const altar = new THREE.Mesh(
         new THREE.CylinderGeometry(3.2, 3.6, 0.7, 8),
-        new THREE.MeshStandardMaterial({ color: 0xfffbeb, roughness: 0.6 })
+        new THREE.MeshStandardMaterial({ color: altarColor, roughness: 0.6 })
       );
       altar.position.set(0, 3.05, 0);
       altar.receiveShadow = true;
@@ -2584,18 +2584,18 @@
     }
 
     function createIsland5() {
-      const island = buildIslandBase(ISLAND_COORDS[5].x, ISLAND_COORDS[5].z, '#f8fafc', 0x475569, '#cbd5e1', '#ffffff');
+      const island = buildIslandBase(ISLAND_COORDS[5].x, ISLAND_COORDS[5].z, '#e2e8f0', 0x334155, '#94a3b8', '#cbd5e1', 0x64748b, 0x475569);
       islandGroups[5] = island;
       buildIsland5Trees(island);
 
       const ringGeo = new THREE.TorusGeometry(3.8, 0.28, 16, 32);
-      const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x475569 });
       waypointBeacon5 = new THREE.Mesh(ringGeo, ringMat);
       waypointBeacon5.rotation.x = Math.PI / 2;
       waypointBeacon5.position.set(0, 3.2, 0);
       island.add(waypointBeacon5);
 
-      const label = createIslandBillboardLabel('⚡ 第五座島嶼：乘法大會考', { border: '#94a3b8', text: '#1e293b' });
+      const label = createIslandBillboardLabel('⚡ 第五座島嶼：乘法大會考', { border: '#64748b', text: '#1e293b' });
       label.position.set(0, 8.5, 0);
       island.add(label);
       islandLabels.push({ sprite: label, baseY: 8.5, offset: 4.8 });
@@ -5069,64 +5069,73 @@
     // 依據題目情境進行語意選字校正 (鵝蛋/籃/顆、四葉草/株/片、梅花/朵/花瓣、蛋黃酥/盒/個、瓢蟲/隻/黑點、章魚燒/盒/顆、蘋果/排/個)
     function correctSpeechTranscriptByContext(transcript, q) {
       if (!transcript || !q) return transcript;
-      let res = transcript;
+      let res = transcript.trim();
       const base = q.base;
 
-      // 1. 通用數學連接詞校正
-      res = res.replace(/[和盒喝何荷河]起來(?:[是事])?/g, '合起來是');
-      res = res.replace(/[和盒喝何荷河]起來/g, '合起來');
-      res = res.replace(/[總種][公共]有/g, '總共有');
-      res = res.replace(/[公共][友又]/g, '共有');
-      res = res.replace(/一[公宮工]是/g, '一共是');
-      res = res.replace(/一[公宮工]/g, '一共');
+      // 1. 去除引號、括號等雜訊
+      res = res.replace(/[「」『』"“”]/g, '');
 
-      // 2. 開頭「每一」校正
-      res = res.replace(/^[沒美妹媒][一1]/g, '每一');
+      // 2. 去除開頭或中間可能唸出的標籤字眼，例如「2代表」、「乘以3代表」、「6代表」
+      res = res.replace(/(?:[×xX]|乘以|乘)?\s*[0-9一二兩三四五六七八九十]+\s*代表/g, '，');
+      res = res.replace(/(?:[×xX]|乘以|乘)\s*代表/g, '，');
+
+      // 3. 數學連接詞與前綴校正
+      res = res.replace(/[和盒喝何荷河合]起來(?:[是事])?/g, '，合起來是');
+      res = res.replace(/[加夾架]起來(?:[是事])?/g, '，合起來是');
+      res = res.replace(/[總種][公共]有?(?:[是事])?/g, '，合起來是');
+      res = res.replace(/[公共][友又有](?:[是事])?/g, '，合起來是');
+      res = res.replace(/一[公宮工]是?/g, '，合起來是');
+      res = res.replace(/全[部步不]是?/g, '，合起來是');
+
+      // 4. 第二句前綴「有」校正
+      res = res.replace(/(?<=[，,\s])[友右又幼](?=[1-9一二兩三四五六七八九十])/g, '有');
+      res = res.replace(/(?<=[，,\s])有(?=[1-9一二兩三四五六七八九十])/g, '，有');
+
+      // 5. 開頭「每一」校正
+      res = res.replace(/^[沒美妹媒門][一1]?/g, '每一');
       res = res.replace(/^每1/g, '每一');
-      res = res.replace(/^[沒美妹媒](?=[串籃株朵盒隻排])/g, '每一');
+      res = res.replace(/^[沒美妹媒門](?=[串籃株朵盒隻排])/g, '每一');
       res = res.replace(/^1(?=[串籃株朵盒隻排])/g, '每一');
       res = res.replace(/^一(?=[串籃株朵盒隻排])/g, '每一');
 
-      // 3. 依各乘數情境主題校正同音字
+      // 6. 依據乘數主題情境，針對量詞、物品名稱與同音錯字進行高精準度情境校正
       if (base === 2) {
-        res = res.replace(/[音櫻英應]?[陶桃挑]/g, '櫻桃');
-        res = res.replace(/(?<=[每一有\d二兩三四五六七八九十])[穿川船傳]/g, '串');
-        res = res.replace(/(?<=[每一有\d二兩三四五六七八九十])[科棵刻客渴克]/g, '顆');
+        res = res.replace(/[音櫻英應應英]?[陶桃挑萄]/g, '櫻桃');
+        res = res.replace(/[穿川船傳創串]/g, '串');
+        res = res.replace(/(?<=[每一有\d一二兩三四五六七八九十\s])[科棵刻客渴克顆]/g, '顆');
       } else if (base === 3) {
-        res = res.replace(/[俄額鳥阿]?蛋/g, '鵝蛋');
-        res = res.replace(/(?<=[每一有\d二兩三四五六七八九十])[欄藍嵐婪蘭攬纜]/g, '籃');
-        res = res.replace(/(?<=[每一有\d二兩三四五六七八九十])[科棵刻客渴克]/g, '顆');
+        res = res.replace(/[俄額鳥阿鵝]?[蛋但擔]/g, '鵝蛋');
+        res = res.replace(/[欄藍嵐婪蘭攬纜籃]/g, '籃');
+        res = res.replace(/(?<=[每一有\d一二兩三四五六七八九十\s])[科棵刻客渴克顆]/g, '顆');
       } else if (base === 4) {
-        res = res.replace(/四[業頁夜野]草/g, '四葉草');
-        res = res.replace(/[業頁夜野]子/g, '葉子');
-        res = res.replace(/(?<=[每一有\d二兩三四五六七八九十])[豬珠朱蛛租諸主注]/g, '株');
-        res = res.replace(/(?<=[每一有\d二兩三四五六七八九十])[遍騙變便偏](?=葉子)?/g, '片');
+        res = res.replace(/四[業頁夜野葉]草/g, '___FOURLEAF___');
+        res = res.replace(/[業頁夜野葉]子?/g, '葉子');
+        res = res.replace(/___FOURLEAF___/g, '四葉草');
+        res = res.replace(/[豬珠朱蛛租諸主注株]/g, '株');
+        res = res.replace(/[遍騙變便偏片]/g, '片');
       } else if (base === 5) {
-        res = res.replace(/[美眉沒]花/g, '梅花');
-        res = res.replace(/花[半伴辦棒扮]/g, '花瓣');
-        res = res.replace(/(?<=[每一有\d二兩三四五六七八九十])[躲跺惰墮](?=梅花)?/g, '朵');
-        res = res.replace(/(?<=[每一有\d二兩三四五六七八九十])[遍騙變便偏](?=花瓣)?/g, '片');
+        res = res.replace(/[美眉沒妹梅]花/g, '梅花');
+        res = res.replace(/花[半伴辦棒扮瓣]/g, '花瓣');
+        res = res.replace(/[躲跺惰墮朵]/g, '朵');
+        res = res.replace(/[遍騙變便偏片]/g, '片');
       } else if (base === 6) {
-        res = res.replace(/蛋黃[書舒樹輸]/g, '蛋黃酥');
-        res = res.replace(/(?<=[每一有\d二兩三四五六七八九十])[何河合荷和核](?=蛋黃酥)?/g, '盒');
-        res = res.replace(/(?<=[每一有\d二兩三四五六七八九十])[各格歌]/g, '個');
+        res = res.replace(/蛋黃[書舒樹輸酥]/g, '蛋黃酥');
+        res = res.replace(/(?<=[每一有\d一二兩三四五六七八九十\s])[何河合荷和核盒]/g, '盒');
+        res = res.replace(/(?<=[每一有\d一二兩三四五六七八九十\s])[各格歌個]/g, '個');
       } else if (base === 7) {
-        res = res.replace(/[條嫖飄描表]蟲/g, '瓢蟲');
-        res = res.replace(/黑[店電墊殿]/g, '黑點');
-        res = res.replace(/(?<=[每一有\d二兩三四五六七八九十])[支之枝知直只織](?=瓢蟲)?/g, '隻');
-        res = res.replace(/(?<=[每一有\d二兩三四五六七八九十])[各格歌]/g, '個');
+        res = res.replace(/[條嫖飄描表瓢]蟲/g, '瓢蟲');
+        res = res.replace(/黑[店電墊殿點]/g, '黑點');
+        res = res.replace(/(?<=[每一有\d一二兩三四五六七八九十\s])[支之枝知直只織隻]/g, '隻');
+        res = res.replace(/(?<=[每一有\d一二兩三四五六七八九十\s])[各格歌個]/g, '個');
       } else if (base === 8) {
-        res = res.replace(/[張章][魚雨][少燒勺]/g, '章魚燒');
-        res = res.replace(/(?<=[每一有\d二兩三四五六七八九十])[何河合荷和核](?=章魚燒)?/g, '盒');
-        res = res.replace(/(?<=[每一有\d二兩三四五六七八九十])[科棵刻客渴克]/g, '顆');
+        res = res.replace(/[張章][魚雨][少燒勺燒]/g, '章魚燒');
+        res = res.replace(/(?<=[每一有\d一二兩三四五六七八九十\s])[何河合荷和核盒]/g, '盒');
+        res = res.replace(/(?<=[每一有\d一二兩三四五六七八九十\s])[科棵刻客渴克顆]/g, '顆');
       } else if (base === 9) {
-        res = res.replace(/[頻平坪屏][果東]/g, '蘋果');
-        res = res.replace(/(?<=[每一有\d二兩三四五六七八九十])[牌派湃牌子]/g, '排');
-        res = res.replace(/(?<=[每一有\d二兩三四五六七八九十])[各格歌]/g, '個');
+        res = res.replace(/[頻平坪屏蘋][果東]/g, '蘋果');
+        res = res.replace(/(?<=[每一有\d一二兩三四五六七八九十\s])[牌派湃拍排][子]?/g, '排');
+        res = res.replace(/(?<=[每一有\d一二兩三四五六七八九十\s])[各格歌個]/g, '個');
       }
-
-      // 4. 第二句量詞校正
-      res = res.replace(/(?<=[，,\s])[友右又](?=[1-9一二兩三四五六七八九十])/g, '有');
 
       return res;
     }
@@ -5151,18 +5160,19 @@
           const lbl = document.getElementById('speech-btn-label');
           if (icon) icon.innerText = '🛑';
           if (lbl) lbl.innerText = '再次點擊停止並辨識';
+
+          // 錄音開始時隱藏之前的反饋訊息，絕不顯示紅色文字或提示答案
+          const fb = document.getElementById('i2-step2-feedback');
+          if (fb) {
+            fb.classList.add('hidden');
+            fb.innerText = '';
+          }
+
           const st = document.getElementById('i2-speech-status');
           if (st) {
             st.classList.remove('hidden');
-            const q = island2CurrentQuestion;
-            if (island2CurrentQuestionHadError && q) {
-              st.innerText = '🎙️ 正在聆聽中，請照著灰色提示文字唸出來即可過關！';
-            } else if (q) {
-              const { h1, h2, h3 } = getIsland2StandardHints(q);
-              st.innerText = `🎙️ 正在聆聽中，請說出算式意義（例如：「${h1}，${h2}，${h3}」）`;
-            } else {
-              st.innerText = '🎙️ 正在聆聽中，說完後可再次點擊按鈕完成辨識...';
-            }
+            st.className = 'bpmf-font text-sm font-bold text-amber-700 text-center animate-pulse';
+            st.innerText = '🎙️ 正在聆聽中，請說出算式代表的意思...（說完請再次點擊按鈕）';
           }
         };
 
@@ -5184,6 +5194,7 @@
           const st = document.getElementById('i2-speech-status');
           if (st) {
             st.classList.remove('hidden');
+            st.className = 'bpmf-font text-sm font-bold text-amber-700 text-center';
             st.innerText = '語音未識別清楚，請再試一次或直接鍵盤填寫！';
           }
         };
@@ -5213,6 +5224,18 @@
           speechRecognitionInstance.stop();
         } catch(e){}
       } else {
+        // 錄音開始前清除隱藏錯誤文字提示，絕不顯示紅色文字或提示答案
+        const fb = document.getElementById('i2-step2-feedback');
+        if (fb) {
+          fb.classList.add('hidden');
+          fb.innerText = '';
+        }
+        const st = document.getElementById('i2-speech-status');
+        if (st) {
+          st.classList.remove('hidden');
+          st.className = 'bpmf-font text-sm font-bold text-amber-700 text-center animate-pulse';
+          st.innerText = '🎙️ 正在聆聽中，請說出算式代表的意思...（說完請再次點擊按鈕）';
+        }
         try {
           speechLastCapturedTranscript = '';
           speechRecognitionInstance.start();
@@ -5294,18 +5317,18 @@
       if (fb) {
         fb.classList.remove('hidden');
         fb.className = 'text-center text-base font-black text-rose-500 mt-2';
-        fb.innerText = '請看框框中的灰色文字提示，按下麥克風唸出來即可過關！🎙️';
+        fb.innerText = '再想一想喔！可以按下麥克風說出算式意義🎙️';
       }
     }
 
-    // 強健型語音辨識解析演算法
+    // 強健型題目情境智慧語音辨識解析演算法
     function parseSpeechToMeaningSlots(transcript) {
       let t = (transcript || '').trim();
       const q = island2CurrentQuestion;
       if (q) {
         t = correctSpeechTranscriptByContext(t, q);
       }
-      // 不顯示「語音辨識到...」提示文字
+      // 辨識完成後隱藏聆聽狀態
       const st = document.getElementById('i2-speech-status');
       if (st) {
         st.classList.add('hidden');
@@ -5315,20 +5338,24 @@
 
       const base = q ? q.base : 2;
       const count = q ? q.count : 1;
+      const total = q ? q.total : (base * count);
       const measureWordMap = { '2': '串', '3': '籃', '4': '株', '5': '朵', '6': '盒', '7': '隻', '8': '盒', '9': '排' };
-      const packUnit = measureWordMap[String(base)] || '份';
+      const packMeasureWord = measureWordMap[String(base)] || '份';
+      const u = (q && q.unitInfo) || {};
+      const itemUnit = (u.item_name || '個').replace(/[\s，,。.]/g, '');
+      const packUnit = (u.unit_name ? u.unit_name.replace(u.name, '').trim() : '') || packMeasureWord;
 
-      // 移除句號
+      // 移除末尾句號
       let raw = t.replace(/[。.]/g, '').trim();
 
       let s1 = '', s2 = '', s3 = '';
 
       // 策略 1: 標點符號或空格切分 (speech recognition 自動加入逗號或空格)
       const parts = raw.split(/[，,\s]+/).map(p => p.trim()).filter(Boolean);
-      if (parts.length === 3) {
+      if (parts.length >= 3) {
         s1 = parts[0];
         s2 = parts[1];
-        s3 = parts[2];
+        s3 = parts.slice(2).join('');
       } else {
         // 策略 2: 無標點連續語音解析
         // 先切出第三句 (合起來/總共/全部/共有/一共/總計/加起來)
@@ -5343,7 +5370,7 @@
         // 第二句通常以「有 + 數字 + 量詞」或「數字 + 量詞」為開頭
         const chDigits = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
         const chCount = count < 10 ? chDigits[count] : '十';
-        const countRegex = new RegExp(`(?:有)?(?:${count}|${chCount}|兩)(?:${packUnit}|個|份|株|籃|朵|隻|盒|排).*`);
+        const countRegex = new RegExp(`(?:有)?(?:${count}|${chCount}|兩)(?:${packMeasureWord}|${packUnit}|個|份|株|籃|朵|隻|盒|排).*`);
         const countMatch = remainder.match(countRegex);
 
         if (countMatch && countMatch.index > 0) {
@@ -5373,6 +5400,34 @@
       s1 = cleanSlot(s1);
       s2 = cleanSlot(s2);
       s3 = cleanSlot(s3);
+
+      // ========== 情境推導與結構完整化 (Context Semantic Reconstruction) ==========
+      if (q) {
+        const baseCh = toChineseNumber(base);
+        const hasBase = s1.includes(String(base)) || s1.includes(baseCh) || (base === 2 && s1.includes('兩'));
+        const hasPack = s1.includes(packMeasureWord) || s1.includes('每');
+        if (!s1 || (hasBase && !hasPack)) {
+          if (hasBase) s1 = `每一${packMeasureWord}有 ${base} ${itemUnit}`;
+        } else if (s1 && !hasBase && hasPack) {
+          s1 = s1 + `有 ${base} ${itemUnit}`;
+        }
+
+        const countCh = toChineseNumber(count);
+        const hasCount = s2.includes(String(count)) || s2.includes(countCh) || (count === 2 && s2.includes('兩'));
+        if (!s2 && hasCount) {
+          s2 = `有 ${count} ${packMeasureWord}`;
+        } else if (s2 && !s2.startsWith('有') && hasCount) {
+          s2 = '有 ' + s2;
+        }
+
+        const totalCh = toChineseNumber(total);
+        const hasTotal = s3.includes(String(total)) || s3.includes(totalCh) || (total === 2 && s3.includes('兩'));
+        if (!s3 && hasTotal) {
+          s3 = `合起來是 ${total} ${itemUnit}`;
+        } else if (s3 && !s3.includes('合起來') && !s3.includes('總共') && !s3.includes('全部') && !s3.includes('共有') && !s3.includes('一共')) {
+          s3 = '合起來是 ' + s3;
+        }
+      }
 
       if (s1 && s2 && s3) {
         // 三句皆成功解析填入
@@ -6533,7 +6588,7 @@
         playSound('correct');
         slot.classList.add('filled');
         fb.className = 'text-center font-bold text-sm sm:text-base mt-2 min-h-[1.5rem] text-emerald-600';
-        fb.innerText = `🎉 太棒了！${base} 的乘法每一行\u{E01E1}都多 ${base}！請利用這個󠇡規律挑戰接下來的 3 題！`;
+        fb.innerText = '答對了！';
         island3ChallengeStep = 2;
         const qSec = document.getElementById('i3-challenge-questions-section');
         if (qSec) qSec.classList.remove('opacity-40', 'pointer-events-none');
@@ -6884,9 +6939,10 @@
     // ==================== 第五座島嶼：乘法大會考 (抽背挑戰) ====================
     let island5Questions = [];
     let island5QIndex = 0;
-    let island5CorrectCount = 0;
+    let island5InTimeCorrectCount = 0;
+    let island5TotalCorrectCount = 0;
     let island5TimerInterval = null;
-    let island5TimeRemaining = 5.0;
+    let island5TimeRemaining = 10.0;
     let island5CanAnswer = false;
     let island5IsTimedOut = false;
 
@@ -6895,7 +6951,8 @@
       gameState.selectedIsland = 5;
       gameState.currentView = 'island5';
       island5QIndex = 0;
-      island5CorrectCount = 0;
+      island5InTimeCorrectCount = 0;
+      island5TotalCorrectCount = 0;
 
       const multipliers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].sort(() => Math.random() - 0.5).slice(0, 5);
       island5Questions = multipliers.map(k => ({
@@ -6969,7 +7026,7 @@
       const fb = document.getElementById('island5-feedback');
       fb.classList.add('hidden');
 
-      island5TimeRemaining = 5.0;
+      island5TimeRemaining = 10.0;
       island5CanAnswer = true;
       island5IsTimedOut = false;
       updateIsland5TimerUI(island5TimeRemaining);
@@ -6990,14 +7047,14 @@
     }
 
     function updateIsland5TimerUI(sec) {
-      const pct = (sec / 5.0) * 100;
+      const pct = (sec / 10.0) * 100;
       const bar = document.getElementById('island5-timer-bar');
       const lbl = document.getElementById('island5-timer-label');
       if (bar) {
         bar.style.width = `${pct}%`;
-        if (sec <= 1.5) {
+        if (sec <= 3.0) {
           bar.className = 'h-full bg-rose-500 rounded-full transition-all duration-75';
-        } else if (sec <= 3.0) {
+        } else if (sec <= 6.0) {
           bar.className = 'h-full bg-amber-500 rounded-full transition-all duration-75';
         } else {
           bar.className = 'h-full bg-emerald-500 rounded-full transition-all duration-75';
@@ -7028,9 +7085,9 @@
           slot.classList.add('filled');
           fb.className = 'text-center text-lg font-black text-emerald-600 mt-2';
           fb.innerText = '答對了！⚡';
-          // 系統機制：若在時間內答對才計入題數，超時填完就算答對也不計入答對題數（不額外跳文字提示學生）
+          island5TotalCorrectCount++;
           if (!island5IsTimedOut) {
-            island5CorrectCount++;
+            island5InTimeCorrectCount++;
           }
           setTimeout(() => nextIsland5Question(), 900);
         } else {
@@ -7078,14 +7135,24 @@
       const chName = CH_NUM_MAP[base];
 
       let stars = 0;
-      if (island5CorrectCount === 5) {
+      let customMsg = '';
+
+      if (island5InTimeCorrectCount === 5) {
         stars = 3;
-      } else if (island5CorrectCount >= 3) {
+        customMsg = `太棒了！5 題全部在時限內答對，獲得 3 顆星！🌟`;
+      } else if (island5TotalCorrectCount === 5) {
+        // 學生如果超出時間才回答，但是 5 題都有回答正確，獲得兩顆星
         stars = 2;
-      } else if (island5CorrectCount >= 1) {
+        customMsg = '很棒喔，都答對了，但是速度還可以再更快唷！';
+      } else if (island5InTimeCorrectCount >= 3) {
+        stars = 2;
+        customMsg = `本次測驗 5 題中在時限內答對 ${island5InTimeCorrectCount} 題，獲得 2 顆星！🌟`;
+      } else if (island5InTimeCorrectCount >= 1) {
         stars = 1;
+        customMsg = `本次測驗 5 題中在時限內答對 ${island5InTimeCorrectCount} 題，獲得 1 顆星！🌟`;
       } else {
         stars = 0;
+        customMsg = `再加油喔！多練習就能掌握乘法規律！💪`;
       }
 
       gameState.island5Progress[String(base)] = Math.max(gameState.island5Progress[String(base)] || 0, stars);
@@ -7105,7 +7172,7 @@
 
       title.innerText = `⚡ ${chName}的乘法大會考 結束！`;
       starsEarned.innerText = '★'.repeat(stars) + '☆'.repeat(3 - stars);
-      msg.innerHTML = `本次測驗 5 題中答對 ${island5CorrectCount} 題，獲得 ${stars} 顆星！🌟`;
+      msg.innerHTML = customMsg;
 
       modal.classList.remove('hidden');
     }
